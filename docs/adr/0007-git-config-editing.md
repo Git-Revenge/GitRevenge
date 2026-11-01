@@ -19,7 +19,7 @@ The Git Config editor (#195) edits global, local and included git config files. 
   - The last 20 backups per file are kept.
   - A restore backs up the current file first.
 - **System config is read-only**, because writing it usually needs admin rights. **Worktree config is deferred.**
-- **Global and included files get their own watch**, because the repo watchers don't cover them. A change sends an app-wide event, and open repos re-read their config-dependent state.
+- **Global and included files are polled**, because the repo watchers don't cover them. One stat per file every 2s costs almost nothing. Watching their folders isn't an option: the global config usually sits in the home folder, and a watch on that folder silences every repository inside it (#377). A change sends an app-wide event, and open repos re-read their config-dependent state.
 
 ## Consequences
 

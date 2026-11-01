@@ -223,28 +223,3 @@ func TestFileIDFoldsCaseWhereTheFileSystemDoes(t *testing.T) {
 		t.Error("FileID not normalized")
 	}
 }
-
-func TestWatcherReportsChanges(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "gitconfig")
-	write(t, path, "[a]\n")
-	got := make(chan string, 10)
-	w := NewWatcher(func(p string) { got <- p })
-	defer w.Close()
-	w.Add(path)
-
-	write(t, filepath.Join(filepath.Dir(path), "unrelated"), "x")
-	write(t, path, "[b]\n")
-	select {
-	case p := <-got:
-		if p != path {
-			t.Errorf("reported %s, want %s", p, path)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("no change reported")
-	}
-	select {
-	case p := <-got:
-		t.Errorf("extra report %s", p)
-	case <-time.After(400 * time.Millisecond):
-	}
-}
