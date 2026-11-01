@@ -138,5 +138,7 @@ const mounts: Record<string, () => Promise<void>> = {
   },
 }
 
-await mounts[new URLSearchParams(location.search).get('mount') ?? '']()
+const chosen = new Map(Object.entries(mounts)).get(new URLSearchParams(location.search).get('mount') ?? '')
+if (!chosen) throw new Error('Unknown component to mount.')
+await chosen()
 win.__ready = true

@@ -35,7 +35,7 @@ test.describe('commit graph', () => {
 
   // #340: reaching the top was ignored, leaving part of the first row cut off.
   test('scrolling back up reaches the first row', async ({ page }) => {
-    await open(page, 'graph', { graphRows: 500, responses: { Refs: [] } })
+    await open(page, 'graph', { graphRows: 500, responses: { Refs: [], CommitSignatures: [] } })
     const scroller = page.locator('.scroller')
     await expect(scroller).toHaveAttribute('aria-rowcount', '500')
     const box = (await scroller.boundingBox())!
@@ -50,7 +50,7 @@ test.describe('commit graph', () => {
 
   // #340: a selection before the first measure scrolled the graph one row down.
   test('opens at the top', async ({ page }) => {
-    await open(page, 'graph', { graphRows: 500, responses: { Refs: [] } })
+    await open(page, 'graph', { graphRows: 500, responses: { Refs: [], CommitSignatures: [] } })
     const scroller = page.locator('.scroller')
     await expect(scroller).toHaveAttribute('aria-rowcount', '500')
     await page.waitForTimeout(200)
