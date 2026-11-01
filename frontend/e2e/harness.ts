@@ -69,6 +69,8 @@ win.go = {
           (_, method: string) =>
           async (...args: unknown[]) => {
             win.__calls.push([method, ...args])
+            const delay = scenario.delays?.[method]
+            if (delay) await new Promise((resolve) => setTimeout(resolve, delay))
             const failure = scenario.failures?.[method]
             if (failure) throw new Error(failure)
             if (behaviours[method]) return (behaviours[method] as (...a: unknown[]) => unknown)(...args)
@@ -155,6 +157,12 @@ const mounts = {
     const ref = refs.find((r) => r.kind === 'local') as never
     mount(Dialog, { target: host, props: { spec: upstreamDialog('/r', ref, refs as never), onClose: record('close') } })
   },
+  async stackedDialogs() {
+    const { default: Dialog } = await import('../src/lib/Dialog.svelte')
+    const spec = (title: string) => ({ title, submit: 'OK', run: async () => {} })
+    mount(Dialog, { target: host, props: { spec: spec('Below'), onClose: record('close-below') } })
+    mount(Dialog, { target: host, props: { spec: spec('Above'), onClose: record('close-above') } })
+  },
 }
 
 switch (new URLSearchParams(location.search).get('mount')) {
@@ -184,6 +192,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'upstreamDialog':
     await mounts.upstreamDialog()
+    break
+  case 'stackedDialogs':
+    await mounts.stackedDialogs()
     break
   default:
     throw new Error('Unknown component to mount.')
