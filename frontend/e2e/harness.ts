@@ -157,6 +157,14 @@ const mounts = {
     const ref = refs.find((r) => r.kind === 'local') as never
     mount(Dialog, { target: host, props: { spec: upstreamDialog('/r', ref, refs as never), onClose: record('close') } })
   },
+  async repoView() {
+    const { default: RepoView } = await import('../src/lib/RepoView.svelte')
+    mount(RepoView, { target: host, props: { path: '/r' } })
+  },
+  async repoPanel() {
+    const { default: RepoPanel } = await import('../src/lib/RepoPanel.svelte')
+    mount(RepoPanel, { target: host, props: { path: '/r', filter: '', openDialog: () => {} } })
+  },
   async stackedDialogs() {
     const { default: Dialog } = await import('../src/lib/Dialog.svelte')
     const spec = (title: string) => ({ title, submit: 'OK', run: async () => {} })
@@ -192,6 +200,12 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'upstreamDialog':
     await mounts.upstreamDialog()
+    break
+  case 'repoView':
+    await mounts.repoView()
+    break
+  case 'repoPanel':
+    await mounts.repoPanel()
     break
   case 'stackedDialogs':
     await mounts.stackedDialogs()

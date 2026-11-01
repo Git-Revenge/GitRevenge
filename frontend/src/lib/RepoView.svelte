@@ -25,7 +25,8 @@
   let selected = $state<Row | undefined>()
   /** Which panel is on the right: uncommitted changes, or the selected commit. */
   let view = $state<'wip' | 'commit'>('commit')
-  let changes = $state(0)
+  /** Files with uncommitted changes; null until the first answer, so nothing claims "clean". */
+  let changes = $state<number | null>(null)
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
 
   let dialog = $state<DialogSpec | null>(null)
@@ -147,9 +148,9 @@
         if (diff?.mode === 'commit') diff = null
       }}
     >
-      <span class="dot" class:dirty={changes > 0}><Icon name={changes > 0 ? 'st-modified' : 'check'} /></span>
-      <span class="wip-title">{changes > 0 ? 'Uncommitted changes' : 'Working tree'}</span>
-      <span class="meta">{changes > 0 ? `${changes} ${changes === 1 ? 'file' : 'files'}` : 'clean'}</span>
+      <span class="dot" class:dirty={!!changes}>{#if changes !== null}<Icon name={changes > 0 ? 'st-modified' : 'check'} />{/if}</span>
+      <span class="wip-title">{changes ? 'Uncommitted changes' : 'Working tree'}</span>
+      {#if changes !== null}<span class="meta">{changes > 0 ? `${changes} ${changes === 1 ? 'file' : 'files'}` : 'clean'}</span>{/if}
     </button>
     <!-- The graph stays mounted while a diff is open, so scroll position and selection
          survive returning to it. -->
@@ -285,6 +286,9 @@
 
   .dot {
     display: inline-flex;
+    /* The icon's size, kept while there's no icon yet so the title doesn't shift. */
+    min-width: 16px;
+    min-height: 16px;
     color: var(--ink-faint);
   }
 

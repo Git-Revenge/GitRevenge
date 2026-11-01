@@ -33,12 +33,15 @@
   let lfs = $state<app.LFSInfo | null>(null)
   let busy = $state(false)
   let lfsOpen = $state(false)
+  /** False until the first answer, so the count doesn't claim 0 worktrees. */
+  let loaded = $state(false)
 
   async function load() {
     const [t, s, l] = await Promise.all([session.run(() => Worktrees(path)), session.run(() => Submodules(path)), session.run(() => LFS(path))])
     trees = t ?? []
     subs = s ?? []
     lfs = l ?? null
+    loaded = true
   }
 
   $effect(() => {
@@ -98,7 +101,7 @@
 {#if shownTrees.length || !filtering}
   <section>
     <div class="head">
-      <h3 class="meta">Worktrees <span class="count">{shownTrees.length.toLocaleString()}</span></h3>
+      <h3 class="meta">Worktrees {#if loaded}<span class="count">{shownTrees.length.toLocaleString()}</span>{/if}</h3>
       <button class="btn sm quiet icon" onclick={onManageWorktrees} title="Add or remove worktrees" aria-label="Manage worktrees"><Icon name="plus" size={14} /></button>
     </div>
     <ul>

@@ -316,6 +316,56 @@ test.describe('upstream dialog', () => {
   })
 })
 
+// #374: an empty starting value read as a fact until the first answer came back.
+test.describe('before the first load has answered', () => {
+  const repoView = (files: unknown[]) => ({ graphRows: 0, delays: { WorkingTree: 500 }, responses: { Refs: [], CommitSignatures: [], WorkingTree: { status: { files } } } })
+  const bar = (page: Page) => page.locator('button.wip')
+
+  test('the working tree bar claims nothing, then says it is clean', async ({ page }) => {
+    await open(page, 'repoView', repoView([]))
+    const titleLeft = async () => (await bar(page).locator('.wip-title').boundingBox())!.x
+    await expect(bar(page)).toContainText('Working tree')
+    await expect(bar(page)).not.toContainText(/clean/i)
+    const before = await titleLeft()
+    await expect(bar(page)).toContainText(/clean/i)
+    expect(await titleLeft()).toBe(before)
+  })
+
+  test('a conflicted tree never shows as clean', async ({ page }) => {
+    await open(page, 'repoView', repoView([{ path: 'a.txt', index: 'U', workTree: 'U', conflicted: true }]))
+    // Every state it passes through, since a retrying assertion would wait out a wrong one.
+    const seen = await bar(page).evaluate(
+      (el) =>
+        new Promise<string[]>((resolve) => {
+          const texts = [el.textContent ?? '']
+          const observer = new MutationObserver(() => {
+            texts.push(el.textContent ?? '')
+            if (/1 file/i.test(el.textContent ?? '')) {
+              observer.disconnect()
+              resolve(texts)
+            }
+          })
+          observer.observe(el, { subtree: true, childList: true, characterData: true })
+        }),
+    )
+    expect(seen.join(' / ')).not.toMatch(/clean/i)
+  })
+
+  const tree = (path: string, main: boolean) => ({ path, head: 'abc', branch: 'b', main, current: main, locked: false, prunable: false })
+  const heading = (page: Page) => page.getByRole('heading', { name: /Worktrees/ })
+
+  test('the Repository panel shows no worktree count until it knows', async ({ page }) => {
+    await open(page, 'repoPanel', { delays: { Worktrees: 500 }, responses: { Worktrees: [tree('/r', true), tree('/r-wt', false)], Submodules: [] } })
+    await expect(heading(page)).toHaveText('Worktrees')
+    await expect(heading(page)).toHaveText('Worktrees 2')
+  })
+
+  test('a repository with no worktrees listed still reads 0 once loaded', async ({ page }) => {
+    await open(page, 'repoPanel', { responses: { Worktrees: [], Submodules: [] } })
+    await expect(heading(page)).toHaveText('Worktrees 0')
+  })
+})
+
 test.describe('views loaded on demand', () => {
   test('shows the view once its code loads', async ({ page }) => {
     await open(page, 'lazy')
