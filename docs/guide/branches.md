@@ -2,7 +2,7 @@
 
 ## Branches and tags
 
-- **New branch** (<kbd>Ctrl</kbd>+<kbd>B</kbd>, or the **+** next to Branches in the sidebar) creates a branch from HEAD and can check it out.
+- **New branch** (<kbd>Ctrl</kbd>+<kbd>B</kbd>, or the **+** at the top of the Branches panel in the sidebar) creates a branch from HEAD and can check it out.
 - Right-click any commit for **Create branch here…** or **Create tag here…**. Give a tag a message to make it an annotated tag.
 - Double-click a branch in the sidebar to check it out. Checking out a remote branch offers to create a local branch that tracks it.
 - Right-click a branch to rename it, delete it, set its upstream, push it, or delete it from the remote. Deleting a branch with unmerged commits asks you to confirm first.

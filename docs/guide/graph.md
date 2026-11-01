@@ -31,7 +31,11 @@ Press <kbd>Ctrl</kbd>+<kbd>F</kbd> to search. You can search by commit message, 
 
 ## Branches and tags
 
-The sidebar lists local branches, remotes, tags and stashes. Type in **Filter branches and tags** to narrow the list. Click a branch or tag to jump to its commit.
+The sidebar has an icon rail and one panel at a time: **Branches**, **Remotes**, **Tags**, **Stashes** and **Repository**. Click an icon to switch panels, or click the active one to hide the panel and give the graph the width. Drag the panel's right edge to resize it, and double-click the edge to reset it. Git Revenge remembers all of this for each repository.
+
+Names with a `/` form folders, so `release/v0.8` and `release/v0.7` sit in a `release` folder. **Name** or **Recent**, at the top of the panel, sorts by name or by most recently updated. The checked-out branch always comes first.
+
+Type in **Filter all panels** to narrow the lists. The filter stays on as you switch panels, and the rail shows how many matches each panel has. **Needs care**, in the Branches panel, shows branches whose upstream is gone or whose stack parent was merged. Click a branch or tag to jump to its commit.
 
 Local branches are grouped by [kind](branch-care.md#branch-kinds): Trunk at the top, then ordinary branches, releases, environments, docs and bots. Branches built on other branches sit under them as a [stack](branch-care.md#stacked-branches). A branch's chip in the graph carries its kind's colour and icon.
 

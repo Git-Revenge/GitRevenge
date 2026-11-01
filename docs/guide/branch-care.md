@@ -11,10 +11,10 @@ Some branches aren't like the others. Git Revenge knows five **kinds**, and trea
 | Kind | Default patterns | What changes |
 |---|---|---|
 | **Trunk** | `main`, `master`, `develop`, `trunk` | Pinned to the left of the graph as a straight spine. Its chip is bold. |
-| **Release** | `release/*`, `releases/*`, `hotfix/*` | Its own sidebar section, newest version first. Can bound an Insights releases window. |
+| **Release** | `release/*`, `releases/*`, `hotfix/*` | Marks its folder in the sidebar, newest version first. Can bound an Insights releases window. |
 | **Environment** | none | For deploy branches such as `staging` or `production`. Its own sidebar section. |
 | **Docs** | `gh-pages`, `gh-docs`, `docs-site` | Drawn muted in the graph, with a toggle to hide it. Left out of Insights. |
-| **Bot** | `dependabot/*`, `renovate/*` | A collapsed sidebar section, with a toggle to hide it. Grouped as dependency updates in Insights. |
+| **Bot** | `dependabot/*`, `renovate/*` | Marks its folder in the sidebar, which starts closed, with a toggle to hide it. Grouped as dependency updates in Insights. |
 
 A pattern matches the branch name without its remote, so `release/*` covers `release/1.4` and `origin/release/1.4` alike. A `*` matches anything, slashes included, so `dependabot/*` catches `dependabot/npm_and_yarn/vite-7.1`. The first kind that matches wins, in the order of the table.
 
@@ -28,7 +28,7 @@ A pattern matches the branch name without its remote, so `release/*` covers `rel
 - **Graph chips** take the kind's colour and icon: Trunk in rose and bold, Release in plum, Environment in ochre, Docs as a teal outline, Bot in faint, smaller text.
 - **The timeline** shows the kind's icon in a commit's circle, instead of the author's initials, for commits on Release, Environment, Docs and Bot lines.
 - **Docs lines** are drawn faded, with their commit messages muted, since a published site isn't code.
-- **The sidebar** splits your local branches into **Trunk** (at the top), **Branches**, **Releases**, **Environments**, **Docs** and **Bots** (collapsed). A section only appears when it has branches. Remote branches stay together under **Remotes**, each marked with its kind's icon.
+- **The sidebar** keeps your local branches in one tree in the **Branches** panel, with the checked-out branch first and Trunk next. A kind's icon marks a folder when every branch in it shares that kind, and otherwise marks each branch. Remote branches do the same in the **Remotes** panel.
 
 The design behind kinds is [ADR 0009](../adr/0009-branch-kinds.md).
 
