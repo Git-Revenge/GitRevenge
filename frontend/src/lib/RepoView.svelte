@@ -286,6 +286,9 @@
 
   .dot {
     display: inline-flex;
+    /* The icon's size, kept while there's no icon yet so the title doesn't shift. */
+    min-width: 16px;
+    min-height: 16px;
     color: var(--ink-faint);
   }
 

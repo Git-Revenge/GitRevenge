@@ -283,9 +283,12 @@ test.describe('before the first load has answered', () => {
 
   test('the working tree bar claims nothing, then says it is clean', async ({ page }) => {
     await open(page, 'repoView', repoView([]))
+    const titleLeft = async () => (await bar(page).locator('.wip-title').boundingBox())!.x
     await expect(bar(page)).toContainText('Working tree')
     await expect(bar(page)).not.toContainText(/clean/i)
+    const before = await titleLeft()
     await expect(bar(page)).toContainText(/clean/i)
+    expect(await titleLeft()).toBe(before)
   })
 
   test('a conflicted tree never shows as clean', async ({ page }) => {
