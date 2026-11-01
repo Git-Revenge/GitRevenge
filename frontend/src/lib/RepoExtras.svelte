@@ -7,13 +7,23 @@
   import { errorText } from './errors'
   import { session } from './session.svelte'
 
-  let { path, openDialog }: { path: string; openDialog: (spec: DialogSpec) => void } = $props()
+  let {
+    path,
+    openDialog,
+    onStatus,
+  }: {
+    path: string
+    openDialog: (spec: DialogSpec) => void
+    /** Reports how many submodules need updating, for the rail's badge, and whether there's
+     * anything to show: false when there are no submodules and LFS isn't available. */
+    onStatus?: (status: { attention: number; hasContent: boolean }) => void
+  } = $props()
 
   let subs = $state<git.Submodule[]>([])
   let lfs = $state<app.LFSInfo | null>(null)
   /** Locks from the server, by file path; null until checked (it needs the network). */
   let locks = $state<Record<string, git.LFSLock> | null>(null)
-  let open = $state<Record<string, boolean>>({ subs: true, lfs: false, files: false })
+  let open = $state<Record<string, boolean>>({ subs: true, lfs: true, files: false })
   let busy = $state(false)
 
   const stateLabel: Record<string, string> = {
@@ -27,6 +37,7 @@
     const [s, l] = await Promise.all([session.run(() => Submodules(path)), session.run(() => LFS(path))])
     subs = s ?? []
     lfs = l ?? null
+    onStatus?.({ attention: subs.filter((x) => x.state !== 'ok').length, hasContent: subs.length > 0 || !!lfs?.available })
   }
 
   $effect(() => {

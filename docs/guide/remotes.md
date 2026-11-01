@@ -22,11 +22,11 @@ The first time you connect to an SSH host your machine doesn't know yet, the app
 
 ## Managing remotes
 
-**Manage remotes…** (in the command palette, or the gear next to Remotes in the sidebar) adds, edits and removes remotes.
+**Manage remotes…** (in the command palette, or the gear at the top of the Remotes panel in the sidebar) adds, edits and removes remotes.
 
 ## LFS
 
-With [git-lfs](https://git-lfs.com) installed, the **Files** section of the sidebar shows LFS details for the repository:
+With [git-lfs](https://git-lfs.com) installed, the **Repository** panel of the sidebar shows LFS details for the repository:
 
 - the patterns tracked with LFS, and a way to **track** a new one;
 - which files are in LFS, and which are only pointers whose content hasn't been downloaded;

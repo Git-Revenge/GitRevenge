@@ -6,7 +6,7 @@ Open a repository and this is what you get. Everything in the screenshots comes 
 ![The Git Revenge window, with numbered markers on each part](../img/repository-annotated-dark.webp#gh-dark-mode-only)
 
 1. **Tabs.** One per open repository, each showing the branch it's on. The flag at the far left goes back to the start page.
-2. **Sidebar.** Branches, remotes, tags and stashes, then LFS and submodules. The arrow next to `main` says it's one commit behind `origin/main`. Type in the box at the top to filter the lists. Right-click anything for what you can do with it.
+2. **Sidebar.** An icon rail switches between branches, remotes, tags, stashes and the repository's LFS and submodules. The arrow next to `main` says it's one commit behind `origin/main`. Type in the box at the top to filter the lists. Right-click anything for what you can do with it.
 3. **Toolbar.** Undo and redo, then fetch, pull and push. The arrows next to Pull and Push hold the less common variants.
 4. **Working tree.** Says whether you have uncommitted changes. Click it to see them on the right.
 5. **The commit graph.** Every commit, newest first, with branch and tag labels and the lines between them. Click a commit to see it on the right. Right-click for everything else: branch, merge, rebase, cherry-pick, revert, reset. [More about the graph](graph.md).
