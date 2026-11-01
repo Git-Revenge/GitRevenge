@@ -1249,6 +1249,7 @@ export namespace git {
 	    stackSize?: number;
 	    stackParentMerged?: boolean;
 	    subject?: string;
+	    updated?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Ref(source);
@@ -1272,6 +1273,7 @@ export namespace git {
 	        this.stackSize = source["stackSize"];
 	        this.stackParentMerged = source["stackParentMerged"];
 	        this.subject = source["subject"];
+	        this.updated = source["updated"];
 	    }
 	}
 	export class ReflogEntry {

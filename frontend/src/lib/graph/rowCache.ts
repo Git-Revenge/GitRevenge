@@ -46,6 +46,8 @@ export interface Ref {
   /** The parent was merged and deleted upstream: this branch needs restacking. */
   stackParentMerged?: boolean
   subject?: string
+  /** When the ref last changed, in Unix seconds; missing for stashes. */
+  updated?: number
 }
 
 export interface Page {

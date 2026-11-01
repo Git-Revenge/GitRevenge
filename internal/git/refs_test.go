@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"strconv"
 	"testing"
 
 	"github.com/risadams/gitrevenge/internal/gittest"
@@ -39,6 +40,30 @@ func TestRefsKindsAndHead(t *testing.T) {
 	}
 	if refs["refs/tags/light"].Commit != fx.Head() {
 		t.Fatal("lightweight tag commit wrong")
+	}
+}
+
+func TestRefsUpdated(t *testing.T) {
+	fx := gittest.WithMergeHistory(t)
+	fx.Git("tag", "light")
+	refs := refsByName(t, fx)
+
+	committed, err := strconv.ParseInt(fx.Git("log", "-1", "--format=%ct", "main"), 10, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := refs["refs/heads/main"].Updated; got != committed {
+		t.Fatalf("branch updated = %d, want its commit date %d", got, committed)
+	}
+	if got := refs["refs/tags/light"].Updated; got != committed {
+		t.Fatalf("lightweight tag updated = %d, want its commit date %d", got, committed)
+	}
+	tagged, err := strconv.ParseInt(fx.Git("for-each-ref", "--format=%(taggerdate:unix)", "refs/tags/v0.1.0"), 10, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := refs["refs/tags/v0.1.0"].Updated; got != tagged {
+		t.Fatalf("annotated tag updated = %d, want its tag date %d", got, tagged)
 	}
 }
 
