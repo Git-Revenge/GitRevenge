@@ -29,6 +29,28 @@ function backend(total: number, available = total) {
 
 const flush = () => new Promise((r) => setTimeout(r, 0))
 
+describe('a failed fetch', () => {
+  it('reports the error without repainting, and clears it once a fetch works', async () => {
+    let fail = true
+    const fetch = vi.fn(async (start: number, count: number): Promise<Page> => {
+      if (fail) throw new Error('no such repository')
+      return { rows: rows(start, count), refs: {}, total: 1000, loading: false, paused: false, estimate: 0 }
+    })
+    const onUpdate = vi.fn()
+    const onError = vi.fn()
+    const cache = new RowCache(fetch, onUpdate, onError)
+    cache.ensure(0, 10)
+    await vi.waitFor(() => expect(onError).toHaveBeenCalledTimes(1))
+    expect(String(onError.mock.calls[0][0])).toContain('no such repository')
+    // A repaint would call ensure() again, and retry at the frame rate.
+    expect(onUpdate).not.toHaveBeenCalled()
+    fail = false
+    cache.ensure(0, 10)
+    await vi.waitFor(() => expect(onUpdate).toHaveBeenCalled())
+    expect(onError).toHaveBeenLastCalledWith(null)
+  })
+})
+
 describe('RowCache', () => {
   it('fetches whole chunks once', async () => {
     const be = backend(1000)

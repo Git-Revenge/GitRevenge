@@ -13,6 +13,7 @@
       .then((u) => {
         if (s === src) url = u
       })
+      // The placeholder below shows the image's name instead.
       .catch(() => {})
   })
 </script>

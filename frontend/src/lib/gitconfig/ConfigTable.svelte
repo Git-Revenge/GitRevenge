@@ -50,6 +50,7 @@
   $effect(() => {
     GitConfigKeys()
       .then((k) => (known = k ?? []))
+      // Only used for suggestions.
       .catch(() => {})
   })
 
