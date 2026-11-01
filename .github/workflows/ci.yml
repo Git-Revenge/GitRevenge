@@ -30,6 +30,8 @@ jobs:
       - run: npm run check
       - run: npm run lint
       - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
 
   go:
     name: Go (${{ matrix.os }})
