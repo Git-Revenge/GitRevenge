@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Ref } from './graph/rowCache'
-import { buildPanels, careCount, needsCare, panelMatches, panelRows, type RowOptions, type TreeRow } from './sidebarTree'
+import { buildPanels, careCount, matchParts, needsCare, panelMatches, panelRows, refStatus, refTooltip, stackPlace, type RowOptions, type TreeRow } from './sidebarTree'
 
 const ref = (short: string, extra: Partial<Ref> = {}): Ref => ({
   name: short,
@@ -412,5 +412,75 @@ describe('large repositories', () => {
   it('survives a very long stack', () => {
     const refs = Array.from({ length: 2000 }, (_, i) => ref(`s${i}`, { stackParent: i ? `s${i - 1}` : '' }))
     expect(branches(refs).filter((r) => r.type === 'ref')).toHaveLength(2000)
+  })
+})
+
+describe('refStatus', () => {
+  it('shows nothing for a branch in step with its upstream', () => {
+    expect(refStatus(ref('main'))).toBeUndefined()
+  })
+
+  it('shows ahead and behind, with words for screen readers', () => {
+    expect(refStatus(ref('a', { ahead: 1 }))).toEqual({ text: '↑1', spoken: '1 ahead', tone: 'link' })
+    expect(refStatus(ref('a', { behind: 2 }))).toEqual({ text: '↓2', spoken: '2 behind', tone: 'link' })
+    expect(refStatus(ref('a', { ahead: 1, behind: 2 }))).toEqual({ text: '↑1↓2', spoken: '1 ahead, 2 behind', tone: 'link' })
+  })
+
+  it('puts gone above ahead and behind', () => {
+    expect(refStatus(ref('a', { gone: true, ahead: 3 }))?.text).toBe('gone')
+  })
+
+  it('puts parent merged above everything', () => {
+    expect(refStatus(ref('a', { stackParentMerged: true, gone: true, ahead: 3 }))).toEqual({ text: 'parent merged', spoken: 'parent merged', tone: 'warning' })
+  })
+
+  it('shows no chip for a hidden branch or a stack position', () => {
+    expect(refStatus(ref('a', { hidden: true, stackDepth: 2, stackSize: 3, stackParent: 'b' }))).toBeUndefined()
+  })
+})
+
+describe('refTooltip', () => {
+  it('starts with the full name', () => {
+    expect(refTooltip(ref('feature/x'))).toBe('feature/x')
+  })
+
+  it('uses the subject for a stash', () => {
+    expect(refTooltip(ref('stash@{0}', { kind: 'stash', subject: 'icon sketches' }))).toBe('icon sketches')
+  })
+
+  it('lists everything the row’s single status leaves out', () => {
+    const r = ref('feature/x', { head: true, stackParent: 'base', stackDepth: 2, stackSize: 3, stackParentMerged: true, gone: true, hidden: true })
+    expect(refTooltip(r).split('\n')).toEqual([
+      'feature/x',
+      'Checked out',
+      'base was merged. Right-click, Restack, to move this branch onto the Trunk.',
+      'Stacked on base (2 of 3)',
+      'Upstream branch was deleted',
+      'Hidden: shown for now',
+    ])
+  })
+
+  it('names the upstream for ahead and behind', () => {
+    expect(refTooltip(ref('a', { ahead: 1, behind: 2, upstream: 'origin/a' })).split('\n')[1]).toBe('1 ahead, 2 behind origin/a')
+  })
+})
+
+describe('stackPlace', () => {
+  it('says where a branch sits in its stack', () => {
+    expect(stackPlace(ref('a', { stackParent: 'b', stackDepth: 2, stackSize: 3 }))).toBe('Stacked on b (2 of 3)')
+    expect(stackPlace(ref('a', { stackDepth: 1, stackSize: 3 }))).toBe('The bottom of a stack (1 of 3)')
+    expect(stackPlace(ref('a'))).toBe('')
+  })
+})
+
+describe('matchParts', () => {
+  it('splits around the match, keeping the label’s case', () => {
+    expect(matchParts('Fix-Menu', 'menu')).toEqual({ pre: 'Fix-', hit: 'Menu', post: '' })
+    expect(matchParts('v0.8.1', ' 0.8 ')).toEqual({ pre: 'v', hit: '0.8', post: '.1' })
+  })
+
+  it('leaves the label whole with no query or no match in it', () => {
+    expect(matchParts('v0.8', '')).toEqual({ pre: 'v0.8', hit: '', post: '' })
+    expect(matchParts('v0.8', 'release/')).toEqual({ pre: 'v0.8', hit: '', post: '' })
   })
 })

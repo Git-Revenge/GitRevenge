@@ -10,12 +10,12 @@
   import Icon from './ui/Icon.svelte'
   import type { IconName } from './ui/Icon.svelte'
   import { kindInfo } from './branchKinds'
-  import { stackLabel } from './stacks'
   import { clampWidth, DEFAULT_WIDTH, loadSidebar, otherPanelWithMatches, ROW_HEIGHT, saveSidebar, visibleRange, type SidebarPanel } from './sidebarState'
-  import { buildPanels, careCount, panelMatches, panelRows, type FolderRow, type TreeRow } from './sidebarTree'
+  import { buildPanels, careCount, matchParts, panelMatches, panelRows, refStatus, refTooltip, stackPlace, type FolderRow, type TreeRow } from './sidebarTree'
 
   let {
     path,
+    selectedCommit,
     onPick,
     onActivate,
     onNewBranch,
@@ -24,6 +24,8 @@
     openDialog,
   }: {
     path: string
+    /** The commit selected in the graph; refs pointing at it show as selected. */
+    selectedCommit?: string
     onPick: (ref: Ref) => void
     /** Double-click: check the ref out. */
     onActivate?: (ref: Ref) => void
@@ -232,10 +234,10 @@
       {/if}
     </header>
 
-    <div class="scroll" bind:this={list} bind:clientHeight={viewHeight} onscroll={(e) => (scrollTop = e.currentTarget.scrollTop)} hidden={ui.panel === 'repo'}>
+    <div class="scroll" class:narrowed={filtering || careOn} bind:this={list} bind:clientHeight={viewHeight} onscroll={(e) => (scrollTop = e.currentTarget.scrollTop)} hidden={ui.panel === 'repo'}>
       <ul style:height="{rows.length * ROW_HEIGHT}px" style:padding-top="{range.start * ROW_HEIGHT}px">
         {#each rows.slice(range.start, range.end) as row (rowKey(row))}
-          <li>
+          <li class:group={row.startsGroup}>
             {#if row.type === 'folder'}
               {@const k = kindInfo(row.kind)}
               <button class="row folder" style:--depth={row.depth} aria-expanded={row.open} title="{row.label}/" onclick={() => toggleFolder(row)}>
@@ -252,9 +254,14 @@
             {:else}
               {@const r = row.ref}
               {@const k = kindInfo(row.mark)}
+              {@const status = refStatus(r)}
+              {@const parts = matchParts(row.label, filter)}
+              {@const isSelected = !!selectedCommit && r.commit === selectedCommit}
               <button
                 class="row ref"
                 class:head={r.head}
+                class:selected={isSelected}
+                aria-current={isSelected || undefined}
                 class:hidden-ref={r.hidden}
                 class:stacked={row.stacked}
                 class:context={row.context}
@@ -266,27 +273,27 @@
                   e.preventDefault()
                   onContext(r, e.clientX, e.clientY)
                 }}
-                title={r.subject ?? r.name}
+                title={refTooltip(r)}
               >
                 {#if r.head}<span class="here" aria-label="checked out"></span>{/if}
                 {#if k}<span class="kind-icon" style:color="var({k.token})" title={k.label}><Icon name={k.icon} size={13} /><span class="visually-hidden">{k.label}</span></span>{/if}
-                <span class="name">{row.label}</span>
-                {#if r.stackParentMerged}
-                  <span class="track merged-parent" title="{r.stackParent} was merged. Right-click, Restack, to move this branch onto the Trunk.">parent merged</span>
-                {:else if stackLabel(r)}
-                  <span class="track stack" title={r.stackParent ? `Stacked on ${r.stackParent}` : 'The bottom of a stack'}
-                    ><Icon name="stack" size={12} /><span>{stackLabel(r)}</span><span class="visually-hidden">{r.stackParent ? `, stacked on ${r.stackParent}` : ', the bottom of a stack'}</span></span
-                  >
-                {/if}
-                {#if r.hidden}<span class="track" title="Hidden: shown for now">hidden</span>{/if}
-                {#if r.gone}
-                  <span class="track" title="Upstream branch was deleted">gone</span>
-                {:else if r.ahead || r.behind}
-                  <span class="track" title="Ahead / behind {r.upstream}">
-                    {#if r.ahead}↑{r.ahead}{/if}{#if r.behind}↓{r.behind}{/if}
-                  </span>
-                {/if}
+                <span class="name">{parts.pre}{#if parts.hit}<mark>{parts.hit}</mark>{/if}{parts.post}</span>
+                {#if r.hidden}<span class="visually-hidden">, hidden</span>{/if}
+                {#if stackPlace(r)}<span class="visually-hidden">, {stackPlace(r)}</span>{/if}
+                {#if status}<span class="track {status.tone}"><span aria-hidden="true">{status.text}</span><span class="visually-hidden">, {status.spoken}</span></span>{/if}
               </button>
+              {#if onContext}
+                <button
+                  class="more"
+                  aria-label="More for {r.kind === 'stash' ? r.subject || r.short : r.short}"
+                  aria-haspopup="menu"
+                  title="More"
+                  onclick={(e) => {
+                    const box = e.currentTarget.getBoundingClientRect()
+                    onContext(r, box.left, box.bottom)
+                  }}><Icon name="more" size={14} /></button
+                >
+              {/if}
             {/if}
           </li>
         {/each}
@@ -405,7 +412,7 @@
     background: var(--paper-deep);
     color: var(--ink-soft);
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 12px;
     line-height: 15px;
     text-align: center;
   }
@@ -430,7 +437,7 @@
     flex-direction: column;
     gap: 8px;
     padding: 10px 8px 8px;
-    border-bottom: 1px solid var(--paper-edge);
+    border-bottom: 1px dotted var(--paper-edge);
   }
 
   .heading {
@@ -544,6 +551,11 @@
     color: var(--ink);
   }
 
+  /* 12px is the design system's floor, which the app's shared 11px meta style is under. */
+  .panel :global(.meta) {
+    font-size: 12px;
+  }
+
   .scroll {
     flex: 1;
     min-height: 0;
@@ -560,6 +572,22 @@
     list-style: none;
     margin: 0;
     padding: 0;
+  }
+
+  li {
+    position: relative;
+  }
+
+  /* Drawn over the row, not above it: every row stays one height for virtual scrolling. */
+  li.group::before {
+    content: '';
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    left: 8px;
+    right: 8px;
+    border-top: 1px dotted var(--paper-edge);
+    pointer-events: none;
   }
 
   .row {
@@ -588,9 +616,26 @@
     padding: 2px 10px 2px calc(10px + var(--depth, 0) * 14px);
   }
 
+  /* Only the checked-out branch is at full strength; hover, focus and selection bring the
+     others up to it. */
   .ref {
     gap: 7px;
     padding: 2px 10px 2px calc(28px + var(--depth, 0) * 14px);
+    color: var(--ink-mute);
+  }
+
+  .ref:focus-visible,
+  li:hover .ref {
+    color: var(--ink);
+  }
+
+  li:hover .row {
+    background: var(--wash-hover);
+  }
+
+  .ref.selected {
+    background: var(--selected);
+    color: var(--ink);
   }
 
   .ref.head {
@@ -598,8 +643,48 @@
     font-weight: 600;
   }
 
-  .ref.context {
-    color: var(--ink-mute);
+  /* While narrowed, what matched stands out from the parents kept only for context. */
+  .narrowed .ref:not(.context, .head, .selected) {
+    color: var(--ink-soft);
+  }
+
+  mark {
+    background: var(--highlight);
+    color: inherit;
+  }
+
+  .more {
+    position: absolute;
+    z-index: 2;
+    top: 2px;
+    right: 4px;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    background: var(--paper-warm);
+    border: none;
+    border-radius: 7px;
+    color: var(--ink-soft);
+    opacity: 0;
+    transition: opacity var(--dur-quick);
+  }
+
+  .more:hover:not(:disabled) {
+    background: var(--paper-deep);
+    color: var(--ink);
+  }
+
+  li:hover .more,
+  li:focus-within .more {
+    opacity: 1;
+  }
+
+  /* More replaces the status; it stays readable to screen readers. */
+  li:hover .track,
+  li:focus-within .track {
+    opacity: 0;
   }
 
   .here,
@@ -668,18 +753,15 @@
     color: var(--link);
   }
 
-  .track.merged-parent {
+  .track.warning {
     color: var(--warning);
   }
 
-  .track.stack {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
+  .track.muted {
+    color: var(--ink-mute);
   }
 
   .hidden-ref .name {
-    color: var(--ink-mute);
     font-style: italic;
   }
 
@@ -717,6 +799,7 @@
   @media (prefers-reduced-motion: reduce) {
     .tab,
     .caret,
+    .more,
     .edge {
       transition: none;
     }
