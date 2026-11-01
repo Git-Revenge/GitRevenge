@@ -113,6 +113,34 @@ test.describe('start page', () => {
     expect(await calls(page, 'OpenRepo')).toEqual([])
   })
 
+  // #358: positions read at the start of a drag went stale when the page scrolled.
+  test('scrolling during a drag keeps the drop in the right place', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 520 })
+    await open(page, 'start', scenario())
+    const first = card(page, 'Work').locator('[data-repo]').first()
+    await first.scrollIntoViewIfNeeded()
+    await first.hover()
+    const from = middle((await first.locator('.repo-grip').boundingBox())!)
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    const before = await page.evaluate(() => {
+      const scroller = [...document.querySelectorAll('*')].find((e) => e.scrollHeight > e.clientHeight + 40 && getComputedStyle(e).overflowY !== 'visible')
+      return (scroller ?? document.scrollingElement)!.scrollTop
+    })
+    await page.mouse.wheel(0, 60)
+    await page.waitForTimeout(150)
+    const moved = await page.evaluate(() => {
+      const scroller = [...document.querySelectorAll('*')].find((e) => e.scrollHeight > e.clientHeight + 40 && getComputedStyle(e).overflowY !== 'visible')
+      return (scroller ?? document.scrollingElement)!.scrollTop
+    })
+    expect(moved).toBeGreaterThan(before)
+    // Where the third row is now, not where it was when the drag began.
+    const target = (await card(page, 'Work').locator('[data-repo]').nth(2).boundingBox())!
+    await page.mouse.move(from.x, target.y + target.height - 2)
+    await page.mouse.up()
+    await expect.poll(() => repos(page, 'Work')).toEqual(['web', 'docs', 'api', 'ops'])
+  })
+
   test('dropping a repository on another group changes nothing', async ({ page }) => {
     await open(page, 'start', scenario())
     const first = card(page, 'Work').locator('[data-repo]').first()
