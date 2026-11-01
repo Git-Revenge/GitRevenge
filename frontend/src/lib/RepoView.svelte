@@ -11,10 +11,8 @@
   import { commitMenuItems, branchAtDialog, checkoutRef, dropItems, newBranchDialog, refItems, type MenuContext } from './menus'
   import ReflogDialog from './ReflogDialog.svelte'
   import CommitPanel from './CommitPanel.svelte'
-  import BlameView from './diff/BlameView.svelte'
-  import ConflictView from './diff/ConflictView.svelte'
-  import FileHistoryView from './diff/FileHistoryView.svelte'
-  import DiffView, { type DiffTarget } from './diff/DiffView.svelte'
+  import type { DiffTarget } from './diff/DiffView.svelte'
+  import Lazy from './ui/Lazy.svelte'
   import GraphView from './graph/GraphView.svelte'
   import type { Ref, Row } from './graph/rowCache'
   import { session } from './session.svelte'
@@ -174,25 +172,26 @@
       <div class="graph">
         {#if diff.mode === 'conflict'}
           {#key diff.file}
-            <ConflictView {path} file={diff.file} onClose={() => (diff = null)} />
+            <Lazy load={() => import('./diff/ConflictView.svelte')} {path} file={diff.file} onClose={() => (diff = null)} />
           {/key}
         {:else if diff.mode === 'history'}
           {#key diff.file}
-            <FileHistoryView {path} file={diff.file} onClose={() => (diff = null)} onOpen={(t) => (diff = t)} />
+            <Lazy load={() => import('./diff/FileHistoryView.svelte')} {path} file={diff.file} onClose={() => (diff = null)} onOpen={(t: DiffTarget) => (diff = t)} />
           {/key}
         {:else if diff.mode === 'blame'}
           {#key diff.file + (diff.commit ?? '')}
-            <BlameView
+            <Lazy
+              load={() => import('./diff/BlameView.svelte')}
               {path}
               file={diff.file}
               rev={diff.commit ?? ''}
               onClose={() => (diff = null)}
-              onOpen={(t) => (diff = t)}
+              onOpen={(t: DiffTarget) => (diff = t)}
               onReveal={revealCommit}
             />
           {/key}
         {:else}
-          <DiffView {path} target={diff} onClose={() => (diff = null)} onOpen={(t) => (diff = t)} />
+          <Lazy load={() => import('./diff/DiffView.svelte')} {path} target={diff} onClose={() => (diff = null)} onOpen={(t: DiffTarget) => (diff = t)} />
         {/if}
       </div>
     {/if}

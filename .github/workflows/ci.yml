@@ -32,6 +32,8 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+      - run: npm run build
+      - run: npm run bundle-budget
 
   go:
     name: Go (${{ matrix.os }})

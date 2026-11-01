@@ -92,6 +92,21 @@ document.body.style.cssText = 'margin:0;height:100vh;background:var(--paper)'
 host.style.cssText = 'display:flex;height:100vh'
 
 const mounts = {
+  async lazy() {
+    const { default: Lazy } = await import('../src/lib/ui/Lazy.svelte')
+    const { default: Icon } = await import('../src/lib/ui/Icon.svelte')
+    const load = scenario.failures?.lazy ? () => Promise.reject(new Error(scenario.failures!.lazy)) : async () => ({ default: Icon })
+    mount(Lazy, { target: host, props: { load, name: 'search' } })
+  },
+  async lazyDiff() {
+    const { default: Lazy } = await import('../src/lib/ui/Lazy.svelte')
+    const target = { mode: 'commit', commit: 'a'.repeat(40), file: 'src/lazy-file.ts' }
+    mount(Lazy, { target: host, props: { load: () => import('../src/lib/diff/DiffView.svelte'), path: '/repo', target, onClose: record('close'), onOpen: record('open') } })
+  },
+  async math() {
+    const { default: MathView } = await import('../src/lib/markdown/MathView.svelte')
+    mount(MathView, { target: host, props: { tex: 'x^2' } })
+  },
   async loading() {
     const { default: Loading } = await import('../src/lib/ui/Loading.svelte')
     mount(Loading, { target: host, props: {} })
@@ -143,6 +158,15 @@ const mounts = {
 }
 
 switch (new URLSearchParams(location.search).get('mount')) {
+  case 'lazy':
+    await mounts.lazy()
+    break
+  case 'lazyDiff':
+    await mounts.lazyDiff()
+    break
+  case 'math':
+    await mounts.math()
+    break
   case 'loading':
     await mounts.loading()
     break
