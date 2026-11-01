@@ -245,25 +245,28 @@
 
   const rowKey = (r: TreeRow) => (r.type === 'folder' ? `folder:${r.key}` : r.ref.name)
 
+  provideCommands(() => [
+    {
+      id: 'view.sidebarFilter',
+      group: 'View',
+      title: 'Filter the sidebar',
+      keywords: 'find branch tag stash search',
+      shortcut: 'Mod+Shift+B',
+      whenTyping: true,
+      run: () => void focusFilter(),
+    },
+    {
+      id: 'view.sidebar',
+      group: 'View',
+      title: ui.collapsed ? 'Show the sidebar panel' : 'Hide the sidebar panel',
+      keywords: 'collapse rail graph width',
+      run: () => (ui.collapsed = !ui.collapsed),
+    },
+  ])
+
+  // One or two per ref, so a key press mustn't build them: that took 61ms with 50,000 branches.
   provideCommands(() => {
-    const list: Command[] = [
-      {
-        id: 'view.sidebarFilter',
-        group: 'View',
-        title: 'Filter the sidebar',
-        keywords: 'find branch tag stash search',
-        shortcut: 'Mod+Shift+B',
-        whenTyping: true,
-        run: () => void focusFilter(),
-      },
-      {
-        id: 'view.sidebar',
-        group: 'View',
-        title: ui.collapsed ? 'Show the sidebar panel' : 'Hide the sidebar panel',
-        keywords: 'collapse rail graph width',
-        run: () => (ui.collapsed = !ui.collapsed),
-      },
-    ]
+    const list: Command[] = []
     for (const r of refs) {
       if (r.kind === 'stash') continue
       if (r.kind === 'local' && !r.head && onActivate)
@@ -272,7 +275,7 @@
       list.push({ id: `goto.${r.name}`, group: 'Go to', title: `Go to ${r.short}`, keywords: `${what} show reveal graph`, run: () => onPick(r) })
     }
     return list
-  })
+  }, { paletteOnly: true })
 
   async function load() {
     refs = ((await session.run(() => Refs(path))) as Ref[] | undefined) ?? []
