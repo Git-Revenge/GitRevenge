@@ -39,10 +39,19 @@ jobs:
     steps:
       # Full history, so the navbar can show the newest release tag. Every run that
       # publishes builds main, whatever pushed.
+      # The screenshots in docs/img are in LFS. Without them the build still succeeds: it inlines
+      # each small pointer file as a data URI, and the published images are broken.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          lfs: true
           ref: ${{ github.event_name != 'pull_request' && 'main' || '' }}
+      - name: Check the screenshots are real images
+        run: |
+          if grep -rlI 'git-lfs.github.com/spec' docs/img; then
+            echo "::error::These files are LFS pointers, not images. Is LFS fetching them?"
+            exit 1
+          fi
       - uses: actions/setup-node@v7
         with:
           node-version: 24
