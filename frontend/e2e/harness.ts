@@ -165,6 +165,12 @@ const mounts = {
     const { default: RepoPanel } = await import('../src/lib/RepoPanel.svelte')
     mount(RepoPanel, { target: host, props: { path: '/r', filter: '', openDialog: () => {} } })
   },
+  async stackedDialogs() {
+    const { default: Dialog } = await import('../src/lib/Dialog.svelte')
+    const spec = (title: string) => ({ title, submit: 'OK', run: async () => {} })
+    mount(Dialog, { target: host, props: { spec: spec('Below'), onClose: record('close-below') } })
+    mount(Dialog, { target: host, props: { spec: spec('Above'), onClose: record('close-above') } })
+  },
 }
 
 switch (new URLSearchParams(location.search).get('mount')) {
@@ -200,6 +206,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'repoPanel':
     await mounts.repoPanel()
+    break
+  case 'stackedDialogs':
+    await mounts.stackedDialogs()
     break
   default:
     throw new Error('Unknown component to mount.')

@@ -274,6 +274,46 @@ test.describe('upstream dialog', () => {
     await expect(page.getByRole('alert')).toContainText('does not exist')
     expect(await events(page, 'close')).toHaveLength(0)
   })
+
+  // #373: the button that was clicked is disabled while it runs, which drops focus to the body.
+  test.describe('after a button has dropped focus', () => {
+    async function failedSave(page: Page) {
+      await open(page, 'upstreamDialog', { responses: { Refs: refs }, failures: { BranchAction: 'nope' }, delays: { BranchAction: 150 } })
+      await save(page).click()
+      await expect(page.getByRole('alert')).toBeVisible()
+      await expect.poll(() => page.evaluate(() => document.activeElement === document.body)).toBe(true)
+    }
+
+    test('Escape still closes the dialog', async ({ page }) => {
+      await failedSave(page)
+      await page.keyboard.press('Escape')
+      expect(await events(page, 'close')).toHaveLength(1)
+    })
+
+    test('Tab and Shift+Tab stay inside the dialog', async ({ page }) => {
+      await failedSave(page)
+      const inside = () => page.evaluate(() => !!document.activeElement?.closest('[role=dialog]'))
+      await page.keyboard.press('Tab')
+      expect(await inside()).toBe(true)
+      await page.evaluate(() => (document.activeElement as HTMLElement).blur())
+      await page.keyboard.press('Shift+Tab')
+      expect(await inside()).toBe(true)
+    })
+
+    test('other keys are left alone', async ({ page }) => {
+      await failedSave(page)
+      await page.keyboard.press('a')
+      expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true)
+    })
+  })
+
+  test('with focus lost, Escape closes only the top dialog', async ({ page }) => {
+    await open(page, 'stackedDialogs')
+    await page.evaluate(() => (document.activeElement as HTMLElement).blur())
+    await page.keyboard.press('Escape')
+    expect(await events(page, 'close-above')).toHaveLength(1)
+    expect(await events(page, 'close-below')).toHaveLength(0)
+  })
 })
 
 // #374: an empty starting value read as a fact until the first answer came back.
