@@ -139,6 +139,27 @@ function stackItem(ctx: MenuContext, ref: Ref): MenuItem {
   }
 }
 
+/** The dialog for setting a branch's upstream: any name git accepts, with the remote branches
+ * it knows about as suggestions. Empty stops tracking. */
+export function upstreamDialog(path: string, ref: Ref, refs: Ref[]): DialogSpec {
+  return {
+    title: `Upstream for ${ref.short}`,
+    message: `${ref.upstream ? `Currently tracking ${ref.upstream}.` : 'Not tracking a remote branch.'} Leave this empty to stop tracking.`,
+    fields: [
+      {
+        key: 'upstream',
+        label: 'Track',
+        type: 'combobox',
+        value: ref.upstream,
+        placeholder: 'origin/main',
+        suggestions: refs.filter((r) => r.kind === 'remote').map((r) => r.short),
+      },
+    ],
+    submit: 'Save',
+    run: (v) => attempt(() => branch(path, 'upstream', ref.short, String(v.upstream).trim())),
+  }
+}
+
 /** Menu items for one ref (branch, remote branch, tag or stash). */
 export function refItems(ref: Ref, ctx: MenuContext): MenuItem[] {
   const { path, openDialog } = ctx
@@ -181,22 +202,7 @@ export function refItems(ref: Ref, ctx: MenuContext): MenuItem[] {
             icon: 'remote',
             run: async () => {
               const refs = ((await session.run(() => Refs(path))) ?? []) as Ref[]
-              const remotes = refs.filter((r) => r.kind === 'remote').map((r) => ({ value: r.short, label: r.short }))
-              openDialog({
-                title: `Upstream for ${ref.short}`,
-                message: ref.upstream ? `Currently tracking ${ref.upstream}.` : 'Not tracking a remote branch.',
-                fields: [
-                  {
-                    key: 'upstream',
-                    label: 'Track',
-                    type: 'select',
-                    value: ref.upstream,
-                    options: [{ value: '', label: '(none)' }, ...remotes],
-                  },
-                ],
-                submit: 'Save',
-                run: (v) => attempt(() => branch(path, 'upstream', ref.short, String(v.upstream))),
-              })
+              openDialog(upstreamDialog(path, ref, refs))
             },
           },
         ],

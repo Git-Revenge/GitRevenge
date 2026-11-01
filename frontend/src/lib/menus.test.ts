@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Ref, Row } from './graph/rowCache'
-import { commitItems, dropItems, groups, refItems, type MenuContext } from './menus'
+import { commitItems, dropItems, groups, refItems, upstreamDialog, type MenuContext } from './menus'
 
 const row = (id: string): Row => ({ index: 0, col: 0, color: 0, up: [], down: [], width: 1, id, parents: 1, author: '', authorTime: 0, subject: '' })
 const ref = (short: string, kind: Ref['kind'], head = false): Ref => ({
@@ -109,5 +109,25 @@ describe('refItems', () => {
   it('keeps checkout and delete on the checked-out branch, disabled', () => {
     const items = refItems(ref('main', 'local', true), ctx('main'))
     expect(items.filter((i) => i.disabled).map((i) => i.label)).toEqual(['Checkout main', 'Delete main…'])
+  })
+})
+
+describe('upstreamDialog', () => {
+  const refs = [ref('main', 'local'), ref('origin/main', 'remote'), ref('origin/x', 'remote'), ref('v1', 'tag')]
+
+  it('offers only remote branches as suggestions, in a field that takes typed text', () => {
+    const field = upstreamDialog('/r', ref('main', 'local'), refs).fields![0]
+    expect(field.type).toBe('combobox')
+    expect(field.suggestions).toEqual(['origin/main', 'origin/x'])
+  })
+
+  it('starts on the current upstream, and says so', () => {
+    const spec = upstreamDialog('/r', { ...ref('main', 'local'), upstream: 'origin/main' }, refs)
+    expect(spec.fields![0].value).toBe('origin/main')
+    expect(spec.message).toContain('Currently tracking origin/main.')
+  })
+
+  it('explains how to stop tracking', () => {
+    expect(upstreamDialog('/r', ref('main', 'local'), refs).message).toContain('Not tracking a remote branch. Leave this empty to stop tracking.')
   })
 })
