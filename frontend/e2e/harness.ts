@@ -41,7 +41,7 @@ type Group = { name: string; paths: string[] }
 const behaviours: Record<string, (...args: never[]) => unknown> = {
   GraphRows: (_path: string, start: number, count: number) => {
     const total = scenario.graphRows ?? 0
-    return { rows: Array.from({ length: Math.max(0, Math.min(count, total - start)) }, (_, k) => graphRow(start + k)), refs: {}, total, loading: false, paused: false, estimate: total }
+    return { rows: Array.from({ length: Math.max(0, Math.min(count, total - start)) }, (_, k) => graphRow(start + k)), refs: scenario.graphRefs ?? {}, total, loading: false, paused: false, estimate: total }
   },
   GroupAction: (action: string, args: string[]) => {
     const groups = responses.Groups as Group[]

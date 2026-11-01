@@ -580,7 +580,7 @@
     min-width: 22px;
     text-align: right;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     color: var(--ink-mute);
   }
 

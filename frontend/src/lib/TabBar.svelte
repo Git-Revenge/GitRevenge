@@ -213,7 +213,7 @@
 
   .dot {
     color: var(--link);
-    font-size: 10px;
+    font-size: 12px;
   }
 
   .home,
@@ -224,7 +224,7 @@
   .head {
     margin-left: 6px;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     color: var(--ink-mute);
   }
 
@@ -278,7 +278,7 @@
     border-radius: 3px;
     background: var(--wash-hover);
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .theme {

@@ -314,7 +314,7 @@ export function drawRow(
       ctx.stroke(icon)
       ctx.restore()
     } else {
-      setFont(ctx, `500 9.5px ${MONO}`)
+      setFont(ctx, `500 12px ${MONO}`)
       ctx.fillStyle = theme.soft
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
@@ -330,14 +330,14 @@ export function drawRow(
   ctx.textBaseline = 'middle'
   const line1 = comfortable ? y + 19 : mid
   let right = lay.width - 14
-  setFont(ctx, `11.5px ${MONO}`)
+  setFont(ctx, `12px ${MONO}`)
   ctx.fillStyle = theme.muted
   ctx.textAlign = 'right'
   ctx.fillText(row.id.slice(0, 7), right, line1)
   if (seal) drawSeal(ctx, right - ctx.measureText(row.id.slice(0, 7)).width - 10, line1 - 4, seal, theme)
   right -= lay.shaW
   if (lay.dateW) {
-    setFont(ctx, `11px ${MONO}`)
+    setFont(ctx, `12px ${MONO}`)
     ctx.fillText(relativeTime(row.authorTime, nowSeconds), right, line1)
     right -= lay.dateW
   }
@@ -356,7 +356,7 @@ export function drawRow(
   ctx.fillText(clip(ctx, row.subject, subjectRight - left), left, line1)
 
   if (comfortable) {
-    setFont(ctx, `10.5px ${MONO}`, '0.08em')
+    setFont(ctx, `12px ${MONO}`, '0.08em')
     ctx.fillStyle = theme.muted
     const meta = `${row.author} · ${relativeTime(row.authorTime, nowSeconds)}`.toUpperCase()
     ctx.fillText(clip(ctx, meta, lay.width - 14 - (lay.graphW + 6)), lay.graphW + 6, y + 37)
@@ -395,7 +395,7 @@ function drawLabels(
   const h = comfortable ? 18 : 17
   const sorted = sortRefs(refs)
   ctx.save()
-  setFont(ctx, `10.5px ${MONO}`)
+  setFont(ctx, `12px ${MONO}`)
   for (let i = 0; i < sorted.length; i++) {
     const r = sorted[i]
     const remaining = sorted.length - i
@@ -483,7 +483,7 @@ function drawLabel(ctx: CanvasRenderingContext2D, text: string, x: number, mid: 
     tx += KIND_ICON_W
   }
   const weight = r.head || kind?.kind === 'trunk' ? '600 ' : ''
-  setFont(ctx, `${weight}${kind?.kind === 'bot' ? 9.5 : 10.5}px ${MONO}`)
+  setFont(ctx, `${weight}12px ${MONO}`)
   ctx.fillStyle = r.head ? theme.bg : r.kind === 'remote' || kind?.kind === 'bot' ? theme.muted : theme.fg
   ctx.textBaseline = 'middle'
   ctx.fillText(text, tx, mid + 0.5)

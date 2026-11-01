@@ -265,7 +265,7 @@
     border: 1px solid var(--paper-edge);
     border-radius: 4px;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     color: var(--ink-mute);
   }
 

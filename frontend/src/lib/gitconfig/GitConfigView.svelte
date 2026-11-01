@@ -345,7 +345,7 @@
 
   kbd {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     opacity: 0.8;
   }
 
