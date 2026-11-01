@@ -43,7 +43,11 @@ func TestDefaults(t *testing.T) {
 		"dependabot/go_modules/x/y-1.2": Bot,
 		"renovate/vite":                 Bot,
 		"production":                    None,
-		"feature/main":                  None,
+		"feature/main":                  Feature,
+		"features/x":                    Feature,
+		"feat/deep/name":                Feature,
+		"feature":                       None,
+		"my-feature":                    None,
 	}
 	for name, want := range cases {
 		if got := r.Kind(name); got != want {

@@ -32,6 +32,7 @@
     environment: { label: 'Environment', hint: 'Deploy branches such as staging' },
     docs: { label: 'Docs', hint: 'Published sites such as gh-pages' },
     bot: { label: 'Bot', hint: 'Branches a bot opens' },
+    feature: { label: 'Feature', hint: 'Work in progress' },
   }
   let repo = $state<app.RepoPreferences | null>(null)
   let kindText = $state<Record<string, string>>({})

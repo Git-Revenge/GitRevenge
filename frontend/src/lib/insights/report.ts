@@ -67,7 +67,7 @@ function windowLine(w: RepoWindow): string {
 /** The kind patterns in use, one line: "docs gh-pages gh-docs; bot dependabot/* …". */
 export function kindsLine(kinds: Record<string, string[]> | undefined): string {
   if (!kinds) return ''
-  return ['trunk', 'release', 'environment', 'docs', 'bot']
+  return ['trunk', 'release', 'environment', 'docs', 'bot', 'feature']
     .map((k) => `${k} ${kinds[k]?.length ? kinds[k].join(' ') : '(none)'}`)
     .join('; ')
 }
