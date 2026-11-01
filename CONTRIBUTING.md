@@ -24,14 +24,14 @@ See [Development](README.md#development) in the README for toolchain versions an
 ```sh
 cd frontend && npm ci && npm run build && cd ..
 go test ./...
-cd frontend && npm run check && npm run lint && npm test
+cd frontend && npm run check && npm run lint && npm test && npm run test:browser
 ```
 
 Also run `golangci-lint run`. CI runs everything on Windows and macOS.
 
 ## Guidelines
 
-- **Tests.** Go tests build fixture repositories on the fly with real git. Frontend logic is covered with Vitest. Add a test with each fix or feature.
+- **Tests.** Go tests build fixture repositories on the fly with real git. Frontend logic is covered with Vitest. Anything about how a screen renders or responds is covered in `frontend/e2e` with Playwright, which mounts the real component in a real browser against a stubbed Go backend, so it doesn't need `wails dev`: add a mount to `harness.ts` if the component needs one, then a test. Add a test with each fix or feature.
 - **Wails bindings.** `frontend/wailsjs` is generated from the Go API. Commit exactly what `wails generate module` writes, and don't reorder it by hand.
 - **Git calls** go through the git layer in `internal/git`, which runs the system git ([ADR 0002](docs/adr/0002-system-git-cli.md)). Don't shell out elsewhere.
 - **Match the surrounding code**: naming, comment density and idiom.

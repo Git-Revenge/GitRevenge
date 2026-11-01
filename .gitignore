@@ -7,3 +7,7 @@ frontend/package.json.md5
 /gitrevenge
 /gitrevenge.exe
 *.exe
+
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
