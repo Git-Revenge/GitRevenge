@@ -182,7 +182,7 @@
     gap: 18px;
     align-items: baseline;
     padding: 12px 4px 12px 22px;
-    border-top: 1px dashed var(--hairline);
+    border-top: 1px dotted var(--paper-edge);
   }
 
   .what {

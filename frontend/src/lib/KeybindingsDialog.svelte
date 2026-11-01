@@ -167,7 +167,7 @@
 
   td {
     padding: 4px 6px;
-    border-top: 1px dashed var(--hairline);
+    border-top: 1px dotted var(--paper-edge);
     vertical-align: middle;
   }
 

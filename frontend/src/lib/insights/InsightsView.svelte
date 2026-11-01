@@ -395,7 +395,7 @@
     flex-direction: column;
     gap: 4px;
     padding: 12px;
-    border-top: 1px dashed var(--hairline);
+    border-top: 1px dotted var(--paper-edge);
     font-size: 13px;
     color: var(--ink-mute);
   }
@@ -612,7 +612,7 @@
     align-items: flex-start;
     gap: 16px;
     padding: 12px 4px;
-    border-top: 1px dashed var(--hairline);
+    border-top: 1px dotted var(--paper-edge);
   }
 
   .who {
@@ -635,7 +635,7 @@
   .quiet {
     margin: 0;
     padding: 12px 4px;
-    border-top: 1px dashed var(--hairline);
+    border-top: 1px dotted var(--paper-edge);
   }
 
   .tags {

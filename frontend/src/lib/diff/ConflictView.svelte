@@ -10,6 +10,7 @@
   import { session } from '../session.svelte'
   import { languageFor } from './highlight'
   import { hasMarkers, parseConflicts, resolution, type Choice, type ConflictRegion } from './markers'
+  import Loading from '../ui/Loading.svelte'
 
   let { path, file, onClose }: { path: string; file: string; onClose: () => void } = $props()
 
@@ -141,7 +142,7 @@
   </header>
 
   {#if !cf}
-    <p class="muted">Loading…</p>
+    <Loading />
   {:else if cf.binary}
     <p class="muted">This file is binary, so it can't be merged line by line. Choose a whole version above.</p>
   {:else}

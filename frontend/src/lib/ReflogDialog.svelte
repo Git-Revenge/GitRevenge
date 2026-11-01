@@ -9,6 +9,7 @@
   import type { Ref } from './graph/rowCache'
   import Modal from './ui/Modal.svelte'
   import Icon from './ui/Icon.svelte'
+  import Loading from './ui/Loading.svelte'
 
   let {
     path,
@@ -64,7 +65,7 @@
   {#if error}
     <p class="error" role="alert">{error}</p>
   {:else if !entries}
-    <p class="muted">Loading…</p>
+    <Loading />
   {:else if entries.length === 0}
     <p class="muted">No reflog for this ref. Git keeps reflogs for local refs it has moved, for 90 days by default.</p>
   {:else}
@@ -127,7 +128,7 @@
 
   td {
     padding: 4px 8px;
-    border-top: 1px dashed var(--hairline);
+    border-top: 1px dotted var(--paper-edge);
     vertical-align: middle;
   }
 

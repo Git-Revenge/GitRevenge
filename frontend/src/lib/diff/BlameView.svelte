@@ -8,6 +8,7 @@
   import type { DiffTarget } from './DiffView.svelte'
   import { highlightLines, languageFor, type Token } from './highlight'
   import { toggleWrap, wrap, wrapCommand } from './wrap.svelte'
+  import Loading from '../ui/Loading.svelte'
 
   let {
     path,
@@ -69,7 +70,7 @@
   </header>
   <div class="body code-ground">
     {#if !lines}
-      <p class="muted">Loading…</p>
+      <Loading />
     {:else}
       <table class:wrap={wrap.on}>
         <tbody>
@@ -124,7 +125,7 @@
   }
 
   tr.start td {
-    border-top: 1px dashed var(--hairline);
+    border-top: 1px dotted var(--paper-edge);
   }
 
   td {
@@ -193,9 +194,4 @@
     color: var(--ink-mute);
   }
 
-  p.muted {
-    margin: 0;
-    padding: 10px 14px;
-    font-style: italic;
-  }
 </style>

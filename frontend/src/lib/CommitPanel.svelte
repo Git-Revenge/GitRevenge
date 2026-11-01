@@ -9,6 +9,7 @@
   import { asPerson, valueParts } from './trailers'
   import Markdown from './Markdown.svelte'
   import Icon from './ui/Icon.svelte'
+  import Loading from './ui/Loading.svelte'
 
   let {
     path,
@@ -149,7 +150,7 @@
 <aside class="panel" aria-label="Commit details">
   <span class="blob" aria-hidden="true"></span>
   {#if !info}
-    <p class="muted pad">Loading…</p>
+    <Loading />
   {:else}
     {@const c = info.commit}
     <header>
@@ -431,7 +432,7 @@
     grid-template-columns: max-content minmax(0, 1fr);
     margin: 0 0 12px;
     padding-top: 10px;
-    border-top: 1px dashed var(--hairline);
+    border-top: 1px dotted var(--paper-edge);
   }
 
   .trailers dt {
@@ -537,7 +538,7 @@
   }
 
   .files li {
-    border-bottom: 1px dashed var(--hairline);
+    border-bottom: 1px dotted var(--paper-edge);
   }
 
   .files button {
