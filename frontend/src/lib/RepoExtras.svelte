@@ -167,7 +167,7 @@
 
 <style>
   section {
-    border-top: 1px dashed var(--hairline);
+    border-top: 1px dotted var(--paper-edge);
   }
 
   .head {
@@ -255,7 +255,7 @@
 
   .badge {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     padding: 0 5px;

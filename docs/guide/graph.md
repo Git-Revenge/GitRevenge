@@ -33,7 +33,7 @@ Press <kbd>Ctrl</kbd>+<kbd>F</kbd> to search. You can search by commit message, 
 
 The sidebar has an icon rail and one panel at a time: **Branches**, **Remotes**, **Tags**, **Stashes** and **Repository**. Click an icon to switch panels, or click the active one to hide the panel and give the graph the width. Drag the panel's right edge to resize it, and double-click the edge to reset it. Git Revenge remembers all of this for each repository.
 
-Names with a `/` form folders, so `release/v0.8` and `release/v0.7` sit in a `release` folder. **Name** or **Recent**, at the top of the panel, sorts by name or by most recently updated. The checked-out branch always comes first.
+Names with a `/` form folders, so `release/v0.8` and `release/v0.7` sit in a `release` folder. **Name** or **Recent**, at the top of the panel, sorts by name or by most recently updated. The checked-out branch always comes first, marked with a rose dot and in bold, and other branches are muted. A branch shows one status at a time (**parent merged**, **gone**, or how far ahead or behind it is); hover over it for the rest. Hovering or tabbing to a row also shows a **…** button with the same menu as right-click.
 
 Type in **Filter all panels** to narrow the lists. The filter stays on as you switch panels, and the rail shows how many matches each panel has. **Needs care**, in the Branches panel, shows branches whose upstream is gone or whose stack parent was merged. Click a branch or tag to jump to its commit.
 

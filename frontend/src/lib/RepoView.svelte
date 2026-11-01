@@ -129,6 +129,7 @@
 <div class="repo">
   <Sidebar
     {path}
+    selectedCommit={selected?.id}
     onPick={pick}
     onActivate={(ref) => checkoutRef(path, ref)}
     onNewBranch={() => (dialog = newBranchDialog(ctx))}

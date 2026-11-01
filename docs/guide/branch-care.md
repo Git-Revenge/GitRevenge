@@ -40,7 +40,7 @@ Hidden branches leave the sidebar and the graph. Commits that only they reach di
 - **Patterns:** under **This repository** in Settings, list them in **Hidden branches**, such as `wip/*, archive/*`.
 - **Docs and Bots:** the **Docs** and **Bots** buttons in the graph's header show or hide every branch of that kind. They're on (showing) by default, and appear once the repository has branches of that kind.
 
-When something is hidden, the sidebar says how many, under the branch lists. **Show them** brings them back for now, marked *hidden*; **Hide them again** undoes that. To unhide a branch for good, right-click it while it's showing and choose **Unhide**.
+When something is hidden, the sidebar says how many, under the branch lists. **Show them** brings them back for now, in italics; **Hide them again** undoes that. To unhide a branch for good, right-click it while it's showing and choose **Unhide**.
 
 ## Cleaning up merged branches
 
@@ -70,7 +70,7 @@ A problem with notes never stops the fetch, pull or push itself.
 
 A branch is **stacked** when it builds on another branch that hasn't merged yet: you started `feature/b` from `feature/a` to keep going while `feature/a` waits for review.
 
-Git Revenge works this out from history. In the sidebar, a stacked branch sits under the branch it builds on, indented, with its place in the stack (**2 of 3**). Hover over that to see what it's stacked on. In the graph, its chip carries a small stack mark.
+Git Revenge works this out from history. In the sidebar, a stacked branch sits under the branch it builds on, indented, even when its name would put it in another folder. Hover over it to see what it's stacked on and its place in the stack (**2 of 3**). In the graph, its chip carries a small stack mark.
 
 If the guess is wrong, right-click the branch and choose **Stack `name` on…**: pick the right branch, **Not stacked**, or **Detect automatically** to go back to the guess.
 

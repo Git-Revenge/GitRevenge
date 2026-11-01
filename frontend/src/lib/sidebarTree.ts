@@ -343,3 +343,51 @@ export function panelMatches(tree: PanelTree, query: string): number {
 export function careCount(tree: PanelTree): number {
   return viewOf(tree.key, '', true).folderCount(tree.root)
 }
+
+export interface RefStatus {
+  /** What the row shows. */
+  text: string
+  /** The same thing in words, for screen readers. */
+  spoken: string
+  tone: 'warning' | 'muted' | 'link'
+}
+
+/** The one status a row shows, most pressing first. The tooltip lists the rest. */
+export function refStatus(r: Ref): RefStatus | undefined {
+  if (r.stackParentMerged) return { text: 'parent merged', spoken: 'parent merged', tone: 'warning' }
+  if (r.gone) return { text: 'gone', spoken: 'upstream gone', tone: 'muted' }
+  if (r.ahead || r.behind) {
+    const text = (r.ahead ? `↑${r.ahead}` : '') + (r.behind ? `↓${r.behind}` : '')
+    const spoken = [r.ahead ? `${r.ahead} ahead` : '', r.behind ? `${r.behind} behind` : ''].filter(Boolean).join(', ')
+    return { text, spoken, tone: 'link' }
+  }
+  return undefined
+}
+
+/** Where a branch sits in its stack, in words, or '' when it isn't in one. */
+export function stackPlace(r: Ref): string {
+  if (!r.stackDepth || !r.stackSize) return ''
+  const place = `${r.stackDepth} of ${r.stackSize}`
+  return r.stackParent ? `Stacked on ${r.stackParent} (${place})` : `The bottom of a stack (${place})`
+}
+
+/** Everything known about a row, one fact per line, since the row itself shows one status. */
+export function refTooltip(r: Ref): string {
+  const lines = [r.kind === 'stash' ? r.subject || r.short : r.short]
+  if (r.head) lines.push('Checked out')
+  if (r.stackParentMerged) lines.push(`${r.stackParent} was merged. Right-click, Restack, to move this branch onto the Trunk.`)
+  if (stackPlace(r)) lines.push(stackPlace(r))
+  if (r.gone) lines.push('Upstream branch was deleted')
+  else if (r.ahead || r.behind) lines.push(`${r.ahead} ahead, ${r.behind} behind ${r.upstream}`)
+  if (r.hidden) lines.push('Hidden: shown for now')
+  return lines.join('\n')
+}
+
+/** Splits a row's label around the filter's match, for highlighting. No match in the label
+ * (it can match earlier in the full name) leaves it all in pre. */
+export function matchParts(label: string, query: string): { pre: string; hit: string; post: string } {
+  const q = query.trim().toLowerCase()
+  const i = q ? label.toLowerCase().indexOf(q) : -1
+  if (i < 0) return { pre: label, hit: '', post: '' }
+  return { pre: label.slice(0, i), hit: label.slice(i, i + q.length), post: label.slice(i + q.length) }
+}
