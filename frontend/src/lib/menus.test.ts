@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Ref, Row } from './graph/rowCache'
-import { commitItems, dropItems, groups, refItems, upstreamDialog, type MenuContext } from './menus'
+import { commitItems, commitMenuItems, dropItems, groups, refItems, upstreamDialog, type MenuContext } from './menus'
 
 const row = (id: string): Row => ({ index: 0, col: 0, color: 0, up: [], down: [], width: 1, id, parents: 1, author: '', authorTime: 0, subject: '' })
 const ref = (short: string, kind: Ref['kind'], head = false): Ref => ({
@@ -129,5 +129,36 @@ describe('upstreamDialog', () => {
 
   it('explains how to stop tracking', () => {
     expect(upstreamDialog('/r', ref('main', 'local'), refs).message).toContain('Not tracking a remote branch. Leave this empty to stop tracking.')
+  })
+})
+
+describe('commitMenuItems', () => {
+  const commit = row('a'.repeat(40))
+  const stash = { ...ref('stash@{0}', 'stash'), subject: 'WIP' }
+
+  it('puts each ref in its own submenu, after the commit\'s items', () => {
+    const items = commitMenuItems(commit, [ref('main', 'local'), ref('origin/main', 'remote'), ref('v1', 'tag')], ctx('main'))
+    const subs = items.filter((i) => i.items)
+    expect(subs.map((i) => i.label)).toEqual(['main', 'origin/main', 'v1'])
+    expect(subs.map((i) => i.icon)).toEqual(['branch', 'remote', 'tag'])
+    expect(subs[0].separator).toBe(true)
+    expect(items.indexOf(subs[0])).toBe(commitItems(commit, [], ctx('main')).length)
+    expect(labels(subs[1].items!)).toContain('Delete origin/main from origin')
+  })
+
+  it('keeps items per ref apart, so each branch has its own Mark', () => {
+    const items = commitMenuItems(commit, [ref('one', 'local'), ref('two', 'local')], ctx('main'))
+    expect(labels(items.find((i) => i.label === 'one')!.items!)).toContain('Mark one as…')
+    expect(labels(items.find((i) => i.label === 'two')!.items!)).toContain('Mark two as…')
+  })
+
+  it('has just the commit\'s items with no refs', () => {
+    expect(commitMenuItems(commit, [], ctx('main')).some((i) => i.items)).toBe(false)
+  })
+
+  it('lists a stash\'s items directly', () => {
+    const items = commitMenuItems(commit, [stash], ctx('main'))
+    expect(items.some((i) => i.items)).toBe(false)
+    expect(labels(items)).toContain('Apply stash')
   })
 })

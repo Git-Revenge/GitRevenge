@@ -16,6 +16,71 @@ test.describe('commit menu', () => {
     await expect(page.getByRole('menu')).toBeVisible()
   })
 
+  const twoBranches = { responses: { Refs: [branch('main', { head: true }), remote('origin/main'), tag('v1.0')] } }
+
+  test('keeps a commit menu short, with a row per ref', async ({ page }) => {
+    await open(page, 'commitMenu', twoBranches)
+    const labels = await page.getByRole('menuitem').allTextContents()
+    expect(labels.length).toBeLessThan(12)
+    await expect(page.getByRole('menuitem', { name: 'origin/main' })).toHaveAttribute('aria-haspopup', 'menu')
+  })
+
+  test('hovering a ref opens its submenu, and moving away closes it', async ({ page }) => {
+    await open(page, 'commitMenu', twoBranches)
+    await page.getByRole('menuitem', { name: 'origin/main' }).hover()
+    await expect(page.getByRole('menu')).toHaveCount(2)
+    await expect(page.getByRole('menuitem', { name: 'Delete origin/main from origin' })).toBeVisible()
+    await page.getByRole('menuitem', { name: /Create branch here/ }).hover()
+    await expect(page.getByRole('menu')).toHaveCount(1)
+  })
+
+  test('the arrow keys go in and out of a submenu, and Esc only closes that level', async ({ page }) => {
+    await open(page, 'commitMenu', twoBranches)
+    await expect(page.getByRole('menu')).toBeVisible()
+    // The refs are last: v1.0, then origin/main above it.
+    await page.keyboard.press('End')
+    await page.keyboard.press('ArrowUp')
+    await expect(page.getByRole('menuitem', { name: 'origin/main' })).toBeFocused()
+    await page.keyboard.press('ArrowRight')
+    await expect(page.getByRole('menu')).toHaveCount(2)
+    await expect(page.getByRole('menuitem', { name: 'Checkout origin/main' })).toBeFocused()
+    await page.keyboard.press('ArrowLeft')
+    await expect(page.getByRole('menu')).toHaveCount(1)
+    await expect(page.getByRole('menuitem', { name: 'origin/main' })).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('menu')).toHaveCount(2)
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('menu')).toHaveCount(1)
+    expect(await events(page, 'close')).toHaveLength(0)
+    await page.keyboard.press('Escape')
+    expect(await events(page, 'close')).toHaveLength(1)
+  })
+
+  test('choosing from a submenu runs it and closes everything', async ({ page }) => {
+    await open(page, 'commitMenu', twoBranches)
+    await page.getByRole('menuitem', { name: 'v1.0' }).click()
+    await page.getByRole('menuitem', { name: 'Push tag v1.0 to origin' }).click()
+    expect(await events(page, 'close')).toHaveLength(1)
+    await expect.poll(() => calls(page, 'PushRef')).toHaveLength(1)
+  })
+
+  test('clicking a submenu row keeps the menu open', async ({ page }) => {
+    await open(page, 'commitMenu', twoBranches)
+    await page.getByRole('menuitem', { name: 'origin/main' }).click()
+    await expect(page.getByRole('menu')).toHaveCount(2)
+    expect(await events(page, 'close')).toHaveLength(0)
+  })
+
+  test('a submenu opens to the left when there is no room on the right', async ({ page }) => {
+    await page.setViewportSize({ width: 800, height: 700 })
+    await open(page, 'commitMenu', { ...twoBranches, menuX: 500 })
+    await page.getByRole('menuitem', { name: 'origin/main' }).hover()
+    await expect(page.getByRole('menu')).toHaveCount(2)
+    const [parent, child] = await page.getByRole('menu').evaluateAll((m) => m.map((x) => x.getBoundingClientRect().toJSON()))
+    expect(child.right).toBeLessThanOrEqual(800)
+    expect(child.left).toBeLessThan(parent.left)
+  })
+
   test('stays inside a short window', async ({ page }) => {
     await page.setViewportSize({ width: 900, height: 400 })
     await open(page, 'commitMenu', { responses: { Refs: [branch('one'), branch('two'), remote('origin/one'), tag('v1')] } })

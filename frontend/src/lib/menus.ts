@@ -368,6 +368,22 @@ export function commitItems(row: Row, refs: Ref[], ctx: MenuContext): MenuItem[]
   ]
 }
 
+const REF_ICONS = { local: 'branch', remote: 'remote', tag: 'tag', stash: 'stash' } as const
+
+/**
+ * A commit's whole menu: its own items, then one row per ref that opens a submenu with that ref's
+ * items, since a commit can carry several refs and a flat list runs to 30 items. A stash has no
+ * commit items, so its own go straight in the menu.
+ */
+export function commitMenuItems(row: Row, refs: Ref[], ctx: MenuContext): MenuItem[] {
+  const own = commitItems(row, refs, ctx)
+  if (own.length === 0) return groups(...refs.map((r) => refItems(r, ctx)))
+  return groups(
+    own,
+    refs.map((r) => ({ label: r.short, icon: REF_ICONS[r.kind], items: refItems(r, ctx) })),
+  )
+}
+
 /**
  * Items for dropping one graph row onto another. One side must be the checked-out branch:
  * dropping something onto it brings that thing in; dragging it onto something moves it.

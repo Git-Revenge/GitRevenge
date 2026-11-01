@@ -9,6 +9,7 @@ export interface Scenario {
   graphRows?: number
   selectedCommit?: string
   current?: string
+  menuX?: number
   theme?: 'light' | 'dark'
 }
 
