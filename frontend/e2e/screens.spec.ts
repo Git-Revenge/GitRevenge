@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { branch, calls, events, open, remote, tag } from './support'
+import { branch, calls, events, open, remote, tag, textUnderFloor } from './support'
 
 test.describe('commit menu', () => {
   // #323: repeated labels threw each_key_duplicate, and no menu appeared.
@@ -175,4 +175,18 @@ test.describe('upstream dialog', () => {
     await expect(page.getByRole('alert')).toContainText('does not exist')
     expect(await events(page, 'close')).toHaveLength(0)
   })
+})
+
+test('no text is under the 12px floor', async ({ page }) => {
+  await open(page, 'sidebar', { responses: { Refs: [branch('fix/a', { ahead: 1 }), branch('fix/b', { gone: true }), tag('v1')], ShowingHidden: false } })
+  await expect(page.locator('.row').first()).toBeVisible()
+  expect(await textUnderFloor(page)).toEqual([])
+})
+
+test('draws a commit with several refs', async ({ page }) => {
+  const id = '0'.repeat(40)
+  await open(page, 'graph', { graphRows: 50, responses: { Refs: [], CommitSignatures: [] }, graphRefs: { [id]: [branch('main', { head: true, branchKind: 'trunk' }), remote('origin/main', { branchKind: 'trunk' }), branch('dependabot/x', { branchKind: 'bot' }), tag('v1.0')] } })
+  await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '50')
+  await page.waitForTimeout(300)
+  expect(await events(page, 'select')).not.toHaveLength(0)
 })

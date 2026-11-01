@@ -7,6 +7,8 @@ export interface Scenario {
   /** Methods that fail, with their error message. */
   failures?: Record<string, string>
   graphRows?: number
+  /** The refs on each commit in the graph, by commit id. */
+  graphRefs?: Record<string, unknown[]>
   selectedCommit?: string
   current?: string
   theme?: 'light' | 'dark'
@@ -60,3 +62,17 @@ export const outline = (page: Page) =>
   )
 
 export const expectOutline = (page: Page, expected: string[]) => expect.poll(() => outline(page)).toEqual(expected)
+
+/** Text smaller than the design system's 12px floor on the page, as "size text". */
+export const textUnderFloor = (page: Page) =>
+  page.evaluate(() => {
+    const out: string[] = []
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const el = n.parentElement
+      if (!n.textContent?.trim() || !el || el.closest('.visually-hidden, script, style')) continue
+      const size = parseFloat(getComputedStyle(el).fontSize)
+      if (size < 12) out.push(size + ' ' + n.textContent.trim().slice(0, 30))
+    }
+    return out
+  })

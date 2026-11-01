@@ -118,7 +118,7 @@
     background: var(--paper);
     text-align: left;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 400;
     letter-spacing: 0.08em;
     text-transform: uppercase;

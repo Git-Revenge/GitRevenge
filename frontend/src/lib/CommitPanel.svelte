@@ -421,7 +421,7 @@
   .key-id {
     display: block;
     font-family: var(--font-mono);
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--ink-mute);
     overflow-wrap: anywhere;
   }
@@ -489,7 +489,7 @@
   .when {
     display: block;
     font-family: var(--font-mono);
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--ink-mute);
   }
 
@@ -498,7 +498,7 @@
     border-radius: 3px;
     background: var(--paper-warm);
     font-family: var(--font-mono);
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--accent-b);
     overflow-wrap: anywhere;
   }
@@ -567,7 +567,7 @@
 
   .status {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }

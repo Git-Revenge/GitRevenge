@@ -129,7 +129,7 @@
     border-radius: 4px;
     background: var(--paper-warm);
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     white-space: nowrap;
   }
 

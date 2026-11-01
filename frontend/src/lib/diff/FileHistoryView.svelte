@@ -131,7 +131,7 @@
   .when {
     white-space: nowrap;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .badge {
@@ -139,7 +139,7 @@
     border-radius: 4px;
     background: var(--selected);
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     color: var(--accent-a);
   }
 
