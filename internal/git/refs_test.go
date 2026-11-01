@@ -2,7 +2,10 @@ package git
 
 import (
 	"context"
+	"fmt"
+	"os/exec"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/risadams/gitrevenge/internal/gittest"
@@ -64,6 +67,102 @@ func TestRefsUpdated(t *testing.T) {
 	}
 	if got := refs["refs/tags/v0.1.0"].Updated; got != tagged {
 		t.Fatalf("annotated tag updated = %d, want its tag date %d", got, tagged)
+	}
+}
+
+// The upstream fields come from a second query, for only the branches that have one (#346).
+func TestRefsUpstreamsOnlyWhereConfigured(t *testing.T) {
+	local, _ := gittest.WithRemote(t, 2)
+	local.Git("branch", "plain")
+	local.Git("branch", "dir/tracking", "--track", "origin/main")
+	local.Git("branch", "dir/plain")
+	refs := refsByName(t, local)
+
+	for _, name := range []string{"main", "dir/tracking"} {
+		if got := refs["refs/heads/"+name].Upstream; got != "origin/main" {
+			t.Errorf("%s upstream = %q, want origin/main", name, got)
+		}
+	}
+	for _, name := range []string{"plain", "dir/plain"} {
+		r := refs["refs/heads/"+name]
+		if r.Upstream != "" || r.Gone || r.Ahead != 0 || r.Behind != 0 {
+			t.Errorf("%s should have no upstream: %+v", name, r)
+		}
+	}
+	if got := refs["refs/remotes/origin/main"].Upstream; got != "" {
+		t.Errorf("a remote branch has no upstream, got %q", got)
+	}
+}
+
+func TestRefsNoUpstreamsAtAll(t *testing.T) {
+	fx := gittest.WithMergeHistory(t)
+	refs := refsByName(t, fx)
+	if len(refs) == 0 {
+		t.Fatal("expected refs")
+	}
+	for name, r := range refs {
+		if r.Upstream != "" {
+			t.Errorf("%s has upstream %q", name, r.Upstream)
+		}
+	}
+}
+
+func TestRefsConfigForDeletedBranch(t *testing.T) {
+	local, _ := gittest.WithRemote(t, 1)
+	local.Git("config", "branch.deleted.remote", "origin")
+	local.Git("config", "branch.deleted.merge", "refs/heads/deleted")
+	refs := refsByName(t, local)
+	if _, ok := refs["refs/heads/deleted"]; ok {
+		t.Fatal("config alone shouldn't make a branch appear")
+	}
+	if got := refs["refs/heads/main"].Upstream; got != "origin/main" {
+		t.Fatalf("main upstream = %q", got)
+	}
+}
+
+func TestRefsOnlyDeletedBranchesConfigured(t *testing.T) {
+	fx := gittest.WithMergeHistory(t)
+	fx.Git("config", "branch.deleted.remote", "origin")
+	fx.Git("config", "branch.deleted.merge", "refs/heads/deleted")
+	if _, ok := refsByName(t, fx)["refs/heads/main"]; !ok {
+		t.Fatal("main should be listed")
+	}
+}
+
+func TestRefsTooManyUpstreamsForACommandLine(t *testing.T) {
+	old := maxUpstreamPatternBytes
+	maxUpstreamPatternBytes = 10
+	t.Cleanup(func() { maxUpstreamPatternBytes = old })
+
+	local, _ := gittest.WithRemote(t, 1)
+	local.Git("branch", "plain")
+	refs := refsByName(t, local)
+	if got := refs["refs/heads/main"].Upstream; got != "origin/main" {
+		t.Fatalf("main upstream = %q", got)
+	}
+	if got := refs["refs/heads/plain"].Upstream; got != "" {
+		t.Fatalf("plain upstream = %q", got)
+	}
+}
+
+func BenchmarkRefsManyBranches(b *testing.B) {
+	fx := gittest.New(b)
+	var in strings.Builder
+	for i := range 5000 {
+		fmt.Fprintf(&in, "commit refs/heads/b/%d/x%d\ncommitter A <a@b> %d +0000\ndata 2\nc\n\n", i%100, i, 1700000000+i)
+	}
+	cmd := exec.Command("git", "fast-import", "--quiet")
+	cmd.Dir = fx.Dir
+	cmd.Stdin = strings.NewReader(in.String())
+	if err := cmd.Run(); err != nil {
+		b.Fatal(err)
+	}
+	fx.Git("pack-refs", "--all")
+	repo := OpenRepo(NewRunner("git"), fx.Dir)
+	for b.Loop() {
+		if _, err := repo.Refs(context.Background()); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
