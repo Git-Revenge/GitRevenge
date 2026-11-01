@@ -34,6 +34,7 @@
   $effect(() => {
     void Refs(path)
       .then((all) => (branches = ((all ?? []) as Ref[]).filter((r) => r.kind === 'local')))
+      // The picker just lists fewer branches; the one opened still shows.
       .catch(() => {})
   })
 

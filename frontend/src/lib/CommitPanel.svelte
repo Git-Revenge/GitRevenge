@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { errorText } from './errors'
   import { CommitDetail, CommitNotes, CommitSignatures, IssueURL, SetCommitNote } from '../../wailsjs/go/app/App.js'
   import type { app, git } from '../../wailsjs/go/models'
   import { BrowserOpenURL } from '../../wailsjs/runtime/runtime.js'
@@ -35,14 +36,23 @@
 
   // git notes on the commit, from every notes ref; the default ref's note can be edited.
   let notes = $state<git.Note[]>([])
+  let notesError = $state('')
   let noteDraft = $state<string | null>(null)
   let noteBusy = $state(false)
   const DEFAULT_NOTES = 'refs/notes/commits'
   let ownNote = $derived(notes.find((n) => n.ref === DEFAULT_NOTES))
 
   async function loadNotes(id: string) {
-    const res = await CommitNotes(path, id).catch(() => [])
-    if (id === commitId) notes = res
+    try {
+      const res = await CommitNotes(path, id)
+      if (id === commitId) {
+        notes = res ?? []
+        notesError = ''
+      }
+    } catch (e) {
+      // Not the same as having no notes, so it's worth saying.
+      if (id === commitId) notesError = errorText(e)
+    }
   }
 
   $effect(() => {
@@ -76,6 +86,7 @@
       .then(([c]) => {
         if (id === commitId) sig = c ?? null
       })
+      // The signature is decoration: a failure just means no mark.
       .catch(() => {})
   })
 
@@ -96,6 +107,7 @@
       .then((u) => {
         if (p === path) issueURL = u
       })
+      // Without it, issue references just aren't links.
       .catch(() => {})
   })
 
@@ -213,6 +225,7 @@
         {/if}
         <dt class="meta">Notes</dt>
         <dd class="notes">
+          {#if notesError}<p class="muted" role="alert">Couldn't read notes: {notesError}</p>{/if}
           {#each notes as n (n.ref)}
             {#if !(n.ref === DEFAULT_NOTES && noteDraft !== null)}
               <div class="note">

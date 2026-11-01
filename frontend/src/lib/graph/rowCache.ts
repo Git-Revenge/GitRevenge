@@ -90,9 +90,14 @@ export class RowCache {
   paused = false
   estimate = 0
 
+  /** Whether the last fetch failed, so only a change is reported. */
+  private failing = false
+
   constructor(
     private fetchPage: (start: number, count: number) => Promise<Page>,
     private onUpdate: () => void,
+    /** A fetch failed, or null once one succeeds again. */
+    private onError?: (error: unknown) => void,
   ) {}
 
   get(i: number): Row | undefined {
@@ -142,10 +147,17 @@ export class RowCache {
         this.loading = page.loading
         this.paused = page.paused
         if (page.estimate) this.estimate = page.estimate
+        if (this.failing) {
+          this.failing = false
+          this.onError?.(null)
+        }
         this.onUpdate()
       })
-      .catch(() => {
-        // Leave the chunk missing; the next ensure() retries.
+      .catch((e: unknown) => {
+        // Leave the chunk missing; the next ensure() retries. This doesn't call onUpdate, because
+        // a repaint would call ensure() again and retry at the frame rate.
+        this.failing = true
+        this.onError?.(e)
       })
       .finally(() => {
         if (this.inflight.get(c) === p) this.inflight.delete(c)

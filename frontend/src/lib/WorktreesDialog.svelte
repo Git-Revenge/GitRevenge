@@ -44,6 +44,7 @@
     void load()
     void Refs(path)
       .then((all) => (branches = ((all ?? []) as Ref[]).filter((r) => r.kind === 'local').map((r) => r.short)))
+      // Only used for suggestions.
       .catch(() => {})
   })
 

@@ -48,6 +48,12 @@ test.describe('commit graph', () => {
     expect(await topRow(page)).toBe(0)
   })
 
+  // #354: a failed fetch used to leave blank rows and no message.
+  test('says so when rows can\'t be read', async ({ page }) => {
+    await open(page, 'graph', { graphRows: 500, responses: { Refs: [], CommitSignatures: [] }, failures: { GraphRows: 'the repository has gone away' } })
+    await expect(page.getByText("Couldn't read history: the repository has gone away")).toBeVisible()
+  })
+
   // #340: a selection before the first measure scrolled the graph one row down.
   test('opens at the top', async ({ page }) => {
     await open(page, 'graph', { graphRows: 500, responses: { Refs: [], CommitSignatures: [] } })

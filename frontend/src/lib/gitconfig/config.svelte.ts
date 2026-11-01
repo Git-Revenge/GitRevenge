@@ -130,6 +130,7 @@ class GitConfigTab {
     const doc = await this.call(() => OpenGitConfig(path))
     if (doc) this.docs[path] = doc
     await this.refreshEffective()
+    // Only remembers the tab for next time.
     void SetGitConfigTab(path).catch(() => {})
   }
 
@@ -245,8 +246,14 @@ class GitConfigTab {
   async onDisk(path: string) {
     if (this.docs[path]) {
       // Ask the backend rather than trusting this copy, so edits are never reloaded away.
-      let fresh = await OpenGitConfig(path).catch(() => undefined)
-      if (fresh && !fresh.dirty && fresh.changedOnDisk) fresh = await ReloadGitConfig(path).catch(() => undefined)
+      let fresh: Awaited<ReturnType<typeof OpenGitConfig>> | undefined
+      try {
+        fresh = await OpenGitConfig(path)
+        if (!fresh.dirty && fresh.changedOnDisk) fresh = await ReloadGitConfig(path)
+      } catch (e) {
+        // Otherwise the old values stay on screen as if they were current.
+        this.error = `Couldn't re-read ${path}: ${errorText(e)}`
+      }
       if (fresh) this.docs[path] = fresh
       // Our own save echoes back as a change too; only a real outside edit is flagged.
       if (fresh?.dirty && fresh.changedOnDisk) this.outside[path] = true
