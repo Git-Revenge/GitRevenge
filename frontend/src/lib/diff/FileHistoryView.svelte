@@ -5,6 +5,7 @@
   import { formatTime } from '../graph/draw'
   import { session } from '../session.svelte'
   import DiffView, { type DiffTarget } from './DiffView.svelte'
+  import Loading from '../ui/Loading.svelte'
 
   let {
     path,
@@ -39,7 +40,7 @@
   </header>
   <ul class="list">
     {#if !commits}
-      <li class="muted pad">Loading…</li>
+      <li><Loading /></li>
     {:else}
       {#each commits as c (c.id)}
         <li>

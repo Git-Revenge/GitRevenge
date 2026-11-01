@@ -8,6 +8,7 @@
   import Icon from './ui/Icon.svelte'
   import InkButton from './ui/InkButton.svelte'
   import Modal from './ui/Modal.svelte'
+  import Loading from './ui/Loading.svelte'
 
   let { path, onClose }: { path: string; onClose: () => void } = $props()
 
@@ -98,7 +99,7 @@
 <Modal title="Worktrees" eyebrow="many checkouts" width={720} {onClose}>
   {#if error}<p class="error" role="alert">{error}</p>{/if}
   {#if !list}
-    <p class="muted">Loading…</p>
+    <Loading />
   {:else}
     <ul class="list">
       {#each list as w (w.path)}
@@ -227,11 +228,6 @@
   .buttons {
     display: flex;
     gap: 8px;
-  }
-
-  .muted {
-    color: var(--ink-mute);
-    font-style: italic;
   }
 
   .error {

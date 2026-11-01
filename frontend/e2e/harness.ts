@@ -92,6 +92,10 @@ document.body.style.cssText = 'margin:0;height:100vh;background:var(--paper)'
 host.style.cssText = 'display:flex;height:100vh'
 
 const mounts = {
+  async loading() {
+    const { default: Loading } = await import('../src/lib/ui/Loading.svelte')
+    mount(Loading, { target: host, props: {} })
+  },
   async sidebar() {
     const { default: Sidebar } = await import('../src/lib/Sidebar.svelte')
     mount(Sidebar, {
@@ -139,6 +143,9 @@ const mounts = {
 }
 
 switch (new URLSearchParams(location.search).get('mount')) {
+  case 'loading':
+    await mounts.loading()
+    break
   case 'sidebar':
     await mounts.sidebar()
     break
