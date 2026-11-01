@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -26,7 +27,8 @@ func (a *App) Groups() ([]settings.Group, error) {
 }
 
 // GroupAction edits groups: create (name), rename (from, to), delete (name),
-// add (name, repo path), remove (name, repo path).
+// add (name, repo path), remove (name, repo path), move (name, index),
+// move-repo (name, repo path, index).
 func (a *App) GroupAction(action string, args []string) error {
 	m, err := a.sessions()
 	if err != nil {
@@ -80,6 +82,16 @@ func (a *App) GroupAction(action string, args []string) error {
 			}
 		case "remove":
 			s.RemoveFromGroup(arg(0), arg(1))
+		case "move":
+			to, convErr := strconv.Atoi(arg(1))
+			if convErr != nil || !s.MoveGroup(arg(0), to) {
+				problem = "That group can't move there. The list may have changed."
+			}
+		case "move-repo":
+			to, convErr := strconv.Atoi(arg(2))
+			if convErr != nil || !s.MoveInGroup(arg(0), arg(1), to) {
+				problem = "That repository can't move there. The list may have changed."
+			}
 		default:
 			problem = "Unknown group action " + action + "."
 		}

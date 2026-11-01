@@ -162,6 +162,68 @@ func TestConcurrentUpdates(t *testing.T) {
 	}
 }
 
+func TestMoveGroup(t *testing.T) {
+	names := func(s Settings) string {
+		var out []string
+		for _, g := range s.Groups {
+			out = append(out, g.Name)
+		}
+		return strings.Join(out, ",")
+	}
+	cases := []struct {
+		name string
+		to   int
+		ok   bool
+		want string
+	}{
+		{"a", 2, true, "b,c,a"},
+		{"c", 0, true, "c,a,b"},
+		{"b", 1, true, "a,b,c"},
+		{"b", 0, true, "b,a,c"},
+		{"missing", 0, false, "a,b,c"},
+		{"a", -1, false, "a,b,c"},
+		{"a", 3, false, "a,b,c"},
+	}
+	for _, c := range cases {
+		s := Settings{Groups: []Group{{Name: "a"}, {Name: "b"}, {Name: "c"}}}
+		if got := s.MoveGroup(c.name, c.to); got != c.ok {
+			t.Errorf("MoveGroup(%q, %d) = %v, want %v", c.name, c.to, got, c.ok)
+		}
+		if got := names(s); got != c.want {
+			t.Errorf("MoveGroup(%q, %d) left %s, want %s", c.name, c.to, got, c.want)
+		}
+	}
+}
+
+func TestMoveInGroup(t *testing.T) {
+	cases := []struct {
+		group, path string
+		to          int
+		ok          bool
+		want        string
+	}{
+		{"g", "/r/a", 2, true, "/r/b,/r/c,/r/a"},
+		{"g", "/r/c", 0, true, "/r/c,/r/a,/r/b"},
+		{"g", "/r/b", 1, true, "/r/a,/r/b,/r/c"},
+		{"missing", "/r/a", 0, false, "/r/a,/r/b,/r/c"},
+		{"g", "/r/missing", 0, false, "/r/a,/r/b,/r/c"},
+		{"g", "/r/a", -1, false, "/r/a,/r/b,/r/c"},
+		{"g", "/r/a", 3, false, "/r/a,/r/b,/r/c"},
+	}
+	for _, c := range cases {
+		s := Settings{Groups: []Group{{Name: "other", Paths: []string{"/r/a"}}, {Name: "g", Paths: []string{"/r/a", "/r/b", "/r/c"}}}}
+		if got := s.MoveInGroup(c.group, c.path, c.to); got != c.ok {
+			t.Errorf("MoveInGroup(%q, %q, %d) = %v, want %v", c.group, c.path, c.to, got, c.ok)
+		}
+		if got := strings.Join(s.Groups[1].Paths, ","); got != c.want {
+			t.Errorf("MoveInGroup(%q, %q, %d) left %s, want %s", c.group, c.path, c.to, got, c.want)
+		}
+		if got := strings.Join(s.Groups[0].Paths, ","); got != "/r/a" {
+			t.Errorf("MoveInGroup changed another group: %s", got)
+		}
+	}
+}
+
 func TestGroups(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings.json")
 	s, err := Open(path)

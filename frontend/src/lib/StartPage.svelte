@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, tick } from 'svelte'
   import { ChooseFolder, GroupAction, Groups, Init } from '../../wailsjs/go/app/App.js'
   import type { settings } from '../../wailsjs/go/models'
   import { commands } from './commands.svelte'
@@ -7,6 +7,7 @@
   import Dialog, { type DialogSpec } from './Dialog.svelte'
   import { errorText } from './errors'
   import GroupDashboard from './GroupDashboard.svelte'
+  import { gapInGrid, gapInList, indexForGap, isInside } from './reorder'
   import { session } from './session.svelte'
   import Icon from './ui/Icon.svelte'
   import InkButton from './ui/InkButton.svelte'
@@ -119,13 +120,72 @@
     for (const p of g.paths) await session.open(p)
   }
 
+  // Re-ordering: drag a grip, or use the menu or Alt+arrows. The grips sit beside the buttons, so
+  // a drag can't also open a repository.
+  let cardsEl = $state<HTMLElement>()
+  let announcement = $state('')
+  type Drag = { group: string; from: number; gap: number | null; boxes: DOMRect[]; repo: boolean; card?: DOMRect }
+  let drag = $state<Drag | null>(null)
+
+  async function moveGroup(g: settings.Group, to: number) {
+    await session.run(() => GroupAction('move', [g.name, String(to)]))
+    await load()
+    announcement = `Moved ${g.name} to position ${to + 1} of ${groups.length}.`
+  }
+
+  async function moveRepo(g: settings.Group, p: string, to: number) {
+    await session.run(() => GroupAction('move-repo', [g.name, p, String(to)]))
+    await load()
+    announcement = `Moved ${base(p)} to position ${to + 1} of ${g.paths.length} in ${g.name}.`
+  }
+
+  function startDrag(e: PointerEvent, group: string, from: number, repo: boolean) {
+    e.preventDefault()
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    const card = repo ? (e.currentTarget as HTMLElement).closest('[data-card]') : null
+    const items = repo ? card?.querySelectorAll('[data-repo]') : cardsEl?.querySelectorAll('[data-card]')
+    drag = { group, from, gap: null, boxes: [...(items ?? [])].map((el) => el.getBoundingClientRect()), repo, card: card?.getBoundingClientRect() }
+  }
+
+  function dragMove(e: PointerEvent) {
+    if (!drag) return
+    if (drag.repo) drag.gap = drag.card && isInside(e.clientX, e.clientY, drag.card) ? gapInList(e.clientY, drag.boxes) : null
+    else drag.gap = gapInGrid(e.clientX, e.clientY, drag.boxes)
+  }
+
+  function dragEnd() {
+    const d = drag
+    drag = null
+    if (!d || d.gap === null) return
+    const to = indexForGap(d.from, d.gap)
+    if (to === null) return
+    const g = groups.find((x) => x.name === d.group)
+    if (!g) return
+    if (d.repo) void moveRepo(g, g.paths[d.from], to)
+    else void moveGroup(g, to)
+  }
+
+  async function repoKey(e: KeyboardEvent, g: settings.Group, i: number) {
+    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+    e.preventDefault()
+    const to = i + (e.key === 'ArrowUp' ? -1 : 1)
+    if (to < 0 || to >= g.paths.length) return
+    const button = e.currentTarget as HTMLElement
+    await moveRepo(g, g.paths[i], to)
+    await tick()
+    button.focus()
+  }
+
   function more(e: MouseEvent, g: settings.Group) {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const at = groups.indexOf(g)
     menu = {
       x: r.left,
       y: r.bottom + 2,
       items: [
-        { label: 'Browse for a repository…', icon: 'folder-open', run: () => browseInto(g) },
+        { label: 'Move earlier', disabled: at === 0, run: () => moveGroup(g, at - 1) },
+        { label: 'Move later', disabled: at === groups.length - 1, run: () => moveGroup(g, at + 1) },
+        { label: 'Browse for a repository…', icon: 'folder-open', separator: true, run: () => browseInto(g) },
         { label: 'Rename…', icon: 'edit', run: () => renameGroup(g) },
         { label: 'Delete group', icon: 'trash', danger: true, run: () => deleteGroup(g) },
       ],
@@ -207,17 +267,38 @@
               <Icon name="worktree" size={28} wash="rose" />Group related repositories to open them together, see their status side by side, and fetch or pull them in one go.
             </p>
           {/if}
-          <div class="cards cascade">
+          <p class="visually-hidden" aria-live="polite">{announcement}</p>
+          <div class="cards cascade" bind:this={cardsEl}>
             {#each groups as g, i (g.name)}
-              <article class="card" style:--splash={TONES[i % TONES.length]}>
+              <article
+                class="card"
+                data-card
+                class:dragging={drag && !drag.repo && drag.from === i}
+                class:gap-before={drag && !drag.repo && drag.gap === i}
+                class:gap-after={drag && !drag.repo && drag.gap === groups.length && i === groups.length - 1}
+                style:--splash={TONES[i % TONES.length]}
+              >
                 <span class="splash" aria-hidden="true"></span>
+                {#if groups.length > 1}
+                  <!-- The More menu's Move items do this from the keyboard. -->
+                  <span class="grip card-grip" aria-hidden="true" title="Drag to re-order" onpointerdown={(e) => startDrag(e, g.name, i, false)} onpointermove={dragMove} onpointerup={dragEnd} onpointercancel={() => (drag = null)}>
+                    <Icon name="grip" size={14} />
+                  </span>
+                {/if}
                 <div class="card-body">
                   <span class="num" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
                   <h3>{g.name}</h3>
                   <ul class="repos">
-                    {#each g.paths as p (p)}
-                      <li>
-                        <button class="repo" onclick={() => session.open(p)} title={p}>{base(p)}</button>
+                    {#each g.paths as p, ri (p)}
+                      {@const inThis = !!drag && drag.repo && drag.group === g.name}
+                      <li data-repo class:dragging={inThis && drag?.from === ri} class:gap-before={inThis && drag?.gap === ri} class:gap-after={inThis && drag?.gap === g.paths.length && ri === g.paths.length - 1}>
+                        {#if g.paths.length > 1}
+                          <!-- Alt+Up and Alt+Down on the row do this from the keyboard. -->
+                          <span class="grip repo-grip" aria-hidden="true" title="Drag to re-order" onpointerdown={(e) => startDrag(e, g.name, ri, true)} onpointermove={dragMove} onpointerup={dragEnd} onpointercancel={() => (drag = null)}>
+                            <Icon name="grip" size={12} />
+                          </span>
+                        {/if}
+                        <button class="repo" onclick={() => session.open(p)} onkeydown={(e) => repoKey(e, g, ri)} title="{p}{g.paths.length > 1 ? '\nAlt+Up or Alt+Down to re-order' : ''}">{base(p)}</button>
                         <button class="forget" aria-label="Remove {base(p)} from {g.name}" title="Remove from group" onclick={() => act('remove', g.name, p)}>
                           <Icon name="close" size={12} />
                         </button>
@@ -250,7 +331,102 @@
   <Dialog spec={dialog} onClose={() => (dialog = null)} />
 {/if}
 
+<svelte:window
+  onkeydown={(e) => {
+    if (drag && e.key === 'Escape') drag = null
+  }}
+/>
+
 <style>
+  .grip {
+    display: grid;
+    place-items: center;
+    color: var(--ink-faint);
+    cursor: grab;
+    touch-action: none;
+    opacity: 0;
+    transition: opacity var(--dur-quick);
+  }
+
+  .grip:active {
+    cursor: grabbing;
+  }
+
+  .card:hover > .grip,
+  li:hover > .grip {
+    opacity: 1;
+  }
+
+  .card-grip {
+    position: absolute;
+    z-index: 1;
+    top: 6px;
+    right: 6px;
+    width: 24px;
+    height: 24px;
+  }
+
+  .repo-grip {
+    position: absolute;
+    z-index: 1;
+    left: -14px;
+    top: 50%;
+    width: 14px;
+    height: 20px;
+    margin-top: -10px;
+  }
+
+  .dragging {
+    opacity: 0.5;
+  }
+
+  /* Where the dragged item will land. */
+  .gap-before::before,
+  .gap-after::after {
+    content: '';
+    position: absolute;
+    z-index: 2;
+    background: var(--link);
+    border-radius: 2px;
+    pointer-events: none;
+  }
+
+  .card.gap-before::before,
+  .card.gap-after::after {
+    top: 8px;
+    bottom: 8px;
+    width: 3px;
+  }
+
+  .card.gap-before::before {
+    left: -2px;
+  }
+
+  .card.gap-after::after {
+    right: -2px;
+  }
+
+  li.gap-before::before,
+  li.gap-after::after {
+    left: 0;
+    right: 0;
+    height: 2px;
+  }
+
+  li.gap-before::before {
+    top: -1px;
+  }
+
+  li.gap-after::after {
+    bottom: -1px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .grip {
+      transition: none;
+    }
+  }
+
   .page {
     position: relative;
     min-height: 100%;
@@ -531,6 +707,7 @@
   }
 
   .repos li {
+    position: relative;
     display: flex;
     align-items: center;
   }
