@@ -28,6 +28,8 @@ Every repository opens in its own tab, and the tabs come back when you restart t
 
 If you work across several related repositories, put them in a group. On the start page, choose **New group**, then **Add…** to add repositories to it.
 
+Hover over a group or one of its repositories and drag its grip to change the order. From the keyboard, a group's **…** menu has **Move earlier** and **Move later**, and <kbd>Alt</kbd>+<kbd>↑</kbd> or <kbd>Alt</kbd>+<kbd>↓</kbd> moves the focused repository. A group's order is also the order **Open all** opens its tabs and its dashboard lists its repositories.
+
 ![A group's dashboard](../img/group-dashboard-light.webp#gh-light-mode-only)
 ![A group's dashboard](../img/group-dashboard-dark.webp#gh-dark-mode-only)
 

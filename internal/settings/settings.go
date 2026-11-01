@@ -317,6 +317,35 @@ func (s *Settings) AddToGroup(name, path string) bool {
 	return true
 }
 
+// MoveGroup moves the named group to index to. It reports false, changing nothing, for an
+// unknown group or an index out of range.
+func (s *Settings) MoveGroup(name string, to int) bool {
+	i := s.GroupIndex(name)
+	if i < 0 || to < 0 || to >= len(s.Groups) {
+		return false
+	}
+	g := s.Groups[i]
+	s.Groups = slices.Insert(slices.Delete(s.Groups, i, i+1), to, g)
+	return true
+}
+
+// MoveInGroup moves path to index to within the named group. It reports false, changing
+// nothing, for an unknown group or path, or an index out of range.
+func (s *Settings) MoveInGroup(name, path string, to int) bool {
+	g := s.GroupIndex(name)
+	if g < 0 {
+		return false
+	}
+	paths := s.Groups[g].Paths
+	i := slices.IndexFunc(paths, func(p string) bool { return fsutil.SamePath(p, path) })
+	if i < 0 || to < 0 || to >= len(paths) {
+		return false
+	}
+	p := paths[i]
+	s.Groups[g].Paths = slices.Insert(slices.Delete(paths, i, i+1), to, p)
+	return true
+}
+
 // RemoveFromGroup removes path from the named group.
 func (s *Settings) RemoveFromGroup(name, path string) {
 	if i := s.GroupIndex(name); i >= 0 {
