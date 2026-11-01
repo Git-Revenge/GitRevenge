@@ -26,7 +26,7 @@ The first time you connect to an SSH host your machine doesn't know yet, the app
 
 ## LFS
 
-With [git-lfs](https://git-lfs.com) installed, the **Repository** panel of the sidebar shows LFS details for the repository:
+With [git-lfs](https://git-lfs.com) installed, the **Repository** panel of the sidebar has an **LFS** row with the number of files. Click it for the details:
 
 - the patterns tracked with LFS, and a way to **track** a new one;
 - which files are in LFS, and which are only pointers whose content hasn't been downloaded;
@@ -34,4 +34,4 @@ With [git-lfs](https://git-lfs.com) installed, the **Repository** panel of the s
 
 ## Submodules
 
-The **Submodules** section lists the repository's submodules. **Update** initializes and updates all of them.
+The **Repository** panel of the sidebar lists the repository's submodules, and says in words when one needs attention. Click one to open it as a tab. **Update** initializes and updates all of them.

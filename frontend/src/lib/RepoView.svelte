@@ -135,6 +135,8 @@
     onNewBranch={() => (dialog = newBranchDialog(ctx))}
     onManageRemotes={() => (remotesOpen = true)}
     onContext={(ref, x, y) => openMenu(refItems(ref, ctx), x, y)}
+    onMenu={openMenu}
+    onManageWorktrees={() => (worktreesOpen = true)}
     openDialog={ctx.openDialog}
   />
   <div class="main">

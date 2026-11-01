@@ -5,7 +5,8 @@
   import type { DialogSpec } from './Dialog.svelte'
   import type { Ref } from './graph/rowCache'
   import { provideCommands, type Command } from './commands.svelte'
-  import RepoExtras from './RepoExtras.svelte'
+  import type { MenuItem } from './ContextMenu.svelte'
+  import RepoPanel from './RepoPanel.svelte'
   import { session } from './session.svelte'
   import Icon from './ui/Icon.svelte'
   import type { IconName } from './ui/Icon.svelte'
@@ -23,6 +24,8 @@
     onNewBranch,
     onManageRemotes,
     onContext,
+    onMenu,
+    onManageWorktrees,
     openDialog,
   }: {
     path: string
@@ -34,6 +37,8 @@
     onNewBranch?: () => void
     onManageRemotes?: () => void
     onContext?: (ref: Ref, x: number, y: number) => void
+    onMenu?: (items: MenuItem[], x: number, y: number) => void
+    onManageWorktrees?: () => void
     openDialog: (spec: DialogSpec) => void
   } = $props()
 
@@ -42,7 +47,7 @@
     { key: 'remotes', label: 'Remotes', icon: 'remote', empty: 'No remote branches. Add a remote to get some.' },
     { key: 'tags', label: 'Tags', icon: 'tag', empty: 'No tags yet.' },
     { key: 'stashes', label: 'Stashes', icon: 'stash', empty: 'No stashes.' },
-    { key: 'repo', label: 'Repository', icon: 'submodule', empty: 'No submodules or LFS here.' },
+    { key: 'repo', label: 'Repository', icon: 'submodule', empty: '' },
   ]
 
   const uid = $props.id()
@@ -60,7 +65,7 @@
   let showingHidden = $state(false)
   let hiddenCount = $derived(refs.filter((r) => r.hidden).length)
   let repoAttention = $state(0)
-  let repoHasContent = $state(true)
+  let repoMatches = $state(0)
 
   let panels = $derived(buildPanels(refs, { showHidden: showingHidden, sort: ui.sort }))
   let current = $derived(ui.panel === 'repo' ? null : panels[ui.panel])
@@ -68,8 +73,13 @@
   let rows = $derived(current ? panelRows(current, { open: ui.open, query: filter, care: careOn }) : [])
   let filtering = $derived(filter.trim().length > 0)
   let needCare = $derived(careCount(panels.branches))
-  let matches = $derived(current && filtering ? panelMatches(current, filter) : 0)
-  let elsewhere = $derived(rows.length === 0 && filtering ? otherPanelWithMatches(panels, ui.panel, filter) : null)
+  let matches = $derived(!filtering ? 0 : current ? panelMatches(current, filter) : repoMatches)
+  // An empty panel names one with matches, the Repository panel last.
+  let elsewhere = $derived.by(() => {
+    if (rows.length > 0 || !filtering) return null
+    return otherPanelWithMatches(panels, ui.panel, filter) ?? (repoMatches > 0 ? { panel: 'repo' as const, count: repoMatches } : null)
+  })
+  let repoElsewhere = $derived(filtering ? otherPanelWithMatches(panels, 'repo', filter) : null)
   let tab = $derived(TABS.find((t) => t.key === ui.panel) ?? TABS[0])
 
   // Only the rows in view are in the DOM, so a repository with tens of thousands of branches
@@ -165,7 +175,6 @@
   }
 
   async function focusFilter() {
-    if (ui.panel === 'repo') ui.panel = 'branches'
     ui.collapsed = false
     await tick()
     filterInput?.focus()
@@ -186,7 +195,7 @@
   /** The rail badge's number, and what it means for screen readers. */
   function badge(key: SidebarPanel): { count: number; text: string } {
     if (filtering) {
-      const count = key === 'repo' ? 0 : panelMatches(panels[key], filter)
+      const count = key === 'repo' ? repoMatches : panelMatches(panels[key], filter)
       return { count, text: count === 1 ? '1 match' : `${count} matches` }
     }
     if (key === 'branches') return { count: needCare, text: needCare === 1 ? '1 needs care' : `${needCare} need care` }
@@ -327,16 +336,14 @@
           <button class="btn sm quiet icon" onclick={onManageRemotes} title="Add, edit or remove remotes" aria-label="Manage remotes"><Icon name="gear" size={14} /></button>
         {/if}
       </div>
-      {#if ui.panel !== 'repo'}
-        <label class="filter">
+      <label class="filter">
           <Icon name="search" size={14} />
-          <input type="search" placeholder="Filter all panels" aria-label="Filter branches, remotes, tags and stashes" bind:value={filter} bind:this={filterInput} onkeydown={filterKey} />
+          <input type="search" placeholder="Filter all panels" aria-label="Filter everything in the sidebar" bind:value={filter} bind:this={filterInput} onkeydown={filterKey} />
           {#if filtering}
             <span class="meta" aria-live="polite">{matches.toLocaleString()}</span>
             <button class="clear" aria-label="Clear the filter" title="Clear the filter" onclick={() => (filter = '')}><Icon name="close" size={12} /></button>
           {/if}
         </label>
-      {/if}
       {#if ui.panel === 'branches'}
         <div class="chips" role="group" aria-label="Which branches to show">
           <button class="chip" aria-pressed={!care} onclick={() => (care = false)}>All</button>
@@ -469,15 +476,22 @@
 
     <!-- Stays mounted so the rail's badge knows about submodules from the start. -->
     <div class="scroll repo-panel" hidden={ui.panel !== 'repo'}>
-      <RepoExtras
+      <RepoPanel
         {path}
+        {filter}
         {openDialog}
+        {onMenu}
+        {onManageWorktrees}
         onStatus={(s) => {
           repoAttention = s.attention
-          repoHasContent = s.hasContent
+          repoMatches = s.matches
         }}
       />
-      {#if !repoHasContent}<p class="empty">{tab.empty}</p>{/if}
+      {#if filtering && repoMatches === 0 && repoElsewhere}
+        <p class="empty">
+          <button class="btn sm text" onclick={() => repoElsewhere && (ui.panel = repoElsewhere.panel)}>{TABS.find((t) => t.key === repoElsewhere?.panel)?.label} has {repoElsewhere.count.toLocaleString()}</button>
+        </p>
+      {/if}
     </div>
 
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
@@ -609,11 +623,6 @@
     font-variation-settings:
       'SOFT' 50,
       'WONK' 1;
-  }
-
-  /* The panel's header already draws the line above the first section. */
-  .repo-panel :global(section:first-child) {
-    border-top: none;
   }
 
   .sort {

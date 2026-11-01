@@ -37,6 +37,8 @@ A group's **Dashboard** shows each repository's branch, how many uncommitted cha
 
 A worktree is a second working folder for the same repository, so you can have two branches checked out side by side. **Manage worktrees…** in the command palette lists them, adds new ones, opens one in a tab, and removes linked ones you're done with.
 
+The **Repository** panel of the sidebar lists them, with each one's branch, and a rose dot marks the one this window has open. Click one to open it as a tab, or right-click it to remove it.
+
 ## Changes made outside the app
 
 Git Revenge watches each open repository. If you commit, check out or rebase in a terminal or another tool, the app picks it up within about a second, with no refresh button needed. If a merge, rebase, cherry-pick, revert or bisect is in progress, even one you started elsewhere, a banner offers **Continue**, **Abort** and **Skip**.
