@@ -11,6 +11,7 @@ export interface Scenario {
   graphRefs?: Record<string, unknown[]>
   selectedCommit?: string
   current?: string
+  menuX?: number
   theme?: 'light' | 'dark'
 }
 

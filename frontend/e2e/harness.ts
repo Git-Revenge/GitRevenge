@@ -126,12 +126,12 @@ const mounts = {
   },
   async commitMenu() {
     const { default: ContextMenu } = await import('../src/lib/ContextMenu.svelte')
-    const { commitItems, groups, refItems } = await import('../src/lib/menus')
+    const { commitMenuItems } = await import('../src/lib/menus')
     const refs = (scenario.responses?.Refs ?? []) as never[]
     const ctx = { path: '/r', current: () => scenario.current ?? 'main', openDialog: record('dialog'), openRebase: record('rebase'), openReflog: record('reflog') }
     const row = { ...graphRow(0), id: 'a'.repeat(40) } as never
-    const items = groups(commitItems(row, refs, ctx), ...refs.map((r) => refItems(r, ctx)))
-    mount(ContextMenu, { target: host, props: { x: 200, y: 100, items, onClose: record('close') } })
+    const items = commitMenuItems(row, refs, ctx)
+    mount(ContextMenu, { target: host, props: { x: scenario.menuX ?? 200, y: 100, items, onClose: record('close') } })
   },
   async upstreamDialog() {
     const { default: Dialog } = await import('../src/lib/Dialog.svelte')
