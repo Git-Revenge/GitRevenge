@@ -13,7 +13,9 @@
     separator?: boolean
     /** Shown beside the label, in Mod+Shift+K form. */
     shortcut?: string
-    run: () => void | Promise<void>
+    /** Opens these as a submenu instead of running. */
+    items?: MenuItem[]
+    run?: () => void | Promise<void>
   }
 </script>
 
@@ -23,8 +25,57 @@
   import { edge, step, typeahead } from './menuKeys'
   import Icon from './ui/Icon.svelte'
   import { menuOut } from './ui/motion'
+  import ContextMenu from './ContextMenu.svelte'
 
-  let { x, y, items, onClose }: { x: number; y: number; items: MenuItem[]; onClose: () => void } = $props()
+  let {
+    x,
+    y,
+    items,
+    onClose,
+    flipX,
+    onBack,
+    focusFirst = true,
+  }: {
+    x: number
+    y: number
+    items: MenuItem[]
+    onClose: () => void
+    /** A submenu's other side of its parent item, for when there's no room to the right. */
+    flipX?: number
+    /** Set on a submenu: go back to the parent, leaving it open. */
+    onBack?: () => void
+    /** A submenu opened by hover leaves focus where it is. */
+    focusFirst?: boolean
+  } = $props()
+
+  /** The open submenu: which item it belongs to, where it goes and whether it takes focus. */
+  let sub = $state<{ index: number; x: number; y: number; flipX: number; focus: boolean } | null>(null)
+  let hoverTimer: ReturnType<typeof setTimeout> | undefined
+
+  function openSub(i: number, focus: boolean) {
+    clearTimeout(hoverTimer)
+    const el = menu.querySelectorAll<HTMLElement>('[role="menuitem"]')[i]
+    const box = el.getBoundingClientRect()
+    sub = { index: i, x: box.right - 4, y: box.top - 5, flipX: box.left + 4, focus }
+  }
+
+  function hover(i: number) {
+    clearTimeout(hoverTimer)
+    if (sub?.index === i) return
+    // A short wait, so moving past a row on the way to another doesn't flash its submenu.
+    // Read now: the parent may have closed this menu by the time the wait is over.
+    const hasItems = !!items[i].items
+    hoverTimer = setTimeout(() => {
+      if (hasItems) openSub(i, false)
+      else sub = null
+    }, 120)
+  }
+
+  function closeSub() {
+    const i = sub?.index ?? -1
+    sub = null
+    if (i >= 0) activate(i)
+  }
 
   let menu: HTMLDivElement
   /** The highlighted item, which also holds DOM focus; -1 for none. */
@@ -40,6 +91,14 @@
   let query = ''
   let queryTimer: ReturnType<typeof setTimeout> | undefined
 
+  /** Whether the pointer's last move already dealt with this item. */
+  let lastHover = -1
+  function hovering(i: number) {
+    const same = lastHover === i
+    lastHover = i
+    return same
+  }
+
   /** Highlights and focuses item i. Moving off an armed item disarms it. */
   function activate(i: number) {
     if (i < 0) return
@@ -51,26 +110,35 @@
   onMount(() => {
     const before = document.activeElement as HTMLElement | null
     const r = menu.getBoundingClientRect()
-    left = Math.max(4, Math.min(x, window.innerWidth - r.width - 4))
+    const fits = x + r.width + 4 <= window.innerWidth
+    left = Math.max(4, !fits && flipX !== undefined ? flipX - r.width : Math.min(x, window.innerWidth - r.width - 4))
     top = Math.max(4, Math.min(y, window.innerHeight - r.height - 4))
-    const first = edge(items, false)
-    if (first < 0) menu.focus()
-    else activate(first)
+    if (focusFirst) {
+      const first = edge(items, false)
+      if (first < 0) menu.focus()
+      else activate(first)
+    }
     return () => {
       clearTimeout(queryTimer)
-      before?.focus?.()
+      clearTimeout(hoverTimer)
+      if (focusFirst) before?.focus?.()
     }
   })
 
   async function pick(i: number) {
     const item = items[i]
     if (item.disabled) return
+    clearTimeout(hoverTimer)
+    if (item.items) {
+      openSub(i, true)
+      return
+    }
     if (item.danger && armed !== i) {
       armed = i
       return
     }
     onClose()
-    await item.run()
+    await item.run?.()
   }
 
   /** Arrows, Home, End and type-ahead move between items; Tab closes, as in native menus. */
@@ -79,7 +147,19 @@
       e.preventDefault()
       activate(j)
     }
-    if (e.key === 'ArrowDown') go(step(items, active, 1))
+    if (onBack) {
+      // Only this submenu hears its keys; Esc shouldn't close the parent too.
+      e.stopPropagation()
+      if (e.key === 'Escape' || e.key === 'ArrowLeft') {
+        e.preventDefault()
+        onBack()
+        return
+      }
+    }
+    if (e.key === 'ArrowRight' && active >= 0 && items[active].items && !items[active].disabled) {
+      e.preventDefault()
+      openSub(active, true)
+    } else if (e.key === 'ArrowDown') go(step(items, active, 1))
     else if (e.key === 'ArrowUp') go(step(items, active < 0 ? items.length : active, -1))
     else if (e.key === 'Home' || e.key === 'PageUp') go(edge(items, false))
     else if (e.key === 'End' || e.key === 'PageDown') go(edge(items, true))
@@ -98,10 +178,10 @@
 
 <svelte:window
   onmousedown={(e) => {
-    if (!menu.contains(e.target as Node)) onClose()
+    if (!onBack && !(e.target as Element).closest?.('[role="menu"]')) onClose()
   }}
-  onkeydown={(e) => e.key === 'Escape' && onClose()}
-  onblur={onClose}
+  onkeydown={(e) => e.key === 'Escape' && !onBack && onClose()}
+  onblur={() => !onBack && onClose()}
 />
 
 <div class="menu" bind:this={menu} out:menuOut|global role="menu" tabindex="-1" style:left="{left}px" style:top="{top}px" onkeydown={onKey}>
@@ -115,17 +195,27 @@
       class:danger={item.danger}
       class:armed={armed === i}
       aria-disabled={item.disabled || undefined}
+      aria-haspopup={item.items ? 'menu' : undefined}
+      aria-expanded={item.items ? sub?.index === i : undefined}
       onclick={() => pick(i)}
       onmousedown={(e) => item.disabled && e.preventDefault()}
-      onmousemove={() => !item.disabled && active !== i && activate(i)}
+      onmousemove={() => {
+        if (!item.disabled && active !== i) activate(i)
+        if (!item.disabled && !hovering(i)) hover(i)
+      }}
     >
       {#if hasIcons}<span class="icon">{#if item.icon}<Icon name={item.icon} />{/if}</span>{/if}
       <span class="label">{armed === i ? `Press again to ${item.label.toLowerCase()}` : item.label}</span>
       {#if armed === i}<Icon name="warning" size={14} />
+      {:else if item.items}<span class="arrow" aria-hidden="true"><Icon name="right" size={14} /></span>
       {:else if item.shortcut}<kbd>{formatShortcut(item.shortcut)}</kbd>{/if}
     </button>
   {/each}
 </div>
+{#if sub && items[sub.index]?.items}
+  <!-- Props are read once more as sub clears, before this block goes, so they allow for null. -->
+  <ContextMenu x={sub?.x ?? 0} y={sub?.y ?? 0} flipX={sub?.flipX} items={(sub && items[sub.index]?.items) || []} {onClose} onBack={closeSub} focusFirst={sub?.focus ?? false} />
+{/if}
 
 <style>
   .menu {
@@ -197,7 +287,7 @@
   kbd {
     flex: none;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     color: var(--ink-mute);
   }
 
@@ -219,6 +309,12 @@
 
   .item.armed:not(.active) {
     background: var(--danger-wash);
+  }
+
+  .arrow {
+    display: inline-flex;
+    margin-left: auto;
+    color: var(--ink-mute);
   }
 
   .rule {

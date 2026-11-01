@@ -50,6 +50,7 @@
   $effect(() => {
     GitConfigKeys()
       .then((k) => (known = k ?? []))
+      // Only used for suggestions.
       .catch(() => {})
   })
 
@@ -509,7 +510,7 @@
 
   .full {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     color: var(--ink-faint);
     overflow-wrap: anywhere;
   }

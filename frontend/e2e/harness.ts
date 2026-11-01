@@ -41,7 +41,7 @@ type Group = { name: string; paths: string[] }
 const behaviours: Record<string, (...args: never[]) => unknown> = {
   GraphRows: (_path: string, start: number, count: number) => {
     const total = scenario.graphRows ?? 0
-    return { rows: Array.from({ length: Math.max(0, Math.min(count, total - start)) }, (_, k) => graphRow(start + k)), refs: {}, total, loading: false, paused: false, estimate: total }
+    return { rows: Array.from({ length: Math.max(0, Math.min(count, total - start)) }, (_, k) => graphRow(start + k)), refs: scenario.graphRefs ?? {}, total, loading: false, paused: false, estimate: total }
   },
   GroupAction: (action: string, args: string[]) => {
     const groups = responses.Groups as Group[]
@@ -107,6 +107,10 @@ const mounts = {
     const { default: MathView } = await import('../src/lib/markdown/MathView.svelte')
     mount(MathView, { target: host, props: { tex: 'x^2' } })
   },
+  async loading() {
+    const { default: Loading } = await import('../src/lib/ui/Loading.svelte')
+    mount(Loading, { target: host, props: {} })
+  },
   async sidebar() {
     const { default: Sidebar } = await import('../src/lib/Sidebar.svelte')
     mount(Sidebar, {
@@ -137,12 +141,12 @@ const mounts = {
   },
   async commitMenu() {
     const { default: ContextMenu } = await import('../src/lib/ContextMenu.svelte')
-    const { commitItems, groups, refItems } = await import('../src/lib/menus')
+    const { commitMenuItems } = await import('../src/lib/menus')
     const refs = (scenario.responses?.Refs ?? []) as never[]
     const ctx = { path: '/r', current: () => scenario.current ?? 'main', openDialog: record('dialog'), openRebase: record('rebase'), openReflog: record('reflog') }
     const row = { ...graphRow(0), id: 'a'.repeat(40) } as never
-    const items = groups(commitItems(row, refs, ctx), ...refs.map((r) => refItems(r, ctx)))
-    mount(ContextMenu, { target: host, props: { x: 200, y: 100, items, onClose: record('close') } })
+    const items = commitMenuItems(row, refs, ctx)
+    mount(ContextMenu, { target: host, props: { x: scenario.menuX ?? 200, y: 100, items, onClose: record('close') } })
   },
   async upstreamDialog() {
     const { default: Dialog } = await import('../src/lib/Dialog.svelte')
@@ -162,6 +166,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'math':
     await mounts.math()
+    break
+  case 'loading':
+    await mounts.loading()
     break
   case 'sidebar':
     await mounts.sidebar()

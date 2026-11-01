@@ -7,6 +7,7 @@
   import { session } from './session.svelte'
   import Icon from './ui/Icon.svelte'
   import Modal from './ui/Modal.svelte'
+  import Loading from './ui/Loading.svelte'
 
   let { path, onClose }: { path: string; onClose: () => void } = $props()
 
@@ -65,7 +66,7 @@
 <Modal title="LFS" eyebrow="large files" width={640} {onClose}>
   {#if error}<p class="error" role="alert">{error}</p>{/if}
   {#if !lfs}
-    <p class="muted">Loading…</p>
+    <Loading />
   {:else}
     <h3>Tracked patterns</h3>
     <ul>

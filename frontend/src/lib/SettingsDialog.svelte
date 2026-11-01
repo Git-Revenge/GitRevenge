@@ -13,6 +13,7 @@
   import InkButton from './ui/InkButton.svelte'
   import Modal from './ui/Modal.svelte'
   import { update } from './update.svelte'
+  import Loading from './ui/Loading.svelte'
 
   let { onClose }: { onClose: () => void } = $props()
 
@@ -111,7 +112,7 @@
 
 <Modal title="Settings" eyebrow="make it yours" width={560} {onClose}>
   {#if !p}
-    <p class="muted">{error || 'Loading…'}</p>
+    {#if error}<p class="muted">{error}</p>{:else}<Loading />{/if}
   {:else}
     <form
       onsubmit={(e) => {

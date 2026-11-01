@@ -9,6 +9,7 @@
   import type { Ref } from './graph/rowCache'
   import Modal from './ui/Modal.svelte'
   import Icon from './ui/Icon.svelte'
+  import Loading from './ui/Loading.svelte'
 
   let {
     path,
@@ -34,6 +35,7 @@
   $effect(() => {
     void Refs(path)
       .then((all) => (branches = ((all ?? []) as Ref[]).filter((r) => r.kind === 'local')))
+      // The picker just lists fewer branches; the one opened still shows.
       .catch(() => {})
   })
 
@@ -64,7 +66,7 @@
   {#if error}
     <p class="error" role="alert">{error}</p>
   {:else if !entries}
-    <p class="muted">Loading…</p>
+    <Loading />
   {:else if entries.length === 0}
     <p class="muted">No reflog for this ref. Git keeps reflogs for local refs it has moved, for 90 days by default.</p>
   {:else}
@@ -118,7 +120,7 @@
     background: var(--paper);
     text-align: left;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 400;
     letter-spacing: 0.08em;
     text-transform: uppercase;

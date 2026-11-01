@@ -1,5 +1,6 @@
 <script lang="ts">
   import { KINDS } from '../branchKinds'
+  import { errorText } from '../errors'
   import { onMount } from 'svelte'
   import { CommitRow, CommitSignatures, GraphRows, Refs, RepoPreferences, SearchGraph, SetKindVisible } from '../../../wailsjs/go/app/App.js'
   import { session } from '../session.svelte'
@@ -31,7 +32,11 @@
   let kindToggles = $state<{ kind: 'docs' | 'bot'; label: string; icon: (typeof KINDS)['docs']['icon']; hidden: boolean }[]>([])
 
   async function loadKindToggles() {
-    const [refs, prefs] = await Promise.all([Refs(path).catch(() => []), RepoPreferences(path).catch(() => null)])
+    const [refs, prefs] = await Promise.all([
+      // The toggles are optional: without these answers they just don't show.
+      Refs(path).catch(() => []),
+      RepoPreferences(path).catch(() => null),
+    ])
     const hidden = new Set(prefs?.hideKinds ?? [])
     kindToggles = (['docs', 'bot'] as const)
       .filter((k) => hidden.has(k) || (refs as Ref[]).some((r) => r.branchKind === k))
@@ -106,6 +111,8 @@
     placeScroller(m)
   })
   let error = $state('')
+  /** Fetching rows failed, separately from reading the history; clears when a fetch works. */
+  let rowError = $state('')
   let selected = $state(-1)
   let hovered = -1
   let frame = 0
@@ -132,6 +139,7 @@
       selectHeadOnce()
       schedule()
     },
+    (e) => (rowError = e === null ? '' : errorText(e)),
   )
 
   function theme(): Theme {
@@ -171,6 +179,7 @@
     const ids = [...sigWanted]
     sigWanted.clear()
     for (const id of ids) sigs.set(id, '') // asked; don't ask again
+    // Signature marks are decoration: a failure just means no mark.
     const checks = await CommitSignatures(path, ids).catch(() => [])
     let signed = false
     for (const c of checks) {
@@ -470,8 +479,8 @@
 
 <div class="graph">
   <div class="status">
-    {#if error}
-      <span class="error">Couldn't read history: {error}</span>
+    {#if error || rowError}
+      <span class="error">Couldn't read history: {error || rowError}</span>
     {:else if loading && paused}
       <span class="meta" title="More history loads as you scroll, search or jump to a commit"
         >{total.toLocaleString()}{estimate > total ? ` of about ${estimate.toLocaleString()}` : ''} commits loaded</span
@@ -637,7 +646,7 @@
 
   .count {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     color: var(--ink-mute);
     white-space: nowrap;
   }

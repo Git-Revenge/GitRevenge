@@ -25,6 +25,7 @@
   let redoLabel = $state('')
 
   async function refreshUndo() {
+    // With no answer, Undo and Redo are just disabled.
     const info = await UndoState(path).catch(() => null)
     undoLabel = info?.undo ?? ''
     redoLabel = info?.redo ?? ''

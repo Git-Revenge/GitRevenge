@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { errorText } from './errors'
   import { CommitDetail, CommitNotes, CommitSignatures, IssueURL, SetCommitNote } from '../../wailsjs/go/app/App.js'
   import type { app, git } from '../../wailsjs/go/models'
   import { BrowserOpenURL } from '../../wailsjs/runtime/runtime.js'
@@ -9,6 +10,7 @@
   import { asPerson, valueParts } from './trailers'
   import Markdown from './Markdown.svelte'
   import Icon from './ui/Icon.svelte'
+  import Loading from './ui/Loading.svelte'
 
   let {
     path,
@@ -35,14 +37,23 @@
 
   // git notes on the commit, from every notes ref; the default ref's note can be edited.
   let notes = $state<git.Note[]>([])
+  let notesError = $state('')
   let noteDraft = $state<string | null>(null)
   let noteBusy = $state(false)
   const DEFAULT_NOTES = 'refs/notes/commits'
   let ownNote = $derived(notes.find((n) => n.ref === DEFAULT_NOTES))
 
   async function loadNotes(id: string) {
-    const res = await CommitNotes(path, id).catch(() => [])
-    if (id === commitId) notes = res
+    try {
+      const res = await CommitNotes(path, id)
+      if (id === commitId) {
+        notes = res ?? []
+        notesError = ''
+      }
+    } catch (e) {
+      // Not the same as having no notes, so it's worth saying.
+      if (id === commitId) notesError = errorText(e)
+    }
   }
 
   $effect(() => {
@@ -76,6 +87,7 @@
       .then(([c]) => {
         if (id === commitId) sig = c ?? null
       })
+      // The signature is decoration: a failure just means no mark.
       .catch(() => {})
   })
 
@@ -96,6 +108,7 @@
       .then((u) => {
         if (p === path) issueURL = u
       })
+      // Without it, issue references just aren't links.
       .catch(() => {})
   })
 
@@ -149,7 +162,7 @@
 <aside class="panel" aria-label="Commit details">
   <span class="blob" aria-hidden="true"></span>
   {#if !info}
-    <p class="muted pad">Loading…</p>
+    <Loading />
   {:else}
     {@const c = info.commit}
     <header>
@@ -213,6 +226,7 @@
         {/if}
         <dt class="meta">Notes</dt>
         <dd class="notes">
+          {#if notesError}<p class="muted" role="alert">Couldn't read notes: {notesError}</p>{/if}
           {#each notes as n (n.ref)}
             {#if !(n.ref === DEFAULT_NOTES && noteDraft !== null)}
               <div class="note">
@@ -421,7 +435,7 @@
   .key-id {
     display: block;
     font-family: var(--font-mono);
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--ink-mute);
     overflow-wrap: anywhere;
   }
@@ -489,7 +503,7 @@
   .when {
     display: block;
     font-family: var(--font-mono);
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--ink-mute);
   }
 
@@ -498,7 +512,7 @@
     border-radius: 3px;
     background: var(--paper-warm);
     font-family: var(--font-mono);
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--accent-b);
     overflow-wrap: anywhere;
   }
@@ -567,7 +581,7 @@
 
   .status {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }

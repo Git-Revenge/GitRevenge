@@ -5,6 +5,7 @@
   import { formatTime } from '../graph/draw'
   import { session } from '../session.svelte'
   import DiffView, { type DiffTarget } from './DiffView.svelte'
+  import Loading from '../ui/Loading.svelte'
 
   let {
     path,
@@ -39,7 +40,7 @@
   </header>
   <ul class="list">
     {#if !commits}
-      <li class="muted pad">Loading…</li>
+      <li><Loading /></li>
     {:else}
       {#each commits as c (c.id)}
         <li>
@@ -131,7 +132,7 @@
   .when {
     white-space: nowrap;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .badge {
@@ -139,7 +140,7 @@
     border-radius: 4px;
     background: var(--selected);
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     color: var(--accent-a);
   }
 

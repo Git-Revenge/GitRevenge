@@ -8,7 +8,7 @@
   import WorktreesDialog from './WorktreesDialog.svelte'
   import Toolbar from './Toolbar.svelte'
   import Icon from './ui/Icon.svelte'
-  import { branchAtDialog, checkoutRef, commitItems, dropItems, groups, newBranchDialog, refItems, type MenuContext } from './menus'
+  import { commitMenuItems, branchAtDialog, checkoutRef, dropItems, newBranchDialog, refItems, type MenuContext } from './menus'
   import ReflogDialog from './ReflogDialog.svelte'
   import CommitPanel from './CommitPanel.svelte'
   import type { DiffTarget } from './diff/DiffView.svelte'
@@ -155,7 +155,7 @@
          survive returning to it. -->
     <div class="graph" class:hidden={diff || rebaseBase}>
       <GraphView bind:this={graph} {path} {onSelect} onContext={(row, refs, x, y) =>
-          openMenu(groups(commitItems(row, refs, ctx), ...refs.map((r) => refItems(r, ctx))), x, y)}
+          openMenu(commitMenuItems(row, refs, ctx), x, y)}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
           if (items.length) openMenu(items, x, y)

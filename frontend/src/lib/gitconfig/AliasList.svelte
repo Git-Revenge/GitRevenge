@@ -26,6 +26,7 @@
   $effect(() => {
     GitCommands()
       .then((c) => (builtins = c ?? []))
+      // Only used for warnings about shadowing a built-in.
       .catch(() => {})
   })
 

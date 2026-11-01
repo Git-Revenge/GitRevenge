@@ -124,7 +124,7 @@
   // a drag can't also open a repository.
   let cardsEl = $state<HTMLElement>()
   let announcement = $state('')
-  type Drag = { group: string; from: number; gap: number | null; boxes: DOMRect[]; repo: boolean; card?: DOMRect }
+  type Drag = { group: string; from: number; gap: number | null; items: Element[]; repo: boolean; card?: Element; x: number; y: number }
   let drag = $state<Drag | null>(null)
 
   async function moveGroup(g: settings.Group, to: number) {
@@ -144,13 +144,23 @@
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
     const card = repo ? (e.currentTarget as HTMLElement).closest('[data-card]') : null
     const items = repo ? card?.querySelectorAll('[data-repo]') : cardsEl?.querySelectorAll('[data-card]')
-    drag = { group, from, gap: null, boxes: [...(items ?? [])].map((el) => el.getBoundingClientRect()), repo, card: card?.getBoundingClientRect() }
+    drag = { group, from, gap: null, items: [...(items ?? [])], repo, card: card ?? undefined, x: e.clientX, y: e.clientY }
+  }
+
+  /** Reads positions afresh each time, because the page can scroll during a drag. */
+  function updateGap() {
+    if (!drag) return
+    const { x, y } = drag
+    const boxes = drag.items.map((el) => el.getBoundingClientRect())
+    if (drag.repo) drag.gap = drag.card && isInside(x, y, drag.card.getBoundingClientRect()) ? gapInList(y, boxes) : null
+    else drag.gap = gapInGrid(x, y, boxes)
   }
 
   function dragMove(e: PointerEvent) {
     if (!drag) return
-    if (drag.repo) drag.gap = drag.card && isInside(e.clientX, e.clientY, drag.card) ? gapInList(e.clientY, drag.boxes) : null
-    else drag.gap = gapInGrid(e.clientX, e.clientY, drag.boxes)
+    drag.x = e.clientX
+    drag.y = e.clientY
+    updateGap()
   }
 
   function dragEnd() {
@@ -335,6 +345,7 @@
   onkeydown={(e) => {
     if (drag && e.key === 'Escape') drag = null
   }}
+  onscrollcapture={updateGap}
 />
 
 <style>

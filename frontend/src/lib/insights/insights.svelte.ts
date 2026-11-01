@@ -195,6 +195,7 @@ class InsightsTab {
   async setScope(s: Scope | null) {
     this.scope = s
     if (!s) return
+    // Only remembers the tab for next time.
     void SetInsightsTab(encode(s)).catch(() => {})
     // Release windows go by tags, which only make sense for one repository.
     if (s.kind === 'group' && this.window === 'releases') this.window = '14d'
@@ -204,7 +205,11 @@ class InsightsTab {
     } else {
       this.tags = []
     }
-    this.thresholds = (await InsightsThresholds(encode(s)).catch(() => null)) ?? ({ ...DEFAULT_THRESHOLDS } as app.Thresholds)
+    // Falling back to the defaults changes what's flagged, so it has to be said.
+    this.thresholds = (await InsightsThresholds(encode(s)).catch((e) => {
+      session.error = `Using the default thresholds: ${errorText(e)}`
+      return null
+    })) ?? ({ ...DEFAULT_THRESHOLDS } as app.Thresholds)
     await this.load()
   }
 
@@ -256,6 +261,7 @@ class InsightsTab {
       if (this.scope?.kind === 'group' && !asOf) {
         const own: number[] = []
         await each(this.repos, PARALLEL, async (repo) => {
+          // Only for lining windows up; the pass below reports each repository's error.
           const r = await InsightsShipped(repo, this.inputs(0)).catch(() => null)
           if (r) own.push(r.window.asOf)
         })
