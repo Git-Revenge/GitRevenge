@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"regexp"
 	"strconv"
@@ -63,7 +64,16 @@ type Ref struct {
 // refFormat deliberately avoids %(refname:short): git makes it unambiguous by comparing
 // every ref against all others, which is quadratic (about 1.9s for 2,000 branches).
 // Stripping the namespace prefix gives the same display name at no cost.
-const refFormat = "%(refname)%00%(objectname)%00%(*objectname)%00%(HEAD)%00%(upstream:short)%00%(upstream:track)%00%(creatordate:unix)"
+const refFormat = "%(refname)%00%(objectname)%00%(*objectname)%00%(HEAD)%00%(creatordate:unix)"
+
+// upstreamFormat is separate because it's nearly all of the cost. Git spends about 125µs per ref
+// per upstream field, even on a ref with no upstream: 5s of the 5.2s for 20,000 branches. So
+// refFormat lists everything, and only branches that have an upstream are asked about it.
+const upstreamFormat = "%(refname)%00%(upstream:short)%00%(upstream:track)"
+
+// maxUpstreamPatternBytes keeps the upstream query's command line well under Windows' limit of
+// about 32KB. Past it, the query covers all of refs/heads, as it did before the split.
+var maxUpstreamPatternBytes = 16 * 1024
 
 var trackRE = regexp.MustCompile(`(ahead|behind) (\d+)`)
 
@@ -76,14 +86,13 @@ func (r *Repo) Refs(ctx context.Context) ([]Ref, error) {
 		sc.Buffer(make([]byte, 64*1024), 1024*1024)
 		for sc.Scan() {
 			f := bytes.Split(sc.Bytes(), []byte{0})
-			if len(f) != 7 {
+			if len(f) != 5 {
 				continue
 			}
 			ref := Ref{
-				Name:     string(f[0]),
-				Commit:   string(f[1]),
-				Head:     string(f[3]) == "*",
-				Upstream: string(f[4]),
+				Name:   string(f[0]),
+				Commit: string(f[1]),
+				Head:   string(f[3]) == "*",
 			}
 			if len(f[2]) > 0 {
 				ref.Commit = string(f[2]) // annotated tag: use the commit it points to
@@ -107,22 +116,15 @@ func (r *Repo) Refs(ctx context.Context) ([]Ref, error) {
 				continue
 			}
 			// A ref whose object has no date (a tag of a tree, say) just sorts last.
-			ref.Updated, _ = strconv.ParseInt(string(f[6]), 10, 64)
-			track := string(f[5])
-			ref.Gone = track == "[gone]"
-			for _, m := range trackRE.FindAllStringSubmatch(track, -1) {
-				n, _ := strconv.Atoi(m[2])
-				if m[1] == "ahead" {
-					ref.Ahead = n
-				} else {
-					ref.Behind = n
-				}
-			}
+			ref.Updated, _ = strconv.ParseInt(string(f[4]), 10, 64)
 			refs = append(refs, ref)
 		}
 		return sc.Err()
 	}, "for-each-ref", "--format="+refFormat, "refs/heads", "refs/remotes", "refs/tags")
 	if err != nil {
+		return nil, err
+	}
+	if err := r.addUpstreams(ctx, refs); err != nil {
 		return nil, err
 	}
 
@@ -131,6 +133,108 @@ func (r *Repo) Refs(ctx context.Context) ([]Ref, error) {
 		return nil, err
 	}
 	return append(refs, stashes...), nil
+}
+
+// addUpstreams fills in the upstream fields of the local branches that have one.
+func (r *Repo) addUpstreams(ctx context.Context, refs []Ref) error {
+	configured, known, err := r.branchesWithUpstream(ctx)
+	if err != nil {
+		return err
+	}
+	if known && len(configured) == 0 {
+		return nil
+	}
+	byName := make(map[string]*Ref, len(refs))
+	for i := range refs {
+		if refs[i].Kind == LocalBranch {
+			byName[refs[i].Name] = &refs[i]
+		}
+	}
+	args := []string{"for-each-ref", "--format=" + upstreamFormat}
+	args = append(args, upstreamPatterns(configured, known, byName)...)
+	if len(args) == 2 {
+		return nil // Every configured branch has been deleted.
+	}
+	return r.Stream(ctx, func(rd io.Reader) error {
+		sc := bufio.NewScanner(rd)
+		sc.Buffer(make([]byte, 64*1024), 1024*1024)
+		for sc.Scan() {
+			f := bytes.Split(sc.Bytes(), []byte{0})
+			if len(f) != 3 {
+				continue
+			}
+			if ref := byName[string(f[0])]; ref != nil {
+				ref.setUpstream(string(f[1]), string(f[2]))
+			}
+		}
+		return sc.Err()
+	}, args...)
+}
+
+// upstreamPatterns narrows the upstream query to the branches listed, when that's known and fits
+// on a command line, and otherwise covers them all.
+func upstreamPatterns(configured []string, known bool, byName map[string]*Ref) []string {
+	if !known {
+		return []string{"refs/heads"}
+	}
+	patterns := make([]string, 0, len(configured))
+	size := 0
+	for _, name := range configured {
+		full := "refs/heads/" + name
+		if byName[full] == nil {
+			continue // The config outlives a deleted branch.
+		}
+		size += len(full) + 1
+		if size > maxUpstreamPatternBytes {
+			return []string{"refs/heads"}
+		}
+		patterns = append(patterns, full)
+	}
+	return patterns
+}
+
+// setUpstream records a branch's upstream from for-each-ref's short name and track fields.
+func (ref *Ref) setUpstream(short, track string) {
+	ref.Upstream = short
+	ref.Gone = track == "[gone]"
+	for _, m := range trackRE.FindAllStringSubmatch(track, -1) {
+		n, _ := strconv.Atoi(m[2])
+		if m[1] == "ahead" {
+			ref.Ahead = n
+		} else {
+			ref.Behind = n
+		}
+	}
+}
+
+// branchesWithUpstream lists the branches whose config names an upstream. known is false if that
+// couldn't be read, in which case the caller should check every branch.
+func (r *Repo) branchesWithUpstream(ctx context.Context) (names []string, known bool, err error) {
+	out, err := r.Read(ctx, "config", "-z", "--get-regexp", "^branch\\..*\\.merge$")
+	if err != nil {
+		var gerr *Error
+		if errors.As(err, &gerr) && gerr.ExitCode == 1 && gerr.Stderr == "" {
+			return nil, true, nil // Nothing matched: no branch has an upstream.
+		}
+		if ctx.Err() != nil {
+			return nil, false, ctx.Err()
+		}
+		return nil, false, nil
+	}
+	seen := map[string]bool{}
+	for _, entry := range bytes.Split(out, []byte{0}) {
+		// With -z, each entry is "key\nvalue".
+		key, _, _ := bytes.Cut(entry, []byte{'\n'})
+		name, ok := strings.CutPrefix(string(key), "branch.")
+		if !ok {
+			continue
+		}
+		if name, ok = strings.CutSuffix(name, ".merge"); ok && !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
+	}
+	return names, true, nil
 }
 
 func (r *Repo) stashes(ctx context.Context) ([]Ref, error) {
