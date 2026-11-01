@@ -7,11 +7,14 @@ import (
 	"time"
 )
 
+// Long enough that steps of one write in a test fall within it, even on a busy machine.
+const testSettle = 250 * time.Millisecond
+
 // watching runs a Watcher that checks often, and returns what it reports.
 func watching(t *testing.T) (*Watcher, <-chan string) {
 	t.Helper()
 	got := make(chan string, 16)
-	w := newWatcher(func(p string) { got <- p }, 10*time.Millisecond)
+	w := newWatcher(func(p string) { got <- p }, 10*time.Millisecond, testSettle)
 	t.Cleanup(w.Close)
 	return w, got
 }
@@ -33,7 +36,7 @@ func expectQuiet(t *testing.T, got <-chan string) {
 	select {
 	case p := <-got:
 		t.Errorf("unexpected report %s", p)
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(3 * testSettle):
 	}
 }
 
@@ -50,6 +53,69 @@ func TestWatcherReportsOnlyChanges(t *testing.T) {
 	write(t, path, "[bigger]\n")
 	expectReport(t, got, path)
 	expectQuiet(t, got)
+}
+
+// #379: a write that isn't atomic truncates first, and a check can land between the steps.
+func TestWatcherWaitsForAWriteToFinish(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "gitconfig")
+	write(t, path, "[a]\n")
+	w, got := watching(t)
+	w.Add(path)
+
+	write(t, path, "")
+	time.Sleep(testSettle / 6) // Longer than the 10ms between checks.
+	write(t, path, "[finished]\n")
+	expectReport(t, got, path)
+	expectQuiet(t, got)
+}
+
+func TestWatcherReportsAFileThatNeverSettles(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "gitconfig")
+	write(t, path, "[a]\n")
+	got := make(chan string, 16)
+	w := newWatcher(func(p string) { got <- p }, 10*time.Millisecond, 10*time.Millisecond)
+	defer w.Close()
+	w.Add(path)
+
+	stop := make(chan struct{})
+	defer close(stop)
+	go func() {
+		content := "[a]\n"
+		for {
+			select {
+			case <-stop:
+				return
+			case <-time.After(2 * time.Millisecond):
+				content += "x"
+				_ = os.WriteFile(path, []byte(content), 0o644)
+			}
+		}
+	}()
+	select {
+	case <-got:
+	case <-time.After(5 * time.Second):
+		t.Fatal("a file that keeps changing was never reported")
+	}
+}
+
+func TestWatcherCloseDoesNotWaitOutASettlingFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "gitconfig")
+	write(t, path, "[a]\n")
+	w := newWatcher(func(string) {}, 10*time.Millisecond, time.Hour)
+	w.Add(path)
+	write(t, path, "[bigger]\n")
+	time.Sleep(50 * time.Millisecond) // Long enough to be waiting for it to settle.
+
+	closed := make(chan struct{})
+	go func() {
+		w.Close()
+		close(closed)
+	}()
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close waited for the file to settle")
+	}
 }
 
 func TestWatcherNoticesASameSizeEdit(t *testing.T) {
@@ -132,7 +198,7 @@ func TestWatcherStopsReportingWhenClosed(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "gitconfig")
 	write(t, path, "[a]\n")
 	got := make(chan string, 16)
-	w := newWatcher(func(p string) { got <- p }, 10*time.Millisecond)
+	w := newWatcher(func(p string) { got <- p }, 10*time.Millisecond, testSettle)
 	w.Add(path)
 	w.Close()
 

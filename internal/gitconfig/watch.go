@@ -6,9 +6,16 @@ import (
 	"time"
 )
 
-// pollInterval is how often config files are checked: the longest an outside edit takes to
-// show. Checking is one stat per file, and there are only a few files.
-const pollInterval = 2 * time.Second
+const (
+	// pollInterval is how often config files are checked. Checking is one stat per file, and
+	// there are only a few files.
+	pollInterval = 2 * time.Second
+	// settleDelay is how long a changed file must stay the same before it's reported, so it
+	// isn't read half written: a write that isn't atomic truncates first.
+	settleDelay = 150 * time.Millisecond
+	// settleChecks bounds the wait, so a file that never stops changing is still reported.
+	settleChecks = 10
+)
 
 // Watcher reports changes to individual config files, which can live anywhere, so repo
 // watchers don't cover them.
@@ -19,6 +26,7 @@ const pollInterval = 2 * time.Second
 type Watcher struct {
 	onChange func(path string)
 	interval time.Duration
+	settle   time.Duration
 	done     chan struct{}
 	wg       sync.WaitGroup
 
@@ -53,13 +61,14 @@ func stateOf(path string) fileState {
 // NewWatcher starts a Watcher that calls onChange, from its own goroutine, with the path
 // given to Add.
 func NewWatcher(onChange func(path string)) *Watcher {
-	return newWatcher(onChange, pollInterval)
+	return newWatcher(onChange, pollInterval, settleDelay)
 }
 
-func newWatcher(onChange func(path string), interval time.Duration) *Watcher {
+func newWatcher(onChange func(path string), interval, settle time.Duration) *Watcher {
 	w := &Watcher{
 		onChange: onChange,
 		interval: interval,
+		settle:   settle,
 		done:     make(chan struct{}),
 		files:    map[string]*watchedFile{},
 	}
@@ -104,29 +113,53 @@ func (w *Watcher) loop() {
 	}
 }
 
-// check returns the files changed since the last check. It doesn't hold the lock while it
-// reads the disk, since a file on a slow network share mustn't hold up Add.
+// check returns the files changed since the last check, once they've stopped changing. It
+// doesn't hold the lock while it reads the disk or waits, since a file on a slow network share
+// mustn't hold up Add.
 func (w *Watcher) check() []string {
 	w.mu.Lock()
-	files := make(map[string]string, len(w.files))
+	paths := make(map[string]string, len(w.files))
+	known := make(map[string]fileState, len(w.files))
 	for key, f := range w.files {
-		files[key] = f.path
+		paths[key] = f.path
+		known[key] = f.state
 	}
 	w.mu.Unlock()
 
-	states := make(map[string]fileState, len(files))
-	for key, path := range files {
-		states[key] = stateOf(path)
+	states := make(map[string]fileState)
+	for key, path := range paths {
+		if state := stateOf(path); state != known[key] {
+			states[key] = state
+		}
+	}
+	if len(states) == 0 {
+		return nil
+	}
+	for range settleChecks {
+		select {
+		case <-w.done:
+			return nil
+		case <-time.After(w.settle):
+		}
+		settled := true
+		for key := range states {
+			if state := stateOf(paths[key]); state != states[key] {
+				states[key] = state
+				settled = false
+			}
+		}
+		if settled {
+			break
+		}
 	}
 
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	var changed []string
+	changed := make([]string, 0, len(states))
 	for key, state := range states {
-		if f := w.files[key]; f.state != state {
-			f.state = state
-			changed = append(changed, f.path)
-		}
+		f := w.files[key]
+		f.state = state
+		changed = append(changed, f.path)
 	}
 	return changed
 }
