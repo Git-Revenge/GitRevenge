@@ -6,7 +6,7 @@
 - Right-click any commit for **Create branch here…** or **Create tag here…**. Give a tag a message to make it an annotated tag.
 - Double-click a branch in the sidebar to check it out. Checking out a remote branch offers to create a local branch that tracks it.
 - Right-click a branch to rename it, delete it, set its upstream, push it, or delete it from the remote. Deleting a branch with unmerged commits asks you to confirm first.
-- Right-click a branch to **Mark as…** a kind, **Hide** it, or say what it's **Stacked on…**. [Branch care](branch-care.md) explains these.
+- Right-click a branch to mark it as a kind (**Mark `name` as…**), **Hide** it, or say what it's stacked on (**Stack `name` on…**). [Branch care](branch-care.md) explains these.
 - Force pushing a Trunk, Release or Environment branch, and deleting a Trunk or Environment branch, ask first and name the kind.
 
 ## Merging, rebasing and cherry-picking

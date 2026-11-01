@@ -20,7 +20,21 @@ export interface MenuContext {
 
 /** Joins groups of items, drawing a rule between non-empty groups. */
 export function groups(...lists: MenuItem[][]): MenuItem[] {
-  return lists.filter((l) => l.length).flatMap((l, g) => l.map((item, i) => (g > 0 && i === 0 ? { ...item, separator: true } : item)))
+  const out: MenuItem[] = []
+  const seen = new Set<string>()
+  for (const list of lists) {
+    let rule = out.length > 0
+    for (const item of list) {
+      rule ||= !!item.separator
+      // A commit's menu combines its refs' items, and a branch and its remote offer the same
+      // Mark and Hide. A dropped item's rule passes to the next one.
+      if (seen.has(item.label)) continue
+      seen.add(item.label)
+      out.push(rule ? { ...item, separator: true } : item)
+      rule = false
+    }
+  }
+  return out
 }
 
 const integrate = (path: string, action: string, ...args: string[]) => () =>
@@ -69,7 +83,7 @@ function hideItem(ctx: MenuContext, ref: Ref, name: string): MenuItem {
 /** Mark a branch (named without its remote) as one of the kinds, or ordinary. */
 function markItem(ctx: MenuContext, ref: Ref, name: string): MenuItem {
   return {
-    label: 'Mark as…',
+    label: `Mark ${name} as…`,
     icon: 'tag',
     run: () =>
       ctx.openDialog({
@@ -93,7 +107,7 @@ function markItem(ctx: MenuContext, ref: Ref, name: string): MenuItem {
 /** Set which branch a local branch is stacked on, or let Git Revenge work it out. */
 function stackItem(ctx: MenuContext, ref: Ref): MenuItem {
   return {
-    label: 'Stacked on…',
+    label: `Stack ${ref.short} on…`,
     icon: 'stack',
     run: async () => {
       const refs = ((await session.run(() => Refs(ctx.path))) as Ref[] | undefined) ?? []

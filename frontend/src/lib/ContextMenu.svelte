@@ -105,7 +105,7 @@
 />
 
 <div class="menu" bind:this={menu} out:menuOut|global role="menu" tabindex="-1" style:left="{left}px" style:top="{top}px" onkeydown={onKey}>
-  {#each items as item, i (item.label)}
+  {#each items as item, i (i)}
     {#if item.separator && i > 0}<div class="rule" role="separator"></div>{/if}
     <button
       role="menuitem"
@@ -133,6 +133,10 @@
     z-index: 100;
     min-width: 220px;
     max-width: 380px;
+    /* A commit's menu combines every ref on it and can outgrow the window. */
+    max-height: calc(100vh - 8px);
+    overflow-y: auto;
+    box-sizing: border-box;
     padding: 4px;
     background: var(--paper);
     border: 1px solid var(--paper-edge);

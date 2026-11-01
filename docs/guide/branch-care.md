@@ -20,7 +20,7 @@ A pattern matches the branch name without its remote, so `release/*` covers `rel
 
 ### Changing them
 
-- **One branch:** right-click it and choose **Mark as…**, then pick a kind or **Ordinary branch**. If a wider pattern still claims the branch (`release/2.0` under `release/*`, say), you're told which one to change.
+- **One branch:** right-click it and choose **Mark `name` as…**, then pick a kind or **Ordinary branch**. If a wider pattern still claims the branch (`release/2.0` under `release/*`, say), you're told which one to change.
 - **Patterns:** in Settings, under **This repository**, each kind has a field. Separate patterns with commas or spaces. **Use defaults** puts a kind back.
 
 ### How kinds look
@@ -72,7 +72,7 @@ A branch is **stacked** when it builds on another branch that hasn't merged yet:
 
 Git Revenge works this out from history. In the sidebar, a stacked branch sits under the branch it builds on, indented, with its place in the stack (**2 of 3**). Hover over that to see what it's stacked on. In the graph, its chip carries a small stack mark.
 
-If the guess is wrong, right-click the branch and choose **Stacked on…**: pick the right branch, **Not stacked**, or **Detect automatically** to go back to the guess.
+If the guess is wrong, right-click the branch and choose **Stack `name` on…**: pick the right branch, **Not stacked**, or **Detect automatically** to go back to the guess.
 
 ### Restacking after the branch below merges
 
