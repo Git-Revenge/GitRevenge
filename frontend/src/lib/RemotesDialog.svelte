@@ -119,7 +119,7 @@
     gap: 4px;
     align-items: center;
     padding: 10px 0;
-    border-bottom: 1px dashed var(--hairline);
+    border-bottom: 1px dotted var(--paper-edge);
   }
 
   .info {

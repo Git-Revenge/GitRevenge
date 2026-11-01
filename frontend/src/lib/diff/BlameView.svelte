@@ -124,7 +124,7 @@
   }
 
   tr.start td {
-    border-top: 1px dashed var(--hairline);
+    border-top: 1px dotted var(--paper-edge);
   }
 
   td {

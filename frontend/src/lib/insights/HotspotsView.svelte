@@ -94,7 +94,7 @@
     gap: 18px;
     align-items: center;
     padding: 11px 4px;
-    border-top: 1px dashed var(--hairline);
+    border-top: 1px dotted var(--paper-edge);
   }
 
   .hot {
@@ -129,7 +129,7 @@
   .quiet {
     margin: 0;
     padding: 12px 4px;
-    border-top: 1px dashed var(--hairline);
+    border-top: 1px dotted var(--paper-edge);
   }
 
   .danger {

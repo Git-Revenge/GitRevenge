@@ -239,7 +239,7 @@
 
   hr {
     border: none;
-    border-top: 1px dashed var(--hairline);
+    border-top: 1px dotted var(--paper-edge);
     margin: 12px 0;
   }
 

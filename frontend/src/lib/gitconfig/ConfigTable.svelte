@@ -455,7 +455,7 @@
     gap: 20px;
     align-items: start;
     padding: 14px 8px 14px 22px;
-    border-top: 1px dashed var(--hairline);
+    border-top: 1px dotted var(--paper-edge);
     transition: background-color var(--dur-base);
   }
 
