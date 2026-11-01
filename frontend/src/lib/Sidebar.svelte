@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Refs, SetShowHidden, ShowingHidden } from '../../wailsjs/go/app/App.js'
   import { EventsOn } from '../../wailsjs/runtime/runtime.js'
-  import { onMount, untrack } from 'svelte'
+  import { onMount, tick, untrack } from 'svelte'
   import type { DialogSpec } from './Dialog.svelte'
   import type { Ref } from './graph/rowCache'
   import { provideCommands, type Command } from './commands.svelte'
@@ -10,6 +10,8 @@
   import Icon from './ui/Icon.svelte'
   import type { IconName } from './ui/Icon.svelte'
   import { kindInfo } from './branchKinds'
+  import { typeahead } from './menuKeys'
+  import { railMove, scrollToShow, treeAction, treePositions } from './sidebarKeys'
   import { clampWidth, DEFAULT_WIDTH, loadSidebar, otherPanelWithMatches, ROW_HEIGHT, saveSidebar, visibleRange, type SidebarPanel } from './sidebarState'
   import { buildPanels, careCount, matchParts, panelMatches, panelRows, refStatus, refTooltip, stackPlace, type FolderRow, type TreeRow } from './sidebarTree'
 
@@ -42,6 +44,8 @@
     { key: 'stashes', label: 'Stashes', icon: 'stash', empty: 'No stashes.' },
     { key: 'repo', label: 'Repository', icon: 'submodule', empty: 'No submodules or LFS here.' },
   ]
+
+  const uid = $props.id()
 
   const storage = (): Pick<Storage, 'getItem' | 'setItem'> => localStorage
 
@@ -83,6 +87,101 @@
     scrollTop = 0
     if (list) list.scrollTop = 0
   })
+
+  // The tree is one Tab stop. Focus stays on the list and aria-activedescendant names the active
+  // row, so rows can come and go with scrolling and filtering without losing focus.
+  let filterInput = $state<HTMLInputElement>()
+  let tree = $state<HTMLElement>()
+  let activeKey = $state('')
+  let lastActive = 0
+  let positions = $derived(treePositions(rows))
+  let activeIndex = $derived.by(() => {
+    const found = rows.findIndex((r) => rowKey(r) === activeKey)
+    return found >= 0 ? found : Math.min(lastActive, Math.max(0, rows.length - 1))
+  })
+  $effect(() => {
+    lastActive = activeIndex
+  })
+  const rowId = (index: number) => `${uid}-row-${index}`
+
+  function setActive(index: number) {
+    const row = rows[index]
+    if (!row) return
+    activeKey = rowKey(row)
+    showRow(index)
+  }
+
+  function showRow(index: number) {
+    if (!list) return
+    const next = scrollToShow(index, ROW_HEIGHT, list.scrollTop, list.clientHeight)
+    if (next !== list.scrollTop) {
+      list.scrollTop = next
+      scrollTop = next
+    }
+  }
+
+  function openMenuFor(index: number) {
+    const row = rows[index]
+    if (row?.type !== 'ref' || !onContext) return
+    const box = document.getElementById(rowId(index))?.getBoundingClientRect()
+    onContext(row.ref, (box?.left ?? 0) + 32, box?.bottom ?? 0)
+  }
+
+  let typed = ''
+  let typedTimer: ReturnType<typeof setTimeout> | undefined
+
+  function treeKey(e: KeyboardEvent) {
+    // Space continues a name being typed, rather than checking out.
+    const typing = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key !== ' ' || typed !== '')
+    if (typing) {
+      e.preventDefault()
+      clearTimeout(typedTimer)
+      typed += e.key
+      typedTimer = setTimeout(() => (typed = ''), 600)
+      const found = typeahead(rows.map((r) => ({ label: r.label })), activeIndex, typed)
+      if (found >= 0) setActive(found)
+      return
+    }
+    const action = treeAction({ key: e.key, shiftKey: e.shiftKey }, rows, activeIndex, Math.max(1, Math.floor(viewHeight / ROW_HEIGHT) - 1), filtering || careOn)
+    if (!action) return
+    e.preventDefault()
+    const row = rows[activeIndex]
+    if (action.type === 'move') setActive(action.index)
+    else if (action.type === 'toggle' && row?.type === 'folder') toggleFolder(row)
+    else if (action.type === 'pick' && row?.type === 'ref') onPick(row.ref)
+    else if (action.type === 'checkout' && row?.type === 'ref') onActivate?.(row.ref)
+    else if (action.type === 'menu') openMenuFor(activeIndex)
+  }
+
+  function filterKey(e: KeyboardEvent) {
+    if (e.key === 'ArrowDown' && rows.length) {
+      e.preventDefault()
+      tree?.focus()
+    } else if (e.key === 'Escape' && filter) {
+      e.preventDefault()
+      e.stopPropagation()
+      filter = ''
+    }
+  }
+
+  async function focusFilter() {
+    if (ui.panel === 'repo') ui.panel = 'branches'
+    ui.collapsed = false
+    await tick()
+    filterInput?.focus()
+    filterInput?.select()
+  }
+
+  // The rail is one Tab stop too; the arrow keys move along it.
+  let rail = $state<HTMLElement>()
+  let railStop = $derived(TABS.findIndex((t) => t.key === ui.panel))
+  function railKey(e: KeyboardEvent) {
+    const buttons = [...(rail?.querySelectorAll('button') ?? [])]
+    const next = railMove(e.key, buttons.indexOf(e.target as HTMLButtonElement), buttons.length)
+    if (next === null) return
+    e.preventDefault()
+    buttons[next].focus()
+  }
 
   /** The rail badge's number, and what it means for screen readers. */
   function badge(key: SidebarPanel): { count: number; text: string } {
@@ -140,6 +239,15 @@
   provideCommands(() => {
     const list: Command[] = [
       {
+        id: 'view.sidebarFilter',
+        group: 'View',
+        title: 'Filter the sidebar',
+        keywords: 'find branch tag stash search',
+        shortcut: 'Mod+Shift+B',
+        whenTyping: true,
+        run: () => void focusFilter(),
+      },
+      {
         id: 'view.sidebar',
         group: 'View',
         title: ui.collapsed ? 'Show the sidebar panel' : 'Hide the sidebar panel',
@@ -172,13 +280,15 @@
 </script>
 
 <aside class="sidebar">
-  <nav class="rail" aria-label="Sidebar panels">
-    {#each TABS as t (t.key)}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <nav class="rail" aria-label="Sidebar panels" bind:this={rail} onkeydown={railKey}>
+    {#each TABS as t, i (t.key)}
       {@const b = badge(t.key)}
       <button
         class="tab"
         class:on={t.key === ui.panel && !ui.collapsed}
         aria-pressed={t.key === ui.panel && !ui.collapsed}
+        tabindex={i === railStop ? 0 : -1}
         aria-label={b.count ? `${t.label}, ${b.text}` : t.label}
         title={b.count ? `${t.label}: ${b.text}` : t.label}
         onclick={() => pickTab(t.key)}
@@ -189,6 +299,7 @@
     {/each}
     <button
       class="tab toggle"
+      tabindex="-1"
       aria-expanded={!ui.collapsed}
       aria-label={ui.collapsed ? 'Show the sidebar panel' : 'Hide the sidebar panel'}
       title={ui.collapsed ? 'Show the sidebar panel' : 'Hide the sidebar panel'}
@@ -219,7 +330,7 @@
       {#if ui.panel !== 'repo'}
         <label class="filter">
           <Icon name="search" size={14} />
-          <input type="search" placeholder="Filter all panels" aria-label="Filter branches, remotes, tags and stashes" bind:value={filter} />
+          <input type="search" placeholder="Filter all panels" aria-label="Filter branches, remotes, tags and stashes" bind:value={filter} bind:this={filterInput} onkeydown={filterKey} />
           {#if filtering}
             <span class="meta" aria-live="polite">{matches.toLocaleString()}</span>
             <button class="clear" aria-label="Clear the filter" title="Clear the filter" onclick={() => (filter = '')}><Icon name="close" size={12} /></button>
@@ -235,12 +346,42 @@
     </header>
 
     <div class="scroll" class:narrowed={filtering || careOn} bind:this={list} bind:clientHeight={viewHeight} onscroll={(e) => (scrollTop = e.currentTarget.scrollTop)} hidden={ui.panel === 'repo'}>
-      <ul style:height="{rows.length * ROW_HEIGHT}px" style:padding-top="{range.start * ROW_HEIGHT}px">
-        {#each rows.slice(range.start, range.end) as row (rowKey(row))}
-          <li class:group={row.startsGroup}>
+      <ul
+        bind:this={tree}
+        role="tree"
+        aria-label={tab.label}
+        aria-activedescendant={rows.length ? rowId(activeIndex) : undefined}
+        tabindex={rows.length ? 0 : -1}
+        style:height="{rows.length * ROW_HEIGHT}px"
+        style:padding-top="{range.start * ROW_HEIGHT}px"
+        onkeydown={treeKey}
+        onfocus={() => showRow(activeIndex)}
+      >
+        {#each rows.slice(range.start, range.end) as row, offset (rowKey(row))}
+          {@const index = range.start + offset}
+          <li
+            id={rowId(index)}
+            role="treeitem"
+            class:group={row.startsGroup}
+            class:active={index === activeIndex}
+            aria-level={row.depth + 1}
+            aria-posinset={positions[index]?.pos}
+            aria-setsize={positions[index]?.size}
+            aria-expanded={row.type === 'folder' ? row.open : undefined}
+            aria-selected={row.type === 'ref' && !!selectedCommit && row.ref.commit === selectedCommit}
+          >
             {#if row.type === 'folder'}
               {@const k = kindInfo(row.kind)}
-              <button class="row folder" style:--depth={row.depth} aria-expanded={row.open} title="{row.label}/" onclick={() => toggleFolder(row)}>
+              <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+              <div
+                class="row folder"
+                style:--depth={row.depth}
+                title="{row.label}/"
+                onclick={() => {
+                  activeKey = rowKey(row)
+                  toggleFolder(row)
+                }}
+              >
                 <span class="caret" class:open={row.open}><Icon name="right" size={10} /></span>
                 {#if k}
                   <span class="kind-icon" style:color="var({k.token})" title={k.label}><Icon name={k.icon} size={14} /><span class="visually-hidden">{k.label}</span></span>
@@ -250,23 +391,26 @@
                 <span class="name">{row.label}</span>
                 {#if row.holdsHead && !row.open}<span class="dot" title="The checked-out branch is in here"><span class="visually-hidden">Holds the checked-out branch</span></span>{/if}
                 <span class="meta count">{row.count.toLocaleString()}</span>
-              </button>
+              </div>
             {:else}
               {@const r = row.ref}
               {@const k = kindInfo(row.mark)}
               {@const status = refStatus(r)}
               {@const parts = matchParts(row.label, filter)}
               {@const isSelected = !!selectedCommit && r.commit === selectedCommit}
-              <button
+              <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+              <div
                 class="row ref"
                 class:head={r.head}
                 class:selected={isSelected}
-                aria-current={isSelected || undefined}
                 class:hidden-ref={r.hidden}
                 class:stacked={row.stacked}
                 class:context={row.context}
                 style:--depth={row.depth}
-                onclick={() => onPick(r)}
+                onclick={() => {
+                  activeKey = rowKey(row)
+                  onPick(r)
+                }}
                 ondblclick={() => onActivate?.(r)}
                 oncontextmenu={(e) => {
                   if (!onContext) return
@@ -275,16 +419,19 @@
                 }}
                 title={refTooltip(r)}
               >
-                {#if r.head}<span class="here" aria-label="checked out"></span>{/if}
+                {#if r.head}<span class="here"><span class="visually-hidden">Checked out: </span></span>{/if}
                 {#if k}<span class="kind-icon" style:color="var({k.token})" title={k.label}><Icon name={k.icon} size={13} /><span class="visually-hidden">{k.label}</span></span>{/if}
                 <span class="name">{parts.pre}{#if parts.hit}<mark>{parts.hit}</mark>{/if}{parts.post}</span>
                 {#if r.hidden}<span class="visually-hidden">, hidden</span>{/if}
                 {#if stackPlace(r)}<span class="visually-hidden">, {stackPlace(r)}</span>{/if}
                 {#if status}<span class="track {status.tone}"><span aria-hidden="true">{status.text}</span><span class="visually-hidden">, {status.spoken}</span></span>{/if}
-              </button>
+              </div>
               {#if onContext}
+                <!-- The Menu key reaches this from the keyboard, so it isn't a Tab stop. -->
                 <button
                   class="more"
+                  tabindex="-1"
+                  aria-hidden="true"
                   aria-label="More for {r.kind === 'stash' ? r.subject || r.short : r.short}"
                   aria-haspopup="menu"
                   title="More"
@@ -604,9 +751,11 @@
     font-size: 14px;
     text-align: left;
     white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
   }
 
-  .row:hover:not(:disabled) {
+  .row:hover {
     background: var(--wash-hover);
     color: var(--ink);
   }
@@ -624,9 +773,23 @@
     color: var(--ink-mute);
   }
 
-  .ref:focus-visible,
-  li:hover .ref {
+  li:hover .ref,
+  [role='tree']:focus-visible li.active .ref {
     color: var(--ink);
+  }
+
+  [role='tree'] {
+    outline: none;
+  }
+
+  [role='tree']:focus-visible li.active::after {
+    content: '';
+    position: absolute;
+    z-index: 2;
+    inset: 0;
+    outline: 2px solid var(--link);
+    outline-offset: -2px;
+    pointer-events: none;
   }
 
   li:hover .row {
@@ -677,13 +840,13 @@
   }
 
   li:hover .more,
-  li:focus-within .more {
+  [role='tree']:focus-visible li.active .more {
     opacity: 1;
   }
 
   /* More replaces the status; it stays readable to screen readers. */
   li:hover .track,
-  li:focus-within .track {
+  [role='tree']:focus-visible li.active .track {
     opacity: 0;
   }
 

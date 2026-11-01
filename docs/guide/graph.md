@@ -37,6 +37,8 @@ Names with a `/` form folders, so `release/v0.8` and `release/v0.7` sit in a `re
 
 Type in **Filter all panels** to narrow the lists. The filter stays on as you switch panels, and the rail shows how many matches each panel has. **Needs care**, in the Branches panel, shows branches whose upstream is gone or whose stack parent was merged. Click a branch or tag to jump to its commit.
 
+The sidebar works from the keyboard. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> jumps to the filter, and <kbd>↓</kbd> moves from there into the list. In the list, the arrow keys move and open folders, <kbd>Enter</kbd> shows a branch in the graph, <kbd>Space</kbd> checks it out, the <kbd>Menu</kbd> key or <kbd>Shift</kbd>+<kbd>F10</kbd> opens its menu, and typing jumps to a name. The rail is one <kbd>Tab</kbd> stop, and <kbd>↑</kbd> and <kbd>↓</kbd> move along it.
+
 Local branches are grouped by [kind](branch-care.md#branch-kinds): Trunk at the top, then ordinary branches, releases, environments, docs and bots. Branches built on other branches sit under them as a [stack](branch-care.md#stacked-branches). A branch's chip in the graph carries its kind's colour and icon.
 
 ## Docs and Bots
