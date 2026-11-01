@@ -8,11 +8,24 @@ import type { Ref } from './graph/rowCache'
 
 export type PanelKey = 'branches' | 'remotes' | 'tags' | 'stashes'
 
+/** Name: A to Z, with tags and releases newest version first. Recent: last updated first. */
+export type SortOrder = 'name' | 'recent'
+
+export interface PanelOptions {
+  /** Include branches the repository's hide patterns match. */
+  showHidden?: boolean
+  sort?: SortOrder
+}
+
 interface Leaf {
   ref: Ref
   label: string
   /** Branches stacked directly on this one. */
   kids: Leaf[]
+  /** This branch and those stacked on it, however deep. */
+  total: number
+  holdsHead: boolean
+  newest: number
 }
 
 interface Folder {
@@ -23,6 +36,7 @@ interface Folder {
   /** Branches here and below, including stacked ones. */
   total: number
   holdsHead: boolean
+  newest: number
   /** The kind marking this folder, when its depth carries marks and its branches share one. */
   kind?: string
   remote: boolean
@@ -82,13 +96,23 @@ export function needsCare(r: Ref): boolean {
 
 const collator = new Intl.Collator(undefined, { numeric: true })
 
-/** Tags and release branches sort newest first; everything else A to Z. */
-function sortLeaves(leaves: Leaf[], panel: PanelKey): void {
+/** The checked-out branch or its stack first, then by the chosen order. By name, tags and
+ * release branches run newest version first, and everything else A to Z. */
+function sortLeaves(leaves: Leaf[], panel: PanelKey, sort: SortOrder): void {
   const newestFirst = (l: Leaf) => panel === 'tags' || l.ref.branchKind === 'release'
   leaves.sort((a, b) => {
-    if (a.ref.head !== b.ref.head) return a.ref.head ? -1 : 1
+    if (a.holdsHead !== b.holdsHead) return a.holdsHead ? -1 : 1
+    if (sort === 'recent' && a.newest !== b.newest) return b.newest - a.newest
     const order = collator.compare(a.label, b.label)
     return newestFirst(a) && newestFirst(b) ? -order : order
+  })
+}
+
+function sortFolders(folders: Folder[], sort: SortOrder): void {
+  folders.sort((a, b) => {
+    if (a.holdsHead !== b.holdsHead) return a.holdsHead ? -1 : 1
+    if (sort === 'recent' && a.newest !== b.newest) return b.newest - a.newest
+    return collator.compare(a.name, b.name)
   })
 }
 
@@ -114,21 +138,7 @@ function stackParents(refs: Ref[]): Map<string, string> {
 }
 
 function newFolder(panel: PanelKey, path: string, name: string, remote: boolean): Folder {
-  return { key: `${panel}:${path}`, name, folders: [], leaves: [], total: 0, holdsHead: false, remote }
-}
-
-/** Counts a leaf and everything stacked on it, without recursing through long stacks. */
-function measure(leaf: Leaf): { total: number; head: boolean } {
-  let total = 0
-  let head = false
-  const pending = [leaf]
-  while (pending.length) {
-    const l = pending.pop()!
-    total++
-    head ||= l.ref.head
-    pending.push(...l.kids)
-  }
-  return { total, head }
+  return { key: `${panel}:${path}`, name, folders: [], leaves: [], total: 0, holdsHead: false, newest: 0, remote }
 }
 
 /** The one kind every branch in this folder shares, or undefined. */
@@ -143,7 +153,7 @@ function sharedKind(f: Folder): string | undefined {
   return kinds.size === 1 ? only : undefined
 }
 
-function buildPanel(panel: PanelKey, refs: Ref[]): PanelTree {
+function buildPanel(panel: PanelKey, refs: Ref[], sort: SortOrder): PanelTree {
   const root = newFolder(panel, '', '', false)
   const parents = panel === 'branches' ? stackParents(refs) : new Map<string, string>()
   const leaves = new Map<string, Leaf>()
@@ -153,7 +163,7 @@ function buildPanel(panel: PanelKey, refs: Ref[]): PanelTree {
     // A stash's subject is prose, so it stays whole; a stacked branch shows its full name.
     const nests = panel !== 'stashes' && !parents.has(ref.short)
     const parts = nests ? ref.short.split('/') : [panel === 'stashes' ? ref.subject || ref.short : ref.short]
-    const leaf: Leaf = { ref, label: parts[parts.length - 1], kids: [] }
+    const leaf: Leaf = { ref, label: parts[parts.length - 1], kids: [], total: 1, holdsHead: ref.head, newest: ref.updated ?? 0 }
     leaves.set(ref.short, leaf)
     if (parents.has(ref.short)) continue
     let at = root
@@ -171,7 +181,17 @@ function buildPanel(panel: PanelKey, refs: Ref[]): PanelTree {
     at.leaves.push(leaf)
   }
   for (const [child, parent] of parents) leaves.get(parent)!.kids.push(leaves.get(child)!)
-  if (panel !== 'stashes') for (const leaf of leaves.values()) sortLeaves(leaf.kids, panel)
+  // Parents take on what's stacked on them, so a whole stack rises with its newest branch.
+  const settle = (l: Leaf) => {
+    for (const k of l.kids) {
+      settle(k)
+      l.total += k.total
+      l.holdsHead ||= k.holdsHead
+      l.newest = Math.max(l.newest, k.newest)
+    }
+    sortLeaves(l.kids, panel, sort)
+  }
+  for (const leaf of leaves.values()) if (!parents.has(leaf.ref.short)) settle(leaf)
 
   const kindDepth = panel === 'branches' ? 0 : panel === 'remotes' ? 1 : -1
   const finish = (f: Folder, depth: number) => {
@@ -187,17 +207,15 @@ function buildPanel(panel: PanelKey, refs: Ref[]): PanelTree {
         kept.push(child)
       }
     }
-    f.folders = kept.sort((a, b) => collator.compare(a.name, b.name))
-    if (panel !== 'stashes') sortLeaves(f.leaves, panel)
+    f.folders = kept
+    sortFolders(f.folders, sort)
+    // Git already lists stashes newest first.
+    if (panel !== 'stashes') sortLeaves(f.leaves, panel, sort)
     f.total = 0
-    for (const l of f.leaves) {
-      const m = measure(l)
-      f.total += m.total
-      f.holdsHead ||= m.head
-    }
-    for (const c of f.folders) {
-      f.total += c.total
-      f.holdsHead ||= c.holdsHead
+    for (const x of [...f.leaves, ...f.folders]) {
+      f.total += x.total
+      f.holdsHead ||= x.holdsHead
+      f.newest = Math.max(f.newest, x.newest)
     }
     if (depth + 1 === kindDepth) for (const c of f.folders) c.kind = sharedKind(c)
   }
@@ -207,15 +225,15 @@ function buildPanel(panel: PanelKey, refs: Ref[]): PanelTree {
 }
 
 /** Sorts refs into panels and builds each one's tree. Hidden branches stay out unless shown. */
-export function buildPanels(refs: Ref[], showHidden = false): Panels {
+export function buildPanels(refs: Ref[], { showHidden = false, sort = 'name' }: PanelOptions = {}): Panels {
   const byPanel: Record<PanelKey, Ref[]> = { branches: [], remotes: [], tags: [], stashes: [] }
   const panelOf = { local: 'branches', remote: 'remotes', tag: 'tags', stash: 'stashes' } as const
   for (const r of refs) if (showHidden || !r.hidden) byPanel[panelOf[r.kind]].push(r)
   return {
-    branches: buildPanel('branches', byPanel.branches),
-    remotes: buildPanel('remotes', byPanel.remotes),
-    tags: buildPanel('tags', byPanel.tags),
-    stashes: buildPanel('stashes', byPanel.stashes),
+    branches: buildPanel('branches', byPanel.branches, sort),
+    remotes: buildPanel('remotes', byPanel.remotes, sort),
+    tags: buildPanel('tags', byPanel.tags, sort),
+    stashes: buildPanel('stashes', byPanel.stashes, sort),
   }
 }
 
@@ -274,11 +292,10 @@ export function panelRows(tree: PanelTree, options: RowOptions = {}): TreeRow[] 
 
   const addFolder = (f: Folder, depth: number, markedKind: string | undefined) => {
     const shown = f.leaves.filter((l) => view.leafCount(l) > 0)
-    const isTrunk = (l: Leaf) => l.ref.branchKind === 'trunk'
-    for (const l of shown) if (isTrunk(l)) addLeaf(l, depth, false, markedKind, false)
-    for (const c of f.folders) {
-      const count = view.folderCount(c)
-      if (count === 0) continue
+    const folders = f.folders.filter((c) => view.folderCount(c) > 0)
+    const groupStart = () => depth === 0 && rows.length > 0
+
+    const addChild = (c: Folder) => {
       const isOpen = view.filtering || (open[c.key] ?? c.kind !== 'bot')
       rows.push({
         type: 'folder',
@@ -286,20 +303,31 @@ export function panelRows(tree: PanelTree, options: RowOptions = {}): TreeRow[] 
         label: c.name,
         depth,
         open: isOpen,
-        count,
+        count: view.folderCount(c),
         holdsHead: c.holdsHead,
         kind: c.kind,
         remote: c.remote,
-        startsGroup: depth === 0 && rows.length > 0,
+        startsGroup: groupStart(),
       })
       if (isOpen) addFolder(c, depth + 1, c.kind ?? markedKind)
     }
-    let first = depth === 0 && rows.length > 0
-    for (const l of shown) {
-      if (isTrunk(l)) continue
-      addLeaf(l, depth, false, markedKind, first)
-      first = false
+    const addGroup = (leaves: Leaf[]) => {
+      let first = groupStart()
+      for (const l of leaves) {
+        addLeaf(l, depth, false, markedKind, first)
+        first = false
+      }
     }
+
+    // The checked-out branch, or the folder or stack holding it, always leads.
+    const headLeaf = shown.find((l) => l.holdsHead)
+    const headFolder = folders.find((c) => c.holdsHead)
+    const rest = shown.filter((l) => l !== headLeaf)
+    if (headLeaf) addLeaf(headLeaf, depth, false, markedKind, false)
+    if (headFolder) addChild(headFolder)
+    addGroup(rest.filter((l) => l.ref.branchKind === 'trunk'))
+    for (const c of folders) if (c !== headFolder) addChild(c)
+    addGroup(rest.filter((l) => l.ref.branchKind !== 'trunk'))
   }
 
   addFolder(tree.root, 0, undefined)

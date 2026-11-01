@@ -55,12 +55,15 @@ type Ref struct {
 	StackParentMerged bool `json:"stackParentMerged,omitempty"`
 	// Subject is the stash message, for stashes.
 	Subject string `json:"subject,omitempty"`
+	// Updated is when the ref last changed, in Unix seconds: the tag date for an annotated
+	// tag, otherwise the commit date. 0 for stashes.
+	Updated int64 `json:"updated,omitempty"`
 }
 
 // refFormat deliberately avoids %(refname:short): git makes it unambiguous by comparing
 // every ref against all others, which is quadratic (about 1.9s for 2,000 branches).
 // Stripping the namespace prefix gives the same display name at no cost.
-const refFormat = "%(refname)%00%(objectname)%00%(*objectname)%00%(HEAD)%00%(upstream:short)%00%(upstream:track)"
+const refFormat = "%(refname)%00%(objectname)%00%(*objectname)%00%(HEAD)%00%(upstream:short)%00%(upstream:track)%00%(creatordate:unix)"
 
 var trackRE = regexp.MustCompile(`(ahead|behind) (\d+)`)
 
@@ -73,7 +76,7 @@ func (r *Repo) Refs(ctx context.Context) ([]Ref, error) {
 		sc.Buffer(make([]byte, 64*1024), 1024*1024)
 		for sc.Scan() {
 			f := bytes.Split(sc.Bytes(), []byte{0})
-			if len(f) != 6 {
+			if len(f) != 7 {
 				continue
 			}
 			ref := Ref{
@@ -103,6 +106,8 @@ func (r *Repo) Refs(ctx context.Context) ([]Ref, error) {
 			if !ok {
 				continue
 			}
+			// A ref whose object has no date (a tag of a tree, say) just sorts last.
+			ref.Updated, _ = strconv.ParseInt(string(f[6]), 10, 64)
 			track := string(f[5])
 			ref.Gone = track == "[gone]"
 			for _, m := range trackRE.FindAllStringSubmatch(track, -1) {

@@ -45,7 +45,7 @@ describe('panels', () => {
   it('leaves out hidden branches unless they are being shown', () => {
     const refs = [ref('main'), ref('wip', { hidden: true })]
     expect(outline(panelRows(buildPanels(refs).branches))).toEqual(['main'])
-    expect(outline(panelRows(buildPanels(refs, true).branches))).toEqual(['main', 'wip'])
+    expect(outline(panelRows(buildPanels(refs, { showHidden: true }).branches))).toEqual(['main', 'wip'])
   })
 })
 
@@ -104,7 +104,7 @@ describe('stacks', () => {
   it('keeps a branch in place when its parent is hidden', () => {
     const refs = [ref('parent', { hidden: true }), ref('child', { stackParent: 'parent' })]
     expect(outline(panelRows(buildPanels(refs).branches))).toEqual(['child'])
-    expect(outline(panelRows(buildPanels(refs, true).branches))).toEqual(['parent', '  child'])
+    expect(outline(panelRows(buildPanels(refs, { showHidden: true }).branches))).toEqual(['parent', '  child'])
   })
 
   it('loses no branch to a stack that loops', () => {
@@ -119,9 +119,28 @@ describe('order', () => {
     expect(outline(rows)).toEqual(['main', 'fix/', '  a', '  b', 'alpha', 'zeta'])
   })
 
-  it('puts the checked-out branch first among its neighbours', () => {
-    const rows = branches([ref('a'), ref('b', { head: true }), ref('fix/a'), ref('fix/b', { head: true })])
-    expect(outline(rows)).toEqual(['fix/', '  b', '  a', 'b', 'a'])
+  it('puts the checked-out branch above Trunk and folders', () => {
+    const rows = branches([ref('main', { branchKind: 'trunk' }), ref('fix/a'), ref('fix/b'), ref('alpha'), ref('zeta', { head: true })])
+    expect(outline(rows)).toEqual(['zeta', 'main', 'fix/', '  a', '  b', 'alpha'])
+  })
+
+  it('puts the folder holding the checked-out branch first, at every level', () => {
+    const rows = branches([ref('main', { branchKind: 'trunk' }), ref('alpha/a'), ref('alpha/b'), ref('zed/one'), ref('zed/deep/x'), ref('zed/deep/y', { head: true })])
+    expect(outline(rows)).toEqual(['zed/', '  deep/', '    y', '    x', '  one', 'main', 'alpha/', '  a', '  b'])
+  })
+
+  it('puts a stack holding the checked-out branch first', () => {
+    const rows = branches([ref('alpha'), ref('zeta'), ref('zeta-top', { head: true, stackParent: 'zeta' })])
+    expect(outline(rows)).toEqual(['zeta', '  zeta-top', 'alpha'])
+  })
+
+  it('keeps Trunk first when Trunk is checked out', () => {
+    const rows = branches([ref('alpha'), ref('fix/a'), ref('fix/b'), ref('main', { branchKind: 'trunk', head: true })])
+    expect(outline(rows)).toEqual(['main', 'fix/', '  a', '  b', 'alpha'])
+  })
+
+  it('drops the checked-out branch from the top when the filter excludes it', () => {
+    expect(outline(branches([ref('alpha'), ref('zeta', { head: true })], { query: 'alpha' }))).toEqual(['alpha'])
   })
 
   it('sorts numbers by value', () => {
@@ -140,6 +159,49 @@ describe('order', () => {
   it('keeps stashes in the order git gives them', () => {
     const s = (i: number, subject: string) => ref(`stash@{${i}}`, { kind: 'stash', subject })
     expect(outline(panelRows(buildPanels([s(0, 'z newest'), s(1, 'a oldest')]).stashes))).toEqual(['z newest', 'a oldest'])
+  })
+})
+
+describe('sorting by most recently updated', () => {
+  const recent = (refs: Ref[], options?: RowOptions) => panelRows(buildPanels(refs, { sort: 'recent' }).branches, options)
+
+  it('puts the newest branch first', () => {
+    expect(outline(recent([ref('a', { updated: 100 }), ref('b', { updated: 300 }), ref('c', { updated: 200 })]))).toEqual(['b', 'c', 'a'])
+  })
+
+  it('still leads with the checked-out branch, then Trunk', () => {
+    const rows = recent([ref('main', { branchKind: 'trunk', updated: 1 }), ref('new', { updated: 900 }), ref('here', { head: true, updated: 2 })])
+    expect(outline(rows)).toEqual(['here', 'main', 'new'])
+  })
+
+  it('sorts folders by the newest branch inside, however deep', () => {
+    const rows = recent([ref('a/one', { updated: 100 }), ref('a/two', { updated: 200 }), ref('b/one', { updated: 50 }), ref('b/deep/x', { updated: 900 }), ref('b/deep/y', { updated: 1 })])
+    expect(outline(rows)).toEqual(['b/', '  deep/', '    x', '    y', '  one', 'a/', '  two', '  one'])
+  })
+
+  it('moves a parent up with the newest branch stacked on it', () => {
+    const rows = recent([ref('other', { updated: 500 }), ref('base', { updated: 100 }), ref('top', { stackParent: 'base', updated: 900 })])
+    expect(outline(rows)).toEqual(['base', '  top', 'other'])
+  })
+
+  it('breaks ties by name, and puts undated refs last', () => {
+    expect(outline(recent([ref('b', { updated: 5 }), ref('a', { updated: 5 }), ref('undated')]))).toEqual(['a', 'b', 'undated'])
+  })
+
+  it('applies to releases and tags, instead of their version order', () => {
+    const k = { branchKind: 'release' }
+    expect(outline(recent([ref('release/v0.9', { ...k, updated: 900 }), ref('release/v0.10', { ...k, updated: 100 })]))).toEqual(['release/', '  v0.9', '  v0.10'])
+    const t = (short: string, updated: number) => ({ ...tag(short), updated })
+    expect(outline(panelRows(buildPanels([t('v2', 1), t('v1', 9)], { sort: 'recent' }).tags))).toEqual(['v1', 'v2'])
+  })
+
+  it('leaves stashes in git’s order', () => {
+    const s = (i: number, subject: string) => ref(`stash@{${i}}`, { kind: 'stash', subject })
+    expect(outline(panelRows(buildPanels([s(0, 'z'), s(1, 'a')], { sort: 'recent' }).stashes))).toEqual(['z', 'a'])
+  })
+
+  it('uses name order by default', () => {
+    expect(outline(branches([ref('a', { updated: 1 }), ref('b', { updated: 9 })]))).toEqual(['a', 'b'])
   })
 })
 
@@ -214,6 +276,11 @@ describe('open and closed folders', () => {
 
 describe('group starts', () => {
   const starts = (rows: TreeRow[]) => rows.filter((r) => r.startsGroup).map((r) => r.label)
+
+  it('separates the checked-out branch from the groups below it', () => {
+    const rows = branches([ref('here', { head: true }), ref('main', { branchKind: 'trunk' }), ref('fix/a'), ref('fix/b'), ref('loose')])
+    expect(starts(rows)).toEqual(['main', 'fix', 'loose'])
+  })
 
   it('starts a group at each top-level folder and at the loose branches', () => {
     const rows = branches([ref('main', { branchKind: 'trunk' }), ref('fix/a'), ref('fix/b'), ref('old/a'), ref('old/b'), ref('loose'), ref('more')])
