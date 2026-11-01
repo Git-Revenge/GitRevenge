@@ -20,11 +20,16 @@
     { group: 'Graph', title: 'Move a page', keys: ['PageUp', 'PageDown'] },
     { group: 'Graph', title: 'First or last commit', keys: ['Home', 'End'] },
     { group: 'Graph', title: 'Next or previous search match', keys: ['Enter', 'Shift+Enter'] },
+    { group: 'Sidebar', title: 'Move through the list', keys: ['↑', '↓'] },
+    { group: 'Sidebar', title: 'Open or close a folder, or step in and out', keys: ['→', '←'] },
+    { group: 'Sidebar', title: 'Show in the graph', keys: ['Enter'] },
+    { group: 'Sidebar', title: 'Check out', keys: ['Space'] },
+    { group: 'Sidebar', title: 'Open the menu', keys: ['Menu', 'Shift+F10'] },
     { group: 'Commit', title: 'Commit the staged changes', keys: ['Mod+Enter'] },
     { group: 'Dialogs and menus', title: 'Close', keys: ['Escape'] },
   ]
 
-  const ORDER = ['App', 'Tabs', 'Repository', 'Branch', 'View', 'Graph', 'Commit', 'Dialogs and menus']
+  const ORDER = ['App', 'Tabs', 'Repository', 'Branch', 'View', 'Graph', 'Sidebar', 'Commit', 'Dialogs and menus']
 
   // Read once on open; tab numbers collapse into one line rather than nine.
   const groups = (() => {
