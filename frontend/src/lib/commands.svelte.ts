@@ -27,6 +27,12 @@ export interface Command {
 
 type Provider = () => Command[]
 
+export interface ProviderOptions {
+  /** Has no shortcuts of its own, so a key press needn't build its commands. For providers that
+   * can list thousands, such as one per ref. */
+  paletteOnly?: boolean
+}
+
 export const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 
 /** "Mod+Shift+Z" → "Ctrl+Shift+Z", or "⌘⇧Z" on macOS. */
@@ -41,7 +47,7 @@ export function formatShortcut(s: string): string {
 
 /** Commands contributed by whatever is on screen, and the palette's open state. */
 class Commands {
-  private providers = new SvelteMap<symbol, Provider>()
+  private providers = new SvelteMap<symbol, { provider: Provider; paletteOnly: boolean }>()
   paletteOpen = $state(false)
   shortcutsOpen = $state(false)
   /** The clone dialog lives at the top level so the palette can open it from anywhere. */
@@ -80,19 +86,24 @@ class Commands {
   }
 
   /** Adds a provider; returns the function that removes it. */
-  add(provider: Provider): () => void {
+  add(provider: Provider, options: ProviderOptions = {}): () => void {
     const key = Symbol()
-    this.providers.set(key, provider)
+    this.providers.set(key, { provider, paletteOnly: !!options.paletteOnly })
     return () => this.providers.delete(key)
   }
 
   /** Every command available right now. Providers are read on demand, so titles reflect
    * current state (the undo label, the checked-out branch). */
   all(): Command[] {
+    return this.collect(true)
+  }
+
+  private collect(withPaletteOnly: boolean): Command[] {
     const seen: Record<string, true> = {}
     const out: Command[] = []
-    for (const p of this.providers.values()) {
-      for (const c of p()) {
+    for (const { provider, paletteOnly } of this.providers.values()) {
+      if (paletteOnly && !withPaletteOnly) continue
+      for (const c of provider()) {
         if (seen[c.id]) continue
         seen[c.id] = true
         if (c.id in this.overrides) {
@@ -104,12 +115,21 @@ class Commands {
     return out
   }
 
+  /** What a key press has to check: everything with a shortcut. Commands from palette-only
+   * providers are left out unless a saved shortcut names one of them. */
+  private withShortcuts(): Command[] {
+    const base = this.collect(false)
+    const ids = new Set(base.map((c) => c.id))
+    const boundElsewhere = Object.entries(this.overrides).some(([id, keys]) => keys && !ids.has(id))
+    return boundElsewhere ? this.collect(true) : base
+  }
+
   /** Runs the command bound to a key event, if any. Returns whether one ran. */
   dispatch(e: KeyboardEvent): boolean {
     if (e.defaultPrevented) return false
     const overlay = !!document.querySelector('[aria-modal="true"], [role="menu"]')
     const typing = isTyping(e.target)
-    for (const c of this.all()) {
+    for (const c of this.withShortcuts()) {
       if (!c.shortcut && !c.aliases) continue
       if ((overlay && !c.global) || (typing && !c.whenTyping && !c.global)) continue
       const keys = c.shortcut ? [c.shortcut, ...(c.aliases ?? [])] : (c.aliases ?? [])
@@ -125,6 +145,6 @@ class Commands {
 export const commands = new Commands()
 
 /** Contributes commands while the calling component is mounted. Call during component setup. */
-export function provideCommands(provider: Provider) {
-  $effect(() => commands.add(provider))
+export function provideCommands(provider: Provider, options: ProviderOptions = {}) {
+  $effect(() => commands.add(provider, options))
 }
