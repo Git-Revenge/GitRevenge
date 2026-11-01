@@ -265,7 +265,7 @@
     padding: 0 14px;
     background: none;
     border: none;
-    border-bottom: 1px dashed var(--hairline);
+    border-bottom: 1px dotted var(--paper-edge);
     border-radius: 0;
     text-align: left;
     transition: background-color var(--dur-base);

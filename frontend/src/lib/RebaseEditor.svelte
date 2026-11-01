@@ -199,7 +199,7 @@
     align-items: flex-start;
     gap: 10px;
     padding: 10px 16px;
-    border-bottom: 1px dashed var(--hairline);
+    border-bottom: 1px dotted var(--paper-edge);
   }
 
   li.drop .subject {

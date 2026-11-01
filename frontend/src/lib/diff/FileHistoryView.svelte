@@ -91,7 +91,7 @@
   }
 
   .list li {
-    border-bottom: 1px dashed var(--hairline);
+    border-bottom: 1px dotted var(--paper-edge);
   }
 
   .list button {

@@ -176,7 +176,7 @@
     align-items: center;
     gap: 6px 12px;
     padding: 8px 0;
-    border-top: 1px dashed var(--hairline);
+    border-top: 1px dotted var(--paper-edge);
   }
 
   .info {

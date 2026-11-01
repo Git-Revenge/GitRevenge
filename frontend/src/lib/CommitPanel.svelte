@@ -431,7 +431,7 @@
     grid-template-columns: max-content minmax(0, 1fr);
     margin: 0 0 12px;
     padding-top: 10px;
-    border-top: 1px dashed var(--hairline);
+    border-top: 1px dotted var(--paper-edge);
   }
 
   .trailers dt {
@@ -537,7 +537,7 @@
   }
 
   .files li {
-    border-bottom: 1px dashed var(--hairline);
+    border-bottom: 1px dotted var(--paper-edge);
   }
 
   .files button {

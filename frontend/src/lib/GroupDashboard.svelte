@@ -159,7 +159,7 @@
 
   td {
     padding: 12px 10px;
-    border-bottom: 1px dashed var(--hairline);
+    border-bottom: 1px dotted var(--paper-edge);
     white-space: nowrap;
   }
 
