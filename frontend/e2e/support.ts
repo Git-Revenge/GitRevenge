@@ -6,6 +6,8 @@ export interface Scenario {
   responses?: Record<string, unknown>
   /** Methods that fail, with their error message. */
   failures?: Record<string, string>
+  /** Methods that take this long to answer, in milliseconds. */
+  delays?: Record<string, number>
   graphRows?: number
   /** The refs on each commit in the graph, by commit id. */
   graphRefs?: Record<string, unknown[]>

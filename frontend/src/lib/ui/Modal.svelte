@@ -1,3 +1,8 @@
+<script lang="ts" module>
+  /** Open panels, newest last: the one to answer a key when focus is on none of them. */
+  const open: HTMLElement[] = []
+</script>
+
 <script lang="ts">
   import { onMount, type Snippet } from 'svelte'
   import { inkIn, inkOut, scrim } from './motion'
@@ -37,8 +42,19 @@
     const before = document.activeElement as HTMLElement | null
     const first = panel.querySelector<HTMLElement>('input:not([disabled]), textarea:not([disabled]), select:not([disabled])') ?? panel.querySelector<HTMLElement>(FOCUSABLE)
     ;(first ?? panel).focus()
-    return () => before?.focus?.()
+    open.push(panel)
+    return () => {
+      open.splice(open.indexOf(panel), 1)
+      before?.focus?.()
+    }
   })
+
+  /** Disabling the focused button moves focus to the body, where the panel can't hear keys. */
+  function onLostKey(e: KeyboardEvent) {
+    if (e.target !== document.body || open.at(-1) !== panel || (e.key !== 'Escape' && e.key !== 'Tab')) return
+    panel.focus()
+    onKey(e)
+  }
 
   function onKey(e: KeyboardEvent) {
     if (e.key === 'Escape' && dismissable) {
@@ -50,7 +66,7 @@
       if (items.length === 0) return
       const first = items[0]
       const last = items[items.length - 1]
-      if (e.shiftKey && document.activeElement === first) {
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === panel)) {
         e.preventDefault()
         last.focus()
       } else if (!e.shiftKey && document.activeElement === last) {
@@ -60,6 +76,8 @@
     }
   }
 </script>
+
+<svelte:window onkeydowncapture={onLostKey} />
 
 <div
   class="scrim"
