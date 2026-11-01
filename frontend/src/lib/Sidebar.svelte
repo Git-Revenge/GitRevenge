@@ -10,11 +10,12 @@
   import { session } from './session.svelte'
   import Icon from './ui/Icon.svelte'
   import type { IconName } from './ui/Icon.svelte'
-  import { kindInfo } from './branchKinds'
   import { typeahead } from './menuKeys'
-  import { railMove, scrollToShow, treeAction, treePositions } from './sidebarKeys'
+  import SidebarRail from './SidebarRail.svelte'
+  import SidebarRow from './SidebarRow.svelte'
+  import { scrollToShow, treeAction, treePositions } from './sidebarKeys'
   import { clampWidth, DEFAULT_WIDTH, loadSidebar, otherPanelWithMatches, ROW_HEIGHT, saveSidebar, visibleRange, type SidebarPanel } from './sidebarState'
-  import { buildPanels, careCount, matchParts, panelMatches, panelRows, refStatus, refTooltip, stackPlace, type FolderRow, type TreeRow } from './sidebarTree'
+  import { buildPanels, careCount, panelMatches, panelRows, type FolderRow, type RefRow, type TreeRow } from './sidebarTree'
 
   let {
     path,
@@ -181,17 +182,6 @@
     filterInput?.select()
   }
 
-  // The rail is one Tab stop too; the arrow keys move along it.
-  let rail = $state<HTMLElement>()
-  let railStop = $derived(TABS.findIndex((t) => t.key === ui.panel))
-  function railKey(e: KeyboardEvent) {
-    const buttons = [...(rail?.querySelectorAll('button') ?? [])]
-    const next = railMove(e.key, buttons.indexOf(e.target as HTMLButtonElement), buttons.length)
-    if (next === null) return
-    e.preventDefault()
-    buttons[next].focus()
-  }
-
   /** The rail badge's number, and what it means for screen readers. */
   function badge(key: SidebarPanel): { count: number; text: string } {
     if (filtering) {
@@ -213,6 +203,16 @@
       ui.panel = key
       ui.collapsed = false
     }
+  }
+
+  function clickFolder(row: FolderRow) {
+    activeKey = rowKey(row)
+    toggleFolder(row)
+  }
+
+  function clickRef(row: RefRow) {
+    activeKey = rowKey(row)
+    onPick(row.ref)
   }
 
   function toggleFolder(row: FolderRow) {
@@ -289,34 +289,13 @@
 </script>
 
 <aside class="sidebar">
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <nav class="rail" aria-label="Sidebar panels" bind:this={rail} onkeydown={railKey}>
-    {#each TABS as t, i (t.key)}
-      {@const b = badge(t.key)}
-      <button
-        class="tab"
-        class:on={t.key === ui.panel && !ui.collapsed}
-        aria-pressed={t.key === ui.panel && !ui.collapsed}
-        tabindex={i === railStop ? 0 : -1}
-        aria-label={b.count ? `${t.label}, ${b.text}` : t.label}
-        title={b.count ? `${t.label}: ${b.text}` : t.label}
-        onclick={() => pickTab(t.key)}
-      >
-        <Icon name={t.icon} size={18} />
-        {#if b.count}<span class="pip" aria-hidden="true">{b.count > 99 ? '99+' : b.count}</span>{/if}
-      </button>
-    {/each}
-    <button
-      class="tab toggle"
-      tabindex="-1"
-      aria-expanded={!ui.collapsed}
-      aria-label={ui.collapsed ? 'Show the sidebar panel' : 'Hide the sidebar panel'}
-      title={ui.collapsed ? 'Show the sidebar panel' : 'Hide the sidebar panel'}
-      onclick={() => (ui.collapsed = !ui.collapsed)}
-    >
-      <Icon name="sidebar" size={18} />
-    </button>
-  </nav>
+  <SidebarRail
+    tabs={TABS.map((t) => ({ key: t.key, label: t.label, icon: t.icon, badge: badge(t.key) }))}
+    panel={ui.panel}
+    collapsed={ui.collapsed}
+    onPick={pickTab}
+    onToggle={() => (ui.collapsed = !ui.collapsed)}
+  />
 
   <div class="panel" class:collapsed={ui.collapsed} style:width="{ui.width}px" hidden={ui.collapsed}>
     <header>
@@ -377,78 +356,7 @@
             aria-expanded={row.type === 'folder' ? row.open : undefined}
             aria-selected={row.type === 'ref' && !!selectedCommit && row.ref.commit === selectedCommit}
           >
-            {#if row.type === 'folder'}
-              {@const k = kindInfo(row.kind)}
-              <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-              <div
-                class="row folder"
-                style:--depth={row.depth}
-                title="{row.label}/"
-                onclick={() => {
-                  activeKey = rowKey(row)
-                  toggleFolder(row)
-                }}
-              >
-                <span class="caret" class:open={row.open}><Icon name="right" size={10} /></span>
-                {#if k}
-                  <span class="kind-icon" style:color="var({k.token})" title={k.label}><Icon name={k.icon} size={14} /><span class="visually-hidden">{k.label}</span></span>
-                {:else}
-                  <span class="kind-icon"><Icon name={row.remote ? 'remote' : row.open ? 'folder-open' : 'folder'} size={14} /></span>
-                {/if}
-                <span class="name">{row.label}</span>
-                {#if row.holdsHead && !row.open}<span class="dot" title="The checked-out branch is in here"><span class="visually-hidden">Holds the checked-out branch</span></span>{/if}
-                <span class="meta count">{row.count.toLocaleString()}</span>
-              </div>
-            {:else}
-              {@const r = row.ref}
-              {@const k = kindInfo(row.mark)}
-              {@const status = refStatus(r)}
-              {@const parts = matchParts(row.label, filter)}
-              {@const isSelected = !!selectedCommit && r.commit === selectedCommit}
-              <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-              <div
-                class="row ref"
-                class:head={r.head}
-                class:selected={isSelected}
-                class:hidden-ref={r.hidden}
-                class:stacked={row.stacked}
-                class:context={row.context}
-                style:--depth={row.depth}
-                onclick={() => {
-                  activeKey = rowKey(row)
-                  onPick(r)
-                }}
-                ondblclick={() => onActivate?.(r)}
-                oncontextmenu={(e) => {
-                  if (!onContext) return
-                  e.preventDefault()
-                  onContext(r, e.clientX, e.clientY)
-                }}
-                title={refTooltip(r)}
-              >
-                {#if r.head}<span class="here"><span class="visually-hidden">Checked out: </span></span>{/if}
-                {#if k}<span class="kind-icon" style:color="var({k.token})" title={k.label}><Icon name={k.icon} size={13} /><span class="visually-hidden">{k.label}</span></span>{/if}
-                <span class="name">{parts.pre}{#if parts.hit}<mark>{parts.hit}</mark>{/if}{parts.post}</span>
-                {#if r.hidden}<span class="visually-hidden">, hidden</span>{/if}
-                {#if stackPlace(r)}<span class="visually-hidden">, {stackPlace(r)}</span>{/if}
-                {#if status}<span class="track {status.tone}"><span aria-hidden="true">{status.text}</span><span class="visually-hidden">, {status.spoken}</span></span>{/if}
-              </div>
-              {#if onContext}
-                <!-- The Menu key reaches this from the keyboard, so it isn't a Tab stop. -->
-                <button
-                  class="more"
-                  tabindex="-1"
-                  aria-hidden="true"
-                  aria-label="More for {r.kind === 'stash' ? r.subject || r.short : r.short}"
-                  aria-haspopup="menu"
-                  title="More"
-                  onclick={(e) => {
-                    const box = e.currentTarget.getBoundingClientRect()
-                    onContext(r, box.left, box.bottom)
-                  }}><Icon name="more" size={14} /></button
-                >
-              {/if}
-            {/if}
+            <SidebarRow {row} {filter} {selectedCommit} onFolderClick={clickFolder} onRefClick={clickRef} {onActivate} {onContext} />
           </li>
         {/each}
       </ul>
@@ -517,65 +425,6 @@
     display: flex;
     flex: none;
     min-height: 0;
-  }
-
-  .rail {
-    flex: none;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    width: 44px;
-    padding: 8px 0;
-    box-sizing: border-box;
-    background: var(--paper-warm);
-    border-right: 1px solid var(--paper-edge);
-  }
-
-  .tab {
-    position: relative;
-    display: grid;
-    place-items: center;
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    background: none;
-    border: none;
-    border-radius: 8px;
-    color: var(--ink-mute);
-    transition:
-      background-color var(--dur-quick),
-      color var(--dur-quick);
-  }
-
-  .tab:hover:not(:disabled) {
-    background: var(--wash-hover);
-    color: var(--ink);
-  }
-
-  .tab.on {
-    background: var(--selected);
-    color: var(--ink);
-  }
-
-  .toggle {
-    margin-top: auto;
-  }
-
-  .pip {
-    position: absolute;
-    right: 0;
-    top: 0;
-    min-width: 15px;
-    padding: 0 3px;
-    box-sizing: border-box;
-    border-radius: 8px;
-    background: var(--paper-deep);
-    color: var(--ink-soft);
-    font-family: var(--font-mono);
-    font-size: 12px;
-    line-height: 15px;
-    text-align: center;
   }
 
   .panel {
@@ -746,47 +595,6 @@
     pointer-events: none;
   }
 
-  .row {
-    position: relative;
-    display: flex;
-    align-items: center;
-    width: 100%;
-    height: 28px;
-    box-sizing: border-box;
-    background: none;
-    border: none;
-    border-radius: 0;
-    color: var(--ink-soft);
-    font-size: 14px;
-    text-align: left;
-    white-space: nowrap;
-    cursor: pointer;
-    user-select: none;
-  }
-
-  .row:hover {
-    background: var(--wash-hover);
-    color: var(--ink);
-  }
-
-  .folder {
-    gap: 6px;
-    padding: 2px 10px 2px calc(10px + var(--depth, 0) * 14px);
-  }
-
-  /* Only the checked-out branch is at full strength; hover, focus and selection bring the
-     others up to it. */
-  .ref {
-    gap: 7px;
-    padding: 2px 10px 2px calc(28px + var(--depth, 0) * 14px);
-    color: var(--ink-mute);
-  }
-
-  li:hover .ref,
-  [role='tree']:focus-visible li.active .ref {
-    color: var(--ink);
-  }
-
   [role='tree'] {
     outline: none;
   }
@@ -799,142 +607,6 @@
     outline: 2px solid var(--link);
     outline-offset: -2px;
     pointer-events: none;
-  }
-
-  li:hover .row {
-    background: var(--wash-hover);
-  }
-
-  .ref.selected {
-    background: var(--selected);
-    color: var(--ink);
-  }
-
-  .ref.head {
-    color: var(--ink);
-    font-weight: 600;
-  }
-
-  /* While narrowed, what matched stands out from the parents kept only for context. */
-  .narrowed .ref:not(.context, .head, .selected) {
-    color: var(--ink-soft);
-  }
-
-  mark {
-    background: var(--highlight);
-    color: inherit;
-  }
-
-  .more {
-    position: absolute;
-    z-index: 2;
-    top: 2px;
-    right: 4px;
-    display: grid;
-    place-items: center;
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    background: var(--paper-warm);
-    border: none;
-    border-radius: 7px;
-    color: var(--ink-soft);
-    opacity: 0;
-    transition: opacity var(--dur-quick);
-  }
-
-  .more:hover:not(:disabled) {
-    background: var(--paper-deep);
-    color: var(--ink);
-  }
-
-  li:hover .more,
-  [role='tree']:focus-visible li.active .more {
-    opacity: 1;
-  }
-
-  /* More replaces the status; it stays readable to screen readers. */
-  li:hover .track,
-  [role='tree']:focus-visible li.active .track {
-    opacity: 0;
-  }
-
-  .here,
-  .dot {
-    flex: none;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--link);
-  }
-
-  .here {
-    margin-left: -15px;
-  }
-
-  /* A stacked branch sits indented under its parent, with a thin elbow joining them. */
-  .ref.stacked::before {
-    content: '';
-    position: absolute;
-    left: calc(16px + var(--depth, 0) * 14px);
-    top: 0;
-    width: 7px;
-    height: 50%;
-    border-left: 1px solid var(--paper-edge);
-    border-bottom: 1px solid var(--paper-edge);
-    border-bottom-left-radius: 4px;
-    pointer-events: none;
-  }
-
-  .caret {
-    flex: none;
-    display: grid;
-    place-items: center;
-    width: 10px;
-    color: var(--ink-mute);
-    transition: transform var(--dur-base) var(--ease-ink);
-  }
-
-  .caret.open {
-    transform: rotate(90deg);
-  }
-
-  .kind-icon {
-    display: inline-flex;
-    flex: none;
-    color: var(--ink-mute);
-  }
-
-  .name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .count {
-    margin-left: auto;
-    flex: none;
-  }
-
-  .track {
-    margin-left: auto;
-    flex: none;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    font-weight: 400;
-    color: var(--link);
-  }
-
-  .track.warning {
-    color: var(--warning);
-  }
-
-  .track.muted {
-    color: var(--ink-mute);
-  }
-
-  .hidden-ref .name {
-    font-style: italic;
   }
 
   .empty {
@@ -969,9 +641,6 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .tab,
-    .caret,
-    .more,
     .edge {
       transition: none;
     }
