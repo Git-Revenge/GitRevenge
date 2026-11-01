@@ -204,3 +204,9 @@ test.describe('upstream dialog', () => {
     expect(await events(page, 'close')).toHaveLength(0)
   })
 })
+
+test('loading text waits, so a fast load does not flash', async ({ page }) => {
+  await open(page, 'loading')
+  await expect(page.getByRole('status')).toHaveCount(0)
+  await expect(page.getByRole('status')).toContainText('Loading…')
+})

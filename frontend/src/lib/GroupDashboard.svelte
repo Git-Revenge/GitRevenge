@@ -6,6 +6,7 @@
   import { formatTime } from './graph/draw'
   import { session } from './session.svelte'
   import Icon from './ui/Icon.svelte'
+  import Loading from './ui/Loading.svelte'
 
   let { name, onClose }: { name: string; onClose: () => void } = $props()
 
@@ -62,7 +63,7 @@
   </header>
 
   {#if loading && rows.length === 0}
-    <p class="muted">Loading…</p>
+    <Loading />
   {:else if rows.length === 0}
     <p class="muted">This group has no repositories yet. Add some from the start page.</p>
   {:else}

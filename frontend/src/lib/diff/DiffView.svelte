@@ -10,6 +10,7 @@
 </script>
 
 <script lang="ts">
+  import Loading from '../ui/Loading.svelte'
   import { FileContents, FileData, FileImage, SetStagedContent, SetWorkTreeContent } from '../../../wailsjs/go/app/App.js'
   import type { git } from '../../../wailsjs/go/models'
   import { formatShortcut, provideCommands } from '../commands.svelte'
@@ -173,7 +174,7 @@
 
   <div class="body code-ground">
     {#if !contents}
-      <p class="muted">Loading…</p>
+      <Loading />
     {:else if contents.kind === 'large'}
       <div class="notice">
         <p>

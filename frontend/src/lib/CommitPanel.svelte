@@ -9,6 +9,7 @@
   import { asPerson, valueParts } from './trailers'
   import Markdown from './Markdown.svelte'
   import Icon from './ui/Icon.svelte'
+  import Loading from './ui/Loading.svelte'
 
   let {
     path,
@@ -149,7 +150,7 @@
 <aside class="panel" aria-label="Commit details">
   <span class="blob" aria-hidden="true"></span>
   {#if !info}
-    <p class="muted pad">Loading…</p>
+    <Loading />
   {:else}
     {@const c = info.commit}
     <header>
