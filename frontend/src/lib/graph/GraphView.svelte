@@ -9,7 +9,7 @@
   import Icon from '../ui/Icon.svelte'
   import { drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneWindow, layoutColumns, METRICS, setLaneColors, type Theme } from './draw'
   import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
-  import { scrollMap, toScroll, toVirtual } from './scrollMap'
+  import { scrollMap, topAfterScroll, toScroll, type ScrollMap } from './scrollMap'
 
   let {
     path,
@@ -67,19 +67,27 @@
    * from it when the history is taller than a scroll area can be (see scrollMap). */
   let top = 0
   /** The scrollTop last set from top, so the scroll event that causes isn't read back
-   * (that would round top to the scale). */
-  let setScroll = -1
+   * (that would round top to the scale). Null when the next scroll isn't ours. */
+  let setScroll: number | null = null
+
+  /** Moves the scroller to match top. No move means no scroll event, so nothing is marked
+   * as ours; a leftover mark would swallow the person's next small scroll. */
+  function placeScroller(m: ScrollMap) {
+    const next = Math.round(toScroll(top, m))
+    if (Math.abs(scroller.scrollTop - next) < 1) return
+    setScroll = next
+    scroller.scrollTop = next
+  }
 
   function scrollTo(t: number) {
     top = Math.max(0, Math.min(map.maxTop, t))
-    setScroll = Math.round(toScroll(top, map))
-    scroller.scrollTop = setScroll
+    placeScroller(map)
     schedule()
   }
 
   function onScroll() {
-    if (Math.abs(scroller.scrollTop - setScroll) > 1) top = toVirtual(scroller.scrollTop, map)
-    setScroll = -1
+    top = topAfterScroll(scroller.scrollTop, setScroll, top, map)
+    setScroll = null
     schedule()
   }
 
@@ -95,8 +103,7 @@
   $effect(() => {
     const m = map
     if (!scroller) return
-    setScroll = Math.round(toScroll(top, m))
-    scroller.scrollTop = setScroll
+    placeScroller(m)
   })
   let error = $state('')
   let selected = $state(-1)
@@ -303,8 +310,10 @@
     selected = Math.max(0, Math.min(span - 1, i))
     // Keep the selection in view.
     const y = selected * rowH
+    // The first selection can land before the first draw has measured the view.
+    const height = viewH || scroller.clientHeight
     if (y < top) scrollTo(y)
-    else if (y + rowH > top + viewH) scrollTo(y + rowH - viewH)
+    else if (y + rowH > top + height) scrollTo(y + rowH - height)
     selectedId = cache.get(selected)?.id ?? ''
     onSelect?.(cache.get(selected), auto)
     schedule()

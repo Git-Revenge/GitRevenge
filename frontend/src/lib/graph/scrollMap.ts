@@ -25,3 +25,11 @@ export const toVirtual = (scrollTop: number, m: ScrollMap) => Math.min(m.maxTop,
 
 /** The scroll position for a virtual top. */
 export const toScroll = (top: number, m: ScrollMap) => top / m.ratio
+
+/**
+ * The virtual top after a scroll event. ownScroll is the scrollTop we last set ourselves, or
+ * null. Our own scroll keeps top as it is, since reading it back would round it to the scale.
+ */
+export function topAfterScroll(scrollTop: number, ownScroll: number | null, top: number, m: ScrollMap): number {
+  return ownScroll !== null && Math.abs(scrollTop - ownScroll) <= 1 ? top : toVirtual(scrollTop, m)
+}
