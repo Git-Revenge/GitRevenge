@@ -10,9 +10,8 @@
   import ShortcutsDialog from './lib/ShortcutsDialog.svelte'
   import { commands, provideCommands, type Command } from './lib/commands.svelte'
   import { gitConfig } from './lib/gitconfig/config.svelte'
-  import GitConfigView from './lib/gitconfig/GitConfigView.svelte'
   import { insights } from './lib/insights/insights.svelte'
-  import InsightsView from './lib/insights/InsightsView.svelte'
+  import Lazy from './lib/ui/Lazy.svelte'
   import OperationBanner from './lib/OperationBanner.svelte'
   import PromptDialog from './lib/PromptDialog.svelte'
   import RepoView from './lib/RepoView.svelte'
@@ -215,9 +214,9 @@
           <RepoView path={session.activeTab.path} />
         {/key}
       {:else if session.active === session.configTabId && gitConfig.open}
-        <GitConfigView />
+        <Lazy load={() => import('./lib/gitconfig/GitConfigView.svelte')} />
       {:else if session.active === session.insightsTabId && insights.open}
-        <InsightsView />
+        <Lazy load={() => import('./lib/insights/InsightsView.svelte')} />
       {:else}
         <StartPage />
       {/if}

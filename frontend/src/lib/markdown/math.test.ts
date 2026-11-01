@@ -1,7 +1,6 @@
-import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
-import { mathMarked, texMath } from './math'
-import MathView from './MathView.svelte'
+import katex from 'katex'
+import { mathMarked, renderMath, texMath } from './math'
 
 const types = (md: string) => mathMarked.lexer(md).map((t) => t.type)
 const inline = (md: string) => (mathMarked.lexer(md)[0] as { tokens?: { type: string; text?: string }[] }).tokens ?? []
@@ -36,9 +35,9 @@ describe('texMath', () => {
   })
 })
 
-describe('MathView', () => {
+describe('renderMath', () => {
   it('renders MathML and refuses links', () => {
-    const out = render(MathView, { props: { tex: '\\frac{1}{2} \\href{https://example.com}{x}' } }).body
+    const out = renderMath(katex, String.raw`\frac{1}{2} \href{https://example.com}{x}`, false)
     expect(out).toContain('<math')
     expect(out).not.toContain('href="https://example.com"')
   })

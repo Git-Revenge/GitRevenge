@@ -1,4 +1,11 @@
+import type Katex from 'katex'
 import { Marked, type TokenizerExtension } from 'marked'
+
+/** TeX as MathML. trust: false keeps \href, \url and HTML extensions out, so the markup is only
+ * what KaTeX generates, and a parse error shows the source with the error, not a crash. */
+export function renderMath(katex: typeof Katex, tex: string, display: boolean): string {
+  return katex.renderToString(tex, { displayMode: display, output: 'mathml', throwOnError: false, trust: false, strict: 'ignore' })
+}
 
 /** A math token: TeX source, shown inline or as a display block. */
 export interface MathToken {

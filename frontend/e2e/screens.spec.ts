@@ -176,3 +176,25 @@ test.describe('upstream dialog', () => {
     expect(await events(page, 'close')).toHaveLength(0)
   })
 })
+
+test.describe('views loaded on demand', () => {
+  test('shows the view once its code loads', async ({ page }) => {
+    await open(page, 'lazy')
+    await expect(page.locator('#host svg')).toBeVisible()
+  })
+
+  test('says so when its code can\'t load', async ({ page }) => {
+    await open(page, 'lazy', { failures: { lazy: 'the file is missing' } })
+    await expect(page.getByRole('alert')).toContainText("Couldn't load this view: the file is missing")
+  })
+
+  test('the real diff view loads and gets its props', async ({ page }) => {
+    await open(page, 'lazyDiff')
+    await expect(page.getByText('lazy-file.ts').first()).toBeVisible()
+  })
+
+  test('math renders once KaTeX loads', async ({ page }) => {
+    await open(page, 'math')
+    await expect(page.locator('math')).toBeAttached()
+  })
+})
