@@ -2,10 +2,12 @@
   export interface Field {
     key: string
     label: string
-    type?: 'text' | 'textarea' | 'checkbox' | 'select'
+    /** A combobox is a text field with suggestions, filtered as you type. */
+    type?: 'text' | 'textarea' | 'checkbox' | 'select' | 'combobox'
     value?: string | boolean
     placeholder?: string
     options?: { value: string; label: string }[]
+    suggestions?: string[]
   }
 
   export interface DialogSpec {
@@ -24,6 +26,7 @@
   import Modal from './ui/Modal.svelte'
 
   let { spec, onClose }: { spec: DialogSpec; onClose: () => void } = $props()
+  const id = $props.id()
 
   // svelte-ignore state_referenced_locally
   let values = $state<Record<string, string | boolean>>(
@@ -58,6 +61,11 @@
             <select bind:value={values[f.key]}>
               {#each f.options ?? [] as o (o.value)}<option value={o.value}>{o.label}</option>{/each}
             </select>
+          {:else if f.type === 'combobox'}
+            <input bind:value={values[f.key]} placeholder={f.placeholder} list="{id}-{f.key}" autocomplete="off" />
+            <datalist id="{id}-{f.key}">
+              {#each f.suggestions ?? [] as s (s)}<option value={s}></option>{/each}
+            </datalist>
           {:else}
             <input bind:value={values[f.key]} placeholder={f.placeholder} />
           {/if}
