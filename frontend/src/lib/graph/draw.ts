@@ -295,12 +295,13 @@ export function drawRow(
     disc(ctx, x, mid, r - 4, color)
   } else if (comfortable) {
     // The author's initials in a lane-coloured ring, as on dev-null's timeline; on a
-    // Release, Environment, Docs or Bot lane, the kind's icon instead.
+    // Release, Environment, Docs or Bot lane, the kind's icon instead. Trunk and Feature keep
+    // the initials, because who did the work matters on those lanes.
     cut(15)
     disc(ctx, x, mid, 13.5, color)
     cut(11.5)
     disc(ctx, x, mid, 10.5, theme.deep)
-    const kind = row.kind && row.kind !== 'trunk' ? kindInfo(row.kind) : undefined
+    const kind = row.kind && row.kind !== 'trunk' && row.kind !== 'feature' ? kindInfo(row.kind) : undefined
     const icon = kind ? iconPath(kind.icon) : undefined
     if (icon) {
       ctx.save()

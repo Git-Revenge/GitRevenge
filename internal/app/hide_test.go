@@ -111,7 +111,7 @@ func TestRefKinds(t *testing.T) {
 	}
 	loadedPage(t, a, tab.Path)
 	refs, _ := a.Refs(tab.Path)
-	want := map[string]string{"main": "trunk", "release/1.0": "release", "gh-pages": "docs", "feature/x": ""}
+	want := map[string]string{"main": "trunk", "release/1.0": "release", "gh-pages": "docs", "feature/x": "feature", "topic": ""}
 	for _, r := range refs {
 		if w, ok := want[r.Short]; ok && r.BranchKind != w {
 			t.Errorf("%s kind = %q, want %q", r.Short, r.BranchKind, w)

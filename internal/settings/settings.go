@@ -76,7 +76,7 @@ type Settings struct {
 type RepoSettings struct {
 	Path string `json:"path"`
 	// Kinds overrides a branch kind's patterns, keyed by kind ("trunk", "release",
-	// "environment", "docs", "bot"). A kind not listed uses its defaults; one listed with no
+	// "environment", "docs", "bot", "feature"). A kind not listed uses its defaults; one listed with no
 	// patterns matches nothing.
 	Kinds map[string][]string `json:"kinds,omitempty"`
 	// Hide lists glob patterns of branches to leave out of the sidebar and the graph.

@@ -1,5 +1,5 @@
 // Package branchkind classifies branches into the built-in kinds (Trunk, Release,
-// Environment, Docs, Bot) and decides which are hidden, by glob patterns kept per
+// Environment, Docs, Bot, Feature) and decides which are hidden, by glob patterns kept per
 // repository in local settings (ADR 0009).
 package branchkind
 
@@ -21,10 +21,11 @@ const (
 	Environment Kind = "environment"
 	Docs        Kind = "docs"
 	Bot         Kind = "bot"
+	Feature     Kind = "feature"
 )
 
 // Order lists the kinds in matching order.
-var Order = []Kind{Trunk, Release, Environment, Docs, Bot}
+var Order = []Kind{Trunk, Release, Environment, Docs, Bot, Feature}
 
 // Defaults are the patterns each kind uses until a repository overrides them. Environment
 // has none: staging and production are too often ordinary branches.
@@ -34,6 +35,7 @@ var Defaults = map[Kind][]string{
 	Environment: {},
 	Docs:        {"gh-pages", "gh-docs", "docs-site"},
 	Bot:         {"dependabot/*", "renovate/*"},
+	Feature:     {"feature/*", "features/*", "feat/*"},
 }
 
 // Valid reports whether k is one of the built-in kinds.

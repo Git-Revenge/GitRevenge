@@ -6,14 +6,15 @@ Everything here is set per repository and kept on your computer, in Git Revenge'
 
 ## Branch kinds
 
-Some branches aren't like the others. Git Revenge knows five **kinds**, and treats each one in its own way:
+Some branches aren't like the others. Git Revenge knows six **kinds**, and treats each one in its own way:
 
 | Kind | Default patterns | What changes |
 |---|---|---|
 | **Trunk** | `main`, `master`, `develop`, `trunk` | Pinned to the left of the graph as a straight spine. Its chip is bold. |
 | **Release** | `release/*`, `releases/*`, `hotfix/*` | Marks its folder in the sidebar, newest version first. Can bound an Insights releases window. |
-| **Environment** | none | For deploy branches such as `staging` or `production`. Its own sidebar section. |
+| **Environment** | none | For deploy branches such as `staging` or `production`. Asks before a force push or delete. |
 | **Docs** | `gh-pages`, `gh-docs`, `docs-site` | Drawn muted in the graph, with a toggle to hide it. Left out of Insights. |
+| **Feature** | `feature/*`, `features/*`, `feat/*` | Marks its folder in the sidebar with a sprout. Otherwise it's an ordinary working branch: no extra confirmations, and it stays in Insights. |
 | **Bot** | `dependabot/*`, `renovate/*` | Marks its folder in the sidebar, which starts closed, with a toggle to hide it. Grouped as dependency updates in Insights. |
 
 A pattern matches the branch name without its remote, so `release/*` covers `release/1.4` and `origin/release/1.4` alike. A `*` matches anything, slashes included, so `dependabot/*` catches `dependabot/npm_and_yarn/vite-7.1`. The first kind that matches wins, in the order of the table.

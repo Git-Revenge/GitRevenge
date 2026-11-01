@@ -33,7 +33,7 @@ This document records the decisions from the initial requirements session (2026-
 | State | Local JSON settings in the OS config dir | [0005](adr/0005-local-state-and-external-changes.md) |
 | Git config editing | Working copy edited through `git config --file`; validated saves with backups | [0007](adr/0007-git-config-editing.md) |
 | Insights | Computed only from repository state; a pure function of the repo and explicit inputs | [0008](adr/0008-insights-from-repository-state.md) |
-| Branch kinds | Five built-in kinds (Trunk, Release, Environment, Docs, Bot) matched by local per-repo patterns | [0009](adr/0009-branch-kinds.md) |
+| Branch kinds | Six built-in kinds (Trunk, Release, Environment, Docs, Bot, Feature) matched by local per-repo patterns | [0009](adr/0009-branch-kinds.md) |
 
 ### Backend
 
