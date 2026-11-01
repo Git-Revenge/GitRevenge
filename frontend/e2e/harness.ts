@@ -91,7 +91,7 @@ document.documentElement.dataset.theme = scenario.theme ?? 'light'
 document.body.style.cssText = 'margin:0;height:100vh;background:var(--paper)'
 host.style.cssText = 'display:flex;height:100vh'
 
-const mounts: Record<string, () => Promise<void>> = {
+const mounts = {
   async sidebar() {
     const { default: Sidebar } = await import('../src/lib/Sidebar.svelte')
     mount(Sidebar, {
@@ -138,7 +138,23 @@ const mounts: Record<string, () => Promise<void>> = {
   },
 }
 
-const chosen = new Map(Object.entries(mounts)).get(new URLSearchParams(location.search).get('mount') ?? '')
-if (!chosen) throw new Error('Unknown component to mount.')
-await chosen()
+switch (new URLSearchParams(location.search).get('mount')) {
+  case 'sidebar':
+    await mounts.sidebar()
+    break
+  case 'start':
+    await mounts.start()
+    break
+  case 'graph':
+    await mounts.graph()
+    break
+  case 'commitMenu':
+    await mounts.commitMenu()
+    break
+  case 'upstreamDialog':
+    await mounts.upstreamDialog()
+    break
+  default:
+    throw new Error('Unknown component to mount.')
+}
 win.__ready = true
