@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Ref, Row } from './graph/rowCache'
-import { dropItems, groups, refItems, type MenuContext } from './menus'
+import { commitItems, dropItems, groups, refItems, type MenuContext } from './menus'
 
 const row = (id: string): Row => ({ index: 0, col: 0, color: 0, up: [], down: [], width: 1, id, parents: 1, author: '', authorTime: 0, subject: '' })
 const ref = (short: string, kind: Ref['kind'], head = false): Ref => ({
@@ -51,6 +51,57 @@ describe('groups', () => {
       ['b', false],
       ['c', true],
     ])
+  })
+
+  it('drops a repeated label, keeping the first', () => {
+    const first = item('same')
+    const items = groups([first, item('a')], [item('same'), item('b')])
+    expect(labels(items)).toEqual(['same', 'a', 'b'])
+    expect(items[0]).toBe(first)
+  })
+
+  it('keeps the group rule when a group loses its first item', () => {
+    const items = groups([item('same')], [item('same'), item('b')])
+    expect(items.map((i) => [i.label, !!i.separator])).toEqual([
+      ['same', false],
+      ['b', true],
+    ])
+  })
+
+  it('keeps a rule from an item that was dropped', () => {
+    const items = groups([item('same'), item('a')], [item('b'), { ...item('same'), separator: true }, item('c')])
+    expect(items.map((i) => [i.label, !!i.separator])).toEqual([
+      ['same', false],
+      ['a', false],
+      ['b', true],
+      ['c', true],
+    ])
+  })
+})
+
+// The graph's menu for a commit combines the items of every ref on it (#323).
+describe('a commit menu with several refs', () => {
+  const menu = (refs: Ref[], current = 'main') => labels(groups(commitItems(row('a'.repeat(40)), refs, ctx(current)), ...refs.map((r) => refItems(r, ctx(current)))))
+  const expectUnique = (list: string[]) => expect(list.filter((l, i) => list.indexOf(l) !== i)).toEqual([])
+
+  it('has no repeated labels for a branch and its remote', () => {
+    expectUnique(menu([ref('main', 'local', true), ref('origin/main', 'remote')]))
+  })
+
+  it('has no repeated labels for branches with different names', () => {
+    expectUnique(menu([ref('feature/x', 'local', true), ref('origin/y', 'remote')], 'feature/x'))
+    expectUnique(menu([ref('one', 'local'), ref('two', 'local'), ref('v1', 'tag')]))
+  })
+
+  it('names the branch on the items a second branch would repeat', () => {
+    const list = menu([ref('one', 'local'), ref('two', 'local')])
+    for (const label of ['Mark one as…', 'Mark two as…', 'Stack one on…', 'Stack two on…']) expect(list).toContain(label)
+  })
+
+  it('offers one Mark and one Hide when a branch and its remote share a name', () => {
+    const list = menu([ref('main', 'local'), ref('origin/main', 'remote')])
+    expect(list.filter((l) => l === 'Mark main as…')).toHaveLength(1)
+    expect(list.filter((l) => l === 'Hide main')).toHaveLength(1)
   })
 })
 
