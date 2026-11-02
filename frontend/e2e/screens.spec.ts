@@ -127,6 +127,27 @@ test.describe('commit graph', () => {
     await page.waitForTimeout(200)
     expect(await scroller.evaluate((e) => e.scrollTop)).toBe(0)
   })
+
+  // #386: finishing the load put the selection back on the row it had before refs arrived.
+  test('selects HEAD when refs arrive just before the load finishes', async ({ page }) => {
+    await open(page, 'graph', { graphRows: 30, delays: { CommitRow: 200 }, responses: { Refs: [], CommitSignatures: [], CommitRow: 0 } })
+    const selected = async () => {
+      await page.mouse.move(0, 0)
+      return (await events(page, 'select')).at(-1)?.[0] as { index: number } | undefined
+    }
+    await expect.poll(async () => (await selected())?.index).toBe(0)
+
+    const head = String(5).padStart(40, '0')
+    await page.evaluate((id) => {
+      const w = window as unknown as { __scenario: { graphRefs: unknown }; __emit: (name: string, data: unknown) => void }
+      w.__scenario.graphRefs = { [id]: [{ name: 'refs/heads/main', short: 'main', kind: 'local', commit: id, head: true }] }
+      w.__emit('graph:progress', { path: '/repo', rows: 30, refsReady: true })
+      w.__emit('graph:progress', { path: '/repo', rows: 30, done: true, estimate: 30 })
+    }, head)
+    await expect.poll(async () => (await selected())?.index).toBe(5)
+    await page.waitForTimeout(500)
+    expect((await selected())?.index).toBe(5)
+  })
 })
 
 test.describe('start page', () => {

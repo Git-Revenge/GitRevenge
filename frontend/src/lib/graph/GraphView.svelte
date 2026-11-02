@@ -302,12 +302,15 @@
     if (selected < 0) return
     const id = selectedId
     const row = id ? await CommitRow(path, id).catch(() => -1) : -1
+    // The selection moved while that was being asked, to HEAD or by the person: it stands.
+    if (selectedId !== id) return
     // If the commit is gone (e.g. amended), stay on the same position but refresh details.
     const target = row >= 0 ? row : selected
     cache.ensure(target, target + 1)
     // Wait for the row to load, giving up after ~5s (e.g. the graph got shorter).
     let frames = 300
     const wait = () => {
+      if (selectedId !== id) return
       if (cache.get(target)) select(target, true)
       else if (frames-- > 0) requestAnimationFrame(wait)
     }
