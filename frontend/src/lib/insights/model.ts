@@ -123,6 +123,9 @@ export function utcMoment(seconds: number): string {
 }
 
 /** How long ago a moment was, roughly, for fetch freshness: "2 hours ago". Display only. */
+/** A project group in the scope menu, short enough for the rail's width. */
+export const groupLabel = (name: string, repos: number) => `${name} · ${repos} ${repos === 1 ? 'repo' : 'repos'}`
+
 export function ago(seconds: number, now = Date.now() / 1000): string {
   const s = Math.max(0, now - seconds)
   if (s < 90) return 'just now'

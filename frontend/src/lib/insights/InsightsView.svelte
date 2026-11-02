@@ -5,7 +5,7 @@
   import Icon from '../ui/Icon.svelte'
   import InkButton from '../ui/InkButton.svelte'
   import { insights, VIEWS, type WindowKind } from './insights.svelte'
-  import { ago, attention, latest, perDay, tiles, utcDay, utcMoment } from './model'
+  import { ago, attention, groupLabel, latest, perDay, tiles, utcDay, utcMoment } from './model'
   import AttentionView from './AttentionView.svelte'
   import HotspotsView from './HotspotsView.svelte'
   import ShippedView from './ShippedView.svelte'
@@ -32,6 +32,14 @@
 
   const repoName = (path: string) => session.tabs.find((t) => t.path === path)?.name ?? path.split(/[\\/]/).pop() ?? path
   const scopeValue = $derived(scope ? `${scope.kind}:${scope.id}` : '')
+  /** The whole of what the scope menu shows, which a long name can cut off. */
+  const scopeTitle = $derived.by(() => {
+    if (scope?.kind === 'group') {
+      const g = insights.groups.find((x) => x.name === scope.id)
+      return g ? groupLabel(g.name, g.paths.length) : scope.id
+    }
+    return scope ? repoName(scope.id) : ''
+  })
 
   function onScope(e: Event & { currentTarget: HTMLSelectElement }) {
     const v = e.currentTarget.value
@@ -57,7 +65,7 @@
 
     <label class="group">
       <span class="meta">Scope</span>
-      <select class="field" value={scopeValue} onchange={onScope}>
+      <select class="field" value={scopeValue} onchange={onScope} title={scopeTitle}>
         {#if session.tabs.length}
           <optgroup label="Repositories">
             {#each session.tabs as tab (tab.path)}<option value="repo:{tab.path}">{tab.name}</option>{/each}
@@ -65,7 +73,7 @@
         {/if}
         {#if insights.groups.length}
           <optgroup label="Project groups">
-            {#each insights.groups as g (g.name)}<option value="group:{g.name}">{g.name} · {g.paths.length} repositories</option>{/each}
+            {#each insights.groups as g (g.name)}<option value="group:{g.name}">{groupLabel(g.name, g.paths.length)}</option>{/each}
           </optgroup>
         {/if}
       </select>

@@ -105,6 +105,11 @@ const mounts = {
     const target = { mode: 'commit', commit: 'a'.repeat(40), file: 'src/lazy-file.ts' }
     mount(Lazy, { target: host, props: { load: () => import('../src/lib/diff/DiffView.svelte'), path: '/repo', target, onClose: record('close'), onOpen: record('open') } })
   },
+  async blame() {
+    host.style.cssText = 'display:block;height:100vh'
+    const { default: BlameView } = await import('../src/lib/diff/BlameView.svelte')
+    mount(BlameView, { target: host, props: { path: '/r', file: 'a.txt', onClose: record('close'), onOpen: record('open'), onReveal: record('reveal') } })
+  },
   async math() {
     const { default: MathView } = await import('../src/lib/markdown/MathView.svelte')
     mount(MathView, { target: host, props: { tex: 'x^2' } })
@@ -179,6 +184,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'lazyDiff':
     await mounts.lazyDiff()
+    break
+  case 'blame':
+    await mounts.blame()
     break
   case 'math':
     await mounts.math()

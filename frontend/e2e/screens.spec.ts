@@ -366,6 +366,19 @@ test.describe('before the first load has answered', () => {
   })
 })
 
+// #390: the date column was cut off at the default size.
+test('blame shows the whole date, whatever the length of the author name', async ({ page }) => {
+  const line = (author: string) => ({ commit: 'a'.repeat(40), author, time: 1784214240, summary: 'S', line: 'text', origLine: 1 })
+  await open(page, 'blame', { responses: { Blame: [line('Someone With A Really Very Long Name Indeed')] } })
+  const when = page.locator('.when')
+  await expect(when).toBeVisible()
+  const cell = (await page.locator('.gutter').boundingBox())!
+  const date = (await when.boundingBox())!
+  expect(date.x + date.width).toBeLessThanOrEqual(cell.x + cell.width)
+  expect(await when.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true)
+  await expect(page.locator('.who')).toHaveAttribute('title', 'Someone With A Really Very Long Name Indeed')
+})
+
 test.describe('views loaded on demand', () => {
   test('shows the view once its code loads', async ({ page }) => {
     await open(page, 'lazy')
