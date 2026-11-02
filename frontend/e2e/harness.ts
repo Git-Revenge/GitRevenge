@@ -11,6 +11,8 @@ type Harness = Window &
     __calls: [string, ...unknown[]][]
     __events: [string, ...unknown[]][]
     __ready: boolean
+    /** Sends an event from the stubbed backend. */
+    __emit: (name: string, data: unknown) => void
     go: unknown
     runtime: unknown
   }
@@ -81,7 +83,13 @@ win.go = {
     ),
   },
 }
-win.runtime = new Proxy({ EventsOnMultiple: () => () => {} } as Record<string, unknown>, { get: (o, k: string) => o[k] ?? (() => {}) })
+const listeners = new Map<string, ((data: unknown) => void)[]>()
+win.__emit = (name, data) => listeners.get(name)?.forEach((listen) => listen(data))
+const EventsOnMultiple = (name: string, listen: (data: unknown) => void) => {
+  listeners.set(name, [...(listeners.get(name) ?? []), listen])
+  return () => listeners.set(name, listeners.get(name)!.filter((l) => l !== listen))
+}
+win.runtime = new Proxy({ EventsOnMultiple } as Record<string, unknown>, { get: (o, k: string) => o[k] ?? (() => {}) })
 
 const record =
   (name: string) =>
