@@ -1117,6 +1117,8 @@ details summary {
 /* ─── Git Revenge: homepage screenshots ─────────────── */
 .showcase-section {
   padding: 0 2rem;
+  /* ThemedImage sets its image's display, so the image is inline and centers as text. */
+  text-align: center;
   margin-top: -40px;
   background: linear-gradient(var(--dr-vellum) 50%, transparent 50%);
 }
@@ -1126,10 +1128,8 @@ details summary {
 }
 
 .showcase-shot {
-  display: block;
   width: 100%;
   max-width: 1100px;
-  margin: 0 auto;
   border-radius: 10px;
   border: 1px solid rgba(26, 22, 20, 0.12);
   box-shadow: var(--ifm-global-shadow-tl);
