@@ -360,6 +360,13 @@ test.describe('before the first load has answered', () => {
     await expect(heading(page)).toHaveText('Worktrees 2')
   })
 
+  // #388: worktrees waited for submodules and LFS, which can take seconds.
+  test('the Repository panel shows worktrees without waiting for the slower sections', async ({ page }) => {
+    await open(page, 'repoPanel', { delays: { Submodules: 5000, LFS: 5000 }, responses: { Worktrees: [tree('/r', true), tree('/r-wt', false)], Submodules: [] } })
+    await expect(heading(page)).toHaveText('Worktrees 2', { timeout: 2000 })
+    await expect(page.getByRole('button', { name: 'r-wt' })).toBeVisible()
+  })
+
   test('a repository with no worktrees listed still reads 0 once loaded', async ({ page }) => {
     await open(page, 'repoPanel', { responses: { Worktrees: [], Submodules: [] } })
     await expect(heading(page)).toHaveText('Worktrees 0')
