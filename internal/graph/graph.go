@@ -208,7 +208,8 @@ type layout struct {
 }
 
 // SetTipKinds gives branch tips a kind ("docs", "release", …), which the lane starting at
-// each carries down its first parents and rows report (Row.Kind, Seg.Kind). It must be
+// each carries down its first parents and rows report (Row.Kind, Seg.Kind). A tip on a Trunk
+// lane leaves the lane's kind alone. It must be
 // called before the first Add; at most 255 kinds.
 func (g *Graph) SetTipKinds(tips map[string]string) {
 	g.mu.Lock()
@@ -389,7 +390,9 @@ func step(st *state, cfg *layout, id oid, ps []oid, base int32, row *Row) (col, 
 		color = st.newColor()
 	default:
 		color = st.lanes[col].color
-		if kind == 0 {
+		// A kinded tip starts its kind here, except on a Trunk lane: a release or bot branch
+		// sitting on main doesn't make main's older commits its own.
+		if kind == 0 || (col < reserved && !isTip) {
 			kind = st.lanes[col].kind
 		}
 	}
