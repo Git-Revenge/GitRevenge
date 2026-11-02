@@ -150,6 +150,11 @@ const mounts = {
     const items = commitMenuItems(row, refs, ctx)
     mount(ContextMenu, { target: host, props: { x: scenario.menuX ?? 200, y: 100, items, onClose: record('close') } })
   },
+  async rebaseEditor() {
+    host.style.cssText = 'display:block;height:100vh'
+    const { default: RebaseEditor } = await import('../src/lib/RebaseEditor.svelte')
+    mount(RebaseEditor, { target: host, props: { path: '/r', base: 'b'.repeat(40), onClose: record('close') } })
+  },
   async upstreamDialog() {
     const { default: Dialog } = await import('../src/lib/Dialog.svelte')
     const { upstreamDialog } = await import('../src/lib/menus')
@@ -197,6 +202,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'commitMenu':
     await mounts.commitMenu()
+    break
+  case 'rebaseEditor':
+    await mounts.rebaseEditor()
     break
   case 'upstreamDialog':
     await mounts.upstreamDialog()

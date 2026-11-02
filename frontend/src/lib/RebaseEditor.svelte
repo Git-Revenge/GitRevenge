@@ -20,8 +20,11 @@
   let items = $state<Item[]>([])
   let error = $state('')
   let busy = $state(false)
+  /** False until the plan has answered, so an empty list doesn't read as 0 commits. */
+  let loaded = $state(false)
 
   async function load() {
+    loaded = false
     try {
       const plan = (await RebasePlan(path, base)) ?? []
       items = plan
@@ -29,6 +32,8 @@
         .reverse()
     } catch (e) {
       error = errorText(e)
+    } finally {
+      loaded = true
     }
   }
 
@@ -61,7 +66,7 @@
   }
 
   let problem = $derived.by(() => {
-    if (items.every((it) => it.action === 'drop')) return 'Every commit is dropped. Use Reset instead.'
+    if (items.length && items.every((it) => it.action === 'drop')) return 'Every commit is dropped. Use Reset instead.'
     for (let i = 0; i < items.length; i++) {
       const it = items[i]
       if ((it.action === 'squash' || it.action === 'fixup') && !target(i)) return 'The oldest kept commit can’t be squashed or fixed up: there’s nothing older to fold it into.'
@@ -92,13 +97,12 @@
     <button class="btn quiet back" onclick={onClose} title="Cancel and return to the graph"><Icon name="back" />Back</button>
     <div class="title">
       <h2>Interactive rebase</h2>
-      <span class="meta">Onto {base.slice(0, 7)} · {items.length} {items.length === 1 ? 'commit' : 'commits'} · newest first</span>
+      <span class="meta">Onto {base.slice(0, 7)} · {#if loaded}{items.length} {items.length === 1 ? 'commit' : 'commits'} · newest first{:else}Loading commits…{/if}</span>
     </div>
-    <span class="spacer"></span>
     <InkButton variant="secondary" onclick={onClose}>Cancel</InkButton>
     <InkButton disabled={busy || !!problem || items.length === 0} onclick={start} title={problem}>Start rebase</InkButton>
   </header>
-  {#if error}<p class="form-error banner" role="alert">{error}</p>{:else if problem}<p class="warn" role="status">{problem}</p>{/if}
+  {#if error}<p class="form-error banner" role="alert">{error}</p>{:else if problem}<p class="warn" role="status">{problem}</p>{:else if loaded && !items.length}<p class="warn" role="status">There are no commits to rebase onto this one.</p>{/if}
 
   <ol>
     {#each items as it, i (it.commit)}
@@ -147,11 +151,15 @@
 
   header {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     padding: 12px 16px;
     border-bottom: 1px solid var(--paper-edge);
+  }
+
+  /* The title gives up its width, so the buttons stay together on one line. */
+  header > :global(button) {
+    flex: none;
   }
 
   .back {
@@ -159,9 +167,17 @@
   }
 
   .title {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 2px;
+  }
+
+  .title .meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   h2 {
@@ -169,10 +185,6 @@
     font-size: 20px;
     font-weight: 500;
     letter-spacing: -0.015em;
-  }
-
-  .spacer {
-    flex: 1;
   }
 
   .banner {
