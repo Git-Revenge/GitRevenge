@@ -170,6 +170,11 @@ const mounts = {
     const ref = refs.find((r) => r.kind === 'local') as never
     mount(Dialog, { target: host, props: { spec: upstreamDialog('/r', ref, refs as never), onClose: record('close') } })
   },
+  async workingTree() {
+    host.style.cssText = 'display:block;height:100vh'
+    const { default: WorkingTreePanel } = await import('../src/lib/WorkingTreePanel.svelte')
+    mount(WorkingTreePanel, { target: host, props: { path: '/r', openFile: () => {}, onCommitted: record('committed') } })
+  },
   async repoView() {
     const { default: RepoView } = await import('../src/lib/RepoView.svelte')
     mount(RepoView, { target: host, props: { path: '/r' } })
@@ -225,6 +230,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'upstreamDialog':
     await mounts.upstreamDialog()
+    break
+  case 'workingTree':
+    await mounts.workingTree()
     break
   case 'repoView':
     await mounts.repoView()

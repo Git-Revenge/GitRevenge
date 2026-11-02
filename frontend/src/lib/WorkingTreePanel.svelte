@@ -75,12 +75,18 @@
   let conflicted = $derived(files.filter((f) => f.conflicted))
   let unstaged = $derived(files.filter((f) => !f.conflicted && (f.untracked || f.workTree !== '.')))
   let staged = $derived(files.filter((f) => !f.untracked && !f.conflicted && f.index !== '.'))
+  /** Commit was asked for before status had loaded: it runs once status says what's staged. */
+  let commitWaiting = $state(false)
   let canCommit = $derived(summary.trim() !== '' && (staged.length > 0 || amend) && !busy)
+  let commitLabel = $derived(amend ? 'Amend commit' : commitWaiting ? 'Reading status…' : wt ? `Commit ${staged.length} ${staged.length === 1 ? 'file' : 'files'}` : 'Commit')
 
   async function refresh() {
     const res = await session.run(() => WorkingTree(path))
+    const waiting = commitWaiting
+    commitWaiting = false
     if (!res) return
     wt = res
+    if (waiting) await commit()
   }
 
   // Refresh on open and whenever the backend reports a change on disk.
@@ -146,6 +152,10 @@
   }
 
   async function commit() {
+    if (!wt && !amend && summary.trim()) {
+      commitWaiting = true
+      return
+    }
     if (!canCommit) return
     busy = true
     const message = body.trim() ? `${summary.trim()}\n\n${body.trim()}` : summary.trim()
@@ -274,7 +284,7 @@
     {/if}
     <section>
       <header>
-        <span class="meta">Unstaged · {unstaged.length}</span>
+        <span class="meta">Unstaged{wt ? ` · ${unstaged.length}` : ''}</span>
         {#if unstaged.length}
           {#if confirmDiscard && confirmDiscard.length > 1}
             <span class="confirm">
@@ -299,7 +309,7 @@
     </section>
     <section>
       <header>
-        <span class="meta">Staged · {staged.length}</span>
+        <span class="meta">Staged{wt ? ` · ${staged.length}` : ''}</span>
         {#if staged.length}<button class="btn sm text" disabled={busy} onclick={() => unstage([])}>Unstage all</button>{/if}
       </header>
       <ul>
@@ -346,7 +356,7 @@
     <div class="commit-row">
       <span class="hint meta">Ctrl+Enter</span>
       <InkButton type="submit" size="lg" arrow disabled={!canCommit}>
-        {amend ? 'Amend commit' : `Commit ${staged.length} ${staged.length === 1 ? 'file' : 'files'}`}
+        {commitLabel}
       </InkButton>
     </div>
   </form>
