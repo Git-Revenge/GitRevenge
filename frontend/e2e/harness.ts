@@ -184,6 +184,10 @@ const mounts = {
     const { default: RepoView } = await import('../src/lib/RepoView.svelte')
     mount(RepoView, { target: host, props: { path: '/r' } })
   },
+  async worktreesDialog() {
+    const { default: WorktreesDialog } = await import('../src/lib/WorktreesDialog.svelte')
+    mount(WorktreesDialog, { target: host, props: { path: '/r', onClose: () => {} } })
+  },
   async repoPanel() {
     const { default: RepoPanel } = await import('../src/lib/RepoPanel.svelte')
     mount(RepoPanel, { target: host, props: { path: '/r', filter: '', openDialog: () => {} } })
@@ -244,6 +248,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'repoView':
     await mounts.repoView()
+    break
+  case 'worktreesDialog':
+    await mounts.worktreesDialog()
     break
   case 'repoPanel':
     await mounts.repoPanel()

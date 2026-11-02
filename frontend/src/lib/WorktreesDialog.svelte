@@ -207,10 +207,6 @@
     font-size: 13px;
   }
 
-  .danger {
-    color: var(--danger);
-  }
-
   .add {
     display: flex;
     flex-direction: column;
