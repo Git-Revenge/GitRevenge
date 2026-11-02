@@ -98,6 +98,43 @@ test.describe('commit graph', () => {
     return (await events(page, 'context-row')).at(-1)?.[0]
   }
 
+  // #383: the new toggles took the room the count had, and the search count ran off the edge.
+  test.describe('in a narrow column', () => {
+    const narrow = { graphRows: 32, responses: { CommitSignatures: [], Refs: [branch('docs/site', { branchKind: 'docs' }), branch('dependabot/x', { branchKind: 'bot' })] } }
+
+    test('the header keeps the commit count on one line', async ({ page }) => {
+      await page.setViewportSize({ width: 640, height: 600 })
+      await open(page, 'graph', narrow)
+      await expect(page.getByRole('button', { name: 'Bots' })).toBeVisible()
+      const count = page.getByText('32 commits')
+      await expect(count).toBeVisible()
+      const box = (await count.boundingBox())!
+      expect(box.height).toBeLessThan(24)
+      expect(await page.locator('.status').evaluate((e) => e.scrollWidth - e.clientWidth)).toBe(0)
+    })
+
+    test('the search count stays inside the column', async ({ page }) => {
+      await page.setViewportSize({ width: 640, height: 600 })
+      await open(page, 'graph', { ...narrow, responses: { ...narrow.responses, SearchGraph: { rows: [], total: 0 } } })
+      await page.getByRole('searchbox', { name: 'Search commits' }).fill('nothing like this')
+      const count = page.getByText('No matches')
+      await expect(count).toBeVisible()
+      const box = (await count.boundingBox())!
+      const next = (await page.getByRole('button', { name: 'Next match' }).boundingBox())!
+      expect(box.x + box.width).toBeLessThanOrEqual(next.x)
+      expect(next.x + next.width).toBeLessThanOrEqual(640)
+    })
+
+    test('the search takes its own line when nothing else fits', async ({ page }) => {
+      await page.setViewportSize({ width: 420, height: 600 })
+      await open(page, 'graph', narrow)
+      const count = (await page.getByText('32 commits').boundingBox())!
+      const search = (await page.getByRole('searchbox', { name: 'Search commits' }).boundingBox())!
+      expect(search.y).toBeGreaterThan(count.y + count.height)
+      expect(search.x + search.width).toBeLessThanOrEqual(420)
+    })
+  })
+
   // #340: reaching the top was ignored, leaving part of the first row cut off.
   test('scrolling back up reaches the first row', async ({ page }) => {
     await open(page, 'graph', { graphRows: 500, responses: { Refs: [], CommitSignatures: [] } })
