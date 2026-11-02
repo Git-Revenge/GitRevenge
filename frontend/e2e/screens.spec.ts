@@ -18,6 +18,32 @@ test.describe('commit menu', () => {
 
   const twoBranches = { responses: { Refs: [branch('main', { head: true }), remote('origin/main'), tag('v1.0')] } }
 
+  // #385: the words that tell two merge items apart were the ones cut off.
+  test.describe('a long label', () => {
+    const merge = (name: string) => `Merge ${name} into main (no fast-forward)`
+    const opened = async (page: Page, name: string) => {
+      await open(page, 'commitMenu', { menuX: 20, responses: { Refs: [branch('main', { head: true }), branch(name)] } })
+      await page.getByRole('menuitem', { name, exact: true }).hover()
+      const item = page.getByRole('menuitem', { name: merge(name) })
+      await item.hover()
+      return item
+    }
+    const cutOff = (item: Awaited<ReturnType<typeof opened>>) => item.locator('.label').evaluate((e) => e.scrollWidth > e.clientWidth)
+
+    test('fits for a typical branch name, with no tooltip', async ({ page }) => {
+      const item = await opened(page, 'feature/metric-units')
+      expect(await cutOff(item)).toBe(false)
+      await expect(item).toHaveAttribute('title', '')
+    })
+
+    test('has its full text as a tooltip when it is cut off', async ({ page }) => {
+      const name = `feature/${'a-very-long-branch-name-'.repeat(3)}end`
+      const item = await opened(page, name)
+      expect(await cutOff(item)).toBe(true)
+      await expect(item).toHaveAttribute('title', merge(name))
+    })
+  })
+
   test('keeps a commit menu short, with a row per ref', async ({ page }) => {
     await open(page, 'commitMenu', twoBranches)
     const labels = await page.getByRole('menuitem').allTextContents()
