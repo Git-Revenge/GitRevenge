@@ -5,7 +5,7 @@
 <meta name="generator" content="Docusaurus v3.10.2">
 <title data-rh="true">Branches, merges and rebases | Git Revenge</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" name="twitter:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" property="og:url" content="https://gitrevenge.com/docs/guide/branches"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Branches, merges and rebases | Git Revenge"><meta data-rh="true" name="description" content="Branches and tags"><meta data-rh="true" property="og:description" content="Branches and tags"><link data-rh="true" rel="icon" href="/img/favicon.svg"><link data-rh="true" rel="canonical" href="https://gitrevenge.com/docs/guide/branches"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/guide/branches" hreflang="en"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/guide/branches" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Branches, merges and rebases","item":"https://gitrevenge.com/docs/guide/branches"}]}</script><link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&amp;family=Caveat:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Crimson+Pro:ital,wght@0,400;0,500;0,600;1,400;1,500&amp;display=swap"><link rel="stylesheet" href="/assets/css/styles.9b150b80.css">
-<script src="/assets/js/runtime~main.a30a8d09.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.0b18cfae.js" defer="defer"></script>
 <script src="/assets/js/main.8e8703e5.js" defer="defer"></script>
 </head>
 <body>
@@ -26,6 +26,9 @@
 </li>
 <li class="">
 <p>Right-click a branch to rename it, delete it, set its upstream, push it, or delete it from the remote. Deleting a branch with unmerged commits asks you to confirm first.</p>
+</li>
+<li class="">
+<p><strong>Pull</strong> on a branch that isn&#x27;t checked out brings it up to date with its upstream. You stay on your current branch and your uncommitted changes aren&#x27;t touched. This only fast-forwards: if the branch has diverged from its upstream, check it out to merge or rebase. Undo moves the branch back.</p>
 </li>
 <li class="">
 <p><strong>Set upstream</strong> suggests the remote branches git knows about, and you can also type any name. Leave it empty to stop tracking.</p>
