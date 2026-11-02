@@ -91,7 +91,9 @@
   let force = $state(false)
 
   async function load() {
-    const t = target
+    const t = target as DiffTarget | null
+    // A write that finishes after the diff has closed lands here with nothing left to show.
+    if (!t) return
     const res = await session.run(() =>
       FileContents(path, t.mode, t.commit ?? '', t.file, t.oldPath ?? '', force),
     )
