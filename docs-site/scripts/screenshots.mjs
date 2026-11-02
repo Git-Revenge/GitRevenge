@@ -7,20 +7,27 @@
 //
 // To run it (Windows; the paths are what the screenshots show):
 //
-//   1. Map a drive to an empty folder, so paths in the shots read T:\tidewater:
-//        subst T: C:\some\empty\folder
-//   2. Point the app's settings at a scratch folder and its global git config at the demo's,
+//   1. Map a drive to an empty folder. Git resolves a mapped drive, so some shots show the
+//      real path: keep it short.
+//        subst T: A:\demo
+//   2. Build the demo once, so its global git config exists:
+//        bash scripts/demo-repo.sh /t/
+//   3. Point the app's settings at a scratch folder and its global git config at the demo's,
 //      so your own repositories and config stay out of the shots, and start it:
 //        $env:APPDATA = "C:\some\scratch\appdata"; $env:GIT_CONFIG_GLOBAL = "T:\gitconfig"
 //        wails dev -browser=false
-//      demo-repo.sh writes T:\gitconfig, and the Git Config scenes refuse to run without it.
-//   3. From docs-site/:
+//      To keep your everyday wails dev running, start this one from a git worktree, with
+//      -devserver localhost:34116, and set APP_URL to match.
+//   4. From docs-site/:
 //        node scripts/screenshots.mjs [scene ...]
+//
+// Each scene closes every tab and removes recent repositories, so it would wreck a session you
+// use. It refuses to run unless the app's global config is the demo's, which step 3 sets.
 //
 // It needs Chrome, Git Bash, ffmpeg and ImageMagick (magick). CHROME, BASH_EXE, APP_URL and
 // DEMO override where Chrome and bash are, where the app is served, and the demo folder.
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -55,6 +62,16 @@ function run(file, args) {
  * tidewater's uncommitted changes are dropped first; with branch, that branch is checked out. */
 async function reset(page, open = ['tidewater'], { clean = false, branch } = {}) {
   await page.evaluate(async () => {
+    // Tabs that aren't repositories stay open across a reload.
+    const pause = (ms) => new Promise((r) => setTimeout(r, ms))
+    for (const name of ['Insights', 'Git Config']) {
+      const close = document.querySelector(`[aria-label="Close ${name}"]`)
+      if (!close) continue
+      close.click()
+      await pause(300)
+      ;[...document.querySelectorAll('[role=dialog] button')].find((b) => b.textContent.includes('Discard'))?.click()
+      await pause(300)
+    }
     const st = await window.go.app.App.RestoreSession()
     for (const t of st?.tabs ?? []) await window.go.app.App.CloseRepo(t.path)
     await window.go.app.App.SetActiveRepo('')
@@ -71,11 +88,20 @@ async function reset(page, open = ['tidewater'], { clean = false, branch } = {})
   }
   if (clean) run('git', ['-C', REPO, 'reset', '-q', '--hard'])
   if (branch) run('git', ['-C', REPO, 'checkout', '-q', branch])
-  // Only the demo repositories belong on the start page.
+  // Only the demo repositories belong on the start page, and it should look lived in: all
+  // three recent, and a group in a known order. tidewater is opened last, to lead the list.
   await page.evaluate(async (demo) => {
-    for (const r of (await window.go.app.App.RecentRepos()) ?? []) {
-      if (!r.path.toLowerCase().startsWith(demo.toLowerCase())) await window.go.app.App.RemoveRecentRepo(r.path)
+    const A = window.go.app.App
+    for (const r of (await A.RecentRepos()) ?? []) await A.RemoveRecentRepo(r.path)
+    for (const name of ['Harbour team', 'Field notes']) await A.GroupAction('delete', [name]).catch(() => {})
+    await A.GroupAction('create', ['Harbour team'])
+    for (const name of ['tidewater', 'harbour-api', 'tide-tables']) await A.GroupAction('add', ['Harbour team', `${demo}${name}`])
+    for (const name of ['tide-tables', 'harbour-api', 'tidewater']) {
+      const tab = await A.OpenRepo(`${demo}${name}`)
+      await A.CloseRepo(tab.path)
     }
+    // The sidebar remembers its panel, filter and sort for each repository.
+    for (const key of Object.keys(localStorage)) if (key.startsWith('gitrevenge.sidebar:')) localStorage.removeItem(key)
   }, DEMO)
   for (const name of open) {
     await page.evaluate((p) => window.go.app.App.OpenRepo(p), path.win32.join(DEMO, name))
@@ -83,7 +109,10 @@ async function reset(page, open = ['tidewater'], { clean = false, branch } = {})
   await page.evaluate((p) => window.go.app.App.SetActiveRepo(p), open.length ? path.win32.join(DEMO, open[0]) : '')
   await page.reload({ waitUntil: 'networkidle0' })
   await overlay(page)
-  if (open.length) await page.waitForSelector('.scroller')
+  if (open.length) {
+    await page.waitForSelector('.scroller')
+    await untilSettled(page, () => !!document.querySelector('.row.ref') && !document.body.innerText.includes('Loading history'))
+  }
   await sleep(800)
 }
 
@@ -211,6 +240,22 @@ async function row(page, i) {
   }, i)
 }
 
+/** Which row of the graph holds the commit with this subject, counting from the top. */
+async function rowOf(page, subject) {
+  const i = await page.evaluate(async (subject) => {
+    const A = window.go.app.App
+    const tab = (await A.RestoreSession()).tabs[0]
+    const { rows } = await A.GraphRows(tab.path, 0, 40)
+    return rows.findIndex((r) => r.subject === subject)
+  }, subject)
+  if (i < 0) throw new Error(`no commit "${subject}" in the first 40 rows`)
+  return i
+}
+
+/** A branch's row in the sidebar, by the name it shows there: the part after its folder. */
+const sidebarRef = (name) =>
+  `::-p-xpath(//div[contains(@class,'row') and contains(@class,'ref')][.//span[contains(@class,'name') and normalize-space(.)='${name}']])`
+
 /** Selects the commit whose subject is given, by searching for it. */
 async function selectCommit(page, subject) {
   const box = await page.waitForSelector('::-p-aria(Search commits)')
@@ -249,8 +294,22 @@ async function stills(page, name, prepare, clip) {
   for (const theme of ['light', 'dark']) {
     await setTheme(page, theme)
     await prepare(page)
+    // A rebuild can catch git mid-read, and an error banner has no place in the docs.
+    const alert = await page.$('[role=alert]')
+    if (alert) throw new Error(`error on screen: ${await alert.evaluate((el) => el.innerText)}`)
     await still(page, name, theme, typeof clip === 'function' ? await clip(page) : clip)
   }
+}
+
+let cuts = null
+let recording = 0
+
+/** Runs a wait. In an animation, most of its length is cut. */
+async function waiting(wait) {
+  const start = Date.now()
+  await wait()
+  const end = Date.now()
+  if (cuts && end - start > 1200) cuts.push([(start - recording + 400) / 1000, (end - recording - 400) / 1000])
 }
 
 /** Records act as docs/img/<name>-<theme>.webp, an animation, in both themes. */
@@ -261,16 +320,63 @@ async function animation(page, name, prepare, act) {
     mouse = { x: WIDTH / 2, y: HEIGHT / 2 }
     await page.mouse.move(mouse.x, mouse.y)
     const webm = path.join(work, `${name}-${theme}.webm`)
+    // A screencast only gets a frame when something repaints, and loses the last one, which
+    // would be the end of what's being shown. So something always repaints: one faint pixel.
+    await page.evaluate(() => {
+      const dot = document.createElement('div')
+      dot.id = 'shots-heartbeat'
+      dot.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;z-index:99999;pointer-events:none;opacity:.01;background:#000'
+      document.body.append(dot)
+      window.__heartbeat = setInterval(() => (dot.style.opacity = dot.style.opacity === '0.01' ? '0.02' : '0.01'), 66)
+    })
     const rec = await page.screencast({ path: webm, scale: 1 })
+    cuts = []
+    recording = Date.now()
     await sleep(600)
     await act(page)
     await sleep(1200)
     await rec.stop()
-    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', webm, '-vf', `fps=15,scale=${WIDTH}:-1:flags=lanczos`,
+    await page.evaluate(() => {
+      clearInterval(window.__heartbeat)
+      document.getElementById('shots-heartbeat')?.remove()
+    })
+    // Waits on git are cut, so the length of the animation doesn't depend on the machine.
+    const keep = cuts.map(([a, b]) => `between(t,${a},${b})`).join('+')
+    const trim = keep ? `select='not(${keep})',setpts=N/15/TB,` : ''
+    cuts = null
+    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', webm, '-vf', `fps=15,${trim}scale=${WIDTH}:-1:flags=lanczos`,
       '-loop', '0', '-c:v', 'libwebp_anim', '-quality', '75', '-compression_level', '6',
       path.join(out, `${name}-${theme}.webp`)])
     console.log(`  ${name}-${theme}.webp (animated)`)
   }
+}
+
+/** Waits for git to reach a state, by asking it, then for the app to catch up. */
+async function untilGit(test) {
+  await waiting(async () => {
+    for (const start = Date.now(); !test(); await sleep(100)) {
+      if (Date.now() - start > 90000) throw new Error(`git never reached: ${test}`)
+    }
+  })
+}
+
+const headOf = () => execFileSync('git', ['-C', REPO, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+const operationRunning = () =>
+  ['rebase-merge', 'rebase-apply', 'MERGE_HEAD'].some((name) => existsSync(path.join(REPO, '.git', name)))
+
+/** Waits until the page has passed test for a second without a break. */
+async function untilSettled(p, test = () => true) {
+  const quiet = () =>
+    !document.querySelector('.op') &&
+    !document.body.innerText.includes('Loading…') &&
+    ![...document.querySelectorAll('button')].some((b) => b.innerText.trim() === 'Cancel' && !b.closest('[role=dialog]') && b.closest('.toolbar'))
+  await waiting(async () => {
+    const start = Date.now()
+    for (let since = Date.now(); Date.now() - since < 1000; await sleep(100)) {
+      if (Date.now() - start > 90000) throw new Error(`the app never settled: ${test}`)
+      if (!(await p.evaluate(quiet)) || !(await p.evaluate(test))) since = Date.now()
+    }
+  })
 }
 
 // ── Scenes ────────────────────────────────────────────────────────────────────────────
@@ -293,11 +399,11 @@ scenes.repo = async (page) => {
   const marks = [
     [400, 45], // tabs
     [250, 1100], // sidebar
-    [1480, 124], // toolbar
+    [1650, 124], // toolbar
     [1180, 205], // working tree
-    [1450, 780], // graph
+    [1510, 780], // graph
     [2490, 130], // right panel
-    [2470, 1075], // commit message
+    [2050, 1000], // commit message
     [2030, 40], // command palette
   ]
   for (const theme of ['light', 'dark']) annotate('repository', theme, marks)
@@ -400,10 +506,9 @@ async function rowMenu(p, i, text) {
   await click(p, byText(text), { pause: 700 })
 }
 
-/** Opens the interactive rebase editor for feature/offline-cache, from where it left main.
- * Row 7 is main's tip: above it are origin/main, the five branch commits and the stash. */
+/** Opens the interactive rebase editor for feature/offline-cache, from where it left main. */
 async function openRebase(p) {
-  await rowMenu(p, 7, 'Interactive rebase')
+  await rowMenu(p, await rowOf(p, 'Set the alert limit in knots too'), 'Interactive rebase')
   await p.waitForSelector(byText('Start rebase', 'button'))
   await sleep(500)
 }
@@ -434,16 +539,17 @@ scenes.rebaseAnim = (page) =>
       await action(p, 'fixup! Cache the last reading from each station', 'fixup')
       await action(p, 'wip', 'squash')
       await sleep(600)
-      await click(p, byText('Start rebase', 'button'), { pause: 4000 })
+      await click(p, byText('Start rebase', 'button'), { pause: 300 })
+      await untilSettled(p, () => !document.body.innerText.includes('Interactive rebase') && document.querySelector('.row.ref.head')?.innerText.includes('offline-cache'))
+      await glide(p, 700, 400, 400)
+      await p.mouse.wheel({ deltaY: -3000 })
+      await sleep(1500)
     },
   )
 
 /** Merges feature/metric-units into main, which stops on a conflict in src/feed.js. */
 async function merge(p) {
-  await click(p, `::-p-xpath(//button[contains(@class, 'ref') and normalize-space(.)='feature/metric-units'])`, {
-    button: 'right',
-    pause: 500,
-  })
+  await click(p, sidebarRef('metric-units'), { button: 'right', pause: 500 })
   await click(p, byText('Merge feature/metric-units into main'), { pause: 300 })
   // The merge stops on the conflict: wait for its banner, and put away git's own message.
   await p.waitForSelector('.op')
@@ -469,10 +575,12 @@ scenes.conflictAnim = (page) =>
       await sleep(800)
       await click(p, 'button.wip', { pause: 900 })
       await click(p, '[title="Open the conflict tool"]', { pause: 1600 })
-      await click(p, byText('Use theirs', 'button'), { pause: 1200 })
-      await click(p, byText('Mark resolved', 'button'), { pause: 1500 })
-      const go = await p.$(byText('Continue', 'button'))
-      if (go) await click(p, byText('Continue', 'button'), { pause: 2000 })
+      await click(p, byText('Use theirs', 'button'), { pause: 300 })
+      await untilGit(() => !execFileSync('git', ['-C', REPO, 'diff', '--name-only', '--diff-filter=U'], { encoding: 'utf8' }).trim())
+      await sleep(1500)
+      await click(p, byText('Continue', 'button'), { pause: 300 })
+      await untilGit(() => !operationRunning())
+      await untilSettled(p, () => /clean/i.test(document.querySelector('button.wip')?.innerText ?? ''))
     },
   )
 
@@ -483,12 +591,16 @@ scenes.commitAnim = (page) =>
     (p) => reset(p),
     async (p) => {
       await click(p, byText('src/alerts.js', 'button'), { pause: 1200 })
-      await click(p, byText('Stage hunk', 'button'), { pause: 1000 })
+      await click(p, byText('Stage hunk', 'button'), { pause: 300 })
+      // Esc while it's still staging shows an error (#391).
+      await untilGit(() => execFileSync('git', ['-C', REPO, 'diff', '--cached', '--name-only'], { encoding: 'utf8' }).includes('src/alerts.js'))
+      await untilSettled(p)
       await keys(p, 'Esc', { hold: 700 })
       await click(p, 'textarea[aria-label="Commit summary"], input[aria-label="Commit summary"]', { pause: 300 })
       await type(p, 'Soften the wind alert and add a knots helper')
       await sleep(500)
-      await keys(p, 'Ctrl+Enter', { hold: 1800 })
+      await keys(p, 'Ctrl+Enter', { hold: 800 })
+      await untilSettled(p, () => document.querySelector('[aria-label="Commit summary"]')?.value === '')
     },
   )
 
@@ -498,14 +610,15 @@ scenes.undoAnim = (page) =>
     'undo',
     (p) => reset(p, ['tidewater'], { clean: true }),
     async (p) => {
-      await click(p, `::-p-xpath(//button[contains(@class, 'ref') and normalize-space(.)='feature/offline-cache'])`, {
-        button: 'right',
-        pause: 500,
-      })
+      const before = headOf()
+      await click(p, sidebarRef('offline-cache'), { button: 'right', pause: 500 })
       await click(p, byText('Merge feature/offline-cache into main'), { pause: 300 })
-      // Give the merge time to land; the toolbar's label can lag behind it (see #220).
-      await sleep(2500)
-      await keys(p, 'Ctrl+Z', { hold: 5000 })
+      await untilGit(() => headOf() !== before)
+      await untilSettled(p, () => [...document.querySelectorAll('button')].find((b) => b.innerText.trim().startsWith('Undo'))?.disabled === false)
+      const merged = headOf()
+      await keys(p, 'Ctrl+Z', { hold: 1000 })
+      await untilGit(() => headOf() !== merged)
+      await untilSettled(p, () => ![...document.querySelectorAll('.row.ref')].some((r) => r.innerText.includes('main') && r.innerText.includes('↑')))
     },
   )
 
@@ -522,7 +635,8 @@ scenes.paletteAnim = (page) =>
       await keys(p, 'Ctrl+K', { hold: 400 })
       await type(p, 'fetch', 90)
       await sleep(500)
-      await keys(p, 'Enter', { hold: 1800 })
+      await keys(p, 'Enter', { hold: 800 })
+      await untilSettled(p)
     },
   )
 
@@ -544,6 +658,141 @@ scenes.searchAnim = (page) =>
       await keys(p, 'Enter', { hold: 900 })
       await keys(p, 'Enter', { hold: 900 })
       await keys(p, 'Enter', { hold: 1200 })
+    },
+  )
+
+// ── The sidebar and what's new around it ──────────────────────────────────────────────
+
+/** The sidebar alone: the rail and its panel. */
+const SIDEBAR = { x: 0, y: 40, width: 280, height: 520 }
+const rail = (name) => `nav.rail button[aria-label^="${name}"]`
+const FILTER = 'input[aria-label="Filter everything in the sidebar"]'
+
+scenes.sidebarBranches = (page) =>
+  stills(page, 'sidebar-branches', (p) => reset(p, ['tidewater'], { clean: true }), SIDEBAR)
+
+scenes.sidebarCare = (page) =>
+  stills(
+    page,
+    'sidebar-needs-care',
+    async (p) => {
+      await reset(p, ['tidewater'], { clean: true })
+      await click(p, byText('Needs care', 'button'), { pause: 500 })
+    },
+    SIDEBAR,
+  )
+
+scenes.sidebarFilter = (page) =>
+  stills(
+    page,
+    'sidebar-filter',
+    async (p) => {
+      await reset(p, ['tidewater'], { clean: true })
+      await click(p, FILTER)
+      await p.keyboard.type('v0')
+      await sleep(600)
+    },
+    SIDEBAR,
+  )
+
+scenes.sidebarRepository = (page) =>
+  stills(
+    page,
+    'sidebar-repository',
+    async (p) => {
+      await reset(p, ['tidewater'], { clean: true })
+      await click(p, rail('Repository'), { pause: 300 })
+      await p.waitForSelector('.repo-panel h3 .count', { timeout: 30000 })
+      await sleep(500)
+    },
+    SIDEBAR,
+  )
+
+scenes.sidebarAnim = (page) =>
+  animation(
+    page,
+    'sidebar-panels',
+    (p) => reset(p, ['tidewater'], { clean: true }),
+    async (p) => {
+      for (const name of ['Remotes', 'Tags', 'Stashes', 'Repository']) await click(p, rail(name), { pause: 1000 })
+      await click(p, rail('Branches'), { pause: 900 })
+      await click(p, FILTER, { pause: 300 })
+      await type(p, 'v0', 140)
+      await sleep(1200)
+      await click(p, rail('Tags'), { pause: 1200 })
+      await click(p, rail('Branches'), { pause: 900 })
+      await click(p, 'button[aria-label="Clear the filter"]', { pause: 700 })
+      await click(p, byText('Needs care', 'button'), { pause: 1400 })
+    },
+  )
+
+/** A commit's menu, with the submenu of one of the branches on it open. It's opened from the
+ * keyboard, since parking the pointer for the still would close a hovered submenu. */
+scenes.commitMenu = (page) =>
+  stills(page, 'commit-menu', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    const r = await row(p, await rowOf(p, 'Document the units'))
+    await clickAt(p, r.x, r.y, { button: 'right', pause: 500 })
+    await p.keyboard.press('End')
+    await p.keyboard.press('ArrowUp')
+    await p.keyboard.press('ArrowRight')
+    await sleep(500)
+  })
+
+scenes.upstream = (page) =>
+  stills(page, 'set-upstream', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await click(p, sidebarRef('metric-units'), { button: 'right', pause: 500 })
+    await click(p, byText('Set upstream of feature/metric-units'), { pause: 700 })
+  })
+
+/** Drags from one point to another, slowly enough to see the drop marker. */
+async function drag(p, from, to) {
+  await glide(p, from.x, from.y, 500)
+  await sleep(300)
+  await p.mouse.down()
+  await glide(p, to.x, to.y, 900)
+  await sleep(350)
+  await p.mouse.up()
+  await sleep(1000)
+}
+
+const middle = (b) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 })
+const card = (name) => `::-p-xpath(//*[@data-card][.//h3[normalize-space(.)="${name}"]])`
+
+scenes.reorderAnim = (page) =>
+  animation(
+    page,
+    'reorder',
+    async (p) => {
+      await reset(p, [])
+      await p.evaluate(async (demo) => {
+        const A = window.go.app.App
+        await A.GroupAction('create', ['Field notes'])
+        await A.GroupAction('add', ['Field notes', `${demo}tide-tables`])
+      }, DEMO)
+      await p.reload({ waitUntil: 'networkidle0' })
+      await overlay(p)
+      await sleep(800)
+    },
+    async (p) => {
+      // A repository within its group: the first, down past the last.
+      const harbour = await p.waitForSelector(card('Harbour team'))
+      const repos = await harbour.$$('[data-repo]')
+      await repos[0].hover()
+      await sleep(250)
+      const grip = await (await repos[0].$('.repo-grip')).boundingBox()
+      const last = await repos.at(-1).boundingBox()
+      mouse = middle(await repos[0].boundingBox())
+      await drag(p, middle(grip), { x: middle(grip).x, y: last.y + last.height - 2 })
+      // Then the whole group, past the other one.
+      await harbour.hover()
+      await sleep(250)
+      const cardGrip = await (await harbour.$('.card-grip')).boundingBox()
+      const other = await (await p.waitForSelector(card('Field notes'))).boundingBox()
+      await drag(p, middle(cardGrip), { x: other.x + other.width - 4, y: other.y + 10 })
+      await p.waitForFunction(() => document.querySelector('[data-card]')?.innerText.includes('Field notes'), { timeout: 30000 })
+      await sleep(800)
     },
   )
 
@@ -597,9 +846,10 @@ scenes.gitconfigRaw = (page) =>
   stills(page, 'gitconfig-raw', async (p) => {
     await gitConfigTab(p, 'Raw text')
     // Break the first header, so the error shows on its line.
-    await click(p, `::-p-xpath(//div[contains(@class,"cm-line")][normalize-space()="[core]"])`)
+    const line = await p.waitForSelector(`::-p-xpath(//div[contains(@class,"cm-line")][starts-with(normalize-space(),"[core")])`)
+    await line.click()
     await p.keyboard.press('End')
-    await p.keyboard.press('Backspace')
+    if ((await line.evaluate((el) => el.textContent.trim())) === '[core]') await p.keyboard.press('Backspace')
     await sleep(1200)
   })
 
@@ -697,6 +947,11 @@ const browser = await puppeteer.launch({
 try {
   const page = await browser.newPage()
   await page.goto(APP, { waitUntil: 'networkidle0' })
+  // Scenes close tabs and delete recent repositories: never let them near a session in use.
+  const global = await page.evaluate(() => window.go.app.App.GitConfigScopes('').then((s) => s.global))
+  if (path.win32.resolve(global).toLowerCase() !== path.win32.join(DEMO, 'gitconfig').toLowerCase()) {
+    throw new Error(`${APP} reads global config from ${global}, so it looks like a session in use. See the top of this file.`)
+  }
   const wanted = process.argv.slice(2)
   for (const [name, scene] of Object.entries(scenes)) {
     if (wanted.length && !wanted.includes(name)) continue

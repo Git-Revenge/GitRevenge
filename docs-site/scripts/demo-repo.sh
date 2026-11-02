@@ -12,7 +12,9 @@
 # - main with merged feature branches, annotated release tags, trailers and a git note;
 # - feature/offline-cache: work in progress with fixup and "wip" commits, for interactive rebase;
 # - feature/metric-units: changes the same lines as main, so merging it conflicts;
-# - a remote with a branch that's ahead, a stash, and uncommitted changes.
+# - a remote with a branch that's ahead, a stash, and uncommitted changes;
+# - for the sidebar: a release folder, a bot branch, a branch whose upstream is gone, and a
+#   linked worktree.
 set -euo pipefail
 
 out=${1:?usage: demo-repo.sh <folder>}
@@ -24,7 +26,7 @@ repo="$out/tidewater"
 for r in "$repo" "$out/harbour-api" "$out/tide-tables"; do
   [ -d "$r/.git" ] && git -C "$r" fsmonitor--daemon stop >/dev/null 2>&1 || true
 done
-rm -rf "$repo" "$out/origin.git"
+rm -rf "$repo" "$out/origin.git" "$out/tidewater-hotfix"
 
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 day=0
@@ -397,6 +399,31 @@ git clone -q "$out/origin.git" "$work"
 )
 rm -rf "$work"
 git fetch -q origin
+
+# Branches for the sidebar. They're dated before the work above, so the top of the graph
+# doesn't change.
+git branch release/v0.1 v0.1.0
+git branch release/v0.2 v0.2.0
+git push -q origin release/v0.2
+# Merged and deleted on the remote, as a host does after a pull request: its upstream is gone.
+git branch fix/tide-rounding main~3
+git push -q -u origin fix/tide-rounding
+git push -q origin --delete fix/tide-rounding
+# A dependency update from a bot, made without touching the working tree.
+(
+  export GIT_INDEX_FILE="$out/.bot-index"
+  export GIT_AUTHOR_NAME='dependabot[bot]' GIT_AUTHOR_EMAIL='bot@tidewater.example' GIT_AUTHOR_DATE=2026-07-11T08:00:00Z
+  export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME" GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL" GIT_COMMITTER_DATE="$GIT_AUTHOR_DATE"
+  from=$(git rev-parse 'v0.1.0^{commit}')
+  git read-tree "$from"
+  lock=$(printf '{ "name": "tidewater", "lockfileVersion": 3 }\n' | git hash-object -w --stdin)
+  git update-index --add --cacheinfo "100644,$lock,package-lock.json"
+  bump=$(git commit-tree "$(git write-tree)" -p "$from" -m "Bump vite from 7.0 to 7.1")
+  git branch dependabot/npm_and_yarn/vite-7.1 "$bump"
+  rm -f "$GIT_INDEX_FILE"
+)
+# A second working folder, for the Repository panel.
+git worktree add -q -b hotfix/gauge-offset "$out/tidewater-hotfix" main~1
 
 # A stash, then changes in the working tree.
 printf '\n## Contributing\n\nOpen an issue first for anything bigger than a typo.\n' >> README.md

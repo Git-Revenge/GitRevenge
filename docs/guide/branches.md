@@ -6,12 +6,17 @@
 - Right-click any commit for **Create branch here…** or **Create tag here…**. Give a tag a message to make it an annotated tag.
 - Double-click a branch in the sidebar to check it out. Checking out a remote branch offers to create a local branch that tracks it.
 - Right-click a branch to rename it, delete it, set its upstream, push it, or delete it from the remote. Deleting a branch with unmerged commits asks you to confirm first.
+- **Set upstream** suggests the remote branches git knows about, and you can also type any name. Leave it empty to stop tracking.
+
+  ![The upstream dialog for feature/metric-units](../img/set-upstream-light.webp#gh-light-mode-only)
+  ![The upstream dialog for feature/metric-units](../img/set-upstream-dark.webp#gh-dark-mode-only)
+
 - Right-click a branch to mark it as a kind (**Mark `name` as…**), **Hide** it, or say what it's stacked on (**Stack `name` on…**). [Branch care](branch-care.md) explains these.
 - Force pushing a Trunk, Release or Environment branch, and deleting a Trunk or Environment branch, ask first and name the kind.
 
 ## Merging, rebasing and cherry-picking
 
-Right-click a branch or commit, and the menu offers what makes sense for it against the branch you have checked out:
+Right-click a branch or commit, and the menu offers what makes sense for it against the branch you have checked out. In the graph, the branches and tags on a commit each have a [submenu](graph.md#right-click-menus), which is where you'll find merging and rebasing:
 
 - **Merge** *it* **into** *your branch*, with or without a fast-forward.
 - **Rebase** *your branch* **onto** *it*.

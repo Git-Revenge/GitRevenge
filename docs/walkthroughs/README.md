@@ -13,7 +13,7 @@ Each walkthrough takes one everyday job from start to finish, with a short anima
 
 ## A practice repository
 
-The walkthroughs all use Tidewater, a small made-up project: a dashboard for a network of coastal weather stations, with a few months of history by four people. It has everything the walkthroughs need: a branch with a messy history, a branch that conflicts with `main`, a stash, a remote that's one commit ahead, and some uncommitted changes.
+The walkthroughs all use Tidewater, a small made-up project: a dashboard for a network of coastal weather stations, with a few months of history by four people. It has everything the walkthroughs need: a branch with a messy history, a branch that conflicts with `main`, a stash, a remote that's one commit ahead, and some uncommitted changes. For exploring the sidebar, it also has a release folder, a bot's branch, a branch whose upstream is gone, and a second worktree.
 
 You can build the same repository and follow along. You need `git` and a bash shell; on Windows, use Git Bash, which comes with Git for Windows.
 
@@ -22,6 +22,6 @@ curl -fsSL https://raw.githubusercontent.com/risadams/GitRevenge/main/docs-site/
 bash demo-repo.sh ~/gitrevenge-practice
 ```
 
-That makes `~/gitrevenge-practice/tidewater`. Open it with **Open repository** on the start page. The script deletes and rebuilds the folders it made each time you run it, so run it again whenever you want a clean start.
+That makes `~/gitrevenge-practice/tidewater`, along with its remote and a few neighbours. Open it with **Open repository** on the start page. The script deletes and rebuilds the folders it made each time you run it, so run it again whenever you want a clean start.
 
 The practice repository sets its own author name (Maya Okafor) and never signs commits, so nothing you do in it uses your identity or keys.
