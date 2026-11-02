@@ -611,22 +611,42 @@
   .status {
     display: flex;
     align-items: center;
-    gap: 10px;
+    /* Too narrow even with the search box at its smallest, and the search takes its own line. */
+    flex-wrap: wrap;
+    gap: 6px 10px;
     min-height: 40px;
-    padding: 0 12px 0 16px;
+    box-sizing: border-box;
+    padding: 6px 12px 6px 16px;
     border-bottom: 1px solid var(--paper-edge);
   }
 
+  /* The search box is what gives up width: the count and the buttons keep theirs. */
+  .status > :global(.meta),
+  .status > :global(.btn) {
+    flex: none;
+    white-space: nowrap;
+  }
+
   .search {
-    margin-left: auto;
+    flex: 1 1 150px;
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 6px;
     color: var(--ink-mute);
   }
 
+  .search :global(svg),
+  .search .count,
+  .search .step {
+    flex: none;
+  }
+
   .search input {
-    width: 260px;
+    flex: 1 1 260px;
+    width: 0;
+    min-width: 90px;
+    max-width: 260px;
     height: 28px;
     padding: 0 10px;
     font-size: 13px;
