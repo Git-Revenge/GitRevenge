@@ -99,6 +99,13 @@
     return same
   }
 
+  /** A label cut off by the menu's width has its full text as a tooltip. */
+  function showFullLabel(e: MouseEvent) {
+    const item = e.currentTarget as HTMLElement
+    const label = item.querySelector<HTMLElement>('.label')
+    item.title = label && label.scrollWidth > label.clientWidth ? (label.textContent ?? '') : ''
+  }
+
   /** Highlights and focuses item i. Moving off an armed item disarms it. */
   function activate(i: number) {
     if (i < 0) return
@@ -198,6 +205,7 @@
       aria-haspopup={item.items ? 'menu' : undefined}
       aria-expanded={item.items ? sub?.index === i : undefined}
       onclick={() => pick(i)}
+      onmouseenter={showFullLabel}
       onmousedown={(e) => item.disabled && e.preventDefault()}
       onmousemove={() => {
         if (!item.disabled && active !== i) activate(i)
@@ -222,7 +230,7 @@
     position: fixed;
     z-index: 100;
     min-width: 220px;
-    max-width: 380px;
+    max-width: min(480px, calc(100vw - 8px));
     /* A commit's menu combines every ref on it and can outgrow the window. */
     max-height: calc(100vh - 8px);
     overflow-y: auto;
