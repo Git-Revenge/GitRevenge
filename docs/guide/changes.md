@@ -4,7 +4,7 @@ Click **Uncommitted changes** at the top of the graph (or choose **Show uncommit
 
 ## Staging
 
-- **Stage all** and **Unstage all** move everything at once.
+- **Stage all** and **Unstage all** move everything at once. **Discard all** throws away everything unstaged, after asking.
 - Each file has its own stage and discard buttons.
 - Open a file to stage part of it. In the **Unified** diff, each hunk has a **Stage hunk** button, and you can select individual lines and stage just those. Staged changes can be unstaged the same way.
 
@@ -23,7 +23,7 @@ If your git config signs commits (`commit.gpgsign`), commits made in Git Revenge
 
 ## Stashing
 
-**Stash** sets your uncommitted changes aside; **Stash…** lets you give the stash a message first. Stashes are listed in the sidebar. Right-click one to **Apply**, **Pop** or **Drop** it.
+**Stash…** sets your uncommitted changes aside, with a message if you want one. Stashes are listed in the **Stashes** panel of the sidebar. Right-click one to **Apply**, **Pop** or **Drop** it.
 
 ## Undo and redo
 

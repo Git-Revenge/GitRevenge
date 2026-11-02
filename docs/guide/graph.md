@@ -33,13 +33,24 @@ Press <kbd>Ctrl</kbd>+<kbd>F</kbd> to search. You can search by commit message, 
 
 The sidebar has an icon rail and one panel at a time: **Branches**, **Remotes**, **Tags**, **Stashes** and **Repository**. Click an icon to switch panels, or click the active one to hide the panel and give the graph the width. Drag the panel's right edge to resize it, and double-click the edge to reset it. Git Revenge remembers all of this for each repository.
 
-Names with a `/` form folders, so `release/v0.8` and `release/v0.7` sit in a `release` folder. **Name** or **Recent**, at the top of the panel, sorts by name or by most recently updated. The checked-out branch always comes first, marked with a rose dot and in bold, and other branches are muted. A branch shows one status at a time (**parent merged**, **gone**, or how far ahead or behind it is); hover over it for the rest. Hovering or tabbing to a row also shows a **…** button with the same menu as right-click.
+![The Branches panel: main first, then feature and release folders, and three other branches](../img/sidebar-branches-light.webp#gh-light-mode-only)
+![The Branches panel: main first, then feature and release folders, and three other branches](../img/sidebar-branches-dark.webp#gh-dark-mode-only)
 
-Type in **Filter all panels** to narrow the lists. The filter stays on as you switch panels, and the rail shows how many matches each panel has. **Needs care**, in the Branches panel, shows branches whose upstream is gone or whose stack parent was merged. Click a branch or tag to jump to its commit.
+Names with a `/` form folders, so `release/v0.8` and `release/v0.7` sit in a `release` folder. A folder holding one branch is shown as that branch, with its full name. **Name** or **Recent**, at the top of the panel, sorts by name or by most recently updated. The checked-out branch always comes first, marked with a rose dot and in bold, and other branches are muted. A branch shows one status at a time (**parent merged**, **gone**, or how far ahead or behind it is); hover over it for the rest. Hovering or tabbing to a row also shows a **…** button with the same menu as right-click.
+
+Type in **Filter all panels** to narrow the lists. The filter stays on as you switch panels, and the rail shows how many matches each panel has.
+
+![The sidebar filtered to "v0", with a count on each panel that has a match](../img/sidebar-filter-light.webp#gh-light-mode-only)
+![The sidebar filtered to "v0", with a count on each panel that has a match](../img/sidebar-filter-dark.webp#gh-dark-mode-only)
+
+**Needs care**, in the Branches panel, shows branches whose upstream is gone or whose stack parent was merged. Click a branch or tag to jump to its commit.
+
+![Needs care, showing one branch whose upstream is gone](../img/sidebar-needs-care-light.webp#gh-light-mode-only)
+![Needs care, showing one branch whose upstream is gone](../img/sidebar-needs-care-dark.webp#gh-dark-mode-only)
 
 The sidebar works from the keyboard. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> jumps to the filter, and <kbd>↓</kbd> moves from there into the list. In the list, the arrow keys move and open folders, <kbd>Enter</kbd> shows a branch in the graph, <kbd>Space</kbd> checks it out, the <kbd>Menu</kbd> key or <kbd>Shift</kbd>+<kbd>F10</kbd> opens its menu, and typing jumps to a name. The rail is one <kbd>Tab</kbd> stop, and <kbd>↑</kbd> and <kbd>↓</kbd> move along it.
 
-Local branches are grouped by [kind](branch-care.md#branch-kinds): Trunk at the top, then ordinary branches, releases, environments, docs and bots. Branches built on other branches sit under them as a [stack](branch-care.md#stacked-branches). A branch's chip in the graph carries its kind's colour and icon.
+A [kind](branch-care.md#branch-kinds)'s icon marks a folder, or a branch on its own, and a branch's chip in the graph carries its kind's colour and icon. Branches built on other branches sit under them as a [stack](branch-care.md#stacked-branches).
 
 ## Docs and Bots
 
@@ -47,8 +58,13 @@ When a repository has Docs branches (such as `gh-pages`) or Bot branches (such a
 
 ## Two layouts
 
-The default **timeline** layout gives each commit two lines: the subject, and the author and date. **Compact rows** fits one commit per line, so you see more history at once. Switch between them in [Settings](settings.md).
+The default **timeline** layout gives each commit two lines: the subject, and the author and date. **Compact rows** fits one commit per line, so you see more history at once. Switch between them with the button in the graph's header, or in [Settings](settings.md).
 
 ## Right-click menus
 
 Right-click a commit, branch or tag for what you can do with it: check it out, create a branch or tag there, merge, rebase, cherry-pick, revert, reset, or see its reflog. [Branches, merges and rebases](branches.md) covers these.
+
+A commit's menu starts with what you can do with the commit itself. Below that, each branch and tag on it has its own submenu, so what you do to `main` stays apart from what you do to `origin/main`. Hover over one to open it, or use the arrow keys.
+
+![A commit's menu, with the submenu of a branch on it open](../img/commit-menu-light.webp#gh-light-mode-only)
+![A commit's menu, with the submenu of a branch on it open](../img/commit-menu-dark.webp#gh-dark-mode-only)

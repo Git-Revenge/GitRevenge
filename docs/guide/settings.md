@@ -18,7 +18,7 @@ With a repository's tab active, a **This repository** section adds settings that
 
 | Setting | What it does |
 |---|---|
-| **Trunk, Release, Environment, Docs, Bot** | The patterns that decide each [branch kind](branch-care.md#branch-kinds). **Use defaults** puts one back. |
+| **Trunk, Release, Environment, Docs, Feature, Bot** | The patterns that decide each [branch kind](branch-care.md#branch-kinds). **Use defaults** puts one back. |
 | **Clean up merged branches after each pull** | Deletes local branches whose upstream was deleted and that have nothing unpushed. [More](branch-care.md#cleaning-up-merged-branches). |
 | **Sync notes on fetch, pull and push** | Shares git notes with the remote. [More](branch-care.md#syncing-notes). |
 | **Hidden branches** | Patterns of branches to leave out of the sidebar and graph. [More](branch-care.md#hiding-branches). |
@@ -56,8 +56,12 @@ On macOS, read <kbd>⌘</kbd> wherever this page says <kbd>Ctrl</kbd>. Press <kb
 | Word wrap in diffs | <kbd>Alt</kbd>+<kbd>Z</kbd> |
 | Back to the graph | <kbd>Escape</kbd> |
 | Next / previous tab | <kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> |
+| Go to a tab by number | <kbd>Ctrl</kbd>+<kbd>1</kbd> to <kbd>Ctrl</kbd>+<kbd>9</kbd> |
 | Close the tab | <kbd>Ctrl</kbd>+<kbd>W</kbd> |
 | Start page | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> |
+| Filter the sidebar | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> |
+
+In the sidebar's list, the keys are different: see [the commit graph](graph.md#branches-and-tags).
 
 ### Changing them
 

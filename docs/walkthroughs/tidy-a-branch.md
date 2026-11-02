@@ -9,7 +9,7 @@ That's what interactive rebase is for: it rewrites a branch's recent commits, le
 
 ## Steps
 
-1. **Check out the branch.** Double-click `feature/offline-cache` in the sidebar.
+1. **Check out the branch.** In the sidebar, open the `feature` folder and double-click `offline-cache`.
 
 2. **Open the rebase editor.** In the graph, right-click the commit the branch started from (here, `main`'s *Set the alert limit in knots too*) and choose **Interactive rebase feature/offline-cache from here…**. The editor lists every commit after that one, newest first.
 

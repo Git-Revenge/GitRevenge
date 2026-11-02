@@ -16,6 +16,15 @@ Open a repository and this is what you get. Everything in the screenshots comes 
 
 The strip along the bottom shows the git and git-lfs versions in use, and which version of Git Revenge you're running.
 
+## The sidebar
+
+The rail down the left edge switches the sidebar between its panels, and the filter stays on as you move between them, with a count on each panel that has a match.
+
+![Switching between the sidebar panels, filtering across them, and showing the branches that need care](../img/sidebar-panels-light.webp#gh-light-mode-only)
+![Switching between the sidebar panels, filtering across them, and showing the branches that need care](../img/sidebar-panels-dark.webp#gh-dark-mode-only)
+
+[The commit graph](graph.md#branches-and-tags) covers the sidebar in full.
+
 ## Getting around without the mouse
 
 The command palette is the quickest way to anything. Open it, type a few letters of what you want, and press <kbd>Enter</kbd>. Each command shows its keyboard shortcut, if it has one, so you pick those up as you go.

@@ -8,8 +8,8 @@ Tidewater is three repositories: the dashboard, `harbour-api` and `tide-tables`.
 2. Click **New group** and name it.
 3. Click **Add…** under the group and choose each repository's folder.
 
-   ![The start page, with recent repositories and a Tidewater group](../img/start-page-light.webp#gh-light-mode-only)
-   ![The start page, with recent repositories and a Tidewater group](../img/start-page-dark.webp#gh-dark-mode-only)
+   ![The start page, with recent repositories and a Harbour team group](../img/start-page-light.webp#gh-light-mode-only)
+   ![The start page, with recent repositories and a Harbour team group](../img/start-page-dark.webp#gh-dark-mode-only)
 
 ## Use the dashboard
 

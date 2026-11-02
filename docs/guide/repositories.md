@@ -30,6 +30,9 @@ If you work across several related repositories, put them in a group. On the sta
 
 Hover over a group or one of its repositories and drag its grip to change the order. From the keyboard, a group's **…** menu has **Move earlier** and **Move later**, and <kbd>Alt</kbd>+<kbd>↑</kbd> or <kbd>Alt</kbd>+<kbd>↓</kbd> moves the focused repository. A group's order is also the order **Open all** opens its tabs and its dashboard lists its repositories.
 
+![Dragging a repository to the end of its group, then dragging the group past another](../img/reorder-light.webp#gh-light-mode-only)
+![Dragging a repository to the end of its group, then dragging the group past another](../img/reorder-dark.webp#gh-dark-mode-only)
+
 ![A group's dashboard](../img/group-dashboard-light.webp#gh-light-mode-only)
 ![A group's dashboard](../img/group-dashboard-dark.webp#gh-dark-mode-only)
 
@@ -40,6 +43,9 @@ A group's **Dashboard** shows each repository's branch, how many uncommitted cha
 A worktree is a second working folder for the same repository, so you can have two branches checked out side by side. **Manage worktrees…** in the command palette lists them, adds new ones, opens one in a tab, and removes linked ones you're done with.
 
 The **Repository** panel of the sidebar lists them, with each one's branch, and a rose dot marks the one this window has open. Click one to open it as a tab, or right-click it to remove it.
+
+![The Repository panel, listing two worktrees and their branches](../img/sidebar-repository-light.webp#gh-light-mode-only)
+![The Repository panel, listing two worktrees and their branches](../img/sidebar-repository-dark.webp#gh-dark-mode-only)
 
 ## Changes made outside the app
 
