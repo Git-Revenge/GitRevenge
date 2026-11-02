@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ago, attention, byDay, byReference, duration, hotFiles, latest, median, perDay, sharedAsOf, tiles, utcDay, utcMoment, type Item, type Ranked, type Tagged } from './model'
+import { ago, attention, byDay, byReference, duration, groupLabel, hotFiles, latest, median, perDay, sharedAsOf, tiles, utcDay, utcMoment, type Item, type Ranked, type Tagged } from './model'
 
 const DAY = 86400
 const item = (repo: string, sha: string, committed: number, extra: Partial<Item> = {}): Tagged<Item> => ({
@@ -58,6 +58,11 @@ describe('perDay', () => {
 })
 
 describe('formatting', () => {
+  it('counts a group\'s repositories in the scope menu', () => {
+    expect(groupLabel('Harbour team', 3)).toBe('Harbour team · 3 repos')
+    expect(groupLabel('Solo', 1)).toBe('Solo · 1 repo')
+  })
+
   const t = Date.UTC(2026, 9, 29, 17, 42) / 1000
   it('writes UTC dates', () => {
     expect(utcDay(t)).toBe('Oct 29')

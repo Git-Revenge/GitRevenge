@@ -82,9 +82,11 @@
                   {#if uncommitted(l.commit)}
                     <span class="muted">Not committed yet</span>
                   {:else}
-                    <button class="sha" onclick={() => onReveal(l.commit)} title="{l.summary}&#10;Show in graph">{l.commit.slice(0, 7)}</button>
-                    <span class="who">{l.author}</span>
-                    <span class="muted when">{formatTime(l.time)}</span>
+                    <span class="who-when">
+                      <button class="sha" onclick={() => onReveal(l.commit)} title="{l.summary}&#10;Show in graph">{l.commit.slice(0, 7)}</button>
+                      <span class="who" title={l.author}>{l.author}</span>
+                      <span class="muted when">{formatTime(l.time)}</span>
+                    </span>
                   {/if}
                 {/if}
               </td>
@@ -136,8 +138,8 @@
 
   /* Each commit's lines carry its lane colour, as in the graph. */
   .gutter {
-    width: 300px;
-    max-width: 300px;
+    width: 340px;
+    max-width: 340px;
     border-left: 3px solid transparent;
     background: var(--paper-warm);
     overflow: hidden;
@@ -145,7 +147,15 @@
     font-size: 13px;
   }
 
+  /* A long name gives up its width: the date is what's being looked for. */
+  .who-when {
+    display: flex;
+    align-items: baseline;
+    width: 320px;
+  }
+
   .sha {
+    flex: none;
     padding: 0;
     background: none;
     border: none;
@@ -160,10 +170,15 @@
   }
 
   .who {
+    flex: 1;
+    min-width: 0;
     margin: 0 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .when {
+    flex: none;
     font-family: var(--font-mono);
     font-size: 12px;
   }
