@@ -351,6 +351,45 @@ test.describe('before the first load has answered', () => {
     expect(seen.join(' / ')).not.toMatch(/clean/i)
   })
 
+  // #389: the commit panel said 0 files, and ignored Ctrl+Enter, until status had loaded.
+  test.describe('commit panel', () => {
+    const file = (path: string, index: string, workTree: string) => ({ path, index, workTree, untracked: false, conflicted: false })
+    const panel = (files: unknown[]) => ({
+      delays: { WorkingTree: 600 },
+      responses: { CommitChanges: 'abc', WorkingTree: { status: { files }, identity: { name: 'A', email: 'a@b' }, signing: { enabled: false } } },
+    })
+    const summary = (page: Page) => page.getByRole('textbox', { name: 'Commit summary' })
+
+    test('claims no counts until status has loaded', async ({ page }) => {
+      await open(page, 'workingTree', panel([file('a.txt', 'M', '.'), file('b.txt', '.', 'M')]))
+      await expect(page.getByText('Unstaged', { exact: true })).toBeVisible()
+      await expect(page.getByText('Staged', { exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Commit', exact: true })).toBeVisible()
+      await expect(page.getByText('Unstaged · 1')).toBeVisible()
+      await expect(page.getByText('Staged · 1', { exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Commit 1 file' })).toBeVisible()
+    })
+
+    test('Ctrl+Enter before status has loaded commits once it has', async ({ page }) => {
+      await open(page, 'workingTree', panel([file('a.txt', 'M', '.')]))
+      await summary(page).fill('Early')
+      await page.keyboard.press('Control+Enter')
+      await expect(page.getByRole('button', { name: 'Reading status…' })).toBeVisible()
+      expect(await calls(page, 'CommitChanges')).toEqual([])
+      await expect.poll(() => calls(page, 'CommitChanges')).toEqual([['/r', 'Early', false]])
+      await expect(summary(page)).toHaveValue('')
+    })
+
+    test('Ctrl+Enter before status has loaded commits nothing if nothing is staged', async ({ page }) => {
+      await open(page, 'workingTree', panel([file('b.txt', '.', 'M')]))
+      await summary(page).fill('Early')
+      await page.keyboard.press('Control+Enter')
+      await expect(page.getByRole('button', { name: 'Commit 0 files' })).toBeVisible()
+      expect(await calls(page, 'CommitChanges')).toEqual([])
+      await expect(summary(page)).toHaveValue('Early')
+    })
+  })
+
   const tree = (path: string, main: boolean) => ({ path, head: 'abc', branch: 'b', main, current: main, locked: false, prunable: false })
   const heading = (page: Page) => page.getByRole('heading', { name: /Worktrees/ })
 
