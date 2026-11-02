@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clip, graphWidth, initials, LANE_COUNT, laneColor, laneVar, laneWindow, laneX, layoutColumns, METRICS, relativeTime, setLaneColors, sortRefs } from './draw'
+import { clip, clippedName, graphWidth, initials, LANE_COUNT, laneColor, laneVar, laneWindow, laneX, layoutColumns, METRICS, relativeTime, setLaneColors, sortRefs } from './draw'
 
 describe('graph geometry', () => {
   it('spaces lanes evenly in both densities', () => {
@@ -45,6 +45,30 @@ describe('clip', () => {
 
   it('handles no room at all', () => {
     expect(clip(ctx, 'hello', 0)).toBe('')
+  })
+})
+
+describe('clippedName', () => {
+  // One pixel a character, so room is a count of characters.
+  const ctx = { measureText: (s: string) => ({ width: s.length }) as TextMetrics }
+
+  it('keeps a name that fits, however short', () => {
+    expect(clippedName(ctx, 'v1.0', 4)).toBe('v1.0')
+  })
+
+  it('cuts a name while enough of it is left to read', () => {
+    expect(clippedName(ctx, 'origin/feature/offline-cache', 12)).toBe('origin/feat…')
+    expect(clippedName(ctx, 'origin/feature/offline-cache', 9)).toBe('origin/f…')
+  })
+
+  it('gives up when too little would be left', () => {
+    expect(clippedName(ctx, 'origin/feature/offline-cache', 8)).toBeNull()
+    expect(clippedName(ctx, 'origin/feature/offline-cache', 0)).toBeNull()
+  })
+
+  it("doesn't count a tag's mark as part of its name", () => {
+    expect(clippedName(ctx, '◆ a-very-long-tag-name', 9)).toBeNull()
+    expect(clippedName(ctx, '◆ a-very-long-tag-name', 11)).toBe('◆ a-very-l…')
   })
 })
 
