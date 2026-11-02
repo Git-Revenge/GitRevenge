@@ -407,6 +407,68 @@ func TestTipKindsFollowLanes(t *testing.T) {
 	}
 }
 
+// kindsOf lays out commits (parents by index) and returns each row's kind, by commit.
+func kindsOf(t *testing.T, commits [][]int, pins []int, kinds map[int]string) map[int]string {
+	t.Helper()
+	g := New()
+	var pinned []string
+	for _, i := range pins {
+		pinned = append(pinned, fakeID(i))
+	}
+	g.Pin(pinned)
+	tips := map[string]string{}
+	for i, k := range kinds {
+		tips[fakeID(i)] = k
+	}
+	g.SetTipKinds(tips)
+	for i, ps := range commits {
+		c := git.LogCommit{ID: fakeID(i), Subject: fmt.Sprint(i), AuthorName: "a"}
+		for _, p := range ps {
+			c.Parents = append(c.Parents, fakeID(p))
+		}
+		if err := g.Add(c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out := map[int]string{}
+	for i, r := range g.Rows(0, len(commits)) {
+		out[i] = r.Kind
+	}
+	return out
+}
+
+func TestKindedTipOnTrunkLeavesTrunkItsKind(t *testing.T) {
+	// main: 0 → 1 → 2 → 3 → 4, with a release tip on 1 and a docs tip on 3.
+	got := kindsOf(t, [][]int{{1}, {2}, {3}, {4}, {}}, []int{0}, map[int]string{0: "trunk", 1: "release", 3: "docs"})
+	for i, k := range got {
+		if k != "trunk" {
+			t.Errorf("row %d kind = %q, want trunk", i, k)
+		}
+	}
+}
+
+func TestKindArrivingBeforeTrunkStopsAtTrunk(t *testing.T) {
+	// A release tip ahead of main: release → main's tip → main's history.
+	got := kindsOf(t, [][]int{{1}, {2}, {}}, []int{1}, map[int]string{0: "release", 1: "trunk"})
+	want := map[int]string{0: "release", 1: "trunk", 2: "trunk"}
+	for i, k := range want {
+		if got[i] != k {
+			t.Errorf("row %d kind = %q, want %q", i, got[i], k)
+		}
+	}
+}
+
+func TestKindedTipOffTrunkStillStartsItsKind(t *testing.T) {
+	// A feature branch off a release branch: the release's commits stay the release's.
+	got := kindsOf(t, [][]int{{1}, {2}, {}}, nil, map[int]string{0: "feature", 1: "release"})
+	want := map[int]string{0: "feature", 1: "release", 2: "release"}
+	for i, k := range want {
+		if got[i] != k {
+			t.Errorf("row %d kind = %q, want %q", i, got[i], k)
+		}
+	}
+}
+
 func TestTipKindsSurviveCheckpoints(t *testing.T) {
 	commits := randomDAG(1200, 3)
 	g := New()
