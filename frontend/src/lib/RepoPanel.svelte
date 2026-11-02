@@ -36,12 +36,32 @@
   /** False until the first answer, so the count doesn't claim 0 worktrees. */
   let loaded = $state(false)
 
-  async function load() {
-    const [t, s, l] = await Promise.all([session.run(() => Worktrees(path)), session.run(() => Submodules(path)), session.run(() => LFS(path))])
-    trees = t ?? []
-    subs = s ?? []
-    lfs = l ?? null
-    loaded = true
+  /** Numbers each load, and remembers the newest each section has shown, so a slow answer
+   * can't replace a newer one. */
+  let loads = 0
+  const newest = { trees: 0, subs: 0, lfs: 0 }
+
+  /** Each section shows as soon as its own answer arrives: submodules and LFS can take seconds. */
+  function load() {
+    const n = ++loads
+    const fresh = (section: keyof typeof newest) => {
+      if (n < newest[section]) return false
+      newest[section] = n
+      return true
+    }
+    return Promise.all([
+      session.run(() => Worktrees(path)).then((t) => {
+        if (!fresh('trees')) return
+        trees = t ?? []
+        loaded = true
+      }),
+      session.run(() => Submodules(path)).then((s) => {
+        if (fresh('subs')) subs = s ?? []
+      }),
+      session.run(() => LFS(path)).then((l) => {
+        if (fresh('lfs')) lfs = l ?? null
+      }),
+    ])
   }
 
   $effect(() => {
