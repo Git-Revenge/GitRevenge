@@ -542,15 +542,6 @@
     color: var(--danger);
   }
 
-  .danger {
-    color: var(--danger);
-  }
-
-  .danger:hover:not(:disabled) {
-    background: var(--danger-wash);
-    color: var(--danger);
-  }
-
   .composer {
     display: flex;
     flex-direction: column;

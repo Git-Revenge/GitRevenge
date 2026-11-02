@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { branch, calls, events, open, remote, tag, textUnderFloor } from './support'
 
 test.describe('commit menu', () => {
@@ -601,4 +601,48 @@ test('loading text waits, so a fast load does not flash', async ({ page }) => {
   await open(page, 'loading')
   await expect(page.getByRole('status')).toHaveCount(0)
   await expect(page.getByRole('status')).toContainText('Loading…')
+})
+
+// #406: a component's own .danger rule beat the button family's, so the label matched its fill.
+test.describe('confirm buttons are legible', () => {
+  const contrast = (button: Locator) =>
+    button.evaluate((el) => {
+      const channels = (c: string) => (c.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
+      const luminance = (c: string) => {
+        const [r, g, b] = channels(c).map((v) => {
+          const x = v / 255
+          return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4
+        })
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+      }
+      const [a, b] = [luminance(getComputedStyle(el).color), luminance(getComputedStyle(el, '::after').backgroundColor)]
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+    })
+  const tree = (path: string, main: boolean) => ({ path, head: 'abc', branch: 'b', main, current: main, locked: false, prunable: false })
+  const files = ['a.txt', 'b.txt'].map((path) => ({ path, index: '.', workTree: 'M', untracked: false, conflicted: false }))
+  const responses = { WorkingTree: { status: { files }, identity: { name: 'A', email: 'a@b' }, signing: { enabled: false } } }
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`Discard all, ${theme}`, async ({ page }) => {
+      await open(page, 'workingTree', { theme, responses })
+      await page.getByRole('button', { name: 'Discard all' }).click()
+      const yes = page.getByRole('button', { name: 'Yes', exact: true })
+      expect(await contrast(yes)).toBeGreaterThanOrEqual(4.5)
+      await yes.hover()
+      expect(await contrast(yes)).toBeGreaterThanOrEqual(4.5)
+    })
+
+    test(`discarding one file, ${theme}`, async ({ page }) => {
+      await open(page, 'workingTree', { theme, responses })
+      await page.getByText('a.txt').hover()
+      await page.getByRole('button', { name: 'Discard changes to a.txt' }).click()
+      expect(await contrast(page.getByRole('button', { name: 'Yes', exact: true }))).toBeGreaterThanOrEqual(4.5)
+    })
+
+    test(`removing a worktree, ${theme}`, async ({ page }) => {
+      await open(page, 'worktreesDialog', { theme, responses: { Worktrees: [tree('/r', true), tree('/r-wt', false)] } })
+      await page.getByRole('button', { name: 'Remove' }).click()
+      expect(await contrast(page.getByRole('button', { name: 'Remove', exact: true }))).toBeGreaterThanOrEqual(4.5)
+    })
+  }
 })
