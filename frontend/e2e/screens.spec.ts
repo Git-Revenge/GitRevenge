@@ -561,6 +561,27 @@ test('closing a diff while staging a hunk shows no error', async ({ page }) => {
   expect(await page.evaluate(() => (window as unknown as { __sessionError: () => string }).__sessionError())).toBe('')
 })
 
+test.describe('pulling a branch that is not checked out', () => {
+  const refs = [branch('main', { head: true }), branch('feat', { upstream: 'origin/feat' })]
+  const pull = async (page: Page) => {
+    await page.getByRole('menuitem', { name: 'feat', exact: true }).hover()
+    await page.getByRole('menuitem', { name: 'Pull feat' }).click()
+  }
+
+  test('asks the backend for that branch', async ({ page }) => {
+    await open(page, 'commitMenu', { responses: { Refs: refs } })
+    await pull(page)
+    await expect.poll(() => calls(page, 'PullBranch')).toEqual([['/r', 'feat']])
+  })
+
+  test('shows why when the branch has diverged', async ({ page }) => {
+    const message = 'feat has diverged from its upstream. Check it out to merge or rebase.'
+    await open(page, 'commitMenu', { responses: { Refs: refs }, failures: { PullBranch: message } })
+    await pull(page)
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __sessionError: () => string }).__sessionError())).toBe(message)
+  })
+})
+
 test.describe('views loaded on demand', () => {
   test('shows the view once its code loads', async ({ page }) => {
     await open(page, 'lazy')
