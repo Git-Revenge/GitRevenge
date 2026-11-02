@@ -262,6 +262,47 @@ test.describe('start page', () => {
   })
 })
 
+test.describe('rebase editor', () => {
+  const plan = [
+    { commit: 'a'.repeat(40), subject: 'First', message: 'First', action: 'pick' },
+    { commit: 'c'.repeat(40), subject: 'Second', message: 'Second', action: 'pick' },
+  ]
+
+  // #387: an empty list counted as every commit being dropped.
+  test('warns about nothing while the commits load', async ({ page }) => {
+    await open(page, 'rebaseEditor', { delays: { RebasePlan: 500 }, responses: { RebasePlan: plan } })
+    await expect(page.getByText('Loading commits…')).toBeVisible()
+    await expect(page.getByRole('status')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Start rebase' })).toBeDisabled()
+    await expect(page.getByText('2 commits · newest first')).toBeVisible()
+    await expect(page.getByRole('status')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Start rebase' })).toBeEnabled()
+  })
+
+  test('still warns when every commit really is dropped', async ({ page }) => {
+    await open(page, 'rebaseEditor', { responses: { RebasePlan: plan } })
+    await page.getByRole('combobox', { name: 'Action for First' }).selectOption('drop')
+    await page.getByRole('combobox', { name: 'Action for Second' }).selectOption('drop')
+    await expect(page.getByRole('status')).toHaveText('Every commit is dropped. Use Reset instead.')
+  })
+
+  test('says so when there is nothing to rebase', async ({ page }) => {
+    await open(page, 'rebaseEditor', { responses: { RebasePlan: [] } })
+    await expect(page.getByRole('status')).toHaveText('There are no commits to rebase onto this one.')
+  })
+
+  test('keeps its buttons on one line in a narrow column', async ({ page }) => {
+    await page.setViewportSize({ width: 560, height: 600 })
+    await open(page, 'rebaseEditor', { responses: { RebasePlan: plan } })
+    const middle = async (name: string) => {
+      const box = (await page.getByRole('button', { name }).boundingBox())!
+      return box.y + box.height / 2
+    }
+    expect(await middle('Start rebase')).toBeCloseTo(await middle('Cancel'), 0)
+    expect(await middle('Start rebase')).toBeCloseTo(await middle('Back'), 0)
+  })
+})
+
 test.describe('upstream dialog', () => {
   const refs = [branch('main', { upstream: 'origin/main' }), remote('origin/main'), remote('origin/x'), tag('v1')]
   const field = (page: Page) => page.getByLabel('Track')
