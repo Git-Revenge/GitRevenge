@@ -27,6 +27,8 @@ type undoEntry struct {
 	// kindBranchCreate / kindBranchDelete.
 	Ref    string
 	Commit string
+	// From is where Ref was before kindBranchMove, which left it at Commit.
+	From string
 	// Branches are the branches deleted together, for kindBranchesDelete.
 	Branches []branchAt
 }
@@ -44,6 +46,8 @@ const (
 	kindBranchDelete undoKind = "branch-delete"
 	// kindBranchesDelete is cleanup on pull: several branches deleted at once.
 	kindBranchesDelete undoKind = "branches-delete"
+	// kindBranchMove is pulling a branch that isn't checked out: only that branch moved.
+	kindBranchMove undoKind = "branch-move"
 )
 
 // undoStacks holds undo and redo history per repository.
@@ -208,6 +212,19 @@ func apply(ctx context.Context, g *git.Repo, e undoEntry, undo bool) error {
 			}
 		}
 		return nil
+	case kindBranchMove:
+		from, to := e.Commit, e.From
+		if !undo {
+			from, to = e.From, e.Commit
+		}
+		if g.Head(ctx).Branch == e.Ref {
+			return userError("Can't move " + e.Ref + " while it is checked out.")
+		}
+		err := g.MoveBranch(ctx, e.Ref, from, to)
+		if errors.Is(err, git.ErrBranchMoved) {
+			return errMoved
+		}
+		return friendlyUndo(err)
 	case kindBranchCreate, kindBranchDelete:
 		create := (e.Kind == kindBranchCreate) != undo // redo create, or undo delete
 		if create {

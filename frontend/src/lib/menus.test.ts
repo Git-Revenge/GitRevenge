@@ -112,6 +112,21 @@ describe('refItems', () => {
   })
 })
 
+describe('Pull on a branch', () => {
+  const pull = (r: Ref) => labels(refItems(r, ctx('main'))).filter((l) => l.startsWith('Pull'))
+  const tracking = { ...ref('feat', 'local'), upstream: 'origin/feat' }
+
+  it('is offered on a branch that has an upstream and is not checked out', () => {
+    expect(pull(tracking)).toEqual(['Pull feat'])
+  })
+
+  it('is not offered on the checked-out branch, or without an upstream', () => {
+    expect(pull({ ...tracking, head: true })).toEqual([])
+    expect(pull(ref('feat', 'local'))).toEqual([])
+    expect(pull({ ...tracking, gone: true })).toEqual([])
+  })
+})
+
 describe('upstreamDialog', () => {
   const refs = [ref('main', 'local'), ref('origin/main', 'remote'), ref('origin/x', 'remote'), ref('v1', 'tag')]
 

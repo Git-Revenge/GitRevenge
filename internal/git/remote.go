@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -169,6 +170,79 @@ func (r *Repo) Pull(ctx context.Context, mode PullMode, o NetOptions) error {
 	c := o.cmd(args...)
 	c.Env = append(c.Env, "GIT_EDITOR=true") // merge commits keep git's message
 	_, err := r.Write(ctx, c)
+	return err
+}
+
+// Why PullBranch refused. In each case the branch is left where it was.
+var (
+	// ErrNoUpstream means the branch doesn't track anything.
+	ErrNoUpstream = errors.New("branch has no upstream")
+	// ErrUpstreamGone means the remote no longer has the branch being tracked.
+	ErrUpstreamGone = errors.New("upstream no longer exists")
+	// ErrBranchDiverged means both sides have commits, so a fast-forward can't work.
+	ErrBranchDiverged = errors.New("branch has diverged from its upstream")
+	// ErrBranchInUse means a worktree, rebase or bisect is using the branch.
+	ErrBranchInUse = errors.New("branch is in use")
+)
+
+// ErrBranchMoved means a branch isn't at the commit MoveBranch expected.
+var ErrBranchMoved = errors.New("branch moved")
+
+// BranchUpstream returns the remote a branch tracks and the full name of the branch there.
+func (r *Repo) BranchUpstream(ctx context.Context, branch string) (remote, merge string, err error) {
+	remote, _ = r.ReadString(ctx, "config", "--get", "branch."+branch+".remote")
+	merge, _ = r.ReadString(ctx, "config", "--get", "branch."+branch+".merge")
+	if remote == "" || merge == "" {
+		return "", "", ErrNoUpstream
+	}
+	return remote, merge, nil
+}
+
+// PullBranch fast-forwards a branch that isn't checked out from its upstream, returning where
+// it was and where it is now. Only the ref moves, so the working tree and index aren't touched.
+// A branch that only has commits of its own has nothing to pull, which isn't an error.
+func (r *Repo) PullBranch(ctx context.Context, branch string, o NetOptions) (from, to string, err error) {
+	remote, merge, err := r.BranchUpstream(ctx, branch)
+	if err != nil {
+		return "", "", err
+	}
+	ref := "refs/heads/" + branch
+	if from, err = r.ReadString(ctx, "rev-parse", "--verify", "-q", ref); err != nil {
+		return "", "", err
+	}
+	// No leading + in the refspec: git itself refuses anything but a fast-forward, or a branch
+	// that a worktree, rebase or bisect is using, even if that started after any check here.
+	_, err = r.Write(ctx, o.cmd("fetch", "--progress", remote, merge+":"+ref))
+	var gerr *Error
+	if errors.As(err, &gerr) {
+		switch {
+		case strings.Contains(gerr.Stderr, "refusing to fetch into"):
+			return "", "", ErrBranchInUse
+		case strings.Contains(gerr.Stderr, "couldn't find remote ref"):
+			return "", "", ErrUpstreamGone
+		case strings.Contains(gerr.Stderr, "[rejected]"), strings.Contains(gerr.Stderr, "non-fast-forward"):
+			// git rejects anything that isn't forward, including a branch that's purely ahead.
+			if _, aerr := r.Read(ctx, "merge-base", "--is-ancestor", branch+"@{upstream}", ref); aerr == nil {
+				return from, from, nil
+			}
+			return "", "", ErrBranchDiverged
+		}
+	}
+	if err != nil {
+		return "", "", err
+	}
+	to, err = r.ReadString(ctx, "rev-parse", "--verify", "-q", ref)
+	return from, to, err
+}
+
+// MoveBranch points a branch that isn't checked out at target, if it's still at expect.
+func (r *Repo) MoveBranch(ctx context.Context, branch, expect, target string) error {
+	tip, err := r.ReadString(ctx, "rev-parse", "--verify", "-q", "refs/heads/"+branch)
+	if err != nil || tip != expect {
+		return ErrBranchMoved
+	}
+	// git refuses to force a branch that a worktree has checked out.
+	_, err = r.Write(ctx, Cmd{Args: []string{"branch", "-f", branch, target}})
 	return err
 }
 

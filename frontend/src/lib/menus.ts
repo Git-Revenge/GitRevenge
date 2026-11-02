@@ -1,4 +1,4 @@
-import { BranchAction, HideBranch, Integrate, MarkBranchKind, PushRef, Refs, Restack, SetStackParent, StashAction } from '../../wailsjs/go/app/App.js'
+import { BranchAction, HideBranch, Integrate, MarkBranchKind, PullBranch, PushRef, Refs, Restack, SetStackParent, StashAction } from '../../wailsjs/go/app/App.js'
 import { CONFIRM_DELETE, KINDS, kindWarning } from './branchKinds'
 import type { MenuItem } from './ContextMenu.svelte'
 import type { DialogSpec } from './Dialog.svelte'
@@ -170,6 +170,10 @@ export function refItems(ref: Ref, ctx: MenuContext): MenuItem[] {
           // The checked-out branch keeps these items, disabled, so the menu's shape doesn't shift.
           { label: `Checkout ${ref.short}`, icon: 'branch', disabled: ref.head, run: () => session.run(() => branch(path, 'checkout', ref.short)) },
           ...(ref.head ? [] : integrateItems(ctx, ref.short, ref.short)),
+          // Only moves the branch, so it's safe beside uncommitted changes on the current one.
+          ...(ref.head || !ref.upstream || ref.gone
+            ? []
+            : [{ label: `Pull ${ref.short}`, icon: 'pull' as const, run: () => session.run(() => PullBranch(path, ref.short)) }]),
           ...(ref.head
             ? []
             : [

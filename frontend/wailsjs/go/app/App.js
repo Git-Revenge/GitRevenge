@@ -254,6 +254,10 @@ export function Pull(arg1, arg2) {
   return window['go']['app']['App']['Pull'](arg1, arg2);
 }
 
+export function PullBranch(arg1, arg2) {
+  return window['go']['app']['App']['PullBranch'](arg1, arg2);
+}
+
 export function PushCurrent(arg1, arg2) {
   return window['go']['app']['App']['PushCurrent'](arg1, arg2);
 }

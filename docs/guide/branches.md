@@ -6,6 +6,7 @@
 - Right-click any commit for **Create branch here…** or **Create tag here…**. Give a tag a message to make it an annotated tag.
 - Double-click a branch in the sidebar to check it out. Checking out a remote branch offers to create a local branch that tracks it.
 - Right-click a branch to rename it, delete it, set its upstream, push it, or delete it from the remote. Deleting a branch with unmerged commits asks you to confirm first.
+- **Pull** on a branch that isn't checked out brings it up to date with its upstream. You stay on your current branch and your uncommitted changes aren't touched. This only fast-forwards: if the branch has diverged from its upstream, check it out to merge or rebase. Undo moves the branch back.
 - **Set upstream** suggests the remote branches git knows about, and you can also type any name. Leave it empty to stop tracking.
 
   ![The upstream dialog for feature/metric-units](../img/set-upstream-light.webp#gh-light-mode-only)

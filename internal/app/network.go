@@ -202,6 +202,58 @@ func (a *App) Pull(path, mode string) error {
 	})
 }
 
+// PullBranch fast-forwards a branch that isn't checked out from its upstream. It never switches
+// branches, so it can't disturb uncommitted changes, and it stops if the branch has diverged.
+// Cleanup on pull doesn't run: pulling one branch shouldn't delete others.
+func (a *App) PullBranch(path, branch string) error {
+	return a.runNetwork(path, "pull", func(ctx context.Context, r *session.Repo, o git.NetOptions) error {
+		// Said before the network is involved, and names the worktree. A rebase or bisect
+		// doesn't show here; git refuses those during the pull.
+		if wts, err := r.Git.Worktrees(ctx); err == nil {
+			for _, w := range wts {
+				switch {
+				case w.Branch != branch:
+				case w.Current:
+					return userError(branch + " is the checked-out branch. Use Pull in the toolbar.")
+				default:
+					return userError(branch + " is checked out in the worktree at " + w.Path + ". Pull it there.")
+				}
+			}
+		}
+		a.upstreams.remember(ctx, r.Path, r.Git)
+		from, to, err := r.Git.PullBranch(ctx, branch, o)
+		if err != nil {
+			return pullBranchErr(branch, err)
+		}
+		if from == to {
+			a.notice(r.Path, branch+" is already up to date.")
+		} else {
+			a.undo.push(r.Path, undoEntry{Label: "Pull " + branch, Kind: kindBranchMove, Ref: branch, From: from, Commit: to})
+			a.undoChanged(r.Path)
+			a.notice(r.Path, "Pulled the latest commits into "+branch+".")
+		}
+		if remote, _, err := r.Git.BranchUpstream(ctx, branch); err == nil && remote != "." {
+			a.syncNotesIn(ctx, r, []string{remote}, o)
+		}
+		return nil
+	})
+}
+
+// pullBranchErr explains why a branch couldn't be pulled.
+func pullBranchErr(branch string, err error) error {
+	switch {
+	case errors.Is(err, git.ErrBranchDiverged):
+		return userError(branch + " has diverged from its upstream. Check it out to merge or rebase.")
+	case errors.Is(err, git.ErrBranchInUse):
+		return userError(branch + " is in use by a rebase or bisect, so it can't be updated from here.")
+	case errors.Is(err, git.ErrNoUpstream):
+		return userError(branch + " has no upstream to pull from. Set one first.")
+	case errors.Is(err, git.ErrUpstreamGone):
+		return userError("The remote no longer has the branch " + branch + " tracks, so there's nothing to pull.")
+	}
+	return err
+}
+
 // PushCurrent pushes the checked-out branch: to its upstream if it has one, otherwise to
 // the only remote (or "origin") and records that as the upstream.
 func (a *App) PushCurrent(path string, force bool) error {

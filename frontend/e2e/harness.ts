@@ -161,6 +161,8 @@ const mounts = {
     const ctx = { path: '/r', current: () => scenario.current ?? 'main', openDialog: record('dialog'), openRebase: record('rebase'), openReflog: record('reflog') }
     const row = { ...graphRow(0), id: 'a'.repeat(40) } as never
     const items = commitMenuItems(row, refs, ctx)
+    const { session } = await import('../src/lib/session.svelte')
+    Object.assign(win, { __sessionError: () => session.error })
     mount(ContextMenu, { target: host, props: { x: scenario.menuX ?? 200, y: 100, items, onClose: record('close') } })
   },
   async rebaseEditor() {
