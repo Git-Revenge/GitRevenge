@@ -405,11 +405,25 @@ function drawLabels(
     const extra = 14 + (labelKind(r) ? KIND_ICON_W : 0) + (r.stackDepth ? KIND_ICON_W : 0)
     let w = ctx.measureText(text).width + extra
     if (x + w > end) {
-      // Out of room: one clipped label that also counts the rest.
-      const label = clip(ctx, text, Math.max(0, end - x - extra - ctx.measureText(more).width)) + more
-      w = ctx.measureText(label).width + extra
-      if (w > 26) drawLabel(ctx, label, x, mid, w, h, r, color, theme)
-      x += w + 5
+      // Out of room: one clipped label that also counts the rest, while enough of its name is left.
+      const clipped = clippedName(ctx, text, Math.max(0, end - x - extra - ctx.measureText(more).width))
+      if (clipped !== null) {
+        const label = clipped + more
+        w = ctx.measureText(label).width + extra
+        drawLabel(ctx, label, x, mid, w, h, r, color, theme)
+        x += w + 5
+        break
+      }
+      // Otherwise only say how many there are, if even that fits.
+      setFont(ctx, `12px ${MONO}`)
+      const count = `+${remaining}`
+      const countW = ctx.measureText(count).width
+      if (x + countW <= end) {
+        ctx.fillStyle = theme.muted
+        ctx.textBaseline = 'middle'
+        ctx.fillText(count, x, mid + 0.5)
+        x += countW + 5
+      }
       break
     }
     drawLabel(ctx, text, x, mid, w, h, r, color, theme)
@@ -501,6 +515,17 @@ function segment(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: numb
     ctx.bezierCurveTo(x1, cy, x2, cy, x2, y2)
   }
   ctx.stroke()
+}
+
+/** The fewest characters of a cut-off name worth showing: "origin/f…" is about the least that
+ * says anything. */
+const MIN_CLIPPED_NAME = 8
+
+/** A ref's name cut to fit maxWidth, or null if too little of it would be left to read. */
+export function clippedName(ctx: Pick<CanvasRenderingContext2D, 'measureText'>, text: string, maxWidth: number): string | null {
+  const clipped = clip(ctx, text, maxWidth)
+  if (clipped === text) return text
+  return clipped.replace(/^[◆≡] /, '').length - 1 < MIN_CLIPPED_NAME ? null : clipped
 }
 
 /** Truncates text with an ellipsis to fit maxWidth pixels. */
