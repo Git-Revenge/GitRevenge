@@ -387,6 +387,17 @@ test.describe('before the first load has answered', () => {
   })
 })
 
+// #391: staging finished after the diff closed, and reloading it showed a null error.
+test('closing a diff while staging a hunk shows no error', async ({ page }) => {
+  const side = (text: string) => ({ text, exists: true, binary: false, tooBig: false, size: text.length })
+  await open(page, 'closingDiff', { delays: { SetStagedContent: 400 }, responses: { FileContents: { old: side('one\n'), new: side('one\ntwo\n') } } })
+  await page.getByRole('button', { name: 'Stage hunk' }).click()
+  await page.evaluate(() => Object.assign(window, { __diffTarget: null }))
+  await expect.poll(() => calls(page, 'SetStagedContent').then((c) => c.length)).toBe(1)
+  await page.waitForTimeout(800)
+  expect(await page.evaluate(() => (window as unknown as { __sessionError: () => string }).__sessionError())).toBe('')
+})
+
 test.describe('views loaded on demand', () => {
   test('shows the view once its code loads', async ({ page }) => {
     await open(page, 'lazy')

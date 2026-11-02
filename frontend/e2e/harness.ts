@@ -173,6 +173,15 @@ const mounts = {
     const { default: RepoPanel } = await import('../src/lib/RepoPanel.svelte')
     mount(RepoPanel, { target: host, props: { path: '/r', filter: '', openDialog: () => {} } })
   },
+  async closingDiff() {
+    host.style.cssText = 'display:block;height:100vh'
+    const { default: DiffView } = await import('../src/lib/diff/DiffView.svelte')
+    const { session } = await import('../src/lib/session.svelte')
+    const state = win as unknown as { __diffTarget: unknown; __sessionError: () => string }
+    state.__diffTarget = { mode: 'unstaged', file: 'a.txt' }
+    state.__sessionError = () => session.error
+    mount(DiffView, { target: host, props: { path: '/r', onClose: record('close'), onOpen: record('open'), get target() { return state.__diffTarget } } as never })
+  },
   async stackedDialogs() {
     const { default: Dialog } = await import('../src/lib/Dialog.svelte')
     const spec = (title: string) => ({ title, submit: 'OK', run: async () => {} })
@@ -214,6 +223,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'repoPanel':
     await mounts.repoPanel()
+    break
+  case 'closingDiff':
+    await mounts.closingDiff()
     break
   case 'stackedDialogs':
     await mounts.stackedDialogs()
