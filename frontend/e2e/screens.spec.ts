@@ -992,10 +992,10 @@ test.describe('before the first load has answered', () => {
     test('shows files by name under their folders, with line counts', async ({ page }) => {
       await open(page, 'workingTree', scenario([file('src/lib/a.ts', '.', 'M', { added: 12, deleted: 3 }), file('b.png', '.', 'M', { binary: true })]))
       await expect(page.getByText('src/lib/', { exact: true })).toBeVisible()
-      const row = page.getByRole('button', { name: /a\.ts/ })
+      const row = page.locator('button.name', { hasText: 'a.ts' })
       await expect(row).toContainText('+12')
       await expect(row).toContainText('−3')
-      await expect(page.getByRole('button', { name: /b\.png/ })).toContainText('binary')
+      await expect(page.locator('button.name', { hasText: 'b.png' })).toContainText('binary')
     })
 
     test('a tick shows whether a file is going in, all or part of it', async ({ page }) => {
