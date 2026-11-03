@@ -516,11 +516,21 @@ function disc(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, co
   ctx.fill()
 }
 
-/** Sort order for labels: checked-out branch, local, remote, tags, stashes. */
-const KIND_ORDER: Record<Ref['kind'], number> = { local: 1, remote: 2, tag: 3, stash: 4 }
+/** Where a branch kind's labels rank; see labelRank. */
+const BRANCH_RANK: Record<string, number> = { trunk: 1, release: 2, environment: 4, feature: 5, docs: 7, bot: 7 }
+
+/** What a label ranks by, lowest first. The label column runs out of room, so what you'd most
+ * want to see comes first: the checked-out branch, Trunk, Release, tags, Environment, Feature,
+ * other branches, Docs and Bot, then stashes. */
+function labelRank(r: Ref): number {
+  if (r.head) return 0
+  if (r.kind === 'tag') return 3
+  if (r.kind === 'stash') return 8
+  return BRANCH_RANK[r.branchKind ?? ''] ?? 6
+}
 
 export function sortRefs(refs: Ref[]): Ref[] {
-  return [...refs].sort((a, b) => Number(b.head) - Number(a.head) || KIND_ORDER[a.kind] - KIND_ORDER[b.kind])
+  return [...refs].sort((a, b) => labelRank(a) - labelRank(b) || Number(a.kind === 'remote') - Number(b.kind === 'remote'))
 }
 
 /** A label as drawn: what it says, and whether the name is also on a remote. */
