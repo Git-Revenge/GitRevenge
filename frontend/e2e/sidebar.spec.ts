@@ -20,6 +20,22 @@ test('leads with the checked-out branch, then Trunk, folders and loose branches'
   await expectOutline(page, ['feature/', '  one', '    feature/two', 'main', 'fix/', '  merged', '  typo', 'old-gone'])
 })
 
+// #463: every merged branch in a stack said "parent merged".
+test('a branch known to be merged says so, once the check has answered', async ({ page }) => {
+  await open(page, 'sidebar', { ...scenario, delays: { MergedBranches: 300 }, responses: { ...scenario.responses, MergedBranches: { 'fix/merged': 'main', 'old-gone': 'main' } } })
+  const row = page.locator('.ref', { hasText: 'merged' }).filter({ hasNotText: 'old-gone' }).first()
+  await expect(page.locator('.ref', { hasText: 'old-gone' })).toContainText('gone')
+  await expect(row.locator('.track')).toHaveText(/parent merged/)
+  await expect(page.locator('.ref', { hasText: 'old-gone' }).locator('.track')).toContainText('merged')
+  await expect(row.locator('.track')).not.toContainText('parent')
+})
+
+test('without an answer, statuses stay as they were', async ({ page }) => {
+  await open(page, 'sidebar', { ...scenario, failures: { MergedBranches: 'nope' } })
+  await expect(page.locator('.ref', { hasText: 'old-gone' }).locator('.track')).toContainText('gone')
+  await expect(page.locator('.track', { hasText: 'parent merged' })).toBeVisible()
+})
+
 test('mutes every branch but the checked-out one', async ({ page }) => {
   await open(page, 'sidebar', scenario)
   const color = (name: string) => page.locator('.ref', { hasText: name }).first().evaluate((e) => getComputedStyle(e).color)

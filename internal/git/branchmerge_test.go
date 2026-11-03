@@ -23,6 +23,48 @@ func branched(t *testing.T, files ...string) (*gittest.Repo, *Repo) {
 	return fx, OpenRepo(newTestRunner(t), fx.Dir)
 }
 
+func TestMergedBranches(t *testing.T) {
+	ctx := context.Background()
+	fx, g := branched(t, "a1.txt", "a2.txt")
+	fx.Git("branch", "bottom", "topic")
+	fx.Checkout("topic")
+	fx.Git("branch", "-m", "top")
+	fx.CommitFile("b1.txt", "b1\n", "add b1")
+	fx.CommitFile("b2.txt", "b2\n", "add b2")
+	fx.Checkout("main")
+	fx.Git("merge", "-q", "--squash", "top")
+	fx.Commit("squash the stack")
+	fx.Git("checkout", "-q", "-b", "unmerged", "main")
+	fx.CommitFile("own.txt", "own\n", "unmerged work")
+	fx.Git("branch", "unmerged-below")
+	fx.CommitFile("own2.txt", "own2\n", "more unmerged work")
+	fx.Checkout("main")
+
+	got := g.MergedBranches(ctx, []string{"bottom", "top", "unmerged", "unmerged-below"}, []string{"main"})
+	for _, name := range []string{"bottom", "top"} {
+		if got[name].How == "" || got[name].Target != "main" {
+			t.Errorf("%s: got %+v", name, got[name])
+		}
+	}
+	for _, name := range []string{"unmerged", "unmerged-below"} {
+		if _, ok := got[name]; ok {
+			t.Errorf("%s read as merged: %+v", name, got[name])
+		}
+	}
+	if len(g.MergedBranches(ctx, []string{"top"}, nil)) != 0 {
+		t.Error("something merged with no targets")
+	}
+}
+
+func TestMergedBranchesStopsWhenOutOfTime(t *testing.T) {
+	_, g := branched(t, "a.txt")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if got := g.MergedBranches(ctx, []string{"topic"}, []string{"main"}); len(got) != 0 {
+		t.Errorf("got %+v", got)
+	}
+}
+
 func TestBranchMergeState(t *testing.T) {
 	ctx := context.Background()
 	state := func(g *Repo) BranchMerge { return g.BranchMergeState(ctx, "topic", []string{"main"}) }
