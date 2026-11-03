@@ -921,6 +921,8 @@ test.describe('before the first load has answered', () => {
     const titleLeft = async () => (await bar(page).locator('.wip-title').boundingBox())!.x
     await expect(bar(page)).toContainText('Working tree')
     await expect(bar(page)).not.toContainText(/clean/i)
+    // The row lines up with the graph, which has to draw once to say where that is.
+    await page.waitForTimeout(100)
     const before = await titleLeft()
     await expect(bar(page)).toContainText(/clean/i)
     expect(await titleLeft()).toBe(before)
@@ -980,6 +982,51 @@ test.describe('before the first load has answered', () => {
       await expect(page.getByRole('button', { name: 'Tick a file to commit it' })).toBeVisible()
       expect(await calls(page, 'CommitChanges')).toEqual([])
       await expect(summary(page)).toHaveValue('Early')
+    })
+  })
+
+  // #427: the rose banner competed with the selected row, and didn't say what to do.
+  test.describe('the row of changes above the graph', () => {
+    const dirty = (files: unknown[]) => ({ graphRows: 3, responses: { Refs: [], CommitSignatures: [], WorkingTree: { status: { files }, identity: { name: 'A', email: 'a@b' }, signing: { enabled: false } } } })
+    const one = { path: 'a.txt', index: '.', workTree: 'M', untracked: false, conflicted: false }
+
+    test('says how many files changed, and offers a review', async ({ page }) => {
+      await open(page, 'repoView', dirty([one, { ...one, path: 'b.txt' }]))
+      await expect(bar(page)).toContainText('2 files changed')
+      await expect(bar(page)).toContainText('Review')
+      await expect(bar(page).locator('.ring')).toBeVisible()
+    })
+
+    test('reads as clean when it is', async ({ page }) => {
+      await open(page, 'repoView', dirty([]))
+      await expect(bar(page)).toContainText(/clean/i)
+      await expect(bar(page)).not.toContainText('Review')
+    })
+
+    test('stays quiet while open, rather than taking the selection colour', async ({ page }) => {
+      await open(page, 'repoView', dirty([one]))
+      await expect(bar(page)).toHaveAttribute('aria-pressed', 'true')
+      const color = await bar(page).evaluate((e) => getComputedStyle(e).backgroundColor)
+      const selected = await bar(page).evaluate(() => {
+        const probe = document.createElement('div')
+        probe.style.background = 'var(--selected)'
+        document.body.append(probe)
+        const c = getComputedStyle(probe).backgroundColor
+        probe.remove()
+        return c
+      })
+      expect(color).not.toBe(selected)
+    })
+
+    test('lines its words up with the commit messages', async ({ page }) => {
+      await page.setViewportSize({ width: 1600, height: 800 })
+      await open(page, 'repoView', dirty([one]))
+      await expect(bar(page)).toContainText('1 file changed')
+      await expect.poll(async () => {
+        const title = (await bar(page).locator('.wip-title').boundingBox())!
+        const message = (await page.locator('.columns').getByText('Message').boundingBox())!
+        return Math.abs(title.x - message.x)
+      }).toBeLessThanOrEqual(1)
     })
   })
 

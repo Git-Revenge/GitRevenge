@@ -7,7 +7,7 @@ You've changed a file, and want to commit some of it now and keep the rest for l
 
 ## Steps
 
-1. **See what's changed.** Click **Uncommitted changes** at the top of the graph. The panel on the right splits your changes into *unstaged* (not going into the next commit) and *staged* (going in).
+1. **See what's changed.** Click the row at the top of the graph that says how many files changed. The panel on the right lists your changes. A tick means a file is going in the next commit, and a dash means part of it is.
 
 2. **Open the file.** Click `src/alerts.js`. Its diff opens in the middle of the window, in the **Unified** layout.
 
