@@ -86,9 +86,79 @@ describe('nesting', () => {
 describe('stacks', () => {
   it('puts a stacked branch under its parent, across folders, with its full name', () => {
     const rows = branches([ref('feature/base'), ref('feature/other'), ref('fix/child', { stackParent: 'feature/base' }), ref('326-top', { stackParent: 'fix/child' })])
-    expect(outline(rows)).toEqual(['feature/', '  base', '    fix/child', '      326-top', '  other'])
+    expect(outline(rows)).toEqual(['feature/', '  base/', '    326-top', '    fix/child', '    base', '  other'])
     expect(branch(rows, 'fix/child').stacked).toBe(true)
     expect(branch(rows, 'feature/base').stacked).toBe(false)
+  })
+
+  // #462: a stack of ten stepped off the side of the panel.
+  describe('as a group', () => {
+    const STACK = [ref('a'), ref('b', { stackParent: 'a' }), ref('c', { stackParent: 'b' }), ref('d', { stackParent: 'c' })]
+    const key = 'branches:stack:a'
+    const merged = { a: 'main', b: 'main', c: 'main', d: 'main' }
+
+    it('lists a stack flat, the top first, under a row of its own', () => {
+      const rows = branches(STACK)
+      expect(outline(rows)).toEqual(['a/', '  d', '  c', '  b', '  a'])
+      expect(rows[0]).toMatchObject({ type: 'folder', stack: true, count: 4, open: true })
+      expect(rows.slice(1).every((r) => r.type === 'ref' && r.railed)).toBe(true)
+    })
+
+    it('leaves a pair as a parent and its child', () => {
+      const rows = branches([ref('a'), ref('b', { stackParent: 'a' })])
+      expect(outline(rows)).toEqual(['a', '  b'])
+      expect(branch(rows, 'b').railed).toBeFalsy()
+    })
+
+    it('keeps a fork in one list, each branch above the one it builds on', () => {
+      const rows = branches([ref('a'), ref('b', { stackParent: 'a' }), ref('c', { stackParent: 'a' }), ref('d', { stackParent: 'c' })])
+      expect(outline(rows)).toEqual(['a/', '  b', '  d', '  c', '  a'])
+    })
+
+    it('starts closed when everything in it is merged, and says so', () => {
+      const rows = branches(STACK, { merged })
+      expect(outline(rows)).toEqual(['a/'])
+      expect(folder(rows, 'a')).toMatchObject({ open: false, note: 'merged', count: 4 })
+    })
+
+    it('stays open while anything in it is not merged', () => {
+      const rows = branches(STACK, { merged: { a: 'main', b: 'main', c: 'main' } })
+      expect(folder(rows, 'a')).toMatchObject({ open: true })
+      expect(folder(rows, 'a').note).toBeUndefined()
+    })
+
+    it('stays as the person left it', () => {
+      expect(outline(branches(STACK, { merged, open: { [key]: true } }))).toHaveLength(5)
+      expect(outline(branches(STACK, { open: { [key]: false } }))).toEqual(['a/'])
+    })
+
+    it('stays open around the checked-out branch, even when merged', () => {
+      const rows = branches([ref('a'), ref('b', { stackParent: 'a' }), ref('c', { stackParent: 'b', head: true })], { merged: { a: 'main', b: 'main', c: 'main' } })
+      expect(outline(rows)).toEqual(['a/', '  c', '  b', '  a'])
+    })
+
+    it('leads the list when it holds the checked-out branch', () => {
+      const rows = branches([ref('0-first'), ref('a'), ref('b', { stackParent: 'a' }), ref('c', { stackParent: 'b', head: true })])
+      expect(outline(rows)[0]).toBe('a/')
+    })
+
+    it('opens to show what a filter found, keeping what those branches build on', () => {
+      const rows = branches(STACK, { merged, query: 'c', open: { [key]: false } })
+      expect(outline(rows)).toEqual(['a/', '  c', '  b', '  a'])
+      expect(folder(rows, 'a').count).toBe(1)
+      expect(branch(rows, 'c').context).toBe(false)
+      expect(branch(rows, 'a').context).toBe(true)
+    })
+
+    it('opens under Needs care too', () => {
+      const rows = branches([ref('a'), ref('b', { stackParent: 'a', stackParentMerged: true }), ref('c', { stackParent: 'b', gone: true })], { care: true, merged: { a: 'main', b: 'main', c: 'main' } })
+      expect(outline(rows)).toEqual(['a/', '  c', '  b', '  a'])
+    })
+
+    it('sits in the folder of the branch at the bottom', () => {
+      const rows = branches([ref('fix/a'), ref('b', { stackParent: 'fix/a' }), ref('c', { stackParent: 'b' }), ref('fix/z')])
+      expect(outline(rows)).toEqual(['fix/', '  a/', '    c', '    b', '    a', '  z'])
+    })
   })
 
   it('counts stacked branches in their parent’s folder', () => {
@@ -332,7 +402,7 @@ describe('filter', () => {
 
   it('shows a stacked match’s parents as context', () => {
     const rows = branches([ref('base'), ref('middle', { stackParent: 'base' }), ref('top', { stackParent: 'middle' }), ref('other')], { query: 'top' })
-    expect(outline(rows)).toEqual(['base', '  middle', '    top'])
+    expect(outline(rows)).toEqual(['base/', '  top', '  middle', '  base'])
     expect(branch(rows, 'base').context).toBe(true)
     expect(branch(rows, 'top').context).toBe(false)
   })

@@ -5,6 +5,9 @@
   import { matchParts, refStatus, refTooltip, stackPlace, type FolderRow, type RefRow, type TreeRow } from './sidebarTree'
   import Icon from './ui/Icon.svelte'
 
+  // For screen readers. Written in the markup, it would lose its space.
+  const STACK_PREFIX = 'Stack: '
+
   let {
     row,
     filter,
@@ -33,17 +36,18 @@
   <div
     class="row folder"
     style:--depth={row.depth}
-    title="{row.label}/"
+    title={row.stack ? `A stack of ${row.count} branches${row.note ? `, all ${row.note}` : ''}` : `${row.label}/`}
     onclick={() => onFolderClick(row)}
   >
     <span class="caret" class:open={row.open}><Icon name="right" size={10} /></span>
     {#if k}
       <span class="kind-icon" style:color="var({k.token})" title={k.label}><Icon name={k.icon} size={14} /><span class="visually-hidden">{k.label}</span></span>
     {:else}
-      <span class="kind-icon"><Icon name={row.remote ? 'remote' : row.open ? 'folder-open' : 'folder'} size={14} /></span>
+      <span class="kind-icon"><Icon name={row.stack ? 'stack' : row.remote ? 'remote' : row.open ? 'folder-open' : 'folder'} size={14} /></span>
     {/if}
-    <span class="name">{row.label}</span>
+    <span class="name">{#if row.stack}<span class="visually-hidden">{STACK_PREFIX}</span>{/if}{row.label}</span>
     {#if row.holdsHead && !row.open}<span class="dot" title="The checked-out branch is in here"><span class="visually-hidden">Holds the checked-out branch</span></span>{/if}
+    {#if row.note}<span class="meta note">{row.note}</span>{/if}
     <span class="meta count">{row.count.toLocaleString()}</span>
   </div>
 {:else}
@@ -59,6 +63,7 @@
     class:selected={isSelected}
     class:hidden-ref={r.hidden}
     class:stacked={row.stacked}
+    class:railed={row.railed}
     class:context={row.context}
     style:--depth={row.depth}
     onclick={() => onRefClick(row)}
@@ -221,6 +226,20 @@
     pointer-events: none;
   }
 
+  /* The branches of a stack's group share one line, since they're a sequence, not a hierarchy. */
+  .ref.railed::before {
+    content: '';
+    position: absolute;
+    left: calc(16px + var(--depth, 0) * 14px);
+    top: 0;
+    width: 0;
+    height: 100%;
+    border-left: 1px solid var(--paper-edge);
+    border-bottom: none;
+    border-radius: 0;
+    pointer-events: none;
+  }
+
   .caret {
     flex: none;
     display: grid;
@@ -246,9 +265,22 @@
     text-overflow: ellipsis;
   }
 
-  .count {
+  .count,
+  .note {
     margin-left: auto;
     flex: none;
+  }
+
+  .note + .count {
+    margin-left: 0;
+  }
+
+  .note {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ink-mute);
   }
 
   .track {

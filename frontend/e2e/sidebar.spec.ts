@@ -30,6 +30,47 @@ test('a branch known to be merged says so, once the check has answered', async (
   await expect(row.locator('.track')).not.toContainText('parent')
 })
 
+// #462
+test.describe('a stack of three or more', () => {
+  const STACK = [
+    branch('main', { branchKind: 'trunk' }),
+    branch('s-base'),
+    branch('s-mid', { stackParent: 's-base' }),
+    branch('s-top', { stackParent: 's-mid' }),
+  ]
+  const stacks = { ...scenario, responses: { ...scenario.responses, Refs: STACK } }
+  const all = { 's-base': 'main', 's-mid': 'main', 's-top': 'main' }
+
+  test('is a group that opens and closes', async ({ page }) => {
+    await open(page, 'sidebar', stacks)
+    await expectOutline(page, ['main', 'Stack: s-base/', '  s-top', '  s-mid', '  s-base'])
+    await page.locator('.folder', { hasText: 's-base' }).click()
+    await expectOutline(page, ['main', 'Stack: s-base/'])
+    await page.locator('.folder', { hasText: 's-base' }).click()
+    await expectOutline(page, ['main', 'Stack: s-base/', '  s-top', '  s-mid', '  s-base'])
+  })
+
+  test('closes itself once all of it is known to be merged, and stays where it is opened', async ({ page }) => {
+    await open(page, 'sidebar', { ...stacks, responses: { ...stacks.responses, Refs: STACK.map((r) => (r.short === 's-top' ? { ...r, gone: true } : r)), MergedBranches: all } })
+    await expectOutline(page, ['main', 'Stack: s-base/'])
+    await expect(page.locator('.folder', { hasText: 's-base' })).toContainText('merged')
+    await page.locator('.folder', { hasText: 's-base' }).click()
+    await expectOutline(page, ['main', 'Stack: s-base/', '  s-top', '  s-mid', '  s-base'])
+    await expect(page.locator('.ref', { hasText: 's-top' }).locator('.track')).toHaveText(/merged/)
+  })
+
+  test('moves with the keyboard like a folder', async ({ page }) => {
+    await open(page, 'sidebar', stacks)
+    await expectOutline(page, ['main', 'Stack: s-base/', '  s-top', '  s-mid', '  s-base'])
+    await page.locator('.folder', { hasText: 's-base' }).click()
+    await expectOutline(page, ['main', 'Stack: s-base/'])
+    await page.keyboard.press('ArrowRight')
+    await expectOutline(page, ['main', 'Stack: s-base/', '  s-top', '  s-mid', '  s-base'])
+    await page.keyboard.press('ArrowLeft')
+    await expectOutline(page, ['main', 'Stack: s-base/'])
+  })
+})
+
 test('without an answer, statuses stay as they were', async ({ page }) => {
   await open(page, 'sidebar', { ...scenario, failures: { MergedBranches: 'nope' } })
   await expect(page.locator('.ref', { hasText: 'old-gone' }).locator('.track')).toContainText('gone')

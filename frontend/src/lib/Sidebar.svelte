@@ -71,7 +71,8 @@
   let panels = $derived(buildPanels(refs, { showHidden: showingHidden, sort: ui.sort }))
   let current = $derived(ui.panel === 'repo' ? null : panels[ui.panel])
   let careOn = $derived(care && ui.panel === 'branches')
-  let rows = $derived(current ? panelRows(current, { open: ui.open, query: filter, care: careOn }) : [])
+  let merged = $derived(session.merged[path] ?? {})
+  let rows = $derived(current ? panelRows(current, { open: ui.open, query: filter, care: careOn, merged }) : [])
   let filtering = $derived(filter.trim().length > 0)
   let needCare = $derived(careCount(panels.branches))
   let matches = $derived(!filtering ? 0 : current ? panelMatches(current, filter) : repoMatches)
@@ -279,7 +280,6 @@
 
   // Which branches that need care are already merged. It takes a while, so it fills in after
   // the list has shown; only the latest answer counts.
-  let merged = $derived(session.merged[path] ?? {})
   let mergedAsked = 0
   async function loadMerged() {
     const asked = ++mergedAsked

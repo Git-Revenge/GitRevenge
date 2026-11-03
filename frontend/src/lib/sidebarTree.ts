@@ -66,6 +66,10 @@ export interface FolderRow extends RowBase {
   holdsHead: boolean
   kind?: string
   remote: boolean
+  /** A stack of branches rather than a folder of them. */
+  stack?: boolean
+  /** A word on what's inside, beside the count. */
+  note?: string
 }
 
 export interface RefRow extends RowBase {
@@ -75,6 +79,8 @@ export interface RefRow extends RowBase {
   stacked: boolean
   /** Doesn't match itself, but a stacked branch above it in the stack needs it shown. */
   context: boolean
+  /** A member of a stack's group, joined to the others by a line. */
+  railed?: boolean
   /** The kind to mark on this row; undefined when a folder above already says it. */
   mark?: string
 }
@@ -87,7 +93,16 @@ export interface RowOptions {
   query?: string
   /** Keep only branches that need care. Only the Branches panel has them. */
   care?: boolean
+  /** Branches known to be merged, by name. A stack of nothing else starts closed. */
+  merged?: Readonly<Record<string, string>>
 }
+
+/** A stack this size gets a row of its own. Below it, a child indented under its parent reads
+ * fine, and a row for the pair would only add to the list. */
+const STACK_GROUP_SIZE = 3
+
+/** A branch and those stacked on it, the top of the stack first, as the graph has them. */
+const stackMembers = (l: Leaf): Leaf[] => [...l.kids.flatMap(stackMembers), l]
 
 /** A branch whose upstream was deleted, or whose stack parent was merged. */
 export function needsCare(r: Ref): boolean {
@@ -271,11 +286,51 @@ function viewOf(panel: PanelKey, query: string, care: boolean) {
 
 /** The rows a panel shows, top to bottom. */
 export function panelRows(tree: PanelTree, options: RowOptions = {}): TreeRow[] {
-  const { open = {}, query = '', care = false } = options
+  const { open = {}, query = '', care = false, merged = {} } = options
   const view = viewOf(tree.key, query, care)
   const rows: TreeRow[] = []
 
+  const addStack = (l: Leaf, depth: number, markedKind: string | undefined, startsGroup: boolean) => {
+    const members = stackMembers(l)
+    const allMerged = members.every((m) => merged[m.ref.short])
+    const key = `${tree.key}:stack:${l.ref.short}`
+    const isOpen = view.filtering || (open[key] ?? (l.holdsHead || !allMerged))
+    rows.push({
+      type: 'folder',
+      key,
+      label: l.label,
+      depth,
+      open: isOpen,
+      count: view.leafCount(l),
+      holdsHead: l.holdsHead,
+      remote: false,
+      stack: true,
+      note: allMerged ? 'merged' : undefined,
+      startsGroup,
+    })
+    if (!isOpen) return
+    for (const m of members) {
+      if (view.leafCount(m) === 0) continue
+      const kind = m.ref.branchKind || undefined
+      rows.push({
+        type: 'ref',
+        ref: m.ref,
+        label: m.label,
+        depth: depth + 1,
+        stacked: m !== l,
+        railed: true,
+        context: view.filtering && !view.matches(m),
+        mark: kind && kind !== markedKind ? kind : undefined,
+        startsGroup: false,
+      })
+    }
+  }
+
   const addLeaf = (l: Leaf, depth: number, stacked: boolean, markedKind: string | undefined, startsGroup: boolean) => {
+    if (!stacked && l.total >= STACK_GROUP_SIZE) {
+      addStack(l, depth, markedKind, startsGroup)
+      return
+    }
     const kind = l.ref.branchKind || undefined
     rows.push({
       type: 'ref',
