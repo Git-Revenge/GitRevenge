@@ -101,13 +101,19 @@ func (a *App) ForcePushLoss(path string) (SharedCommits, error) {
 }
 
 // pushRefusal explains a rejected push when the remote's commits are ones that were on this
-// branch here: undone or rewritten, rather than pushed by someone else. Otherwise it's err.
+// branch here and have left it: undone or rewritten, rather than pushed by someone else.
+// Otherwise it's err. An upstream still in the branch's history doesn't count, however much
+// the reflog remembers it: that's the remote having moved on since the last fetch.
 func pushRefusal(ctx context.Context, g *git.Repo, branch, upstream string, err error) error {
 	if upstream == "" || !isRejectedPush(err) {
 		return err
 	}
 	tip, tipErr := g.ReadString(ctx, "rev-parse", upstream)
-	if tipErr != nil || !g.WasOnBranch(ctx, branch, strings.TrimSpace(tip)) {
+	if tipErr != nil {
+		return err
+	}
+	tip = strings.TrimSpace(tip)
+	if _, stillHere := g.ReadString(ctx, "merge-base", "--is-ancestor", tip, "refs/heads/"+branch); stillHere == nil || !g.WasOnBranch(ctx, branch, tip) {
 		return err
 	}
 	return userError("The remote still has commits you undid or rewrote here, so it refused the push. To take them away for everyone, put them back and use Revert, which adds a commit undoing them. To replace them instead, force push (with lease).")
