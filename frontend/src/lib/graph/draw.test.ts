@@ -210,12 +210,33 @@ describe('clippedName', () => {
 })
 
 describe('sortRefs', () => {
-  const ref = (short: string, kind: 'local' | 'remote' | 'tag' | 'stash', head = false) =>
-    ({ name: short, short, kind, head, commit: '', upstream: '', ahead: 0, behind: 0, gone: false }) as const
+  const ref = (short: string, kind: 'local' | 'remote' | 'tag' | 'stash', head = false, branchKind = '') =>
+    ({ name: short, short, kind, head, branchKind, commit: '', upstream: '', ahead: 0, behind: 0, gone: false }) as const
+  const order = (refs: Ref[]) => sortRefs(refs).map((r) => r.short)
 
-  it('puts the checked-out branch first, then local, remote, tag', () => {
-    const out = sortRefs([ref('v1', 'tag'), ref('origin/main', 'remote'), ref('dev', 'local'), ref('main', 'local', true)])
-    expect(out.map((r) => r.short)).toEqual(['main', 'dev', 'origin/main', 'v1'])
+  it('ranks by what matters most', () => {
+    const refs = [
+      ref('stash@{0}', 'stash'),
+      ref('dependabot/x', 'local', false, 'bot'),
+      ref('gh-pages', 'local', false, 'docs'),
+      ref('dev', 'local'),
+      ref('feature/a', 'local', false, 'feature'),
+      ref('staging', 'local', false, 'environment'),
+      ref('v1', 'tag'),
+      ref('release/1', 'local', false, 'release'),
+      ref('main', 'local', false, 'trunk'),
+      ref('wip', 'local', true),
+    ]
+    expect(order(refs)).toEqual(['wip', 'main', 'release/1', 'v1', 'staging', 'feature/a', 'dev', 'dependabot/x', 'gh-pages', 'stash@{0}'])
+  })
+
+  it("doesn't let a long run of ordinary branches push Trunk or a tag out", () => {
+    const refs = [ref('a', 'local'), ref('b', 'local'), ref('v1', 'tag'), ref('origin/main', 'remote', false, 'trunk')]
+    expect(order(refs).slice(0, 2)).toEqual(['origin/main', 'v1'])
+  })
+
+  it('puts local before remote at the same rank, and otherwise keeps the order given', () => {
+    expect(order([ref('origin/b', 'remote'), ref('origin/a', 'remote'), ref('c', 'local')])).toEqual(['c', 'origin/b', 'origin/a'])
   })
 })
 
