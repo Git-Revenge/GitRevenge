@@ -2,6 +2,8 @@
 export interface RightPanelState {
   /** The width the person chose. What fits the window right now comes from fitWidth. */
   width: number
+  /** Hidden to give the graph the room. */
+  hidden: boolean
 }
 
 export const DEFAULT_WIDTH = 420
@@ -29,7 +31,7 @@ type Store = Pick<Storage, 'getItem' | 'setItem'>
 
 /** The saved state for a repository. Anything missing or unreadable uses its default. */
 export function loadRightPanel(path: string, store: Store): RightPanelState {
-  const state: RightPanelState = { width: DEFAULT_WIDTH }
+  const state: RightPanelState = { width: DEFAULT_WIDTH, hidden: false }
   let saved: Partial<RightPanelState> | null
   try {
     saved = JSON.parse(store.getItem(keyFor(path)) ?? 'null')
@@ -38,6 +40,7 @@ export function loadRightPanel(path: string, store: Store): RightPanelState {
   }
   if (typeof saved !== 'object' || saved === null) return state
   if (typeof saved.width === 'number' && Number.isFinite(saved.width)) state.width = Math.max(MIN_WIDTH, Math.round(saved.width))
+  if (typeof saved.hidden === 'boolean') state.hidden = saved.hidden
   return state
 }
 

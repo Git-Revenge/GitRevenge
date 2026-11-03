@@ -89,12 +89,21 @@
     { id: 'repo.reflog', group: 'Repository', title: 'Show the reflog…', keywords: 'history head moves recover lost commit', run: () => (reflogRef = 'HEAD') },
     { id: 'repo.worktrees', group: 'Repository', title: 'Manage worktrees…', keywords: 'worktree checkout folder parallel', run: () => (worktreesOpen = true) },
     {
+      id: 'view.rightPanel',
+      group: 'View',
+      title: right.hidden ? 'Show the right panel' : 'Hide the right panel',
+      keywords: 'details commit changes collapse graph width',
+      shortcut: 'Mod+Alt+B',
+      run: () => (right.hidden = !right.hidden),
+    },
+    {
       id: 'view.changes',
       group: 'View',
       title: 'Show uncommitted changes',
       keywords: 'working tree stage commit',
       run: () => {
         view = 'wip'
+        right.hidden = false
         if (diff?.mode === 'commit') diff = null
       },
     },
@@ -172,6 +181,7 @@
   />
   <div class="main">
     <Toolbar {path} />
+    <div class="wip-row">
     <button
       class="wip"
       class:active={view === 'wip'}
@@ -180,6 +190,7 @@
       style:--text="{graphLayout?.textX ?? 44}px"
       onclick={() => {
         view = 'wip'
+        right.hidden = false
         if (diff?.mode === 'commit') diff = null
       }}
     >
@@ -192,6 +203,8 @@
       {/if}
       {#if changes}<span class="review">Review</span>{/if}
     </button>
+    <button class="btn sm quiet icon panel-toggle" aria-pressed={!right.hidden} aria-label={right.hidden ? 'Show the right panel' : 'Hide the right panel'} title={right.hidden ? 'Show the right panel' : 'Hide the right panel'} onclick={() => (right.hidden = !right.hidden)}><Icon name="sidebar" size={14} /></button>
+    </div>
     <!-- The graph stays mounted while a diff is open, so scroll position and selection
          survive returning to it. -->
     <div class="graph" class:hidden={diff || rebaseBase}>
@@ -237,7 +250,7 @@
       </div>
     {/if}
   </div>
-  {#if view === 'wip' || selected}
+  {#if (view === 'wip' || selected) && !right.hidden}
     <div class="right" style:width="{rightWidth}px">
       <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
       <div
@@ -353,8 +366,23 @@
 
   /* A quiet row that lines up with the graph below: a dashed node where the work will land,
      and its words where commit messages start. */
+  .wip-row {
+    flex: none;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px dotted var(--paper-edge);
+  }
+
+  .panel-toggle {
+    flex: none;
+    margin: 0 8px;
+    transform: scaleX(-1);
+  }
+
   .wip {
     position: relative;
+    flex: 1;
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -362,7 +390,6 @@
     padding: 0 14px 0 var(--text);
     background: none;
     border: none;
-    border-bottom: 1px dotted var(--paper-edge);
     border-radius: 0;
     text-align: left;
     transition: background-color var(--dur-base);

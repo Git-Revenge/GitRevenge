@@ -27,7 +27,7 @@ Column headers name what's in each column. In compact rows with enough width, th
 - <kbd>Page Up</kbd> and <kbd>Page Down</kbd> move a page at a time.
 - <kbd>Home</kbd> and <kbd>End</kbd> go to the newest and oldest commits.
 
-Drag the left edge of the panel on the right to resize it, or use the arrow keys on it, and double-click the edge to reset it. Git Revenge remembers the width for each repository. Once it's wide enough, the panel lays out in two columns.
+Drag the left edge of the panel on the right to resize it, or use the arrow keys on it, and double-click the edge to reset it. Git Revenge remembers the width for each repository. Once it's wide enough, the panel lays out in two columns. To give the graph the room, hide the panel with the button at the right of the row above the graph, or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd>.
 
 Selecting a commit shows it on the right. The top of the panel has its subject, author, a button to copy its SHA, a link to its parent, and an **Actions** menu. Tabs under that show the **Message**, the **Files** it changed with their line counts, its **Trailers** such as `Co-authored-by` and `Closes`, grouped by what they're for with long `Cc` lists collapsed (`#14` links to the issue on your repository's host, and **Grouped** switches to the trailers as written), and **Details** such as [notes](history.md#notes) and its [signature](history.md#signatures). The tab you pick stays picked as you move between commits. Once the panel is wide enough, the files stay beside the other tabs.
 
