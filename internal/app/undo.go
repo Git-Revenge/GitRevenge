@@ -198,20 +198,31 @@ func apply(ctx context.Context, g *git.Repo, e undoEntry, undo bool) error {
 	case kindBranchesDelete:
 		// Undo recreates every branch; redo deletes them again. A branch that came back some
 		// other way in between is left alone.
-		for _, b := range e.Branches {
-			_, missing := g.Read(ctx, "rev-parse", "--verify", "-q", "refs/heads/"+b.Name)
-			var err error
-			switch {
-			case undo && missing != nil:
-				err = g.CreateBranch(ctx, b.Name, b.Commit, false)
-			case !undo && missing == nil && g.Head(ctx).Branch != b.Name:
-				err = g.DeleteBranch(ctx, b.Name, true)
+		here, err := g.BranchNames(ctx)
+		if err != nil {
+			return friendlyUndo(err)
+		}
+		if !undo {
+			head := g.Head(ctx).Branch
+			var names []string
+			for _, b := range e.Branches {
+				if here[b.Name] && b.Name != head {
+					names = append(names, b.Name)
+				}
 			}
-			if err != nil {
-				return friendlyUndo(err)
+			return friendlyUndo(g.DeleteBranches(ctx, names))
+		}
+		// The upstreams go first, so the branches arrive complete, in one step.
+		tips := map[string]string{}
+		for _, b := range e.Branches {
+			if !here[b.Name] {
+				if err := g.SetBranchTracking(ctx, b.Name, b.Tracking); err != nil {
+					return friendlyUndo(err)
+				}
+				tips[b.Name] = b.Commit
 			}
 		}
-		return nil
+		return friendlyUndo(g.CreateBranchesAt(ctx, tips))
 	case kindBranchMove:
 		from, to := e.Commit, e.From
 		if !undo {

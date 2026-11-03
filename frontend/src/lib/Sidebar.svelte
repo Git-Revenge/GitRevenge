@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { MergedBranches, Refs, SetShowHidden, ShowingHidden } from '../../wailsjs/go/app/App.js'
+  import { DeletableBranches, DeleteMergedBranches, MergedBranches, Refs, SetShowHidden, ShowingHidden } from '../../wailsjs/go/app/App.js'
   import { EventsOn } from '../../wailsjs/runtime/runtime.js'
   import { onMount, tick, untrack } from 'svelte'
   import type { DialogSpec } from './Dialog.svelte'
@@ -72,6 +72,8 @@
   let current = $derived(ui.panel === 'repo' ? null : panels[ui.panel])
   let careOn = $derived(care && ui.panel === 'branches')
   let merged = $derived(session.merged[path] ?? {})
+  let deletable = $state<string[]>([])
+  let deleting = $state(false)
   let rows = $derived(current ? panelRows(current, { open: ui.open, query: filter, care: careOn, merged }) : [])
   let filtering = $derived(filter.trim().length > 0)
   let needCare = $derived(careCount(panels.branches))
@@ -284,7 +286,21 @@
   async function loadMerged() {
     const asked = ++mergedAsked
     const answer = refs.some(needsCare) ? await MergedBranches(path).catch(() => null) : {}
-    if (asked === mergedAsked && answer) session.merged[path] = answer
+    if (asked !== mergedAsked || !answer) return
+    session.merged[path] = answer
+    const names = Object.keys(answer)
+    const safe = names.length ? await DeletableBranches(path, names).catch(() => null) : null
+    if (asked === mergedAsked) deletable = safe ?? []
+  }
+
+  // Undo is one click away in the message this leaves, so it doesn't ask first.
+  async function deleteAll() {
+    deleting = true
+    const gone = await session.run(() => DeleteMergedBranches(path, deletable))
+    // The graph takes a moment to reload, and these shouldn't look deletable until it has.
+    if (gone) refs = refs.filter((r) => r.kind !== 'local' || !gone.includes(r.short))
+    deletable = []
+    deleting = false
   }
 
   async function load() {
@@ -342,6 +358,12 @@
           <button class="chip" aria-pressed={!care} onclick={() => (care = false)}>All</button>
           <button class="chip" aria-pressed={care} onclick={() => (care = true)}>Needs care <span class="meta">{needCare.toLocaleString()}</span></button>
         </div>
+        {#if careOn && !filter.trim() && deletable.length > 0}
+          <div class="care-bar">
+            <span>{deletable.length.toLocaleString()} safe to delete</span>
+            <button class="btn sm" disabled={deleting} onclick={deleteAll}>{deleting ? 'Deleting…' : 'Delete all'}</button>
+          </div>
+        {/if}
       {/if}
     </header>
 
@@ -546,6 +568,19 @@
   .chips {
     display: flex;
     gap: 4px;
+  }
+
+  .care-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--ink-soft);
+    font-size: 13px;
+  }
+
+  .care-bar .btn {
+    flex: none;
   }
 
   .chip {

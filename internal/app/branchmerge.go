@@ -115,3 +115,78 @@ func mergeTargets(refs []git.Ref, rules branchkind.Rules, remotes []string, name
 	}
 	return out
 }
+
+// DeletableBranches narrows merged branches to those Delete all may take: not checked out here
+// or in a worktree, not hidden, not a protected kind, and with nothing left that builds on them.
+func (a *App) DeletableBranches(path string, names []string) ([]string, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return nil, err
+	}
+	return a.deletableBranches(context.Background(), r, names), nil
+}
+
+func (a *App) deletableBranches(ctx context.Context, r *session.Repo, names []string) []string {
+	refs := r.Refs().All
+	busy := map[string]bool{}
+	if wts, err := r.Git.Worktrees(ctx); err == nil {
+		for _, w := range wts {
+			busy[w.Branch] = true
+		}
+	}
+	rules := a.branchRules(r.Path)
+	safe := map[string]bool{}
+	for _, ref := range refs {
+		if ref.Kind == git.LocalBranch && slices.Contains(names, ref.Short) && !ref.Head && !ref.Hidden && !busy[ref.Short] && !protectedKinds[rules.Kind(ref.Short)] {
+			safe[ref.Short] = true
+		}
+	}
+	// A branch stays while one that stays builds on it, which can run all the way down a stack.
+	for changed := true; changed; {
+		changed = false
+		for _, ref := range refs {
+			if ref.Kind == git.LocalBranch && safe[ref.StackParent] && !safe[ref.Short] {
+				delete(safe, ref.StackParent)
+				changed = true
+			}
+		}
+	}
+	return slices.DeleteFunc(slices.Clone(names), func(name string) bool { return !safe[name] })
+}
+
+// DeleteMergedBranches deletes those of names that are still merged and safe to delete, as one
+// step to undo. What the list showed may be out of date by now, so it checks again first. It
+// returns the names of those it deleted.
+func (a *App) DeleteMergedBranches(path string, names []string) ([]string, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), mergedBranchesTimeout)
+	defer cancel()
+	merged, err := a.mergedBranches(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	still := slices.DeleteFunc(slices.Clone(names), func(name string) bool {
+		_, ok := merged[name]
+		return !ok
+	})
+	safe := a.deletableBranches(ctx, r, still)
+	current, err := r.Git.Refs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var refs []git.Ref
+	for _, ref := range current {
+		if ref.Kind == git.LocalBranch && slices.Contains(safe, ref.Short) {
+			refs = append(refs, ref)
+		}
+	}
+	gone := a.deleteMerged(ctx, r, refs)
+	if gone == nil {
+		return []string{}, nil
+	}
+	r.ReloadGraph()
+	return gone, nil
+}

@@ -143,3 +143,86 @@ func (r *Repo) DeleteTag(ctx context.Context, name string) error {
 	_, err := r.Write(ctx, Cmd{Args: []string{"tag", "-d", name}})
 	return err
 }
+
+// BranchTracking is a branch's upstream as configured. Deleting the remote branch leaves it in
+// place, but deleting the branch takes it too.
+type BranchTracking struct {
+	Remote string
+	Merge  string
+}
+
+// BranchTrackings reads every branch's upstream configuration, by branch.
+func (r *Repo) BranchTrackings(ctx context.Context) map[string]BranchTracking {
+	out, err := r.ReadString(ctx, "config", "--local", "--get-regexp", `^branch\..*\.(remote|merge)$`)
+	if err != nil {
+		return nil // git exits non-zero when nothing matches.
+	}
+	all := map[string]BranchTracking{}
+	for _, line := range strings.Split(out, "\n") {
+		key, value, ok := strings.Cut(strings.TrimSpace(line), " ")
+		if !ok {
+			continue
+		}
+		// A branch's name can hold dots, so its setting is whatever follows the last one.
+		name, setting := key[:max(strings.LastIndex(key, "."), 0)], key[strings.LastIndex(key, ".")+1:]
+		name = strings.TrimPrefix(name, "branch.")
+		t := all[name]
+		if setting == "remote" {
+			t.Remote = value
+		} else {
+			t.Merge = value
+		}
+		all[name] = t
+	}
+	return all
+}
+
+// SetBranchTracking restores what BranchTrackings read. Unlike SetUpstream, it works when the
+// remote branch no longer exists, and before the branch does.
+func (r *Repo) SetBranchTracking(ctx context.Context, name string, t BranchTracking) error {
+	if t.Remote == "" || t.Merge == "" {
+		return nil
+	}
+	if _, err := r.Write(ctx, Cmd{Args: []string{"config", "--local", "branch." + name + ".remote", t.Remote}}); err != nil {
+		return err
+	}
+	_, err := r.Write(ctx, Cmd{Args: []string{"config", "--local", "branch." + name + ".merge", t.Merge}})
+	return err
+}
+
+// BranchNames lists the local branches.
+func (r *Repo) BranchNames(ctx context.Context) (map[string]bool, error) {
+	out, err := r.ReadString(ctx, "for-each-ref", "--format=%(refname:short)", "refs/heads")
+	if err != nil {
+		return nil, err
+	}
+	names := map[string]bool{}
+	for _, name := range strings.Fields(out) {
+		names[name] = true
+	}
+	return names, nil
+}
+
+// DeleteBranches force-deletes several branches with one git command, since each command that
+// changes a ref sets off a reload the next has to compete with. git deletes what it can and
+// returns an error if any stayed, so a caller wanting to know which reads BranchNames after.
+func (r *Repo) DeleteBranches(ctx context.Context, names []string) error {
+	if len(names) == 0 {
+		return nil
+	}
+	_, err := r.Write(ctx, Cmd{Args: append([]string{"branch", "-D", "--"}, names...)})
+	return err
+}
+
+// CreateBranchesAt creates several branches, by name and commit, all or none.
+func (r *Repo) CreateBranchesAt(ctx context.Context, tips map[string]string) error {
+	if len(tips) == 0 {
+		return nil
+	}
+	var in strings.Builder
+	for name, commit := range tips {
+		in.WriteString("create refs/heads/" + name + " " + commit + "\n")
+	}
+	_, err := r.Write(ctx, Cmd{Args: []string{"update-ref", "--stdin"}, Stdin: strings.NewReader(in.String())})
+	return err
+}

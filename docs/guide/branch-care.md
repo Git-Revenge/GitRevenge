@@ -58,6 +58,8 @@ This works with squash merges, which `git branch --merged` can't detect. Git Rev
 
 A message in the corner names what was deleted. **Undo** in it, or the toolbar's Undo, brings every one of them back.
 
+You can also do this whenever you like. **Needs care**, in the Branches panel, counts the branches already merged and safe to delete, and **Delete all** deletes them without asking, since Undo brings them back. It leaves the same branches alone as above, along with hidden branches, and looks at each one again first to be sure it's still merged.
+
 ## Syncing notes
 
 [Git notes](history.md#notes) aren't fetched or pushed by default. Turn on **Sync notes on fetch, pull and push** under **This repository** to change that:

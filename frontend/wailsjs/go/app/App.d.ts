@@ -50,6 +50,10 @@ export function CommitSignatures(arg1:string,arg2:Array<string>):Promise<Array<g
 
 export function ConflictFile(arg1:string,arg2:string):Promise<git.ConflictFile>;
 
+export function DeletableBranches(arg1:string,arg2:Array<string>):Promise<Array<string>>;
+
+export function DeleteMergedBranches(arg1:string,arg2:Array<string>):Promise<Array<string>>;
+
 export function DiscardFiles(arg1:string,arg2:Array<string>):Promise<void>;
 
 export function EffectiveGitConfig(arg1:string):Promise<Array<git.ConfigEntry>>;

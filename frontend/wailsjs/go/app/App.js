@@ -90,6 +90,14 @@ export function ConflictFile(arg1, arg2) {
   return window['go']['app']['App']['ConflictFile'](arg1, arg2);
 }
 
+export function DeletableBranches(arg1, arg2) {
+  return window['go']['app']['App']['DeletableBranches'](arg1, arg2);
+}
+
+export function DeleteMergedBranches(arg1, arg2) {
+  return window['go']['app']['App']['DeleteMergedBranches'](arg1, arg2);
+}
+
 export function DiscardFiles(arg1, arg2) {
   return window['go']['app']['App']['DiscardFiles'](arg1, arg2);
 }
