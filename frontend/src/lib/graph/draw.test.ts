@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clearOf, clip, clippedName, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, relativeTime, remoteOf, repeatsAuthor, setLaneColors, sortRefs } from './draw'
+import { clearOf, clip, clippedName, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, relativeTime, remoteOf, repeatsAuthor, rowWashed, setLaneColors, sortRefs } from './draw'
 import type { Ref, Row } from './rowCache'
 
 describe('graph geometry', () => {
@@ -84,6 +84,17 @@ describe('lanes', () => {
     expect(repeatsAuthor(row(2, 'Ana', 2), { prev: row(2) })).toBe(false)
     expect(repeatsAuthor(row(2), { prev: row(3), prev2: row(4) })).toBe(false)
     expect(repeatsAuthor(row(2), {})).toBe(false)
+  })
+})
+
+describe('rowWashed', () => {
+  it('tints branch rows', () => {
+    for (const kind of [undefined, '', 'feature', 'release', 'environment', 'bot']) expect(rowWashed({ kind })).toBe(true)
+  })
+
+  it('leaves Trunk and Docs rows bare', () => {
+    expect(rowWashed({ kind: 'trunk' })).toBe(false)
+    expect(rowWashed({ kind: 'docs' })).toBe(false)
   })
 })
 

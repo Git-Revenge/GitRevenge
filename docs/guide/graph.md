@@ -13,7 +13,7 @@ Your **Trunk** branch (`main`, `master` or `develop`) runs straight down the lef
 
 ## Reading the graph
 
-Each row is tinted with the colour of its line, from the commit into the start of the message, so you can tell which line a commit is on without tracing it. A line is drawn thin and faint where it's idle, and thickens around its commits.
+A commit on a branch is tinted with the colour of its line, from the commit to the start of the message, so you can tell which line it's on without tracing it. Trunk and Docs commits have no tint: Trunk is always the left-hand line, and Docs lines are meant to recede. A line is drawn thin and faint where it's idle, and thickens around its commits.
 
 When there's room, branches and tags have their own column to the left of the graph, each joined to its commit by a thin line. A cloud marks a name that's on a remote, and the prefix of your main remote is left off. Your main remote is the one the checked-out branch tracks, else `origin`, else the only remote. A local branch shares a label with the remote branch it tracks when both are on the commit. A branch on several remotes takes one label, with a count beside the cloud, and a branch on just one other remote keeps its name, such as `fork/x`. In a narrow window, labels sit in front of the commit message instead.
 

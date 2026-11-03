@@ -137,10 +137,11 @@ const QUIET_ALPHA = 0.3
 const HALO_WIDTH = 4.5
 const ELBOW_RADIUS = 8
 
-/** How strong the lane's colour is behind a row, and how far past the message's start it runs. */
-const LANE_WASH = 0.12
-const DOCS_LANE_WASH = 0.07
-const LANE_WASH_TAIL = 90
+/** How strong the lane's colour is behind a branch's row, where it stops being solid on its way
+ * to the message, and the gap it leaves above and below so rows don't merge into a block. */
+const LANE_WASH = 0.08
+const LANE_WASH_SOLID = 0.55
+const LANE_WASH_INSET = 2
 
 /** How far past a label's right edge drawLabels' returned position is. */
 const LABEL_TRAIL = 8
@@ -296,6 +297,12 @@ export function clearOf(color: string): string {
   return /^#[0-9a-f]{6}$/i.test(color) ? `${color}00` : 'transparent'
 }
 
+/** Whether a row carries its lane's colour. Trunk is always the left-hand line, and it holds so
+ * many commits that its wash would be a block across the graph; Docs lines are meant to recede. */
+export function rowWashed(row: Pick<Row, 'kind'>): boolean {
+  return row.kind !== 'trunk' && row.kind !== 'docs'
+}
+
 /** Where a row's labels were drawn, from their left edge to their right. */
 export type LabelSpan = [start: number, end: number]
 
@@ -336,19 +343,22 @@ export function drawRow(
   const color = laneColor(row.color)
   const docs = row.kind === 'docs'
 
-  // The lane's colour runs from the node into the start of the message, so the row reads as
-  // belonging to its lane without tracing the line.
-  const washX = Math.max(x, graphLeft)
-  const washEnd = lay.textX + LANE_WASH_TAIL
-  const tint = ctx.createLinearGradient(washX, 0, washEnd, 0)
-  tint.addColorStop(0, color)
-  tint.addColorStop(0.74, color)
-  tint.addColorStop(1, clearOf(color))
+  // A branch's colour runs from its node to the message, so the row reads as belonging to its
+  // lane without tracing the line.
   const before = ctx.globalAlpha
-  ctx.globalAlpha = before * (docs ? DOCS_LANE_WASH : LANE_WASH)
-  ctx.fillStyle = tint
-  ctx.fillRect(washX, y, washEnd - washX, h)
-  ctx.globalAlpha = before
+  const washX = Math.max(x, graphLeft)
+  if (rowWashed(row) && washX < lay.textX) {
+    const tint = ctx.createLinearGradient(washX, 0, lay.textX, 0)
+    tint.addColorStop(0, color)
+    tint.addColorStop(LANE_WASH_SOLID, color)
+    tint.addColorStop(1, clearOf(color))
+    ctx.globalAlpha = before * LANE_WASH
+    ctx.fillStyle = tint
+    ctx.beginPath()
+    ctx.roundRect(washX, y + LANE_WASH_INSET, lay.textX - washX, h - LANE_WASH_INSET * 2, 3)
+    ctx.fill()
+    ctx.globalAlpha = before
+  }
 
   // Labels in their own column, each tied to its node by a thin line.
   if (lay.refW && refs.length) {
