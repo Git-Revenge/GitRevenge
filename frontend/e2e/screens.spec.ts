@@ -402,6 +402,86 @@ test.describe('commit graph', () => {
     })
   })
 
+  // #434: the right panel was a fixed 420px.
+  test.describe('resizing the right panel', () => {
+    const files = { path: 'a.txt', index: '.', workTree: 'M' }
+    const scenario = { graphRows: 3, responses: { Refs: [], CommitSignatures: [], WorkingTree: { status: { files: [files] }, signing: { enabled: false }, identity: { name: 'A', email: 'a@example.com' } } } }
+    const edge = (page: Page) => page.getByRole('separator', { name: 'Resize the right panel' })
+    const width = (page: Page) => page.locator('.right').evaluate((e) => e.getBoundingClientRect().width)
+    const ready = async (page: Page) => {
+      await page.setViewportSize({ width: 1600, height: 800 })
+      await open(page, 'repoView', scenario)
+      await expect(edge(page)).toBeVisible()
+    }
+
+    test('dragging the edge resizes it, and double-clicking resets it', async ({ page }) => {
+      await ready(page)
+      expect(await width(page)).toBe(420)
+      const box = (await edge(page).boundingBox())!
+      const x = box.x + box.width / 2
+      const y = box.y + 200
+      await page.mouse.move(x, y)
+      await page.mouse.down()
+      await page.mouse.move(x - 100, y)
+      await page.mouse.up()
+      expect(await width(page)).toBe(520)
+      await edge(page).dblclick()
+      await expect.poll(() => width(page)).toBe(420)
+    })
+
+    test('the arrow keys resize it, and Home resets it', async ({ page }) => {
+      await ready(page)
+      await edge(page).focus()
+      await page.keyboard.press('ArrowLeft')
+      expect(await width(page)).toBe(436)
+      await page.keyboard.press('ArrowRight')
+      await page.keyboard.press('ArrowRight')
+      expect(await width(page)).toBe(404)
+      await page.keyboard.press('Home')
+      expect(await width(page)).toBe(420)
+    })
+
+    test('stops at its limits', async ({ page }) => {
+      await ready(page)
+      const box = (await edge(page).boundingBox())!
+      const y = box.y + 200
+      await page.mouse.move(box.x + 3, y)
+      await page.mouse.down()
+      await page.mouse.move(1500, y)
+      await page.mouse.up()
+      expect(await width(page)).toBe(320)
+      const narrow = (await edge(page).boundingBox())!
+      await page.mouse.move(narrow.x + 3, y)
+      await page.mouse.down()
+      await page.mouse.move(0, y)
+      await page.mouse.up()
+      expect(await width(page)).toBe(960)
+    })
+
+    test('remembers the width after a reload', async ({ page }) => {
+      await ready(page)
+      await edge(page).focus()
+      await page.keyboard.press('ArrowLeft')
+      await page.reload()
+      await expect(edge(page)).toBeVisible()
+      await expect.poll(() => width(page)).toBe(436)
+    })
+
+    test('the working tree panel puts the commit form beside the files when wide', async ({ page }) => {
+      await ready(page)
+      await expect(page.locator('.composer')).toBeVisible()
+      const list = page.locator('.lists')
+      const beside = async () => (await page.locator('.composer').boundingBox())!.x >= (await list.boundingBox())!.x + (await list.boundingBox())!.width - 1
+      expect(await beside()).toBe(false)
+      const box = (await edge(page).boundingBox())!
+      await page.mouse.move(box.x + 3, box.y + 200)
+      await page.mouse.down()
+      await page.mouse.move(box.x - 300, box.y + 200)
+      await page.mouse.up()
+      await expect.poll(beside).toBe(true)
+    })
+  })
+
   // #418: the commit panel has the same list, for the keyboard and screen readers.
   test("the commit panel lists the selected commit's refs", async ({ page }) => {
     const id = '0'.repeat(40)

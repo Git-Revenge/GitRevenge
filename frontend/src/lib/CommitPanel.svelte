@@ -310,8 +310,8 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    width: 420px;
-    min-width: 300px;
+    flex: 1;
+    min-width: 0;
     padding-bottom: 16px;
     border-left: 1px solid var(--paper-edge);
     background: var(--paper);
