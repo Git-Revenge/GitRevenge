@@ -150,3 +150,39 @@ func TestUnstack(t *testing.T) {
 		t.Error("worked-out should be worked out from history again")
 	}
 }
+
+// Deciding what's safe to delete can't wait for the graph to reload. Before, a branch that had
+// just come back from Undo wasn't there yet, so deleting it quietly did nothing, and a branch
+// just checked out wasn't yet known to be.
+func TestDeletableBranchesReadsGitNotTheGraph(t *testing.T) {
+	isolateGit(t)
+	a := newTestApp(t)
+	local, _ := gittest.WithRemote(t, 1)
+	tab, err := a.OpenRepo(local.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	local.Git("branch", "other")
+	refsAfterReload(t, a, tab.Path, func(rs []git.Ref) bool {
+		return slices.ContainsFunc(rs, func(r git.Ref) bool { return r.Short == "other" })
+	})
+
+	// Straight after making it, well inside the watcher's debounce.
+	local.Git("branch", "fresh")
+	safe, err := a.DeletableBranches(tab.Path, []string{"fresh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(safe, []string{"fresh"}) {
+		t.Errorf("a branch just made: %v", safe)
+	}
+
+	local.Git("checkout", "-q", "other")
+	safe, err = a.DeletableBranches(tab.Path, []string{"other", "main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(safe, "other") {
+		t.Errorf("the branch just checked out: %v", safe)
+	}
+}

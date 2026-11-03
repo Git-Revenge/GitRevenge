@@ -134,8 +134,13 @@ func (a *App) DeletableBranches(path string, names []string) ([]string, error) {
 	return a.deletableBranches(context.Background(), r, names), nil
 }
 
+// It reads git rather than the loaded graph, which can be a reload behind: a branch back from
+// Undo wouldn't be there yet, and the checked-out branch could be out of date.
 func (a *App) deletableBranches(ctx context.Context, r *session.Repo, names []string) []string {
-	refs := r.Refs().All
+	refs, err := r.Git.Refs(ctx)
+	if err != nil {
+		return nil
+	}
 	busy := map[string]bool{}
 	if wts, err := r.Git.Worktrees(ctx); err == nil {
 		for _, w := range wts {
@@ -143,9 +148,10 @@ func (a *App) deletableBranches(ctx context.Context, r *session.Repo, names []st
 		}
 	}
 	rules := a.branchRules(r.Path)
+	parents := session.Stacks(ctx, r.Git, refs, rules, a.repoSettings(r.Path).StackParents)
 	safe := map[string]bool{}
 	for _, ref := range refs {
-		if ref.Kind == git.LocalBranch && slices.Contains(names, ref.Short) && !ref.Head && !ref.Hidden && !busy[ref.Short] && !protectedKinds[rules.Kind(ref.Short)] {
+		if ref.Kind == git.LocalBranch && slices.Contains(names, ref.Short) && !ref.Head && !rules.Hidden(ref.Short) && !busy[ref.Short] && !protectedKinds[rules.Kind(ref.Short)] {
 			safe[ref.Short] = true
 		}
 	}
@@ -153,8 +159,8 @@ func (a *App) deletableBranches(ctx context.Context, r *session.Repo, names []st
 	for changed := true; changed; {
 		changed = false
 		for _, ref := range refs {
-			if ref.Kind == git.LocalBranch && safe[ref.StackParent] && !safe[ref.Short] {
-				delete(safe, ref.StackParent)
+			if parent := parents[ref.Short]; ref.Kind == git.LocalBranch && safe[parent] && !safe[ref.Short] {
+				delete(safe, parent)
 				changed = true
 			}
 		}
@@ -172,10 +178,11 @@ func (a *App) DeleteMergedBranches(path string, names []string) ([]string, error
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), mergedBranchesTimeout)
 	defer cancel()
-	merged, err := a.mergedBranches(ctx, r)
+	targets, err := a.mergeTargetsFor(context.Background(), r)
 	if err != nil {
 		return nil, err
 	}
+	merged := r.Git.MergedBranches(ctx, names, targets)
 	still := slices.DeleteFunc(slices.Clone(names), func(name string) bool {
 		_, ok := merged[name]
 		return !ok
