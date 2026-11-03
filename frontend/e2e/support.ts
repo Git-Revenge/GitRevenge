@@ -9,6 +9,8 @@ export interface Scenario {
   /** Methods that take this long to answer, in milliseconds. */
   delays?: Record<string, number>
   graphRows?: number
+  /** The graph's rows as given, for a test about lanes; graphRows draws one straight lane. */
+  graphData?: unknown[]
   /** The refs on each commit in the graph, by commit id. */
   graphRefs?: Record<string, unknown[]>
   selectedCommit?: string

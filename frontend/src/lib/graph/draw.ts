@@ -13,8 +13,8 @@ export interface Metrics {
 }
 
 export const METRICS: Record<Density, Metrics> = {
-  comfortable: { rowH: 52, laneW: 22, pad: 16 },
-  compact: { rowH: 30, laneW: 16, pad: 12 },
+  comfortable: { rowH: 52, laneW: 16, pad: 10 },
+  compact: { rowH: 30, laneW: 11, pad: 8 },
 }
 
 /** Lane colours are the theme's --lane-0 … --lane-5 tokens, cycled by colour index. */
@@ -130,6 +130,21 @@ function iconPath(name: IconName): Path2D | undefined {
 /** How strongly Docs lanes, nodes and messages fade (ADR 0009). */
 const MUTED = 0.4
 
+/** A busy lane's line, and an idle lane's: thin and faint, so the commits stand out. */
+const LINE_WIDTH = 1.75
+const QUIET_WIDTH = 1
+const QUIET_ALPHA = 0.3
+const HALO_WIDTH = 4.5
+const ELBOW_RADIUS = 8
+
+/** How strong the lane's colour is behind a row, and how far past the message's start it runs. */
+const LANE_WASH = 0.12
+const DOCS_LANE_WASH = 0.07
+const LANE_WASH_TAIL = 90
+
+/** How far past a label's right edge drawLabels' returned position is. */
+const LABEL_TRAIL = 8
+
 /** Width a kind icon takes in a ref label, gap included. */
 const KIND_ICON_W = 15
 
@@ -187,23 +202,47 @@ export interface Layout {
   firstLane: number
   density: Density
   m: Metrics
+  /** The branch and tag column left of the graph; 0 when labels sit inline with the subject. */
+  refW: number
+  /** Where the message starts. */
+  textX: number
   /** Compact's right-hand columns: author, date, sha. */
   authorW: number
   dateW: number
   shaW: number
+  /** Where those columns start. */
+  authorX: number
+  dateX: number
+  shaX: number
+}
+
+/** The branch and tag column's width: labels go back inline when the window can't spare it. */
+export function refColumnWidth(width: number): number {
+  return width >= 640 ? 150 : 0
 }
 
 export function layoutColumns(width: number, graphW: number, density: Density, firstLane = 0): Layout {
   const compact = density === 'compact'
+  const refW = refColumnWidth(width)
+  const shaW = 76
+  const dateW = compact && width >= 960 ? 104 : 0
+  const authorW = compact && width >= 800 ? 150 : 0
+  const shaX = width - shaW
+  const dateX = shaX - dateW
   return {
     width,
     graphW,
     firstLane,
     density,
     m: METRICS[density],
-    shaW: 76,
-    dateW: compact && width > 900 ? 104 : 0,
-    authorW: compact && width > 700 ? 150 : 0,
+    refW,
+    textX: refW + graphW + (compact ? 8 : 6),
+    authorW,
+    dateW,
+    shaW,
+    authorX: dateX - authorW,
+    dateX,
+    shaX,
   }
 }
 
@@ -213,6 +252,45 @@ const MONO = '"JetBrains Mono Variable", ui-monospace, Consolas, monospace'
 function setFont(ctx: CanvasRenderingContext2D, font: string, spacing = '0px') {
   ctx.font = font
   ctx.letterSpacing = spacing
+}
+
+/** The rows around a row, for what depends on them. Any of them may not be loaded yet. */
+export interface Near {
+  prev?: Row
+  prev2?: Row
+  next?: Row
+}
+
+/** Whether a lane is busy at this row: it holds the row's commit, or sits between two commits
+ * a row either side. Everything else is idle and draws quietly. */
+export function laneActive(col: number, row: Row, near: Near): boolean {
+  return col === row.col || (near.prev?.col === col && near.next?.col === col)
+}
+
+/** Whether this commit continues its author's run on the lane: their previous commit is on the
+ * same lane, within two rows. Merges break a run. */
+export function repeatsAuthor(row: Row, near: Near): boolean {
+  const before = near.prev?.col === row.col ? near.prev : near.prev2?.col === row.col ? near.prev2 : undefined
+  return !!before && before.author === row.author && before.parents <= 1 && row.parents <= 1
+}
+
+export type Point = [x: number, y: number]
+
+/** A line between lanes, as a rounded corner. A line leaving a node runs sideways along the
+ * node's row then turns down; one arriving comes down then turns in along the row. Both ends
+ * away from the node are vertical, so lines join up across rows. */
+export function elbow(x1: number, y1: number, x2: number, y2: number, leaving: boolean): { start: Point; before: Point; corner: Point; after: Point; end: Point } {
+  const dx = x2 - x1
+  const side = dx < 0 ? -1 : 1
+  const r = Math.min(Math.abs(dx), Math.abs(y2 - y1), ELBOW_RADIUS)
+  return leaving
+    ? { start: [x1, y1], before: [x2 - side * r, y1], corner: [x2, y1], after: [x2, y1 + r], end: [x2, y2] }
+    : { start: [x1, y1], before: [x1, y2 - r], corner: [x1, y2], after: [x1 + side * r, y2], end: [x2, y2] }
+}
+
+/** The same colour fully transparent, so a fade doesn't drift to grey on the way out. */
+export function clearOf(color: string): string {
+  return /^#[0-9a-f]{6}$/i.test(color) ? `${color}00` : 'transparent'
 }
 
 /** Draws one row whose top edge is at y. nowSeconds dates the relative times. */
@@ -228,6 +306,7 @@ export function drawRow(
   dimmed: boolean,
   nowSeconds: number,
   seal?: Seal,
+  near: Near = {},
 ) {
   const { m } = lay
   const h = m.rowH
@@ -241,28 +320,91 @@ export function drawRow(
     ctx.fillRect(0, y, lay.width, h)
   }
 
+  const mid = y + h / 2
+  const lx = (col: number) => lay.refW + laneX(col - lay.firstLane, m)
+  const graphLeft = lay.refW
+  const graphRight = lay.refW + lay.graphW
+  const x = lx(row.col)
+  const color = laneColor(row.color)
+  const docs = row.kind === 'docs'
+
+  // The lane's colour runs from the node into the start of the message, so the row reads as
+  // belonging to its lane without tracing the line.
+  const washX = Math.max(x, graphLeft)
+  const washEnd = lay.textX + LANE_WASH_TAIL
+  const tint = ctx.createLinearGradient(washX, 0, washEnd, 0)
+  tint.addColorStop(0, color)
+  tint.addColorStop(0.74, color)
+  tint.addColorStop(1, clearOf(color))
+  const before = ctx.globalAlpha
+  ctx.globalAlpha = before * (docs ? DOCS_LANE_WASH : LANE_WASH)
+  ctx.fillStyle = tint
+  ctx.fillRect(washX, y, washEnd - washX, h)
+  ctx.globalAlpha = before
+
+  // Labels in their own column, each tied to its node by a thin line.
+  if (lay.refW && refs.length) {
+    const end = drawLabels(ctx, refs, 8, mid, lay.refW - 16, color, theme, comfortable) - LABEL_TRAIL
+    const to = Math.min(x, graphRight)
+    if (end < to && x >= graphLeft) {
+      ctx.globalAlpha = before * 0.45
+      ctx.lineWidth = 1
+      ctx.strokeStyle = color
+      ctx.beginPath()
+      ctx.moveTo(end, mid)
+      ctx.lineTo(to, mid)
+      ctx.stroke()
+      ctx.globalAlpha = before
+    }
+  }
+
   // Lanes, clipped to the graph column so wide graphs don't run under the text.
   ctx.save()
   ctx.beginPath()
-  ctx.rect(0, y, lay.graphW, h)
+  ctx.rect(graphLeft, y, lay.graphW, h)
   ctx.clip()
-  ctx.lineWidth = 2
   ctx.lineCap = 'round'
-  const mid = y + h / 2
-  const lx = (col: number) => laneX(col - lay.firstLane, m)
+  ctx.lineJoin = 'round'
   // Docs lanes (a published site, not code) draw muted.
-  const lane = (s: Seg, x1: number, y1: number, x2: number, y2: number) => {
-    if (s.kind === 'docs') ctx.globalAlpha *= MUTED
-    segment(ctx, x1, y1, x2, y2, laneColor(s.color))
-    if (s.kind === 'docs') ctx.globalAlpha /= MUTED
+  const strength = (s: Seg) => before * (s.kind === 'docs' ? MUTED : 1)
+  const straight = (s: Seg, y1: number, y2: number) => {
+    const sx = lx(s.from)
+    if (sx < graphLeft || sx > graphRight) return
+    const active = s.kind === 'trunk' || laneActive(s.from, row, near)
+    ctx.globalAlpha = strength(s) * (active ? 1 : QUIET_ALPHA)
+    ctx.lineWidth = active ? LINE_WIDTH : QUIET_WIDTH
+    ctx.strokeStyle = laneColor(s.color)
+    ctx.beginPath()
+    ctx.moveTo(sx, y1)
+    ctx.lineTo(sx, y2)
+    ctx.stroke()
   }
-  for (const s of row.up) lane(s, lx(s.from), y, lx(s.to), mid)
-  for (const s of row.down) lane(s, lx(s.from), mid, lx(s.to), y + h)
-  const docs = row.kind === 'docs'
+  // A halo in the row's background lets a line pass over the lanes it crosses.
+  const stroke = (e: ReturnType<typeof elbow>, width: number, style: string) => {
+    ctx.lineWidth = width
+    ctx.strokeStyle = style
+    ctx.beginPath()
+    ctx.moveTo(...e.start)
+    ctx.lineTo(...e.before)
+    ctx.quadraticCurveTo(...e.corner, ...e.after)
+    ctx.lineTo(...e.end)
+    ctx.stroke()
+  }
+  const link = (s: Seg, y1: number, y2: number, leaving: boolean) => {
+    const e = elbow(lx(s.from), y1, lx(s.to), y2, leaving)
+    ctx.globalAlpha = strength(s)
+    stroke(e, HALO_WIDTH, theme.bg)
+    if (wash) stroke(e, HALO_WIDTH, wash)
+    stroke(e, LINE_WIDTH, laneColor(s.color))
+  }
+  for (const s of row.up) if (s.from === s.to) straight(s, y, mid)
+  for (const s of row.down) if (s.from === s.to) straight(s, mid, y + h)
+  for (const s of row.up) if (s.from !== s.to) link(s, y, mid, false)
+  for (const s of row.down) if (s.from !== s.to) link(s, mid, y + h, true)
+  ctx.globalAlpha = before
+  ctx.lineWidth = LINE_WIDTH
   if (docs) ctx.globalAlpha *= MUTED
 
-  const x = lx(row.col)
-  const color = laneColor(row.color)
   const isHead = refs.some((r) => r.head)
   const isStash = refs.some((r) => r.kind === 'stash')
   /** Fills a disc in the row's own background, so a node cuts the lines behind it. */
@@ -273,12 +415,12 @@ export function drawRow(
   if (isHead) {
     // A soft halo marks the checked-out commit.
     ctx.globalAlpha *= 0.3
-    disc(ctx, x, mid, comfortable ? 18 : 9.5, color)
+    disc(ctx, x, mid, comfortable ? 16 : 8.5, color)
     ctx.globalAlpha /= 0.3
   }
   if (isStash) {
     // Stashes aren't real history: a dashed ring, like the working tree's.
-    const r = comfortable ? 10 : 6
+    const r = comfortable ? 9 : 5
     cut(r + 2)
     ctx.setLineDash([3, 2.5])
     ctx.strokeStyle = color
@@ -288,19 +430,19 @@ export function drawRow(
     ctx.setLineDash([])
   } else if (row.parents > 1) {
     // Merges: a ringed dot.
-    const r = comfortable ? 8 : 6
+    const r = comfortable ? 7.5 : 5.5
     cut(r + 1.5)
     disc(ctx, x, mid, r, color)
     cut(r - 2)
     disc(ctx, x, mid, r - 4, color)
-  } else if (comfortable) {
+  } else if (comfortable && (isHead || !repeatsAuthor(row, near))) {
     // The author's initials in a lane-coloured ring, as on dev-null's timeline; on a
     // Release, Environment, Docs or Bot lane, the kind's icon instead. Trunk and Feature keep
     // the initials, because who did the work matters on those lanes.
-    cut(15)
-    disc(ctx, x, mid, 13.5, color)
-    cut(11.5)
-    disc(ctx, x, mid, 10.5, theme.deep)
+    cut(13.5)
+    disc(ctx, x, mid, 12, color)
+    cut(10.25)
+    disc(ctx, x, mid, 9.5, theme.deep)
     const kind = row.kind && row.kind !== 'trunk' && row.kind !== 'feature' ? kindInfo(row.kind) : undefined
     const icon = kind ? iconPath(kind.icon) : undefined
     if (icon) {
@@ -314,43 +456,45 @@ export function drawRow(
       ctx.stroke(icon)
       ctx.restore()
     } else {
-      setFont(ctx, `500 12px ${MONO}`)
+      setFont(ctx, `500 12px ${MONO}`, '-0.03em')
       ctx.fillStyle = theme.soft
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText(initials(row.author), x, mid + 0.5)
+      ctx.letterSpacing = '0px'
     }
+  } else if (comfortable) {
+    // The same author carrying on: a dot, since the initials just above already say who.
+    cut(6.5)
+    disc(ctx, x, mid, 5, color)
   } else {
-    cut(7)
-    disc(ctx, x, mid, 5.5, color)
+    cut(6)
+    disc(ctx, x, mid, 4.5, color)
   }
   if (docs) ctx.globalAlpha /= MUTED
   ctx.restore()
 
   ctx.textBaseline = 'middle'
   const line1 = comfortable ? y + 19 : mid
-  let right = lay.width - 14
+  ctx.textAlign = 'left'
   setFont(ctx, `12px ${MONO}`)
   ctx.fillStyle = theme.muted
-  ctx.textAlign = 'right'
-  ctx.fillText(row.id.slice(0, 7), right, line1)
-  if (seal) drawSeal(ctx, right - ctx.measureText(row.id.slice(0, 7)).width - 10, line1 - 4, seal, theme)
-  right -= lay.shaW
+  ctx.fillText(row.id.slice(0, 7), lay.shaX, line1)
+  if (seal) drawSeal(ctx, lay.shaX - 10, line1 - 4, seal, theme)
   if (lay.dateW) {
     setFont(ctx, `12px ${MONO}`)
-    ctx.fillText(relativeTime(row.authorTime, nowSeconds), right, line1)
-    right -= lay.dateW
+    ctx.fillStyle = theme.muted
+    ctx.fillText(relativeTime(row.authorTime, nowSeconds), lay.dateX, line1)
   }
   if (lay.authorW) {
     setFont(ctx, `13px ${SERIF}`)
-    ctx.fillText(clip(ctx, row.author, lay.authorW - 16), right, line1)
-    right -= lay.authorW
+    ctx.fillStyle = theme.muted
+    ctx.fillText(clip(ctx, row.author, lay.authorW - 16), lay.authorX, line1)
   }
 
-  ctx.textAlign = 'left'
-  let left = lay.graphW + (comfortable ? 6 : 8)
-  const subjectRight = right - 12
-  left = drawLabels(ctx, refs, left, line1, Math.min(subjectRight - left, (subjectRight - left) * 0.6), color, theme, comfortable)
+  let left = lay.textX
+  const subjectRight = (lay.authorW ? lay.authorX : lay.dateW ? lay.dateX : lay.shaX) - 22
+  if (!lay.refW) left = drawLabels(ctx, refs, left, line1, Math.min(subjectRight - left, (subjectRight - left) * 0.6), color, theme, comfortable)
   setFont(ctx, `${comfortable ? 14.5 : 13.5}px ${SERIF}`)
   ctx.fillStyle = docs ? theme.muted : theme.fg
   ctx.fillText(clip(ctx, row.subject, subjectRight - left), left, line1)
@@ -359,7 +503,7 @@ export function drawRow(
     setFont(ctx, `12px ${MONO}`, '0.08em')
     ctx.fillStyle = theme.muted
     const meta = `${row.author} · ${relativeTime(row.authorTime, nowSeconds)}`.toUpperCase()
-    ctx.fillText(clip(ctx, meta, lay.width - 14 - (lay.graphW + 6)), lay.graphW + 6, y + 37)
+    ctx.fillText(clip(ctx, meta, lay.width - 14 - lay.textX), lay.textX, y + 37)
     ctx.letterSpacing = '0px'
   }
   ctx.restore()
@@ -379,6 +523,31 @@ export function sortRefs(refs: Ref[]): Ref[] {
   return [...refs].sort((a, b) => Number(b.head) - Number(a.head) || KIND_ORDER[a.kind] - KIND_ORDER[b.kind])
 }
 
+/** A label as drawn: what it says, and whether the name is also on a remote. */
+export interface RefLabel {
+  ref: Ref
+  text: string
+  remote: boolean
+}
+
+/** Labels for a commit's refs, in display order. `origin/` gives way to the remote icon, and a
+ * local branch and its origin counterpart on the same commit share a label. Other remotes
+ * keep their prefix, so `origin/x` and `fork/x` stay apart. */
+export function refLabels(refs: Ref[]): RefLabel[] {
+  const sorted = sortRefs(refs)
+  const locals = new Set(sorted.filter((r) => r.kind === 'local').map((r) => r.short))
+  const originName = (r: Ref) => (r.kind === 'remote' && r.short.startsWith('origin/') && r.short !== 'origin/HEAD' ? r.short.slice('origin/'.length) : null)
+  const onOrigin = new Set(sorted.map(originName))
+  const labels: RefLabel[] = []
+  for (const r of sorted) {
+    const name = originName(r)
+    if (name !== null && locals.has(name)) continue
+    const prefix = r.kind === 'tag' ? '◆ ' : r.kind === 'stash' ? '≡ ' : ''
+    labels.push({ ref: r, text: prefix + (name ?? r.short), remote: r.kind === 'remote' || (r.kind === 'local' && onOrigin.has(r.short)) })
+  }
+  return labels
+}
+
 /** Draws ref labels starting at x; returns the x where the subject should start. */
 function drawLabels(
   ctx: CanvasRenderingContext2D,
@@ -393,16 +562,14 @@ function drawLabels(
   if (refs.length === 0) return x
   const end = x + maxWidth
   const h = comfortable ? 18 : 17
-  const sorted = sortRefs(refs)
+  const labels = refLabels(refs)
   ctx.save()
   setFont(ctx, `12px ${MONO}`)
-  for (let i = 0; i < sorted.length; i++) {
-    const r = sorted[i]
-    const remaining = sorted.length - i
+  for (let i = 0; i < labels.length; i++) {
+    const { ref: r, text, remote } = labels[i]
+    const remaining = labels.length - i
     const more = remaining > 1 ? ` +${remaining - 1}` : ''
-    const prefix = r.kind === 'tag' ? '◆ ' : r.kind === 'stash' ? '≡ ' : ''
-    const text = prefix + r.short
-    const extra = 14 + (labelKind(r) ? KIND_ICON_W : 0) + (r.stackDepth ? KIND_ICON_W : 0)
+    const extra = 14 + (labelKind(r) ? KIND_ICON_W : 0) + (r.stackDepth ? KIND_ICON_W : 0) + (remote ? KIND_ICON_W : 0)
     let w = ctx.measureText(text).width + extra
     if (x + w > end) {
       // Out of room: one clipped label that also counts the rest, while enough of its name is left.
@@ -410,7 +577,7 @@ function drawLabels(
       if (clipped !== null) {
         const label = clipped + more
         w = ctx.measureText(label).width + extra
-        drawLabel(ctx, label, x, mid, w, h, r, color, theme)
+        drawLabel(ctx, label, x, mid, w, h, r, color, theme, remote)
         x += w + 5
         break
       }
@@ -426,7 +593,7 @@ function drawLabels(
       }
       break
     }
-    drawLabel(ctx, text, x, mid, w, h, r, color, theme)
+    drawLabel(ctx, text, x, mid, w, h, r, color, theme, remote)
     x += w + 5
   }
   ctx.restore()
@@ -435,7 +602,7 @@ function drawLabels(
 
 /** One ref label: a soft wash of the lane colour, like the brand's tags. The checked-out
  * branch is solid; tags take the ochre wash whatever their lane. */
-function drawLabel(ctx: CanvasRenderingContext2D, text: string, x: number, mid: number, w: number, h: number, r: Ref, color: string, theme: Theme) {
+function drawLabel(ctx: CanvasRenderingContext2D, text: string, x: number, mid: number, w: number, h: number, r: Ref, color: string, theme: Theme, remote: boolean) {
   const y = mid - h / 2
   const kind = labelKind(r)
   const kindColor = kind ? theme.kinds?.[kind.kind] : undefined
@@ -501,20 +668,19 @@ function drawLabel(ctx: CanvasRenderingContext2D, text: string, x: number, mid: 
   ctx.fillStyle = r.head ? theme.bg : r.kind === 'remote' || kind?.kind === 'bot' ? theme.muted : theme.fg
   ctx.textBaseline = 'middle'
   ctx.fillText(text, tx, mid + 0.5)
-}
-
-function segment(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, color: string) {
-  ctx.strokeStyle = color
-  ctx.beginPath()
-  ctx.moveTo(x1, y1)
-  if (x1 === x2) {
-    ctx.lineTo(x2, y2)
-  } else {
-    // Vertical tangents at both ends so lines enter and leave rows straight.
-    const cy = (y1 + y2) / 2
-    ctx.bezierCurveTo(x1, cy, x2, cy, x2, y2)
+  const cloud = remote ? iconPath('remote') : undefined
+  if (cloud) {
+    const size = 11
+    ctx.save()
+    ctx.translate(tx + ctx.measureText(text).width + 3, mid - size / 2)
+    ctx.scale(size / 24, size / 24)
+    ctx.lineWidth = 2.4
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.strokeStyle = r.head ? theme.bg : theme.muted
+    ctx.stroke(cloud)
+    ctx.restore()
   }
-  ctx.stroke()
 }
 
 /** The fewest characters of a cut-off name worth showing: "origin/f…" is about the least that

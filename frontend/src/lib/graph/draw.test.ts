@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { clip, clippedName, graphWidth, initials, LANE_COUNT, laneColor, laneVar, laneWindow, laneX, layoutColumns, METRICS, relativeTime, setLaneColors, sortRefs } from './draw'
+import { clearOf, clip, clippedName, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, METRICS, refColumnWidth, refLabels, relativeTime, repeatsAuthor, setLaneColors, sortRefs } from './draw'
+import type { Ref, Row } from './rowCache'
 
 describe('graph geometry', () => {
   it('spaces lanes evenly in both densities', () => {
@@ -27,6 +28,142 @@ describe('graph geometry', () => {
     expect(laneColor(LANE_COUNT)).toBe(colors[0])
     expect(laneColor(-1)).toBe(colors[LANE_COUNT - 1])
     expect(laneVar(LANE_COUNT + 2)).toBe('var(--lane-2)')
+  })
+})
+
+describe('columns', () => {
+  it('gives labels a column when the window has room, and puts the message after the graph', () => {
+    const lay = layoutColumns(1200, 100, 'compact')
+    expect(lay.refW).toBe(refColumnWidth(1200))
+    expect(lay.refW).toBeGreaterThan(0)
+    expect(lay.textX).toBeGreaterThan(lay.refW + lay.graphW)
+  })
+
+  it('keeps labels inline in a narrow window', () => {
+    const lay = layoutColumns(500, 100, 'compact')
+    expect(lay.refW).toBe(0)
+    expect(lay.textX).toBeGreaterThan(100)
+  })
+
+  it('lays the right-hand columns edge to edge, ending at the window', () => {
+    const lay = layoutColumns(1200, 100, 'compact')
+    expect(lay.authorX + lay.authorW).toBe(lay.dateX)
+    expect(lay.dateX + lay.dateW).toBe(lay.shaX)
+    expect(lay.shaX + lay.shaW).toBe(1200)
+  })
+
+  it('drops the date before the author as the window narrows', () => {
+    expect(layoutColumns(900, 100, 'compact').dateW).toBe(0)
+    expect(layoutColumns(900, 100, 'compact').authorW).toBeGreaterThan(0)
+    expect(layoutColumns(700, 100, 'compact').authorW).toBe(0)
+  })
+})
+
+describe('lanes', () => {
+  const row = (col: number, author = 'Ana', parents = 1) => ({ col, author, parents }) as Row
+
+  it("calls a lane busy where it holds the row's commit", () => {
+    expect(laneActive(2, row(2), {})).toBe(true)
+    expect(laneActive(1, row(2), {})).toBe(false)
+  })
+
+  it('keeps a lane busy between commits a row either side', () => {
+    expect(laneActive(1, row(2), { prev: row(1), next: row(1) })).toBe(true)
+    expect(laneActive(1, row(2), { prev: row(1), next: row(3) })).toBe(false)
+    expect(laneActive(1, row(2), { prev: row(1) })).toBe(false)
+  })
+
+  it("spots an author's run on a lane, across one row of other work", () => {
+    expect(repeatsAuthor(row(2), { prev: row(2) })).toBe(true)
+    expect(repeatsAuthor(row(2), { prev: row(3), prev2: row(2) })).toBe(true)
+  })
+
+  it('breaks a run on another author, a merge, a gap or another lane', () => {
+    expect(repeatsAuthor(row(2), { prev: row(2, 'Bo') })).toBe(false)
+    expect(repeatsAuthor(row(2), { prev: row(2, 'Ana', 2) })).toBe(false)
+    expect(repeatsAuthor(row(2, 'Ana', 2), { prev: row(2) })).toBe(false)
+    expect(repeatsAuthor(row(2), { prev: row(3), prev2: row(4) })).toBe(false)
+    expect(repeatsAuthor(row(2), {})).toBe(false)
+  })
+})
+
+describe('elbow', () => {
+  it('leaves a node sideways along its row, then turns down', () => {
+    const e = elbow(0, 10, 50, 40, true)
+    expect(e.before).toEqual([42, 10])
+    expect(e.corner).toEqual([50, 10])
+    expect(e.after).toEqual([50, 18])
+    expect(e.end).toEqual([50, 40])
+  })
+
+  it('comes down, then turns in along the row to reach a node', () => {
+    const e = elbow(50, 0, 0, 30, false)
+    expect(e.before).toEqual([50, 22])
+    expect(e.corner).toEqual([50, 30])
+    expect(e.after).toEqual([42, 30])
+    expect(e.end).toEqual([0, 30])
+  })
+
+  it('tightens the corner to fit a short hop', () => {
+    const e = elbow(0, 0, 3, 30, true)
+    expect(e.before).toEqual([0, 0])
+    expect(e.after).toEqual([3, 3])
+  })
+})
+
+describe('clearOf', () => {
+  it('keeps the hue while fading a full hex colour out', () => {
+    expect(clearOf('#cb0162')).toBe('#cb016200')
+  })
+
+  it('falls back for anything else', () => {
+    expect(clearOf('#888')).toBe('transparent')
+    expect(clearOf('rgb(1, 2, 3)')).toBe('transparent')
+  })
+})
+
+describe('refLabels', () => {
+  const ref = (short: string, kind: Ref['kind'], head = false) => ({ name: short, short, kind, head, commit: '', upstream: '', ahead: 0, behind: 0, gone: false }) as Ref
+  const said = (refs: Ref[]) => refLabels(refs).map((l) => [l.text, l.remote])
+
+  it('swaps origin/ for the remote mark', () => {
+    expect(said([ref('origin/feature/x', 'remote')])).toEqual([['feature/x', true]])
+  })
+
+  it('folds a local branch and its origin counterpart into one label', () => {
+    expect(said([ref('main', 'local', true), ref('origin/main', 'remote')])).toEqual([['main', true]])
+  })
+
+  it('leaves a local branch that is not on origin alone', () => {
+    expect(said([ref('wip', 'local'), ref('origin/other', 'remote')])).toEqual([
+      ['wip', false],
+      ['other', true],
+    ])
+  })
+
+  it('keeps the prefix of other remotes, so they stay apart', () => {
+    expect(said([ref('origin/x', 'remote'), ref('fork/x', 'remote')])).toEqual([
+      ['x', true],
+      ['fork/x', true],
+    ])
+  })
+
+  it("doesn't fold a local branch into another remote's branch of the same name", () => {
+    expect(said([ref('x', 'local'), ref('fork/x', 'remote')])).toEqual([
+      ['x', false],
+      ['fork/x', true],
+    ])
+  })
+
+  it('leaves origin/HEAD whole, since "HEAD" alone would mislead', () => {
+    expect(said([ref('origin/HEAD', 'remote')])).toEqual([['origin/HEAD', true]])
+  })
+
+  it('marks tags and stashes, which are never on a remote', () => {
+    expect(said([ref('v1.0', 'tag'), ref('stash@{0}', 'stash')])).toEqual([
+      ['◆ v1.0', false],
+      ['≡ stash@{0}', false],
+    ])
   })
 })
 

@@ -11,6 +11,14 @@ Commits are in date order, newest at the top, so work that happened side by side
 
 Your **Trunk** branch (`main`, `master` or `develop`) runs straight down the left-hand column in rose, and other lines branch off it to the right. A second Trunk branch, such as `develop` beside `main`, gets the next column.
 
+## Reading the graph
+
+Each row is tinted with the colour of its line, from the commit into the start of the message, so you can tell which line a commit is on without tracing it. A line is drawn thin and faint where it's idle, and thickens around its commits.
+
+When there's room, branches and tags have their own column to the left of the graph, each joined to its commit by a thin line. A cloud marks a name that's on a remote: `origin/` is left off, and a local branch and its `origin` counterpart on the same commit share one label. Other remotes keep their name, so `fork/x` stays apart from `origin/x`. In a narrow window, labels sit in front of the commit message instead.
+
+Column headers name what's in each column. In compact rows with enough width, the filter button beside **Author** searches for the selected commit's author.
+
 ## Moving around
 
 - Scroll, or use the arrow keys to move the selection one commit at a time.
@@ -58,7 +66,7 @@ When a repository has Docs branches (such as `gh-pages`) or Bot branches (such a
 
 ## Two layouts
 
-The default **timeline** layout gives each commit two lines: the subject, and the author and date. **Compact rows** fits one commit per line, so you see more history at once. Switch between them with the button in the graph's header, or in [Settings](settings.md).
+The default **timeline** layout gives each commit two lines: the subject, and the author and date. A commit's circle shows the author's initials, and shrinks to a dot when the same author's previous commit on that line is just above it. **Compact rows** fits one commit per line, so you see more history at once. Switch between them with the button in the graph's header, or in [Settings](settings.md).
 
 ## Right-click menus
 
