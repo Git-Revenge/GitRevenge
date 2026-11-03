@@ -80,8 +80,30 @@
   let staged = $derived(files.filter((f) => !f.untracked && !f.conflicted && f.index !== '.'))
   /** Commit was asked for before status had loaded: it runs once status says what's staged. */
   let commitWaiting = $state(false)
-  let canCommit = $derived(summary.trim() !== '' && (staged.length > 0 || amend) && !busy)
-  let commitLabel = $derived(amend ? 'Amend commit' : commitWaiting ? 'Reading status…' : wt ? `Commit ${staged.length} ${staged.length === 1 ? 'file' : 'files'}` : 'Commit')
+  let canCommit = $derived(summary.trim() !== '' && (staged.length > 0 || amend) && conflicted.length === 0 && !busy)
+  /** The checked-out branch, for saying where a commit will go. '' when there isn't one. */
+  let branch = $derived.by(() => {
+    const head = session.activeTab?.head ?? ''
+    return head.startsWith('detached') ? '' : head
+  })
+  const plural = (n: number, what: string) => (n === 1 ? `1 ${what}` : `${n} ${what}s`)
+  /** What to do next, in a word: each step of committing leads to the next. */
+  let nextStep = $derived.by(() => {
+    if (conflicted.length) return `Fix ${conflicted.length === 1 ? 'this conflict' : `these ${conflicted.length} conflicts`}, and the commit can go ahead.`
+    if (amend) return summary.trim() ? 'Ready to amend the last commit.' : 'Say what the amended commit does.'
+    if (!staged.length) return 'Tick what belongs in this commit, then say what it does.'
+    if (!summary.trim()) return `${plural(staged.length, 'file')} going in. Now say what the commit does.`
+    return `${plural(staged.length, 'file')} going in, and ready to go.`
+  })
+  let commitLabel = $derived.by(() => {
+    if (amend) return 'Amend commit'
+    if (commitWaiting) return 'Reading status…'
+    if (!wt) return 'Commit'
+    if (conflicted.length) return `Resolve ${plural(conflicted.length, 'conflict')} to commit`
+    if (!staged.length) return 'Tick a file to commit it'
+    if (!summary.trim()) return `Describe it to commit ${plural(staged.length, 'file')}`
+    return `Commit ${plural(staged.length, 'file')}${branch ? ` to ${branch}` : ''}`
+  })
 
   async function refresh() {
     const res = await session.run(() => WorkingTree(path))
@@ -268,8 +290,9 @@
 <aside class="panel" onkeydown={onKey} role="region" aria-label="Uncommitted changes">
   <div class="top">
     <div class="title">
-      <span class="hand">still on your desk</span>
-      <h2>Uncommitted changes</h2>
+      <span class="hand">{branch ? `on ${branch}` : 'still on your desk'}</span>
+      <h2>{wt && files.length ? `${plural(files.length, 'file')} changed` : 'Uncommitted changes'}</h2>
+      {#if wt && files.length}<p class="next">{nextStep}</p>{/if}
     </div>
     {#if !stashing}
       <button class="btn quiet" disabled={busy || files.length === 0} onclick={() => (stashing = true)} title="Set these changes aside in a stash"
@@ -433,6 +456,13 @@
     .lists {
       grid-column: 1;
     }
+  }
+
+  .next {
+    margin: 2px 0 0;
+    font-size: 14px;
+    line-height: 1.35;
+    color: var(--ink-soft);
   }
 
   .clean {
