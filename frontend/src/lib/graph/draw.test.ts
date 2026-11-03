@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clearOf, clip, clippedName, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, METRICS, refColumnWidth, refLabels, relativeTime, repeatsAuthor, setLaneColors, sortRefs } from './draw'
+import { clearOf, clip, clippedName, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, relativeTime, remoteOf, repeatsAuthor, setLaneColors, sortRefs } from './draw'
 import type { Ref, Row } from './rowCache'
 
 describe('graph geometry', () => {
@@ -148,6 +148,33 @@ describe('refLabels', () => {
     ])
   })
 
+  it('folds a local branch with the remote it tracks, whatever the remote is called', () => {
+    const tracking = { ...ref('x', 'local'), upstream: 'fork/x' }
+    expect(said([tracking, ref('fork/x', 'remote')])).toEqual([['x', true]])
+  })
+
+  it('folds a branch with its upstream under a different name', () => {
+    const tracking = { ...ref('topic', 'local'), upstream: 'origin/feature/topic' }
+    expect(said([tracking, ref('origin/feature/topic', 'remote')])).toEqual([['topic', true]])
+  })
+
+  it("doesn't fold a tracking branch with its namesake on the main remote", () => {
+    const tracking = { ...ref('x', 'local'), upstream: 'fork/x' }
+    expect(said([tracking, ref('origin/x', 'remote')])).toEqual([
+      ['x', false],
+      ['x', true],
+    ])
+  })
+
+  it('leaves off the prefix of whichever remote is the main one', () => {
+    const labels = refLabels([ref('github/x', 'remote'), ref('origin/y', 'remote')], 'github')
+    expect(labels.map((l) => l.text)).toEqual(['x', 'origin/y'])
+  })
+
+  it('keeps every prefix when there is no main remote', () => {
+    expect(refLabels([ref('a/x', 'remote')], '').map((l) => l.text)).toEqual(['a/x'])
+  })
+
   it("doesn't fold a local branch into another remote's branch of the same name", () => {
     expect(said([ref('x', 'local'), ref('fork/x', 'remote')])).toEqual([
       ['x', false],
@@ -164,6 +191,29 @@ describe('refLabels', () => {
       ['◆ v1.0', false],
       ['≡ stash@{0}', false],
     ])
+  })
+})
+
+describe('mainRemote', () => {
+  const ref = (short: string, kind: Ref['kind'], extra: Partial<Ref> = {}) => ({ name: short, short, kind, head: false, commit: '', upstream: '', ahead: 0, behind: 0, gone: false, ...extra }) as Ref
+
+  it("takes the remote of the checked-out branch's upstream", () => {
+    expect(mainRemote([ref('main', 'local', { head: true, upstream: 'github/main' }), ref('origin/main', 'remote')])).toBe('github')
+  })
+
+  it('falls back to origin, then to the only remote', () => {
+    expect(mainRemote([ref('a/x', 'remote'), ref('origin/x', 'remote')])).toBe('origin')
+    expect(mainRemote([ref('main', 'local', { head: true }), ref('github/x', 'remote')])).toBe('github')
+  })
+
+  it('has none when it cannot tell', () => {
+    expect(mainRemote([ref('a/x', 'remote'), ref('b/x', 'remote')])).toBe('')
+    expect(mainRemote([ref('main', 'local', { head: true })])).toBe('')
+  })
+
+  it('reads the remote from the front of the name', () => {
+    expect(remoteOf({ short: 'fork/feature/x' })).toBe('fork')
+    expect(remoteOf({ short: 'main' })).toBe('')
   })
 })
 

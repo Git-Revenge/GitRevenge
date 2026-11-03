@@ -8,7 +8,7 @@
   import { theme as colorTheme } from '../theme.svelte'
   import { provideCommands } from '../commands.svelte'
   import Icon from '../ui/Icon.svelte'
-  import { drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneWindow, layoutColumns, METRICS, refColumnWidth, setLaneColors, type Layout, type Theme } from './draw'
+  import { drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneWindow, layoutColumns, mainRemote, METRICS, refColumnWidth, setLaneColors, type Layout, type Theme } from './draw'
   import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
   import { scrollMap, topAfterScroll, toScroll, type ScrollMap } from './scrollMap'
 
@@ -29,6 +29,8 @@
 
   // The Docs and Bots visibility toggles (ADR 0009): shown when the repository has branches
   // of that kind, or has them hidden. On means visible.
+  /** The repository's main remote, whose prefix labels leave off. */
+  let remote = 'origin'
   let kindToggles = $state<{ kind: 'docs' | 'bot'; label: string; icon: (typeof KINDS)['docs']['icon']; hidden: boolean }[]>([])
 
   async function loadKindToggles() {
@@ -37,6 +39,8 @@
       Refs(path).catch(() => []),
       RepoPreferences(path).catch(() => null),
     ])
+    remote = mainRemote(refs as Ref[])
+    schedule()
     const hidden = new Set(prefs?.hideKinds ?? [])
     kindToggles = (['docs', 'bot'] as const)
       .filter((k) => hidden.has(k) || (refs as Ref[]).some((r) => r.branchKind === k))
@@ -233,7 +237,7 @@
     // A history wider than the column scrolls its lanes so the nodes in view stay visible.
     const sel = cache.get(selected)
     const firstLane = minCol === Infinity ? 0 : laneWindow(minCol, maxCol, sel && selected >= first && selected < last ? sel.col : null, laneCapacity(graphW, m))
-    const lay = layoutColumns(w, graphW, density, firstLane)
+    const lay = layoutColumns(w, graphW, density, firstLane, remote)
     if (!columns || columns.width !== lay.width || columns.graphW !== lay.graphW || columns.density !== lay.density) columns = lay
     const th = theme()
     const now = Date.now() / 1000

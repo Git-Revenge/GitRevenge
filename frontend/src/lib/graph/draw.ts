@@ -214,6 +214,8 @@ export interface Layout {
   authorX: number
   dateX: number
   shaX: number
+  /** The repository's main remote (see mainRemote). */
+  remote: string
 }
 
 /** The branch and tag column's width: labels go back inline when the window can't spare it. */
@@ -221,7 +223,7 @@ export function refColumnWidth(width: number): number {
   return width >= 640 ? 150 : 0
 }
 
-export function layoutColumns(width: number, graphW: number, density: Density, firstLane = 0): Layout {
+export function layoutColumns(width: number, graphW: number, density: Density, firstLane = 0, remote = 'origin'): Layout {
   const compact = density === 'compact'
   const refW = refColumnWidth(width)
   const shaW = 76
@@ -243,6 +245,7 @@ export function layoutColumns(width: number, graphW: number, density: Density, f
     authorX: dateX - authorW,
     dateX,
     shaX,
+    remote,
   }
 }
 
@@ -344,7 +347,7 @@ export function drawRow(
 
   // Labels in their own column, each tied to its node by a thin line.
   if (lay.refW && refs.length) {
-    const end = drawLabels(ctx, refs, 8, mid, lay.refW - 16, color, theme, comfortable) - LABEL_TRAIL
+    const end = drawLabels(ctx, refs, 8, mid, lay.refW - 16, color, theme, comfortable, lay.remote) - LABEL_TRAIL
     const to = Math.min(x, graphRight)
     if (end < to && x >= graphLeft) {
       ctx.globalAlpha = before * 0.45
@@ -494,7 +497,7 @@ export function drawRow(
 
   let left = lay.textX
   const subjectRight = (lay.authorW ? lay.authorX : lay.dateW ? lay.dateX : lay.shaX) - 22
-  if (!lay.refW) left = drawLabels(ctx, refs, left, line1, Math.min(subjectRight - left, (subjectRight - left) * 0.6), color, theme, comfortable)
+  if (!lay.refW) left = drawLabels(ctx, refs, left, line1, Math.min(subjectRight - left, (subjectRight - left) * 0.6), color, theme, comfortable, lay.remote)
   setFont(ctx, `${comfortable ? 14.5 : 13.5}px ${SERIF}`)
   ctx.fillStyle = docs ? theme.muted : theme.fg
   ctx.fillText(clip(ctx, row.subject, subjectRight - left), left, line1)
@@ -540,20 +543,42 @@ export interface RefLabel {
   remote: boolean
 }
 
-/** Labels for a commit's refs, in display order. `origin/` gives way to the remote icon, and a
- * local branch and its origin counterpart on the same commit share a label. Other remotes
+/** The remote a remote branch is on, assuming a remote's name has no slash in it. */
+export function remoteOf(r: Pick<Ref, 'short'>): string {
+  const slash = r.short.indexOf('/')
+  return slash < 0 ? '' : r.short.slice(0, slash)
+}
+
+/** The repository's main remote, whose prefix labels leave off: the checked-out branch's
+ * upstream remote, else `origin` if there is one, else the only remote. */
+export function mainRemote(refs: Ref[]): string {
+  const upstream = refs.find((r) => r.head && r.kind === 'local')?.upstream
+  if (upstream && remoteOf({ short: upstream })) return remoteOf({ short: upstream })
+  const remotes = new Set(refs.filter((r) => r.kind === 'remote').map(remoteOf))
+  if (remotes.has('origin')) return 'origin'
+  return remotes.size === 1 ? [...remotes][0] : ''
+}
+
+/** Labels for a commit's refs, in display order. The main remote's prefix gives way to the
+ * remote icon. A local branch shares a label with the remote branch it tracks on this commit;
+ * one that tracks nothing shares a label with its namesake on the main remote. Other remotes
  * keep their prefix, so `origin/x` and `fork/x` stay apart. */
-export function refLabels(refs: Ref[]): RefLabel[] {
+export function refLabels(refs: Ref[], main = 'origin'): RefLabel[] {
   const sorted = sortRefs(refs)
-  const locals = new Set(sorted.filter((r) => r.kind === 'local').map((r) => r.short))
-  const originName = (r: Ref) => (r.kind === 'remote' && r.short.startsWith('origin/') && r.short !== 'origin/HEAD' ? r.short.slice('origin/'.length) : null)
-  const onOrigin = new Set(sorted.map(originName))
+  const shorts = new Set(refs.map((r) => r.short))
+  /** The remote branch this local branch folds with, if it's on this commit. */
+  const foldsWith = (r: Ref) => (r.upstream ? r.upstream : `${main}/${r.short}`)
+  const folded = new Set(sorted.filter((r) => r.kind === 'local' && shorts.has(foldsWith(r))).map(foldsWith))
+  const prefix = main ? `${main}/` : ''
+  const shortened = (r: Ref) => (prefix && r.short.startsWith(prefix) && r.short !== `${main}/HEAD` ? r.short.slice(prefix.length) : r.short)
   const labels: RefLabel[] = []
   for (const r of sorted) {
-    const name = originName(r)
-    if (name !== null && locals.has(name)) continue
-    const prefix = r.kind === 'tag' ? '◆ ' : r.kind === 'stash' ? '≡ ' : ''
-    labels.push({ ref: r, text: prefix + (name ?? r.short), remote: r.kind === 'remote' || (r.kind === 'local' && onOrigin.has(r.short)) })
+    if (r.kind === 'remote') {
+      if (!folded.has(r.short)) labels.push({ ref: r, text: shortened(r), remote: true })
+    } else {
+      const mark = r.kind === 'tag' ? '◆ ' : r.kind === 'stash' ? '≡ ' : ''
+      labels.push({ ref: r, text: mark + r.short, remote: r.kind === 'local' && shorts.has(foldsWith(r)) })
+    }
   }
   return labels
 }
@@ -568,11 +593,12 @@ function drawLabels(
   color: string,
   theme: Theme,
   comfortable: boolean,
+  remoteName: string,
 ): number {
   if (refs.length === 0) return x
   const end = x + maxWidth
   const h = comfortable ? 18 : 17
-  const labels = refLabels(refs)
+  const labels = refLabels(refs, remoteName)
   ctx.save()
   setFont(ctx, `12px ${MONO}`)
   for (let i = 0; i < labels.length; i++) {
