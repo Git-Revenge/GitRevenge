@@ -28,7 +28,8 @@ A pattern matches the branch name without its remote, so `release/*` covers `rel
 
 - **Graph chips** take the kind's colour and icon: Trunk in rose and bold, Release in plum, Environment in ochre, Docs as a teal outline, Feature in green, Bot in faint text.
 - **The timeline** shows the kind's icon in a commit's circle, instead of the author's initials, for commits on Release, Environment, Docs and Bot lines.
-- **Docs lines** are drawn faded, with their commit messages muted, since a published site isn't code.
+- **Docs lines** are drawn faded, with their commit messages muted, since a published site isn't code. A line that also has an ordinary or Feature branch at its tip isn't faded.
+- **When branches of different kinds point at one commit**, each keeps its own label, and the commit's line takes the kind that comes first in the order Trunk, Release, Environment, Docs, Bot, Feature.
 - **The sidebar** keeps your local branches in one tree in the **Branches** panel, with the checked-out branch first, or the folder holding it, and Trunk next. A kind's icon marks a folder when every branch in it shares that kind, and otherwise marks each branch. Remote branches do the same in the **Remotes** panel.
 
 The design behind kinds is [ADR 0009](../adr/0009-branch-kinds.md).
