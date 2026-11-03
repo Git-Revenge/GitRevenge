@@ -257,7 +257,7 @@
         onkeydown={rightResizeKey}
       ></div>
   {#if view === 'wip'}
-    <WorkingTreePanel {path} current={diff} openFile={(t) => (diff = t)} onNewBranch={() => (dialog = newBranchDialog(ctx))} />
+    <WorkingTreePanel {path} current={diff} openFile={(t) => (diff = t)} onNewBranch={() => (dialog = newBranchDialog(ctx))} onMenu={openMenu} />
   {:else if selected}
     <CommitPanel {path} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} onReveal={revealCommit} onActions={(x, y) => selected && openMenu(commitMenuItems(selected, graph.refsOf(selected.id), ctx), x, y)} />
   {/if}

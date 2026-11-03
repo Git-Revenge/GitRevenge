@@ -240,6 +240,8 @@ export function TakeConflictSide(arg1:string,arg2:string,arg3:string):Promise<vo
 
 export function Theme():Promise<string>;
 
+export function TrailerHints(arg1:string):Promise<git.TrailerHints>;
+
 export function Undo(arg1:string):Promise<void>;
 
 export function UndoState(arg1:string):Promise<app.UndoInfo>;

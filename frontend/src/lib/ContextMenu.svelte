@@ -116,6 +116,7 @@
 
   onMount(() => {
     const before = document.activeElement as HTMLElement | null
+    const el = menu
     const r = menu.getBoundingClientRect()
     const fits = x + r.width + 4 <= window.innerWidth
     left = Math.max(4, !fits && flipX !== undefined ? flipX - r.width : Math.min(x, window.innerWidth - r.width - 4))
@@ -128,7 +129,9 @@
     return () => {
       clearTimeout(queryTimer)
       clearTimeout(hoverTimer)
-      if (focusFirst) before?.focus?.()
+      // Give focus back, unless what was chosen has moved it somewhere on purpose.
+      const now = document.activeElement
+      if (focusFirst && (!now || now === document.body || el.contains(now))) before?.focus?.()
     }
   })
 

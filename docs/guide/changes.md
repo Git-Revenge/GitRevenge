@@ -19,6 +19,8 @@ Your changes are one list, by filename under their folders, with line counts. A 
 ![A unified diff with Stage hunk and Discard hunk buttons](../img/diff-unified-light.webp#gh-light-mode-only)
 ![A unified diff with Stage hunk and Discard hunk buttons](../img/diff-unified-dark.webp#gh-dark-mode-only)
 
+**Trailer**, in the commit form, adds lines such as `Co-authored-by` and `Closes` to the end of your description in the right format. It suggests the keys and people from your repository's recent history.
+
 After a commit, the panel shows its SHA with an **Undo** button, which brings the changes back staged and restores the message.
 
 Discarding asks you to confirm first, since it throws your changes away. The walkthrough [Stage and commit](../walkthroughs/first-commit.md) goes through it from start to finish.

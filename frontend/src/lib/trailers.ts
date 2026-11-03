@@ -118,3 +118,24 @@ export function groupTrailers(trailers: TrailerLine[]): TrailerGroups {
   groups.people.sort((a, b) => peopleOrder.indexOf(a.label) - peopleOrder.indexOf(b.label))
   return groups
 }
+
+/** Keys offered even when a repository's history doesn't use them yet. */
+export const COMMON_TRAILER_KEYS = ['Co-authored-by', 'Closes', 'Fixes', 'Refs', 'Reviewed-by', 'Signed-off-by']
+
+/** The history's keys first, as it spells them, then the common ones it doesn't use. */
+export function trailerKeyChoices(used: string[]): string[] {
+  const seen = new Set(used.map((k) => k.toLowerCase()))
+  return [...used, ...COMMON_TRAILER_KEYS.filter((k) => !seen.has(k.toLowerCase()))]
+}
+
+const TRAILER_LINE = /^[A-Za-z0-9-]+: /
+
+/** Adds a trailer to the end of a commit's description, in the block of trailers already
+ * there, or as a new paragraph, since git only reads a trailer in the last paragraph. */
+export function appendTrailer(body: string, key: string, value = ''): string {
+  const text = body.trimEnd()
+  const line = `${key}: ${value}`
+  if (!text) return line
+  const last = text.slice(text.lastIndexOf('\n\n') + 1).trim()
+  return `${text}${last.split('\n').every((l) => TRAILER_LINE.test(l)) ? '\n' : '\n\n'}${line}`
+}

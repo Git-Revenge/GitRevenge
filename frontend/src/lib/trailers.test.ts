@@ -1,5 +1,31 @@
 import { describe, expect, it } from 'vitest'
-import { groupTrailers, asPerson, valueParts } from './trailers'
+import { appendTrailer, groupTrailers, trailerKeyChoices, asPerson, valueParts } from './trailers'
+
+describe('appendTrailer', () => {
+  it('starts an empty description', () => {
+    expect(appendTrailer('', 'Closes', '#1')).toBe('Closes: #1')
+  })
+
+  it('starts a new paragraph after ordinary text', () => {
+    expect(appendTrailer('Why this matters.', 'Closes', '#1')).toBe('Why this matters.\n\nCloses: #1')
+  })
+
+  it('joins a block of trailers already there', () => {
+    expect(appendTrailer('Why.\n\nCloses: #1', 'Refs', '#2')).toBe('Why.\n\nCloses: #1\nRefs: #2')
+    expect(appendTrailer('Closes: #1\n', 'Refs', '#2')).toBe('Closes: #1\nRefs: #2')
+  })
+
+  it('leaves the value for typing when there is none', () => {
+    expect(appendTrailer('', 'Closes')).toBe('Closes: ')
+  })
+})
+
+describe('trailerKeyChoices', () => {
+  it("puts the history's keys first, then the common ones it doesn't use", () => {
+    expect(trailerKeyChoices(['closes', 'Change-Id']).slice(0, 3)).toEqual(['closes', 'Change-Id', 'Co-authored-by'])
+    expect(trailerKeyChoices(['closes']).filter((k) => k.toLowerCase() === 'closes')).toHaveLength(1)
+  })
+})
 
 describe('groupTrailers', () => {
   const line = (key: string, value: string) => ({ key, value })
