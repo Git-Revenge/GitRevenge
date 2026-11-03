@@ -1,10 +1,11 @@
-import { BranchAction, BranchMergeState, HideBranch, Integrate, MarkBranchKind, PullBranch, PushRef, Refs, Restack, SetStackParent, StashAction } from '../../wailsjs/go/app/App.js'
+import { DeleteStack, RestoreStack, StackDeletePlan, Unstack, BranchAction, BranchMergeState, HideBranch, Integrate, MarkBranchKind, PullBranch, PushRef, Refs, Restack, SetStackParent, StashAction } from '../../wailsjs/go/app/App.js'
 import { CONFIRM_DELETE, KINDS, kindWarning } from './branchKinds'
 import type { MenuItem } from './ContextMenu.svelte'
 import type { DialogSpec } from './Dialog.svelte'
 import type { Ref, Row } from './graph/rowCache'
 import { errorText } from './errors'
 import { session } from './session.svelte'
+import { toasts } from './toasts.svelte'
 
 /** What the menus need from the view that opens them. */
 export interface MenuContext {
@@ -450,6 +451,84 @@ export function branchAtDialog(path: string, commit: string): DialogSpec {
     submit: 'Create branch',
     run: (v) => attempt(() => branch(path, 'create', String(v.name).trim(), commit, v.checkout ? 'true' : '')),
   }
+}
+
+/** What a stack's row offers. members is its branches, the top first, so the last is the
+ * bottom. A stack that forks has more than one top. */
+export function stackItems(members: Ref[], ctx: MenuContext): MenuItem[] {
+  const { path } = ctx
+  const bottom = members[members.length - 1].short
+  const names = members.map((r) => r.short)
+  const tops = members.filter((r) => !members.some((o) => o.stackParent === r.short))
+  const one = tops.length === 1
+  return groups(
+    tops.map((t) => ({
+      label: one ? `Check out top of stack (${t.short})` : `Check out ${t.short}`,
+      icon: 'branch',
+      disabled: t.head,
+      run: () => checkoutRef(path, t),
+    })),
+    tops.map((t) => ({
+      label: one ? 'New branch on top…' : `New branch on ${t.short}…`,
+      icon: 'plus',
+      run: () => ctx.openDialog(branchOnDialog(path, t.short)),
+    })),
+    [{ label: 'Unstack', icon: 'stack', run: () => unstack(path, bottom, names) }],
+    [{ label: 'Delete stack…', icon: 'trash', run: () => deleteStack(ctx, bottom, names) }],
+  )
+}
+
+function branchOnDialog(path: string, start: string): DialogSpec {
+  return {
+    title: `New branch on ${start}`,
+    fields: [
+      { key: 'name', label: 'Branch name', placeholder: 'feature/my-change' },
+      { key: 'checkout', label: 'Check it out', type: 'checkbox', value: true },
+    ],
+    submit: 'Create branch',
+    run: (v) => attempt(() => branch(path, 'create', String(v.name).trim(), start, v.checkout ? 'true' : '')),
+  }
+}
+
+/** The bottom branch was never stacked on anything, so there's nothing to change on it. */
+async function unstack(path: string, bottom: string, names: string[]) {
+  const stacked = names.filter((n) => n !== bottom)
+  const before = await session.run(() => Unstack(path, stacked))
+  if (!before) return
+  toasts.show(`Unstacked ${bottom}. Its branches show separately now.`, {
+    label: 'Undo',
+    run: async () => {
+      await session.run(() => RestoreStack(path, stacked, before))
+    },
+  })
+}
+
+/** Everything merged goes straight away, with Undo in the message that leaves. Anything that
+ * isn't gets a dialog naming it. */
+async function deleteStack(ctx: MenuContext, bottom: string, names: string[]) {
+  const { path } = ctx
+  const plan = await session.run(() => StackDeletePlan(path, names))
+  if (!plan) return
+  const kept = plan.keep.length
+    ? `${plan.keep.join(', ')} ${plan.keep.length === 1 ? 'stays because it is' : 'stay because they are'} checked out, in a worktree, hidden, protected, or built on by another branch.`
+    : ''
+  if (plan.delete.length === 0) {
+    toasts.show(`Nothing in this stack can be deleted: ${kept}`)
+    return
+  }
+  if (plan.unmerged.length === 0) {
+    await session.run(() => DeleteStack(path, bottom, plan.delete, false))
+    if (kept) toasts.show(kept)
+    return
+  }
+  const lost = plan.unmerged.map((u) => (u.commits ? `${u.name}: ${u.commits === 1 ? '1 commit' : `${u.commits} commits`} not merged` : `${u.name}: not merged`))
+  ctx.openDialog({
+    title: `Delete stack ${bottom}?`,
+    message: [`Some of this work isn't merged anywhere:`, lost.join('\n'), kept, 'You can bring it all back with Undo.'].filter(Boolean).join('\n\n'),
+    submit: `Delete ${plan.delete.length === 1 ? '1 branch' : `${plan.delete.length} branches`}`,
+    danger: true,
+    run: () => attempt(() => DeleteStack(path, bottom, plan.delete, true)),
+  })
 }
 
 /** The dialog for "new branch from HEAD". */

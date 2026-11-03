@@ -23,6 +23,7 @@ function parentOf(rows: TreeRow[], index: number): number {
   return -1
 }
 
+const hasMenu = (row: TreeRow) => row.type === 'ref' || !!row.stack
 const hasChildren = (rows: TreeRow[], index: number) => index + 1 < rows.length && rows[index + 1].depth > rows[index].depth
 
 /**
@@ -63,9 +64,9 @@ export function treeAction(press: KeyPress, rows: TreeRow[], active: number, pag
     case ' ':
       return row.type === 'folder' ? { type: 'toggle' } : { type: 'checkout' }
     case 'ContextMenu':
-      return row.type === 'ref' ? { type: 'menu' } : null
+      return hasMenu(row) ? { type: 'menu' } : null
     case 'F10':
-      return press.shiftKey && row.type === 'ref' ? { type: 'menu' } : null
+      return press.shiftKey && hasMenu(row) ? { type: 'menu' } : null
   }
   return null
 }

@@ -98,6 +98,10 @@ export function DeleteMergedBranches(arg1, arg2) {
   return window['go']['app']['App']['DeleteMergedBranches'](arg1, arg2);
 }
 
+export function DeleteStack(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['DeleteStack'](arg1, arg2, arg3, arg4);
+}
+
 export function DiscardFiles(arg1, arg2) {
   return window['go']['app']['App']['DiscardFiles'](arg1, arg2);
 }
@@ -366,6 +370,10 @@ export function RestoreSession() {
   return window['go']['app']['App']['RestoreSession']();
 }
 
+export function RestoreStack(arg1, arg2, arg3) {
+  return window['go']['app']['App']['RestoreStack'](arg1, arg2, arg3);
+}
+
 export function RunOperationAction(arg1, arg2) {
   return window['go']['app']['App']['RunOperationAction'](arg1, arg2);
 }
@@ -458,6 +466,10 @@ export function ShowingHidden(arg1) {
   return window['go']['app']['App']['ShowingHidden'](arg1);
 }
 
+export function StackDeletePlan(arg1, arg2) {
+  return window['go']['app']['App']['StackDeletePlan'](arg1, arg2);
+}
+
 export function StageFiles(arg1, arg2) {
   return window['go']['app']['App']['StageFiles'](arg1, arg2);
 }
@@ -496,6 +508,10 @@ export function UndoState(arg1) {
 
 export function UnsetGitConfig(arg1, arg2, arg3) {
   return window['go']['app']['App']['UnsetGitConfig'](arg1, arg2, arg3);
+}
+
+export function Unstack(arg1, arg2) {
+  return window['go']['app']['App']['Unstack'](arg1, arg2);
 }
 
 export function UnstageFiles(arg1, arg2) {

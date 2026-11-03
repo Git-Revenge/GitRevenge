@@ -17,6 +17,7 @@
     onRefClick,
     onActivate,
     onContext,
+    onStackContext,
   }: {
     row: TreeRow
     filter: string
@@ -27,6 +28,7 @@
     onRefClick: (row: RefRow) => void
     onActivate?: (ref: Ref) => void
     onContext?: (ref: Ref, x: number, y: number) => void
+    onStackContext?: (members: Ref[], x: number, y: number) => void
   } = $props()
 </script>
 
@@ -35,7 +37,13 @@
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
   <div
     class="row folder"
+    class:stack-row={row.stack}
     style:--depth={row.depth}
+    oncontextmenu={(e) => {
+      if (!row.members || !onStackContext) return
+      e.preventDefault()
+      onStackContext(row.members, e.clientX, e.clientY)
+    }}
     title={row.stack ? `A stack of ${row.count} branches${row.note ? `, all ${row.note}` : ''}` : `${row.label}/`}
     onclick={() => onFolderClick(row)}
   >
@@ -50,6 +58,21 @@
     {#if row.note}<span class="meta note">{row.note}</span>{/if}
     <span class="meta count">{row.count.toLocaleString()}</span>
   </div>
+  {#if row.members && onStackContext}
+    {@const members = row.members}
+    <button
+      class="more"
+      tabindex="-1"
+      aria-hidden="true"
+      aria-label="More for this stack"
+      aria-haspopup="menu"
+      title="More"
+      onclick={(e) => {
+        const box = e.currentTarget.getBoundingClientRect()
+        onStackContext(members, box.left, box.bottom)
+      }}><Icon name="more" size={14} /></button
+    >
+  {/if}
 {:else}
   {@const r = row.ref}
   {@const k = kindInfo(row.mark)}
@@ -195,7 +218,11 @@
 
   /* More replaces the status; it stays readable to screen readers. */
   :global(li:hover) .track,
-  :global([role='tree']:focus-visible li.active) .track {
+  :global([role='tree']:focus-visible li.active) .track,
+  :global(li:hover) .stack-row .count,
+  :global([role='tree']:focus-visible li.active) .stack-row .count,
+  :global(li:hover) .stack-row .note,
+  :global([role='tree']:focus-visible li.active) .stack-row .note {
     opacity: 0;
   }
 

@@ -59,6 +59,49 @@ test.describe('a stack of three or more', () => {
     await expect(page.locator('.ref', { hasText: 's-top' }).locator('.track')).toHaveText(/merged/)
   })
 
+  // #474
+  test('has a menu', async ({ page }) => {
+    await open(page, 'repoView', stacks)
+    const row = page.locator('.folder', { hasText: 's-base' })
+    await expect(row).toBeVisible()
+    await row.click({ button: 'right' })
+    await expect(page.getByRole('menuitem', { name: 'Check out top of stack (s-top)' })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Unstack' })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Delete stack…' })).toBeVisible()
+  })
+
+  test('deletes straight away when all of it is merged', async ({ page }) => {
+    const names = ['s-top', 's-mid', 's-base']
+    await open(page, 'repoView', { ...stacks, responses: { ...stacks.responses, StackDeletePlan: { delete: names, keep: [], unmerged: [] }, DeleteStack: names } })
+    await page.locator('.folder', { hasText: 's-base' }).click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Delete stack…' }).click()
+    await expect.poll(() => calls(page, 'DeleteStack')).toHaveLength(1)
+    expect(JSON.stringify(await calls(page, 'DeleteStack'))).toContain('false')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  test('asks first, naming the work, when some of it is not merged', async ({ page }) => {
+    const names = ['s-top', 's-mid', 's-base']
+    const plan = { delete: names, keep: [], unmerged: [{ name: 's-top', commits: 2 }] }
+    await open(page, 'repoView', { ...stacks, responses: { ...stacks.responses, StackDeletePlan: plan, DeleteStack: names } })
+    await page.locator('.folder', { hasText: 's-base' }).click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Delete stack…' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toContainText('s-top: 2 commits not merged')
+    expect(await calls(page, 'DeleteStack')).toHaveLength(0)
+    await dialog.getByRole('button', { name: 'Delete 3 branches' }).click()
+    await expect.poll(() => calls(page, 'DeleteStack')).toHaveLength(1)
+    expect(JSON.stringify(await calls(page, 'DeleteStack'))).toContain('true')
+  })
+
+  test('unstacks all but its bottom branch', async ({ page }) => {
+    await open(page, 'repoView', { ...stacks, responses: { ...stacks.responses, Unstack: {} } })
+    await page.locator('.folder', { hasText: 's-base' }).click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Unstack' }).click()
+    await expect.poll(() => calls(page, 'Unstack')).toHaveLength(1)
+    expect(JSON.stringify(await calls(page, 'Unstack'))).toContain('["s-top","s-mid"]')
+  })
+
   test('moves with the keyboard like a folder', async ({ page }) => {
     await open(page, 'sidebar', stacks)
     await expectOutline(page, ['main', 'Stack: s-base/', '  s-top', '  s-mid', '  s-base'])

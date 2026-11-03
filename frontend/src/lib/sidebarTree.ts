@@ -70,6 +70,8 @@ export interface FolderRow extends RowBase {
   stack?: boolean
   /** A word on what's inside, beside the count. */
   note?: string
+  /** A stack's branches, all of them whatever a filter shows, the top first. */
+  members?: Ref[]
 }
 
 export interface RefRow extends RowBase {
@@ -306,6 +308,7 @@ export function panelRows(tree: PanelTree, options: RowOptions = {}): TreeRow[] 
       remote: false,
       stack: true,
       note: allMerged ? 'merged' : undefined,
+      members: members.map((m) => m.ref),
       startsGroup,
     })
     if (!isOpen) return

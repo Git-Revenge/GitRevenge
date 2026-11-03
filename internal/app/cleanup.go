@@ -135,6 +135,8 @@ type BranchesCleaned struct {
 	// UndoLabel is the undo entry that restores them, so the UI can offer Undo only while
 	// it's still the next one.
 	UndoLabel string `json:"undoLabel"`
+	// Merged says all of them were already merged.
+	Merged bool `json:"merged"`
 }
 
 // cleanupAfterPull deletes the branches cleanupCandidates finds, when the setting is on.
@@ -149,10 +151,15 @@ func (a *App) cleanupAfterPull(ctx context.Context, r *session.Repo) {
 	a.deleteMerged(ctx, r, cands)
 }
 
-// deleteMerged deletes branches already known to be merged, records one undo entry that
-// restores them all, and tells the UI. Failures to delete one branch skip it. It returns the
-// names of those it deleted.
+// deleteMerged deletes branches already known to be merged, as one step to undo.
 func (a *App) deleteMerged(ctx context.Context, r *session.Repo, refs []git.Ref) []string {
+	return a.deleteTogether(ctx, r, refs, "Clean up "+plural(len(refs), "merged branch", "merged branches"), true)
+}
+
+// deleteTogether deletes branches, records one undo entry under label that restores them all,
+// and tells the UI. Failures to delete one branch skip it. It returns the names of those it
+// deleted.
+func (a *App) deleteTogether(ctx context.Context, r *session.Repo, refs []git.Ref, label string, merged bool) []string {
 	tracking := r.Git.BranchTrackings(ctx)
 	asked := make([]string, len(refs))
 	for i, ref := range refs {
@@ -175,11 +182,10 @@ func (a *App) deleteMerged(ctx context.Context, r *session.Repo, refs []git.Ref)
 		names[i] = b.Name
 	}
 	a.upstreams.forget(r.Path, names)
-	label := "Clean up " + plural(len(gone), "merged branch", "merged branches")
 	h := r.Git.Head(ctx)
 	a.undo.push(r.Path, undoEntry{Label: label, Kind: kindBranchesDelete, Branches: gone, Before: h, After: h})
 	a.undoChanged(r.Path)
-	a.emit("branches:cleaned", BranchesCleaned{Path: r.Path, Branches: names, UndoLabel: label})
+	a.emit("branches:cleaned", BranchesCleaned{Path: r.Path, Branches: names, UndoLabel: label, Merged: merged})
 	return names
 }
 

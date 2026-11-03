@@ -240,11 +240,23 @@ func (a *App) SetKindVisible(path, kind string, visible bool) error {
 // parent names a local branch, "" means not stacked, and auto drops the override so the
 // stack is inferred again.
 func (a *App) SetStackParent(path, branch, parent string, auto bool) error {
-	path = a.repoKey(path)
 	branch, parent = strings.TrimSpace(branch), strings.TrimSpace(parent)
 	if branch == "" || branch == parent {
 		return userError("A branch can't be stacked on itself.")
 	}
+	return a.updateStackParents(path, func(parents map[string]string) {
+		if auto {
+			delete(parents, branch)
+		} else {
+			parents[branch] = parent
+		}
+	})
+}
+
+// updateStackParents changes the stack parents set by hand in the repository at path, then
+// reloads its graph to show them.
+func (a *App) updateStackParents(path string, change func(map[string]string)) error {
+	path = a.repoKey(path)
 	m, err := a.sessions()
 	if err != nil {
 		return err
@@ -254,11 +266,7 @@ func (a *App) SetStackParent(path, branch, parent string, auto bool) error {
 		if rs.StackParents == nil {
 			rs.StackParents = map[string]string{}
 		}
-		if auto {
-			delete(rs.StackParents, branch)
-		} else {
-			rs.StackParents[branch] = parent
-		}
+		change(rs.StackParents)
 		if len(rs.StackParents) == 0 {
 			rs.StackParents = nil
 		}
