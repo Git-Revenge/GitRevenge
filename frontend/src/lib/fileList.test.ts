@@ -12,6 +12,14 @@ describe('fileGroups', () => {
     ])
   })
 
+  it('keeps a folder together when a subfolder sorts among its files', () => {
+    const groups = fileGroups([f('src/a.ts'), f('src/lib/b.ts'), f('src/z.ts')])
+    expect(groups.map((g) => [g.folder, g.files.length])).toEqual([
+      ['src', 2],
+      ['src/lib', 1],
+    ])
+  })
+
   it('keeps the top of the repository apart', () => {
     expect(fileGroups([f('README.md'), f('a/one.ts')]).map((g) => g.folder)).toEqual(['', 'a'])
   })

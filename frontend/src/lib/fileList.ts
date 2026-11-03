@@ -9,14 +9,15 @@ export const fileName = (path: string) => path.slice(path.lastIndexOf('/') + 1)
 
 export const fileFolder = (path: string) => path.slice(0, Math.max(0, path.lastIndexOf('/')))
 
-/** Groups files by folder, keeping their order, so a list reads by filename. */
+/** Groups files by folder, so a list reads by filename. Folders keep the order they first
+ * appear in, and a folder's files stay together even where a subfolder sorts among them. */
 export function fileGroups<F extends { path: string }>(files: F[]): FileGroup<F>[] {
-  const groups: FileGroup<F>[] = []
+  const groups = new Map<string, FileGroup<F>>()
   for (const f of files) {
     const folder = fileFolder(f.path)
-    const last = groups.at(-1)
-    if (last?.folder === folder) last.files.push(f)
-    else groups.push({ folder, files: [f] })
+    const group = groups.get(folder)
+    if (group) group.files.push(f)
+    else groups.set(folder, { folder, files: [f] })
   }
-  return groups
+  return [...groups.values()]
 }
