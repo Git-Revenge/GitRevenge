@@ -21,3 +21,67 @@ export function fileGroups<F extends { path: string }>(files: F[]): FileGroup<F>
   }
   return [...groups.values()]
 }
+
+/** A row of a file list: a folder heading, or a file. */
+export type FileRow<F> = { type: 'folder'; key: string; name: string; path: string; depth: number; open: boolean; collapsible: boolean } | { type: 'file'; key: string; file: F; depth: number }
+
+export interface FileRowOptions {
+  /** Keeps only files whose path has this in it, ignoring case. */
+  query?: string
+  /** Nests folders one level at a time. Otherwise each folder is one heading with its whole path. */
+  tree?: boolean
+  /** In a tree, the folders that are closed, by path. */
+  closed?: ReadonlySet<string>
+}
+
+/** The rows of a file list. The filter opens every folder, so a match is never left hidden. */
+export function fileRows<F extends { path: string }>(files: F[], { query = '', tree = false, closed = new Set() }: FileRowOptions = {}): FileRow<F>[] {
+  const q = query.trim().toLowerCase()
+  const shown = q ? files.filter((f) => f.path.toLowerCase().includes(q)) : files
+  const rows: FileRow<F>[] = []
+  if (!tree) {
+    for (const g of fileGroups(shown)) {
+      if (g.folder) rows.push({ type: 'folder', key: `folder:${g.folder}`, name: `${g.folder}/`, path: g.folder, depth: 0, open: true, collapsible: false })
+      for (const file of g.files) rows.push({ type: 'file', key: file.path, file, depth: 0 })
+    }
+    return rows
+  }
+  const seen = new Set<string>()
+  for (const file of shown) {
+    const parts = file.path.split('/')
+    let folder = ''
+    let hidden = false
+    for (let depth = 0; depth < parts.length - 1; depth++) {
+      folder = folder ? `${folder}/${parts[depth]}` : parts[depth]
+      const open = !!q || !closed.has(folder)
+      if (!hidden && !seen.has(folder)) {
+        seen.add(folder)
+        rows.push({ type: 'folder', key: `folder:${folder}`, name: parts[depth], path: folder, depth, open, collapsible: true })
+      }
+      hidden ||= !open
+    }
+    if (!hidden) rows.push({ type: 'file', key: file.path, file, depth: parts.length - 1 })
+  }
+  return rows
+}
+
+/** Lists shorter than this have nothing to gain from a filter. */
+export const FILTER_FROM = 5
+
+const TREE_KEY = 'gitrevenge.fileTree'
+
+export function readTreeChoice(): boolean {
+  try {
+    return localStorage.getItem(TREE_KEY) === 'on'
+  } catch {
+    return false
+  }
+}
+
+export function saveTreeChoice(tree: boolean) {
+  try {
+    localStorage.setItem(TREE_KEY, tree ? 'on' : 'off')
+  } catch {
+    // Storage unavailable; the choice lasts for this session only.
+  }
+}

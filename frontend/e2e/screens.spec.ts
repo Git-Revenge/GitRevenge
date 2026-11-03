@@ -590,6 +590,43 @@ test.describe('commit graph', () => {
       expect(text.indexOf('Signed-off-by')).toBeLessThan(text.indexOf('Closes'))
     })
 
+    // #440: long lists of files were hard to scan.
+    test.describe('with many files', () => {
+      const many = [...files, { status: 'M', path: 'src/lib/d.ts', added: 2, deleted: 2 }, { status: 'M', path: 'src/e.ts', added: 1, deleted: 0 }]
+      const openMany = async (page: Page) => {
+        await open(page, 'repoView', { ...scenario(), responses: { ...scenario().responses, CommitDetail: { commit, files: many } } })
+        const box = (await page.locator('.scroller').boundingBox())!
+        await page.mouse.click(box.x + 500, box.y + 26)
+        await tab(page, 'Files').click()
+      }
+
+      test('filters them, and says when nothing matches', async ({ page }) => {
+        await openMany(page)
+        const panel = page.getByRole('tabpanel')
+        await panel.getByRole('searchbox', { name: 'Filter files' }).fill('docs')
+        await expect(panel.locator('.file-row')).toHaveCount(1)
+        await panel.getByRole('searchbox', { name: 'Filter files' }).fill('no such file')
+        await expect(panel.getByText('No files match that.')).toBeVisible()
+      })
+
+      test('shows them as a tree, with folders that close, and remembers', async ({ page }) => {
+        await openMany(page)
+        const panel = page.getByRole('tabpanel')
+        await panel.getByRole('button', { name: 'Tree' }).click()
+        await expect(panel.getByRole('button', { name: 'lib/', exact: true })).toBeVisible()
+        await expect(panel.locator('.file-row')).toHaveCount(6)
+        await panel.getByRole('button', { name: 'lib/', exact: true }).click()
+        await expect(panel.locator('.file-row')).toHaveCount(3)
+        expect(await page.evaluate(() => localStorage.getItem('gitrevenge.fileTree'))).toBe('on')
+      })
+    })
+
+    test('has no filter for a short list', async ({ page }) => {
+      await openCommit(page)
+      await tab(page, 'Files').click()
+      await expect(page.getByRole('searchbox', { name: 'Filter files' })).toHaveCount(0)
+    })
+
     test('says so when there is no description', async ({ page }) => {
       await openCommit(page, { body: '', trailers: [] })
       await expect(tab(page, 'Trailers')).toHaveCount(0)
@@ -1176,6 +1213,18 @@ test.describe('before the first load has answered', () => {
         await page.getByRole('textbox', { name: 'Commit summary' }).fill('Fix')
         await expect(page.getByRole('button', { name: 'Commit 1 file to main' })).toBeEnabled()
       })
+    })
+
+    // #440: the same tools in the working tree.
+    test('filters a long list, and offers a tree', async ({ page }) => {
+      const names = ['src/a.ts', 'src/b.ts', 'src/c.ts', 'docs/d.md', 'docs/e.md']
+      await open(page, 'workingTree', scenario(names.map((n) => file(n, '.', 'M'))))
+      await page.getByRole('searchbox', { name: 'Filter files' }).fill('docs')
+      await expect(page.locator('button.name')).toHaveCount(2)
+      await page.getByRole('searchbox', { name: 'Filter files' }).fill('')
+      await page.getByRole('button', { name: 'Tree' }).click()
+      await page.getByRole('button', { name: 'src/', exact: true }).click()
+      await expect(page.locator('button.name')).toHaveCount(2)
     })
 
     test('says so when there is nothing to commit', async ({ page }) => {
