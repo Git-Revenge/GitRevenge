@@ -9,6 +9,7 @@
     row,
     filter,
     selectedCommit,
+    mergedInto,
     onFolderClick,
     onRefClick,
     onActivate,
@@ -17,6 +18,8 @@
     row: TreeRow
     filter: string
     selectedCommit?: string
+    /** The branch already holding this row's work, if any. */
+    mergedInto?: string
     onFolderClick: (row: FolderRow) => void
     onRefClick: (row: RefRow) => void
     onActivate?: (ref: Ref) => void
@@ -46,7 +49,7 @@
 {:else}
   {@const r = row.ref}
   {@const k = kindInfo(row.mark)}
-  {@const status = refStatus(r)}
+  {@const status = refStatus(r, mergedInto)}
   {@const parts = matchParts(row.label, filter)}
   {@const isSelected = !!selectedCommit && r.commit === selectedCommit}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -65,7 +68,7 @@
       e.preventDefault()
       onContext(r, e.clientX, e.clientY)
     }}
-    title={refTooltip(r)}
+    title={refTooltip(r, mergedInto)}
   >
     {#if r.head}<span class="here"><span class="visually-hidden">Checked out: </span></span>{/if}
     {#if k}<span class="kind-icon" style:color="var({k.token})" title={k.label}><Icon name={k.icon} size={13} /><span class="visually-hidden">{k.label}</span></span>{/if}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Ref, Row } from './graph/rowCache'
+import { session } from './session.svelte'
 import { commitItems, commitMenuItems, deleteBranchDialog, dropItems, groups, refItems, upstreamDialog, type MenuContext } from './menus'
 
 const row = (id: string): Row => ({ index: 0, col: 0, color: 0, up: [], down: [], width: 1, id, parents: 1, author: '', authorTime: 0, subject: '' })
@@ -150,6 +151,23 @@ describe('deleting a branch', () => {
     const d = deleteBranchDialog('/r', { ...topic, branchKind: 'trunk' }, { target: 'main', how: 'merged', unmerged: 0 })
     expect(d.message).toMatch(/trunk/i)
     expect(d.danger).toBe(true)
+  })
+})
+
+// #463
+describe('Restack', () => {
+  const stacked = { ...ref('top', 'local'), stackParentMerged: true, stackParent: 'bottom' }
+  const restack = () => labels(refItems(stacked, ctx('main'))).filter((l) => l.startsWith('Restack'))
+
+  it('is offered when the branch below merged and this one has work of its own', () => {
+    session.merged['/r'] = {}
+    expect(restack()).toHaveLength(1)
+  })
+
+  it('is not offered on a branch that is itself merged', () => {
+    session.merged['/r'] = { top: 'main' }
+    expect(restack()).toEqual([])
+    session.merged['/r'] = {}
   })
 })
 

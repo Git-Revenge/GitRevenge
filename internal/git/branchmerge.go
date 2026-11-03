@@ -167,3 +167,44 @@ func countCherry(out string) (missing, landed int) {
 	}
 	return missing, landed
 }
+
+// MergedBranches returns those of names whose work is on a target. It starts at the tops of
+// stacks, because a branch inside one that's merged needs no merging of its own to check, and
+// each check can take a second on a big repository. It returns what it has if ctx runs out.
+func (r *Repo) MergedBranches(ctx context.Context, names, targets []string) map[string]BranchMerge {
+	merged := map[string]BranchMerge{}
+	if len(targets) == 0 {
+		return merged
+	}
+	above := make(map[string][]string, len(names))
+	for _, name := range names {
+		for _, b := range r.branchesContaining(ctx, name) {
+			if slices.Contains(names, b) {
+				above[name] = append(above[name], b)
+			}
+		}
+	}
+	// Fewest branches above first, so whatever a branch could inherit has already been read.
+	order := slices.Clone(names)
+	slices.SortStableFunc(order, func(a, b string) int { return len(above[a]) - len(above[b]) })
+	for _, name := range order {
+		if ctx.Err() != nil {
+			break
+		}
+		inherited := false
+		for _, b := range above[name] {
+			if m, ok := merged[b]; ok {
+				merged[name] = BranchMerge{Target: m.Target, How: SquashedIn}
+				inherited = true
+				break
+			}
+		}
+		if inherited {
+			continue
+		}
+		if state := r.mergeIntoAny(ctx, "refs/heads/"+name, targets); state.How != "" {
+			merged[name] = state
+		}
+	}
+	return merged
+}

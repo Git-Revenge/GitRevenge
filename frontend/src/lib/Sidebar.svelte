@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Refs, SetShowHidden, ShowingHidden } from '../../wailsjs/go/app/App.js'
+  import { MergedBranches, Refs, SetShowHidden, ShowingHidden } from '../../wailsjs/go/app/App.js'
   import { EventsOn } from '../../wailsjs/runtime/runtime.js'
   import { onMount, tick, untrack } from 'svelte'
   import type { DialogSpec } from './Dialog.svelte'
@@ -15,7 +15,7 @@
   import SidebarRow from './SidebarRow.svelte'
   import { scrollToShow, treeAction, treePositions } from './sidebarKeys'
   import { clampWidth, DEFAULT_WIDTH, loadSidebar, otherPanelWithMatches, ROW_HEIGHT, saveSidebar, visibleRange, type SidebarPanel } from './sidebarState'
-  import { buildPanels, careCount, panelMatches, panelRows, type FolderRow, type RefRow, type TreeRow } from './sidebarTree'
+  import { buildPanels, careCount, panelMatches, panelRows, type FolderRow, type RefRow, type TreeRow, needsCare } from './sidebarTree'
 
   let {
     path,
@@ -277,8 +277,19 @@
     return list
   }, { paletteOnly: true })
 
+  // Which branches that need care are already merged. It takes a while, so it fills in after
+  // the list has shown; only the latest answer counts.
+  let merged = $derived(session.merged[path] ?? {})
+  let mergedAsked = 0
+  async function loadMerged() {
+    const asked = ++mergedAsked
+    const answer = refs.some(needsCare) ? await MergedBranches(path).catch(() => null) : {}
+    if (asked === mergedAsked && answer) session.merged[path] = answer
+  }
+
   async function load() {
     refs = ((await session.run(() => Refs(path))) as Ref[] | undefined) ?? []
+    void loadMerged()
     showingHidden = (await session.run(() => ShowingHidden(path))) ?? false
   }
 
@@ -359,7 +370,7 @@
             aria-expanded={row.type === 'folder' ? row.open : undefined}
             aria-selected={row.type === 'ref' && !!selectedCommit && row.ref.commit === selectedCommit}
           >
-            <SidebarRow {row} {filter} {selectedCommit} onFolderClick={clickFolder} onRefClick={clickRef} {onActivate} {onContext} />
+            <SidebarRow {row} {filter} {selectedCommit} mergedInto={row.type === 'ref' && row.ref.kind === 'local' ? merged[row.ref.short] : undefined} onFolderClick={clickFolder} onRefClick={clickRef} {onActivate} {onContext} />
           </li>
         {/each}
       </ul>

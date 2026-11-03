@@ -439,6 +439,25 @@ describe('refStatus', () => {
   })
 })
 
+// #463: "parent merged" suggested a restack on branches that only needed deleting.
+describe('a merged branch', () => {
+  it('says merged, whatever else is true of it', () => {
+    expect(refStatus(ref('a', { stackParentMerged: true, gone: true, ahead: 3 }), 'main')).toEqual({ text: 'merged', spoken: 'merged into main', tone: 'muted' })
+  })
+
+  it('leaves the other statuses to branches that are not', () => {
+    expect(refStatus(ref('a', { stackParentMerged: true }))?.text).toBe('parent merged')
+    expect(refStatus(ref('a', { gone: true }))?.text).toBe('gone')
+  })
+
+  it('says why in its tooltip, and stops suggesting a restack', () => {
+    const r = ref('a', { stackParentMerged: true, stackParent: 'b' })
+    expect(refTooltip(r, 'main')).toContain('already on main')
+    expect(refTooltip(r, 'main')).not.toContain('Restack')
+    expect(refTooltip(r)).toContain('Restack')
+  })
+})
+
 describe('refTooltip', () => {
   it('starts with the full name', () => {
     expect(refTooltip(ref('feature/x'))).toBe('feature/x')

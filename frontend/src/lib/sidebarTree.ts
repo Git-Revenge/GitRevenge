@@ -352,8 +352,11 @@ export interface RefStatus {
   tone: 'warning' | 'muted' | 'link'
 }
 
-/** The one status a row shows, most pressing first. The tooltip lists the rest. */
-export function refStatus(r: Ref): RefStatus | undefined {
+/** The one status a row shows, most pressing first. The tooltip lists the rest. mergedInto is
+ * the branch already holding this one's work, if any: then there's nothing left to do but
+ * delete it, whatever else is true. */
+export function refStatus(r: Ref, mergedInto?: string): RefStatus | undefined {
+  if (mergedInto) return { text: 'merged', spoken: `merged into ${mergedInto}`, tone: 'muted' }
   if (r.stackParentMerged) return { text: 'parent merged', spoken: 'parent merged', tone: 'warning' }
   if (r.gone) return { text: 'gone', spoken: 'upstream gone', tone: 'muted' }
   if (r.ahead || r.behind) {
@@ -372,10 +375,11 @@ export function stackPlace(r: Ref): string {
 }
 
 /** Everything known about a row, one fact per line, since the row itself shows one status. */
-export function refTooltip(r: Ref): string {
+export function refTooltip(r: Ref, mergedInto?: string): string {
   const lines = [r.kind === 'stash' ? r.subject || r.short : r.short]
   if (r.head) lines.push('Checked out')
-  if (r.stackParentMerged) lines.push(`${r.stackParent} was merged. Right-click, Restack, to move this branch onto the Trunk.`)
+  if (mergedInto) lines.push(`Its work is already on ${mergedInto}, so it's safe to delete`)
+  else if (r.stackParentMerged) lines.push(`${r.stackParent} was merged. Right-click, Restack, to move this branch onto the Trunk.`)
   if (stackPlace(r)) lines.push(stackPlace(r))
   if (r.gone) lines.push('Upstream branch was deleted')
   else if (r.ahead || r.behind) lines.push(`${r.ahead} ahead, ${r.behind} behind ${r.upstream}`)

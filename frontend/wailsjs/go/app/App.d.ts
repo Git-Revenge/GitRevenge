@@ -126,6 +126,8 @@ export function LastCommitMessage(arg1:string):Promise<string>;
 
 export function MarkBranchKind(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function MergedBranches(arg1:string):Promise<Record<string, string>>;
+
 export function OpenGitConfig(arg1:string):Promise<app.ConfigDoc>;
 
 export function OpenRepo(arg1:string):Promise<app.RepoTab>;

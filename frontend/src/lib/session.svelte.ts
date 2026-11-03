@@ -31,6 +31,9 @@ class Session {
   revision = $state<Record<string, number>>({})
   /** Per-repo counter bumped when its undo or redo history changes. */
   undoRevision = $state<Record<string, number>>({})
+  /** Branches whose work is already on another branch, by repository and name, with that
+   * branch. It fills in after the branches load, since checking takes a while. */
+  merged = $state<Record<string, Record<string, string>>>({})
   /** The active value for the Git Config tab; never a repository path. */
   configTabId = $state('gitrevenge:gitconfig')
   /** The config file the Git Config tab had selected last session, or '' if it was closed. */

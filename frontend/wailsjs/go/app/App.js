@@ -242,6 +242,10 @@ export function MarkBranchKind(arg1, arg2, arg3) {
   return window['go']['app']['App']['MarkBranchKind'](arg1, arg2, arg3);
 }
 
+export function MergedBranches(arg1) {
+  return window['go']['app']['App']['MergedBranches'](arg1);
+}
+
 export function OpenGitConfig(arg1) {
   return window['go']['app']['App']['OpenGitConfig'](arg1);
 }

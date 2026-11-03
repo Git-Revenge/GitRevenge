@@ -238,7 +238,8 @@ export function refItems(ref: Ref, ctx: MenuContext): MenuItem[] {
             },
           },
         ],
-        ref.stackParentMerged
+        // Restacking is for work still to land: a branch already merged only needs deleting.
+        ref.stackParentMerged && !session.merged[path]?.[ref.short]
           ? [{ label: `Restack ${ref.short} (${ref.stackParent} was merged)`, icon: 'rebase', run: () => session.run(() => Restack(ctx.path, ref.short)) }]
           : [],
         [markItem(ctx, ref, ref.short), stackItem(ctx, ref), hideItem(ctx, ref, ref.short)],

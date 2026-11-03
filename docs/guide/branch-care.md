@@ -80,6 +80,8 @@ If the guess is wrong, right-click the branch and choose **Stack `name` on…**:
 
 When a host squash-merges the branch below, the branch on top still carries the old, un-squashed commits. Once a fetch or pull shows the lower branch's upstream is gone, the branch on top is marked **parent merged** in the sidebar.
 
+If the branch on top has no work of its own left to land, it says **merged** instead: there's nothing to restack, and it only needs deleting.
+
 Right-click it and choose **Restack**. Git Revenge checks it out if it isn't already, then moves just its own commits onto the latest Trunk, leaving the merged branch's old commits behind. If that runs into conflicts, you resolve them as in any [rebase](branches.md#conflicts). Undo puts the branch back where it was.
 
 ## Safety checks

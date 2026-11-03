@@ -7,6 +7,7 @@ import (
 
 	"github.com/risadams/gitrevenge/internal/branchkind"
 	"github.com/risadams/gitrevenge/internal/git"
+	"github.com/risadams/gitrevenge/internal/session"
 )
 
 // branchMergeTimeout bounds the check when deleting a branch. An old branch on a huge
@@ -38,6 +39,49 @@ func (a *App) BranchMergeState(path, name string) (git.BranchMerge, error) {
 		names[i] = rm.Name
 	}
 	return r.Git.BranchMergeState(ctx, name, mergeTargets(refs, a.branchRules(path), names, name)), nil
+}
+
+// mergedBranchesTimeout bounds checking every branch that needs care.
+const mergedBranchesTimeout = 30 * time.Second
+
+// MergedBranches says which branches that need care already have their work on a Trunk branch
+// or the checked-out branch, by branch, with the branch holding it.
+func (a *App) MergedBranches(path string) (map[string]string, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), mergedBranchesTimeout)
+	defer cancel()
+	merged, err := a.mergedBranches(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]string, len(merged))
+	for name, state := range merged {
+		out[name] = state.Target
+	}
+	return out, nil
+}
+
+func (a *App) mergedBranches(ctx context.Context, r *session.Repo) (map[string]git.BranchMerge, error) {
+	refs := r.Refs().All
+	remotes, err := r.Git.Remotes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	remoteNames := make([]string, len(remotes))
+	for i, rm := range remotes {
+		remoteNames[i] = rm.Name
+	}
+	targets := mergeTargets(refs, a.branchRules(r.Path), remoteNames, "")
+	var names []string
+	for _, ref := range refs {
+		if ref.Kind == git.LocalBranch && (ref.Gone || ref.StackParentMerged) && !slices.Contains(targets, ref.Short) {
+			names = append(names, ref.Short)
+		}
+	}
+	return r.Git.MergedBranches(ctx, names, targets), nil
 }
 
 // mergeTargets lists what to compare a branch with: local Trunk branches, then their remote
