@@ -180,12 +180,14 @@ func (a *App) DeleteMergedBranches(path string, names []string) ([]string, error
 		_, ok := merged[name]
 		return !ok
 	})
-	safe := a.deletableBranches(ctx, r, still)
-	refs, err := a.currentRefs(ctx, r, safe)
+	// Only the check is on the clock: running out mustn't stop the delete halfway.
+	work := context.Background()
+	safe := a.deletableBranches(work, r, still)
+	refs, err := a.currentRefs(work, r, safe)
 	if err != nil {
 		return nil, err
 	}
-	gone := a.deleteMerged(ctx, r, refs)
+	gone := a.deleteMerged(work, r, refs)
 	if gone == nil {
 		return []string{}, nil
 	}

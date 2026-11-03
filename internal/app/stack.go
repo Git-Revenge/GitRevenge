@@ -36,49 +36,55 @@ func (a *App) StackDeletePlan(path string, names []string) (StackPlan, error) {
 }
 
 // stackDeletePlan counts a branch as unmerged when the time runs out before it's been checked,
-// which only means being asked.
+// which only means being asked. Only the merge checks are on the clock, so running out can't
+// fail the plan.
 func (a *App) stackDeletePlan(ctx context.Context, r *session.Repo, names []string) (StackPlan, error) {
-	targets, err := a.mergeTargetsFor(ctx, r)
+	targets, err := a.mergeTargetsFor(context.Background(), r)
 	if err != nil {
 		return StackPlan{}, err
 	}
-	merged := r.Git.MergedBranches(ctx, names, targets)
-	plan := StackPlan{Delete: a.deletableBranches(ctx, r, names), Keep: []string{}, Unmerged: []UnmergedBranch{}}
+	states := r.Git.BranchStates(ctx, names, targets)
+	plan := StackPlan{Delete: a.deletableBranches(context.Background(), r, names), Keep: []string{}, Unmerged: []UnmergedBranch{}}
 	for _, name := range names {
 		if !slices.Contains(plan.Delete, name) {
 			plan.Keep = append(plan.Keep, name)
 		}
 	}
 	for _, name := range plan.Delete {
-		if _, ok := merged[name]; !ok {
-			plan.Unmerged = append(plan.Unmerged, UnmergedBranch{Name: name, Commits: r.Git.BranchMergeState(ctx, name, targets).Unmerged})
+		if states[name].How == "" {
+			plan.Unmerged = append(plan.Unmerged, UnmergedBranch{Name: name, Commits: states[name].Unmerged})
 		}
 	}
 	return plan, nil
 }
 
-// DeleteStack deletes what StackDeletePlan allows of these branches, as one step to undo. It
-// looks again first, and unless allowed to lose work, stops if anything isn't merged any more.
-// It returns the names of those it deleted.
+// DeleteStack deletes what StackDeletePlan allows of these branches, as one step to undo. Unless
+// allowed to lose work, it looks again first and stops if anything isn't merged any more. It
+// returns the names of those it deleted.
 func (a *App) DeleteStack(path, root string, names []string, allowUnmerged bool) ([]string, error) {
 	r, err := a.openRepo(path)
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), mergedBranchesTimeout)
-	defer cancel()
-	plan, err := a.stackDeletePlan(ctx, r, names)
+	safe := a.deletableBranches(context.Background(), r, names)
+	if !allowUnmerged {
+		ctx, cancel := context.WithTimeout(context.Background(), mergedBranchesTimeout)
+		defer cancel()
+		plan, err := a.stackDeletePlan(ctx, r, names)
+		if err != nil {
+			return nil, err
+		}
+		if len(plan.Unmerged) > 0 {
+			return nil, userError(plan.Unmerged[0].Name + " doesn't read as merged any more, so nothing was deleted.")
+		}
+		safe = plan.Delete
+	}
+	ctx := context.Background()
+	refs, err := a.currentRefs(ctx, r, safe)
 	if err != nil {
 		return nil, err
 	}
-	if len(plan.Unmerged) > 0 && !allowUnmerged {
-		return nil, userError(plan.Unmerged[0].Name + " isn't merged any more, so nothing was deleted.")
-	}
-	refs, err := a.currentRefs(ctx, r, plan.Delete)
-	if err != nil {
-		return nil, err
-	}
-	gone := a.deleteTogether(ctx, r, refs, "Delete stack "+root, len(plan.Unmerged) == 0)
+	gone := a.deleteTogether(ctx, r, refs, "Delete stack "+root, !allowUnmerged)
 	if gone == nil {
 		return []string{}, nil
 	}

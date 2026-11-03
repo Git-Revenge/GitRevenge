@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/risadams/gitrevenge/internal/gittest"
@@ -53,6 +54,19 @@ func TestMergedBranches(t *testing.T) {
 	}
 	if len(g.MergedBranches(ctx, []string{"top"}, nil)) != 0 {
 		t.Error("something merged with no targets")
+	}
+}
+
+func TestBranchStates(t *testing.T) {
+	ctx := context.Background()
+	fx, g := branched(t, "a.txt", "b.txt")
+	fx.Git("branch", "level", "main")
+	got := g.BranchStates(ctx, []string{"topic"}, []string{"main", "level"})
+	if got["topic"].How != "" || got["topic"].Unmerged != 2 || got["topic"].Target != "main" {
+		t.Errorf("got %+v", got)
+	}
+	if len(g.MergedBranches(ctx, []string{"topic"}, []string{"main"})) != 0 {
+		t.Error("topic isn't merged")
 	}
 }
 
@@ -206,6 +220,88 @@ func TestBranchMergeState(t *testing.T) {
 		}
 		if got := g.BranchMergeState(ctx, "bottom", []string{"main"}); got.How == "" || got.Unmerged != 0 {
 			t.Errorf("got %+v", got)
+		}
+	})
+
+	// #477: this stack read as merged, then stopped as main moved on.
+	t.Run("a merged stack stays merged when the target changes the same files afterwards", func(t *testing.T) {
+		fx, g := branched(t, "a1.txt", "a2.txt")
+		fx.Git("branch", "bottom", "topic")
+		fx.Checkout("topic")
+		fx.Git("branch", "-m", "top")
+		fx.CommitFile("shared.txt", "first draft\n", "start shared")
+		fx.CommitFile("shared.txt", "final\n", "finish shared")
+		fx.Checkout("main")
+		for _, b := range []string{"bottom", "top"} {
+			fx.Git("merge", "-q", "--squash", b)
+			fx.Commit("squash " + b)
+		}
+		fx.CommitFile("shared.txt", "rewritten since\n", "main moves on")
+		if _, err := fx.TryGit("merge-tree", "--write-tree", "main", "top"); err == nil {
+			t.Fatal("the fixture should conflict")
+		}
+		for _, b := range []string{"bottom", "top"} {
+			if got := g.BranchMergeState(ctx, b, []string{"main"}); got.How == "" || got.Unmerged != 0 {
+				t.Errorf("%s: got %+v", b, got)
+			}
+		}
+	})
+
+	t.Run("a file the target only ever had part of doesn't count", func(t *testing.T) {
+		fx, g := branched(t, "a.txt", "b.txt")
+		fx.Checkout("main")
+		fx.CommitFile("a.txt", "a.txt\n", "same a")
+		fx.CommitFile("b.txt", "something else\n", "different b")
+		if got := state(g); got.How != "" {
+			t.Errorf("got %+v", got)
+		}
+	})
+
+	t.Run("files held at different times don't count", func(t *testing.T) {
+		fx, g := branched(t, "a.txt", "b.txt")
+		fx.CommitFile("a.txt", "a.txt\n", "same a")
+		fx.CommitFile("a.txt", "changed\n", "a moves on")
+		fx.CommitFile("b.txt", "b.txt\n", "same b, but a has gone")
+		if g.targetHeldChanges(ctx, "refs/heads/topic", "main") {
+			t.Error("main never held both at once")
+		}
+	})
+
+	// #477: what stopped the exact match on the real stack.
+	t.Run("other work landing in the same file still counts", func(t *testing.T) {
+		fx, g := branched(t)
+		fx.CommitFile("shared.txt", "one\ntwo\nthree\nfour\nfive\nsix\nseven\n", "main adds shared")
+		fx.Git("checkout", "-q", "topic")
+		fx.Git("merge", "-q", "main")
+		fx.CommitFile("shared.txt", "one\ntwo\nthree\nfour\nfive\nsix\nSEVEN\n", "topic changes the end")
+		fx.CommitFile("own.txt", "own\n", "and a file of its own")
+		fx.Checkout("main")
+		fx.CommitFile("shared.txt", "ONE\ntwo\nthree\nfour\nfive\nsix\nseven\n", "other work, at the top")
+		fx.Git("merge", "-q", "--squash", "topic")
+		fx.Commit("squash topic")
+		fx.CommitFile("shared.txt", "ONE\ntwo\nthree\nfour\nfive\nsix\nrewritten\n", "main moves on")
+		if _, err := fx.TryGit("merge-tree", "--write-tree", "main", "topic"); err == nil {
+			t.Fatal("the fixture should conflict")
+		}
+		if !g.targetHeldChanges(ctx, "refs/heads/topic", "main") {
+			t.Error("main held all of topic once it was squashed in")
+		}
+	})
+
+	t.Run("a branch deleting a file counts once the target has too", func(t *testing.T) {
+		fx, g := branched(t)
+		first := strings.Fields(fx.Git("ls-tree", "--name-only", "topic"))[0]
+		fx.Checkout("topic")
+		fx.CommitFile("keep.txt", "keep\n", "a change, so the delete isn't all")
+		fx.RemoveFile(first)
+		fx.Commit("and a delete")
+		fx.Checkout("main")
+		fx.CommitFile("keep.txt", "keep\n", "same change")
+		fx.RemoveFile(first)
+		fx.Commit("same delete")
+		fx.CommitFile("keep.txt", "later\n", "moves on")
+		if !g.targetHeldChanges(ctx, "refs/heads/topic", "main") {
+			t.Error("main held both the change and the delete")
 		}
 	})
 
