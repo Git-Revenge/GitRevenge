@@ -35,3 +35,10 @@ Two changes, from the sidebar work in epic #332:
 
 - **The sidebar no longer has a section per kind.** An icon rail shows one panel at a time, and a branch tree nests names at each `/`. A section per kind would read `Releases` > `release` > `v0.8`, so a kind marks its folder instead, and Trunk still sorts first after the checked-out branch.
 - **Feature is a sixth kind.** Unlike the others, it changes how a branch looks rather than how it's treated: no extra confirmations, no toggle, a normal lane, and it stays in Insights. It keeps author initials in the timeline, because who did the work matters on a working branch. It's last in matching order, so a name another kind claims stays that kind.
+
+## Amendment, 2026-11-03
+
+From #419, on commits that several branches point at:
+
+- **The kind earliest in the matching order wins a shared tip,** whether its branches are local or remote. Before this, a local branch beat a remote one and otherwise the alphabetically last name won, so `release/x` beat `feature/y` by accident of how they sort.
+- **A Docs tip with real work on it isn't muted.** If an ordinary or Feature branch points at the same commit, the lane takes that branch's kind, or none. Faded code is worse than a Docs line drawn at full strength. Checking this reads every branch, but only in a repository with a Docs tip.
