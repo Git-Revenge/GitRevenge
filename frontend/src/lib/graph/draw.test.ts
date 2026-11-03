@@ -124,45 +124,73 @@ describe('clearOf', () => {
 
 describe('refLabels', () => {
   const ref = (short: string, kind: Ref['kind'], head = false) => ({ name: short, short, kind, head, commit: '', upstream: '', ahead: 0, behind: 0, gone: false }) as Ref
-  const said = (refs: Ref[]) => refLabels(refs).map((l) => [l.text, l.remote])
+  const said = (refs: Ref[]) => refLabels(refs).map((l) => [l.text, l.remotes])
 
   it('swaps origin/ for the remote mark', () => {
-    expect(said([ref('origin/feature/x', 'remote')])).toEqual([['feature/x', true]])
+    expect(said([ref('origin/feature/x', 'remote')])).toEqual([['feature/x', 1]])
   })
 
   it('folds a local branch and its origin counterpart into one label', () => {
-    expect(said([ref('main', 'local', true), ref('origin/main', 'remote')])).toEqual([['main', true]])
+    expect(said([ref('main', 'local', true), ref('origin/main', 'remote')])).toEqual([['main', 1]])
   })
 
   it('leaves a local branch that is not on origin alone', () => {
     expect(said([ref('wip', 'local'), ref('origin/other', 'remote')])).toEqual([
-      ['wip', false],
-      ['other', true],
+      ['wip', 0],
+      ['other', 1],
     ])
   })
 
-  it('keeps the prefix of other remotes, so they stay apart', () => {
-    expect(said([ref('origin/x', 'remote'), ref('fork/x', 'remote')])).toEqual([
-      ['x', true],
-      ['fork/x', true],
+  it('keeps the prefix of a branch on just one other remote', () => {
+    expect(said([ref('fork/x', 'remote')])).toEqual([['fork/x', 1]])
+  })
+
+  it('folds the same branch across remotes, counting them', () => {
+    expect(said([ref('origin/x', 'remote'), ref('fork/x', 'remote'), ref('up/x', 'remote')])).toEqual([['x', 3]])
+  })
+
+  it('drops the prefix when several other remotes share the name', () => {
+    expect(said([ref('fork/x', 'remote'), ref('up/x', 'remote')])).toEqual([['x', 2]])
+  })
+
+  it('folds a local branch with every remote that has the name', () => {
+    expect(said([ref('main', 'local', true), ref('origin/main', 'remote'), ref('fork/main', 'remote')])).toEqual([['main', 2]])
+  })
+
+  it('counts from the upstream when a branch tracks another name', () => {
+    const tracking = { ...ref('topic', 'local'), upstream: 'fork/feature/topic' }
+    expect(said([tracking, ref('fork/feature/topic', 'remote'), ref('origin/feature/topic', 'remote')])).toEqual([['topic', 2]])
+  })
+
+  it('keeps different branches apart', () => {
+    expect(said([ref('origin/a', 'remote'), ref('fork/b', 'remote')])).toEqual([
+      ['a', 1],
+      ['fork/b', 1],
+    ])
+  })
+
+  it('never folds a remote HEAD', () => {
+    expect(said([ref('origin/HEAD', 'remote'), ref('fork/HEAD', 'remote')])).toEqual([
+      ['origin/HEAD', 1],
+      ['fork/HEAD', 1],
     ])
   })
 
   it('folds a local branch with the remote it tracks, whatever the remote is called', () => {
     const tracking = { ...ref('x', 'local'), upstream: 'fork/x' }
-    expect(said([tracking, ref('fork/x', 'remote')])).toEqual([['x', true]])
+    expect(said([tracking, ref('fork/x', 'remote')])).toEqual([['x', 1]])
   })
 
   it('folds a branch with its upstream under a different name', () => {
     const tracking = { ...ref('topic', 'local'), upstream: 'origin/feature/topic' }
-    expect(said([tracking, ref('origin/feature/topic', 'remote')])).toEqual([['topic', true]])
+    expect(said([tracking, ref('origin/feature/topic', 'remote')])).toEqual([['topic', 1]])
   })
 
   it("doesn't fold a tracking branch with its namesake on the main remote", () => {
     const tracking = { ...ref('x', 'local'), upstream: 'fork/x' }
     expect(said([tracking, ref('origin/x', 'remote')])).toEqual([
-      ['x', false],
-      ['x', true],
+      ['x', 0],
+      ['x', 1],
     ])
   })
 
@@ -177,19 +205,19 @@ describe('refLabels', () => {
 
   it("doesn't fold a local branch into another remote's branch of the same name", () => {
     expect(said([ref('x', 'local'), ref('fork/x', 'remote')])).toEqual([
-      ['x', false],
-      ['fork/x', true],
+      ['x', 0],
+      ['fork/x', 1],
     ])
   })
 
   it('leaves origin/HEAD whole, since "HEAD" alone would mislead', () => {
-    expect(said([ref('origin/HEAD', 'remote')])).toEqual([['origin/HEAD', true]])
+    expect(said([ref('origin/HEAD', 'remote')])).toEqual([['origin/HEAD', 1]])
   })
 
   it('marks tags and stashes, which are never on a remote', () => {
     expect(said([ref('v1.0', 'tag'), ref('stash@{0}', 'stash')])).toEqual([
-      ['◆ v1.0', false],
-      ['≡ stash@{0}', false],
+      ['◆ v1.0', 0],
+      ['≡ stash@{0}', 0],
     ])
   })
 })
