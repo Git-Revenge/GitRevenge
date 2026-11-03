@@ -2,7 +2,9 @@
   import { errorText } from './errors'
   import { CommitDetail, CommitNotes, CommitSignatures, IssueURL, SetCommitNote } from '../../wailsjs/go/app/App.js'
   import type { app, git } from '../../wailsjs/go/models'
-  import { BrowserOpenURL } from '../../wailsjs/runtime/runtime.js'
+  import { BrowserOpenURL, ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
+  import { fileGroups, fileName } from './fileList'
+  import { TWO_COLUMNS } from './rightPanel'
   import { formatTime, type RefLabel } from './graph/draw'
   import RefChip from './graph/RefChip.svelte'
   import type { DiffTarget } from './diff/DiffView.svelte'
@@ -10,7 +12,7 @@
   import { reflow } from './text'
   import { asPerson, valueParts } from './trailers'
   import Markdown from './Markdown.svelte'
-  import Icon from './ui/Icon.svelte'
+  import Icon, { type IconName } from './ui/Icon.svelte'
   import Loading from './ui/Loading.svelte'
 
   let {
@@ -18,6 +20,8 @@
     commitId,
     refs = [],
     openFile,
+    onActions,
+    onReveal,
     current,
     onSearch,
   }: {
@@ -30,6 +34,10 @@
     current?: DiffTarget | null
     /** Searches the graph, e.g. for other commits with the same trailer. */
     onSearch?: (query: string) => void
+    /** Opens the commit's menu at this position. */
+    onActions?: (x: number, y: number) => void
+    /** Shows another commit in the graph, such as a parent. */
+    onReveal?: (id: string) => void
   } = $props()
 
   /** The graph search for commits sharing this trailer: by name for a person. */
@@ -38,6 +46,66 @@
   }
 
   let info = $state<app.CommitInfo | null>(null)
+
+  // Which tab shows. It stays put as you move between commits, and is remembered across
+  // sessions; a commit it can't apply to shows the message instead, without forgetting it.
+  type Tab = 'message' | 'files' | 'trailers' | 'details'
+  const TAB_LABELS: Record<Tab, string> = { message: 'Message', files: 'Files', trailers: 'Trailers', details: 'Details' }
+  const TAB_KEY = 'gitrevenge.commitTab'
+  let chosenTab = $state<Tab>(readTab())
+  function readTab(): Tab {
+    try {
+      const saved = localStorage.getItem(TAB_KEY)
+      return saved && saved in TAB_LABELS ? (saved as Tab) : 'message'
+    } catch {
+      return 'message'
+    }
+  }
+  function chooseTab(t: Tab) {
+    chosenTab = t
+    try {
+      localStorage.setItem(TAB_KEY, t)
+    } catch {
+      // Storage unavailable; the choice lasts for this session only.
+    }
+  }
+
+  let panelWidth = $state(0)
+  /** With room for it, the files stay beside the other tabs instead of being one of them. */
+  let wide = $derived(panelWidth >= TWO_COLUMNS)
+  let tabs = $derived.by(() => {
+    const out: Tab[] = wide ? ['message'] : ['message', 'files']
+    if (info?.commit.trailers.length) out.push('trailers')
+    out.push('details')
+    return out
+  })
+  let tab = $derived(tabs.includes(chosenTab) ? chosenTab : 'message')
+
+  /** Arrow keys move along the tabs, as a tab list should. */
+  function tabKey(e: KeyboardEvent, t: Tab) {
+    const i = tabs.indexOf(t)
+    const to = e.key === 'ArrowRight' ? (i + 1) % tabs.length : e.key === 'ArrowLeft' ? (i - 1 + tabs.length) % tabs.length : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1
+    if (to < 0) return
+    e.preventDefault()
+    chooseTab(tabs[to])
+    const list = (e.currentTarget as HTMLElement).parentElement
+    list?.querySelectorAll<HTMLElement>('[role=tab]')[to]?.focus()
+  }
+
+  let copied = $state(false)
+  let copiedTimer: ReturnType<typeof setTimeout> | undefined
+  async function copySha(id: string) {
+    try {
+      copied = (await ClipboardSetText(id)) !== false
+    } catch {
+      copied = false
+    }
+    clearTimeout(copiedTimer)
+    copiedTimer = setTimeout(() => (copied = false), 1500)
+  }
+
+  const STATUS_ICONS: Record<string, IconName> = { A: 'st-added', M: 'st-modified', T: 'st-modified', D: 'st-deleted', R: 'st-renamed', C: 'st-renamed' }
+  const STATUS_KINDS: Record<string, string> = { A: 'added', M: 'modified', T: 'modified', D: 'deleted', R: 'renamed', C: 'renamed' }
 
   // git notes on the commit, from every notes ref; the default ref's note can be edited.
   let notes = $state<git.Note[]>([])
@@ -163,144 +231,178 @@
   }
 </script>
 
-<aside class="panel" aria-label="Commit details">
+{#snippet fileList()}
+  <div class="files-head">
+    <span class="meta label">Files changed</span>
+    {#if info && info.commit.parents.length > 1}<span class="merge-note" title="Changes are shown against the first parent">First parent</span>{/if}
+  </div>
+  <div class="files">
+    {#each fileGroups(info?.files ?? []) as g (g.folder)}
+      {#if g.folder}<div class="folder" title={g.folder}>{g.folder}/</div>{/if}
+      <ul>
+        {#each g.files as f (f.path)}
+          <li>
+            <button
+              class:active={current?.mode === 'commit' && current.commit === commitId && current.file === f.path}
+              onclick={() => showFile(f)}
+              title={f.oldPath ? `${f.oldPath} → ${f.path}` : f.path}
+            >
+              <span class="code s-{STATUS_KINDS[f.status] ?? 'modified'}" title={statusNames[f.status] ?? f.status}><Icon name={STATUS_ICONS[f.status] ?? 'st-modified'} size={14} /><span class="visually-hidden">{statusNames[f.status] ?? f.status}</span></span>
+              <span class="file">{fileName(f.path)}</span>
+              {#if f.oldPath}<span class="from">from {f.oldPath}</span>{/if}
+              {#if f.binary}
+                <span class="binary">binary</span>
+              {:else if f.added || f.deleted}
+                <span class="added">+{f.added}</span>
+                <span class="deleted">−{f.deleted}</span>
+              {/if}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/each}
+  </div>
+{/snippet}
+
+<aside class="panel" aria-label="Commit details" bind:clientWidth={panelWidth}>
   <span class="blob" aria-hidden="true"></span>
   {#if !info}
     <Loading />
   {:else}
     {@const c = info.commit}
     <header>
-      <div class="head-row">
-        <span class="hand">this commit</span>
-        {#if c.body}
-          <button
-            class="btn sm quiet raw-toggle"
-            aria-pressed={raw}
-            onclick={toggleRaw}
-            title={raw ? 'Show the message rendered as markdown' : 'Show the message as plain text'}>{raw ? 'Raw' : 'Markdown'}</button
-          >
+      <h2>{c.subject}</h2>
+      <div class="who">
+        <button class="author" onclick={() => onSearch?.(c.author.name)} title="Find commits by {c.author.name}">{c.author.name}</button>
+        <span class="when">{formatTime(c.author.time)}</span>
+      </div>
+      <div class="ids">
+        <button class="btn sm secondary sha" onclick={() => copySha(c.id)} title="Copy the full SHA" aria-label="Copy SHA {c.id.slice(0, 7)}"
+          >{#if copied}Copied{:else}{c.id.slice(0, 7)}{/if}<Icon name={copied ? 'check' : 'copy'} size={13} /></button
+        >
+        {#each c.parents as p (p)}
+          <button class="btn sm text" onclick={() => onReveal?.(p)} title="Show this parent in the graph">parent {p.slice(0, 7)}</button>
+        {/each}
+        {#if info.commit.signed && sig}
+          <span class="sig-mark sig-{sig.status}" title={SIG_TEXT[sig.status] ?? 'Unsigned'}><Icon name={sig.status === 'good' ? 'check' : 'warning'} size={13} />{sig.status === 'good' ? 'Verified' : 'Signature'}</span>
+        {/if}
+        <span class="spacer"></span>
+        {#if onActions}
+          <button class="btn sm quiet" onclick={(e) => onActions?.(e.clientX, e.clientY)}>Actions<Icon name="chevron" size={13} /></button>
         {/if}
       </div>
-      <h2>{c.subject}</h2>
-      {#if c.body}
-        <div class="message">
-          {#if raw}<p class="body">{reflow(c.body)}</p>{:else}<Markdown text={c.body} {issueURL} />{/if}
+      {#if refs.length}
+        <div class="refs" aria-label="Branches and tags on this commit">
+          {#each refs as l (l.ref.name)}<RefChip label={l} />{/each}
         </div>
-      {/if}
-      {#if c.trailers.length}
-        <dl class="trailers" aria-label="Trailers">
-          {#each c.trailers as t, i (i)}
-            {@const who = asPerson(t.value)}
-            <dt class="meta">{t.key}</dt>
-            <dd class="trailer">
-              {#if who}
-                {who.name}<span class="email" title={who.email}>{who.email}</span>
-              {:else}
-                {#each valueParts(t.value, issueURL) as part, k (k)}{#if part.href}<a
-                      href={part.href}
-                      title={part.href}
-                      onclick={(e) => openLink(e, part.href!)}>{part.text}</a
-                    >{:else}{part.text}{/if}{/each}
-              {/if}
-              {#if onSearch}
-                <button
-                  class="find"
-                  title="Find commits with this trailer"
-                  aria-label="Find commits with {trailerQuery(t.key, t.value)}"
-                  onclick={() => onSearch(trailerQuery(t.key, t.value))}><Icon name="search" size={13} /></button
-                >
-              {/if}
-            </dd>
-          {/each}
-        </dl>
-      {/if}
-      <dl>
-        {#if refs.length}
-          <dt class="meta">Refs</dt>
-          <dd class="refs">
-            {#each refs as l (l.ref.name)}<RefChip label={l} />{/each}
-          </dd>
-        {/if}
-        <dt class="meta">Author</dt>
-        <dd>
-          {c.author.name}
-          <span class="email" title={c.author.email}>{c.author.email}</span>
-          <span class="when">{formatTime(c.author.time)}</span>
-        </dd>
-        {#if c.committer.name !== c.author.name || c.committer.time !== c.author.time}
-          <dt class="meta">Committer</dt>
-          <dd>
-          {c.committer.name}
-          <span class="when">{formatTime(c.committer.time)}</span>
-        </dd>
-        {/if}
-        <dt class="meta">Notes</dt>
-        <dd class="notes">
-          {#if notesError}<p class="muted" role="alert">Couldn't read notes: {notesError}</p>{/if}
-          {#each notes as n (n.ref)}
-            {#if !(n.ref === DEFAULT_NOTES && noteDraft !== null)}
-              <div class="note">
-                {#if n.ref !== DEFAULT_NOTES}<span class="meta note-ref">{n.ref.replace(/^refs\/notes\//, '')}</span>{/if}
-                <p>{n.text}</p>
-              </div>
-            {/if}
-          {/each}
-          {#if noteDraft !== null}
-            <textarea bind:value={noteDraft} rows="3" aria-label="Note" disabled={noteBusy}></textarea>
-            <span class="note-actions">
-              <button class="btn sm secondary" disabled={noteBusy} onclick={() => saveNote(noteDraft ?? '')}>Save note</button>
-              <button class="btn sm quiet" disabled={noteBusy} onclick={() => (noteDraft = null)}>Cancel</button>
-            </span>
-          {:else}
-            <span class="note-actions">
-              <button class="btn sm quiet" onclick={() => (noteDraft = ownNote?.text ?? '')}><Icon name={ownNote ? 'edit' : 'plus'} size={14} />{ownNote ? 'Edit note' : 'Add note'}</button>
-              {#if ownNote}<button class="btn sm quiet" disabled={noteBusy} onclick={() => saveNote('')}><Icon name="trash" size={14} />Remove</button>{/if}
-            </span>
-          {/if}
-        </dd>
-        {#if info.commit.signed}
-          <dt class="meta">Signature</dt>
-          <dd class="sig sig-{sig?.status ?? 'pending'}">
-            {#if !sig}
-              Checking…
-            {:else}
-              <Icon name={sig.status === 'good' ? 'check' : 'warning'} size={14} />
-              {SIG_TEXT[sig.status] ?? 'Unsigned'}{sig.format ? ` · ${sig.format.toUpperCase()}` : ''}
-              {#if sig.signer}<span class="email" title={sig.signer}>{sig.signer}</span>{/if}
-              {#if sig.key}<span class="key-id" title="Key">{sig.key}</span>{/if}
-            {/if}
-          </dd>
-        {/if}
-        <dt class="meta">Commit</dt>
-        <dd><code>{c.id}</code></dd>
-        {#if c.parents.length}
-          <dt class="meta">{c.parents.length > 1 ? 'Parents' : 'Parent'}</dt>
-          <dd class="parents">{c.parents.map((p) => p.slice(0, 10)).join(' ')}</dd>
-        {/if}
-      </dl>
-      {#if c.parents.length > 1}
-        <p class="note">Changes are shown against the first parent.</p>
       {/if}
     </header>
 
-    <div class="files-head">
-      <span class="meta label">Files changed</span>
-      <span class="meta">{info.files.length}</span>
-    </div>
-    <ul class="files">
-      {#each info.files as f (f.path)}
-        <li>
-          <button
-            class:active={current?.mode === 'commit' && current.commit === commitId && current.file === f.path}
-            onclick={() => showFile(f)}
-            title={f.oldPath ? `${f.oldPath} → ${f.path}` : f.path}
-          >
-            <span class="status s-{f.status}">{statusNames[f.status] ?? f.status}</span>
-            <span class="file">{f.oldPath ? `${f.oldPath} → ${f.path}` : f.path}</span>
-          </button>
-        </li>
+    <div class="tabs" role="tablist" aria-label="Commit">
+      {#each tabs as t (t)}
+        <button role="tab" id="commit-tab-{t}" class="tab" class:active={tab === t} aria-selected={tab === t} aria-controls="commit-panel" tabindex={tab === t ? 0 : -1} onclick={() => chooseTab(t)} onkeydown={(e) => tabKey(e, t)}>{TAB_LABELS[t]}</button>
       {/each}
-    </ul>
+    </div>
+
+    <div class="content" class:wide>
+      <div class="tabpanel" id="commit-panel" role="tabpanel" aria-labelledby="commit-tab-{tab}" tabindex="-1">
+        {#if tab === 'message'}
+          {#if c.body}
+            <div class="message-tools">
+              <button class="btn sm quiet raw-toggle" aria-pressed={raw} onclick={toggleRaw} title={raw ? 'Show the message rendered as markdown' : 'Show the message as plain text'}>{raw ? 'Raw' : 'Markdown'}</button>
+            </div>
+            <div class="message">
+              {#if raw}<p class="body">{reflow(c.body)}</p>{:else}<Markdown text={c.body} {issueURL} />{/if}
+            </div>
+          {:else}
+            <p class="muted">No description.</p>
+          {/if}
+        {:else if tab === 'files'}
+          {@render fileList()}
+        {:else if tab === 'trailers'}
+          <dl class="trailers" aria-label="Trailers">
+            {#each c.trailers as t, i (i)}
+              {@const who = asPerson(t.value)}
+              <dt class="meta">{t.key}</dt>
+              <dd class="trailer">
+                {#if who}
+                  {who.name}<span class="email" title={who.email}>{who.email}</span>
+                {:else}
+                  {#each valueParts(t.value, issueURL) as part, k (k)}{#if part.href}<a href={part.href} title={part.href} onclick={(e) => openLink(e, part.href!)}>{part.text}</a>{:else}{part.text}{/if}{/each}
+                {/if}
+                {#if onSearch}
+                  <button class="find" title="Find commits with this trailer" aria-label="Find commits with {trailerQuery(t.key, t.value)}" onclick={() => onSearch(trailerQuery(t.key, t.value))}><Icon name="search" size={13} /></button>
+                {/if}
+              </dd>
+            {/each}
+          </dl>
+        {:else}
+          <dl class="details">
+            <dt class="meta">Author</dt>
+            <dd>
+              {c.author.name}
+              <span class="email" title={c.author.email}>{c.author.email}</span>
+              <span class="when">{formatTime(c.author.time)}</span>
+            </dd>
+            {#if c.committer.name !== c.author.name || c.committer.time !== c.author.time}
+              <dt class="meta">Committer</dt>
+              <dd>
+                {c.committer.name}
+                <span class="when">{formatTime(c.committer.time)}</span>
+              </dd>
+            {/if}
+            <dt class="meta">Notes</dt>
+            <dd class="notes">
+              {#if notesError}<p class="muted" role="alert">Couldn't read notes: {notesError}</p>{/if}
+              {#each notes as n (n.ref)}
+                {#if !(n.ref === DEFAULT_NOTES && noteDraft !== null)}
+                  <div class="note">
+                    {#if n.ref !== DEFAULT_NOTES}<span class="meta note-ref">{n.ref.replace(/^refs\/notes\//, '')}</span>{/if}
+                    <p>{n.text}</p>
+                  </div>
+                {/if}
+              {/each}
+              {#if noteDraft !== null}
+                <textarea bind:value={noteDraft} rows="3" aria-label="Note" disabled={noteBusy}></textarea>
+                <span class="note-actions">
+                  <button class="btn sm secondary" disabled={noteBusy} onclick={() => saveNote(noteDraft ?? '')}>Save note</button>
+                  <button class="btn sm quiet" disabled={noteBusy} onclick={() => (noteDraft = null)}>Cancel</button>
+                </span>
+              {:else}
+                <span class="note-actions">
+                  <button class="btn sm quiet" onclick={() => (noteDraft = ownNote?.text ?? '')}><Icon name={ownNote ? 'edit' : 'plus'} size={13} />{ownNote ? 'Edit note' : 'Add note'}</button>
+                  {#if ownNote}<button class="btn sm quiet" disabled={noteBusy} onclick={() => saveNote('')}><Icon name="trash" size={13} />Remove</button>{/if}
+                </span>
+              {/if}
+            </dd>
+            <dt class="meta">Signature</dt>
+            {#if info.commit.signed}
+              <dd class="sig sig-{sig?.status ?? 'pending'}">
+                {#if !sig}
+                  Checking…
+                {:else}
+                  <Icon name={sig.status === 'good' ? 'check' : 'warning'} size={14} />
+                  {SIG_TEXT[sig.status] ?? 'Unsigned'}{sig.format ? ` · ${sig.format.toUpperCase()}` : ''}
+                  {#if sig.signer}<span class="email" title={sig.signer}>{sig.signer}</span>{/if}
+                  {#if sig.key}<span class="key-id" title="Key">{sig.key}</span>{/if}
+                {/if}
+              </dd>
+            {:else}
+              <dd class="muted">Not signed</dd>
+            {/if}
+            <dt class="meta">Commit</dt>
+            <dd><code>{c.id}</code></dd>
+            {#if c.parents.length}
+              <dt class="meta">{c.parents.length > 1 ? 'Parents' : 'Parent'}</dt>
+              <dd class="parents">{c.parents.map((p) => p.slice(0, 10)).join(' ')}</dd>
+            {/if}
+          </dl>
+        {/if}
+      </div>
+      {#if wide}
+        <div class="side-files">{@render fileList()}</div>
+      {/if}
+    </div>
   {/if}
 </aside>
 
@@ -311,11 +413,265 @@
     flex-direction: column;
     flex: 1;
     min-width: 0;
-    padding-bottom: 16px;
     border-left: 1px solid var(--paper-edge);
     background: var(--paper);
-    overflow-x: hidden;
+    overflow: hidden;
+  }
+
+  .who {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 8px;
+    font-size: 14px;
+  }
+
+  .author {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: var(--ink);
+    text-align: left;
+  }
+
+  .author:hover:not(:disabled) {
+    background: none;
+    color: var(--link);
+  }
+
+  .ids {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin-top: 8px;
+  }
+
+  .spacer {
+    flex: 1;
+  }
+
+  .sha {
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .sig-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .sig-mark.sig-good {
+    color: var(--success);
+  }
+
+  .sig-mark:not(.sig-good) {
+    color: var(--warning);
+  }
+
+  /* Plain headings, under one torn rose bar, like the repository tabs above. */
+  .tabs {
+    position: relative;
+    flex: none;
+    display: flex;
+    gap: 2px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--paper-edge);
+  }
+
+  .tab {
+    position: relative;
+    padding: 8px 10px 9px;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    font-size: 14px;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  .tab:hover:not(:disabled) {
+    background: none;
+    color: var(--ink);
+  }
+
+  .tab.active {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .tab.active::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    bottom: 1px;
+    height: 3px;
+    border-radius: 45% 55% 50% 50% / 55% 45%;
+    background: var(--link);
+  }
+
+  .content {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+  }
+
+  .tabpanel {
+    flex: 1;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 12px 20px 16px;
     overflow-y: auto;
+    outline: none;
+  }
+
+  .content.wide .tabpanel {
+    flex: 3;
+  }
+
+  .side-files {
+    flex: 2;
+    min-width: 0;
+    box-sizing: border-box;
+    padding-top: 12px;
+    border-left: 1px solid var(--paper-edge);
+    overflow-y: auto;
+  }
+
+  .message-tools {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 4px;
+  }
+
+  .files-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 0 6px;
+  }
+
+  .side-files .files-head,
+  .side-files .files {
+    margin-left: 20px;
+    margin-right: 12px;
+  }
+
+  .merge-note {
+    font-size: 13px;
+    color: var(--ink-mute);
+  }
+
+  .folder {
+    margin-top: 8px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-mute);
+  }
+
+  .files ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .files li button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 28px;
+    padding: 2px 4px;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    text-align: left;
+  }
+
+  .files li button:hover:not(:disabled) {
+    background: var(--wash-hover);
+  }
+
+  .files li button.active {
+    background: var(--selected);
+  }
+
+  .code {
+    display: inline-flex;
+    flex: none;
+  }
+
+  .s-added {
+    color: var(--success);
+  }
+
+  .s-modified {
+    color: var(--warning);
+  }
+
+  .s-deleted {
+    color: var(--danger);
+  }
+
+  .s-renamed {
+    color: var(--accent-a);
+  }
+
+  .file {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--ink);
+  }
+
+  .from {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-mute);
+  }
+
+  .added,
+  .deleted,
+  .binary {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .added {
+    margin-left: auto;
+    color: var(--success);
+  }
+
+  .from + .added {
+    margin-left: 0;
+  }
+
+  .deleted {
+    color: var(--danger);
+  }
+
+  .binary {
+    margin-left: auto;
+    color: var(--ink-mute);
   }
 
   /* One watercolour blob behind the title: decoration only. */
@@ -338,12 +694,13 @@
 
   header {
     position: relative;
-    padding: 18px 20px 4px;
+    flex: none;
+    padding: 16px 16px 10px 20px;
   }
 
   h2 {
-    margin: 4px 0 8px;
-    font-size: 21px;
+    margin: 0 0 6px;
+    font-size: 19px;
     font-weight: 500;
     line-height: 1.25;
     letter-spacing: -0.015em;
@@ -380,6 +737,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
+    margin-top: 8px;
   }
 
   .message {

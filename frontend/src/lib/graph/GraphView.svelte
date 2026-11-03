@@ -312,6 +312,11 @@
     return i >= 0 && i < span ? i : -1
   }
 
+  /** The refs on a commit, for its menu. */
+  export function refsOf(id: string): Ref[] {
+    return cache.refsFor(id)
+  }
+
   /** Searches the graph for q and moves to the first match, e.g. a trailer from the
    * commit panel. */
   export async function search(q: string) {

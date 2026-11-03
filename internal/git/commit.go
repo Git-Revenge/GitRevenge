@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -98,6 +99,12 @@ type FileChange struct {
 	Path   string `json:"path"`
 	// OldPath is set for renames and copies.
 	OldPath string `json:"oldPath,omitempty"`
+	// Added and Deleted count changed lines. Both are 0 for a binary file, or if they
+	// couldn't be read: they're only there to help scan a list.
+	Added   int `json:"added"`
+	Deleted int `json:"deleted"`
+	// Binary means the file has no lines to count.
+	Binary bool `json:"binary,omitempty"`
 }
 
 // ChangedFiles lists the files a commit changed relative to its first parent (or, for a
@@ -113,7 +120,44 @@ func (r *Repo) ChangedFiles(ctx context.Context, c CommitDetail) ([]FileChange, 
 	if err != nil {
 		return nil, err
 	}
-	return parseNameStatus(out), nil
+	changes := parseNameStatus(out)
+	args[slices.Index(args, "--name-status")] = "--numstat"
+	if counts, err := r.Read(ctx, args...); err == nil {
+		applyNumstat(changes, counts)
+	}
+	return changes, nil
+}
+
+// applyNumstat fills in line counts from `--numstat -z` output: ADDED TAB DELETED TAB path
+// NUL, or for renames and copies ADDED TAB DELETED TAB NUL old NUL new NUL. A binary file has
+// - for both counts.
+func applyNumstat(changes []FileChange, out []byte) {
+	byPath := make(map[string]*FileChange, len(changes))
+	for i := range changes {
+		byPath[changes[i].Path] = &changes[i]
+	}
+	f := strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
+	for i := 0; i < len(f); i++ {
+		added, rest, ok := strings.Cut(f[i], "\t")
+		if !ok {
+			continue
+		}
+		deleted, path, ok := strings.Cut(rest, "\t")
+		if !ok {
+			continue
+		}
+		if path == "" && i+2 < len(f) {
+			path = f[i+2]
+			i += 2
+		}
+		c := byPath[path]
+		if c == nil {
+			continue
+		}
+		c.Binary = added == "-" && deleted == "-"
+		c.Added, _ = strconv.Atoi(added)
+		c.Deleted, _ = strconv.Atoi(deleted)
+	}
 }
 
 // parseNameStatus parses `--name-status -z` output: STATUS NUL path NUL, or for renames

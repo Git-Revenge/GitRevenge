@@ -485,6 +485,105 @@ test.describe('commit graph', () => {
     })
   })
 
+  // #435: a long commit pushed its files far below the fold.
+  test.describe('the commit panel', () => {
+    const id = '0'.repeat(40)
+    const person = { name: 'Ana Cruz', email: 'ana@example.com', time: 1793500000 }
+    const commit = { id, subject: 'Commit 0', body: 'The long story.', trailers: [{ key: 'Closes', value: '#12' }], parents: ['a'.repeat(40)], author: person, committer: person }
+    const files = [
+      { status: 'M', path: 'src/lib/a.ts', added: 12, deleted: 3 },
+      { status: 'A', path: 'src/lib/b.ts', added: 5, deleted: 0 },
+      { status: 'M', path: 'docs/c.md', added: 1, deleted: 1 },
+      { status: 'M', path: 'logo.png', added: 0, deleted: 0, binary: true },
+    ]
+    const scenario = (over: object = {}) => ({ graphRows: 3, responses: { Refs: [], CommitSignatures: [], CommitNotes: [], WorkingTree: { status: { files: [] }, signing: { enabled: false }, identity: { name: 'A', email: 'a@example.com' } }, CommitDetail: { commit: { ...commit, ...over }, files }, CommitRow: 1 } })
+    const openCommit = async (page: Page, over: object = {}) => {
+      await open(page, 'repoView', scenario(over))
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.click(box.x + 500, box.y + 26)
+      await expect(page.getByRole('heading', { name: 'Commit 0' })).toBeVisible()
+    }
+    const tab = (page: Page, name: string) => page.getByRole('tab', { name, exact: true })
+
+    test('opens on the message, under plain headings', async ({ page }) => {
+      await openCommit(page)
+      await expect(tab(page, 'Message')).toHaveAttribute('aria-selected', 'true')
+      await expect(page.getByRole('tabpanel')).toContainText('The long story.')
+      await expect(page.getByRole('tab')).toHaveText(['Message', 'Files', 'Trailers', 'Details'])
+    })
+
+    test('lists files by name under their folders, with line counts', async ({ page }) => {
+      await openCommit(page)
+      await tab(page, 'Files').click()
+      const panel = page.getByRole('tabpanel')
+      await expect(panel.getByText('src/lib/', { exact: true })).toBeVisible()
+      await expect(panel.getByRole('button', { name: /a\.ts/ })).toContainText('+12')
+      await expect(panel.getByRole('button', { name: /a\.ts/ })).toContainText('−3')
+      await expect(panel.getByRole('button', { name: /logo\.png/ })).toContainText('binary')
+    })
+
+    test('remembers the tab across commits and sessions', async ({ page }) => {
+      await openCommit(page)
+      await tab(page, 'Details').click()
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.click(box.x + 500, box.y + 78)
+      await expect(tab(page, 'Details')).toHaveAttribute('aria-selected', 'true')
+      await page.reload()
+      const again = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.click(again.x + 500, again.y + 26)
+      await expect(tab(page, 'Details')).toHaveAttribute('aria-selected', 'true')
+    })
+
+    test('the arrow keys move along the tabs', async ({ page }) => {
+      await openCommit(page)
+      await tab(page, 'Message').focus()
+      await page.keyboard.press('ArrowRight')
+      await expect(tab(page, 'Files')).toBeFocused()
+      await expect(tab(page, 'Files')).toHaveAttribute('aria-selected', 'true')
+      await page.keyboard.press('ArrowLeft')
+      await page.keyboard.press('ArrowLeft')
+      await expect(tab(page, 'Details')).toBeFocused()
+    })
+
+    test('a commit without trailers shows the message, and keeps the choice for one that has them', async ({ page }) => {
+      await page.addInitScript(() => localStorage.setItem('gitrevenge.commitTab', 'trailers'))
+      await openCommit(page, { trailers: [] })
+      await expect(tab(page, 'Trailers')).toHaveCount(0)
+      await expect(tab(page, 'Message')).toHaveAttribute('aria-selected', 'true')
+      expect(await page.evaluate(() => localStorage.getItem('gitrevenge.commitTab'))).toBe('trailers')
+    })
+
+    test('says so when there is no description', async ({ page }) => {
+      await openCommit(page, { body: '', trailers: [] })
+      await expect(tab(page, 'Trailers')).toHaveCount(0)
+      await expect(page.getByRole('tabpanel')).toContainText('No description.')
+    })
+
+    test('copies the SHA, and shows the parent', async ({ page }) => {
+      await openCommit(page)
+      await page.getByRole('button', { name: 'Copy SHA 0000000' }).click()
+      await expect(page.getByRole('button', { name: 'Copy SHA 0000000' })).toContainText('Copied')
+      await page.getByRole('button', { name: 'parent aaaaaaa' }).click()
+      await expect.poll(() => calls(page, 'CommitRow').then((c) => c.at(-1))).toEqual(['/r', 'a'.repeat(40)])
+    })
+
+    test('Actions opens the commit menu', async ({ page }) => {
+      await openCommit(page)
+      await page.getByRole('button', { name: 'Actions' }).click()
+      await expect(page.getByRole('menu')).toBeVisible()
+    })
+
+    test('when wide, the files stay beside the tabs', async ({ page }) => {
+      await page.setViewportSize({ width: 1600, height: 800 })
+      await openCommit(page)
+      await page.getByRole('separator', { name: 'Resize the right panel' }).focus()
+      for (let i = 0; i < 16; i++) await page.keyboard.press('ArrowLeft')
+      await expect(tab(page, 'Files')).toHaveCount(0)
+      await expect(page.getByRole('tabpanel')).toContainText('The long story.')
+      await expect(page.locator('.side-files').getByRole('button', { name: /a\.ts/ })).toBeVisible()
+    })
+  })
+
   // #418: the commit panel has the same list, for the keyboard and screen readers.
   test("the commit panel lists the selected commit's refs", async ({ page }) => {
     const id = '0'.repeat(40)
@@ -497,7 +596,7 @@ test.describe('commit graph', () => {
     })
     const box = (await page.locator('.scroller').boundingBox())!
     await page.mouse.click(box.x + 500, box.y + 26)
-    const list = page.getByRole('definition').filter({ hasText: 'local · origin' })
+    const list = page.getByLabel('Branches and tags on this commit')
     await expect(list).toBeVisible()
     await expect(list.getByText('main', { exact: true })).toBeVisible()
     await expect(list.getByText('◆ v1.0')).toBeVisible()

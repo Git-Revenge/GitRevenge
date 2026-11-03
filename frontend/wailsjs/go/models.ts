@@ -1016,6 +1016,9 @@ export namespace git {
 	    status: string;
 	    path: string;
 	    oldPath?: string;
+	    added: number;
+	    deleted: number;
+	    binary?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new FileChange(source);
@@ -1026,6 +1029,9 @@ export namespace git {
 	        this.status = source["status"];
 	        this.path = source["path"];
 	        this.oldPath = source["oldPath"];
+	        this.added = source["added"];
+	        this.deleted = source["deleted"];
+	        this.binary = source["binary"];
 	    }
 	}
 	export class FileCommit {
