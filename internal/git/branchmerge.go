@@ -34,6 +34,7 @@ type BranchMerge struct {
 // make merging them conflict. Anything that goes wrong reads as "not known to be merged",
 // since the answer decides whether deleting the branch asks first.
 func (r *Repo) BranchMergeState(ctx context.Context, branch string, targets []string) BranchMerge {
+	targets = r.distinctTargets(ctx, targets)
 	first := r.mergeIntoAny(ctx, "refs/heads/"+branch, targets)
 	if first.How != "" || len(targets) == 0 {
 		return first
@@ -66,6 +67,29 @@ func (r *Repo) branchesContaining(ctx context.Context, branch string) []string {
 		}
 	}
 	return names
+}
+
+// distinctTargets drops targets at the same commit as an earlier one, such as a Trunk branch
+// and its upstream when they're level: comparing with both would only give the same answer
+// twice, at the cost of the slowest check there is.
+func (r *Repo) distinctTargets(ctx context.Context, targets []string) []string {
+	if len(targets) < 2 {
+		return targets
+	}
+	out, err := r.ReadString(ctx, append([]string{"rev-parse"}, targets...)...)
+	commits := strings.Fields(out)
+	if err != nil || len(commits) != len(targets) {
+		return targets
+	}
+	seen := map[string]bool{}
+	var distinct []string
+	for i, commit := range commits {
+		if !seen[commit] {
+			seen[commit] = true
+			distinct = append(distinct, targets[i])
+		}
+	}
+	return distinct
 }
 
 // mergeIntoAny returns the first target holding ref's work, else the state against the first.
@@ -101,11 +125,110 @@ func (r *Repo) mergeInto(ctx context.Context, ref, target string) BranchMerge {
 	}
 	state.Unmerged = missing
 	// One commit has no combined change that it doesn't already have itself.
-	if (missing+landed > 1 && r.squashedWhole(ctx, ref, target)) || r.mergeChangesNothing(ctx, ref, target) {
+	if (missing+landed > 1 && r.squashedWhole(ctx, ref, target)) || r.targetHeldChanges(ctx, ref, target) || r.mergeChangesNothing(ctx, ref, target) {
 		state.How = SquashedIn
 		state.Unmerged = 0
 	}
 	return state
+}
+
+// maxHeldPaths is how many changed files targetHeldChanges will look for. A branch changing
+// more than this goes on to the other checks.
+const maxHeldPaths = 200
+
+// maxHeldMerges is how many equally close commits targetHeldChanges will try a merge at.
+const maxHeldMerges = 4
+
+// targetHeldChanges reports whether target held all of ref's changes at some commit since they
+// parted. That's the top of a stack squash-merged a branch at a time, and it stays true however
+// target changes those files afterwards, which would make merging ref conflict today.
+//
+// Trying a merge at every commit would be slow, so it reads the history of ref's files once. A
+// commit with every file exactly as ref has it settles it. Other work landing in the same files
+// can stop that ever happening, so the commits that came closest get a real merge to decide.
+// A branch that changes nothing overall has nothing to look for, so it doesn't count.
+func (r *Repo) targetHeldChanges(ctx context.Context, ref, target string) bool {
+	out, err := r.ReadString(ctx, "merge-base", target, ref)
+	if err != nil {
+		return false
+	}
+	base := strings.TrimSpace(out)
+	out, err = r.ReadString(ctx, "-c", "core.quotepath=off", "diff", "--raw", "--no-abbrev", "--no-renames", base, ref)
+	if err != nil {
+		return false
+	}
+	want := map[string]string{}
+	for line := range strings.Lines(out) {
+		path, blob, ok := rawChange(line)
+		if !ok {
+			return false
+		}
+		want[path] = blob
+	}
+	if len(want) == 0 || len(want) > maxHeldPaths {
+		return false
+	}
+	args := []string{"--literal-pathspecs", "-c", "core.quotepath=off", "log", "--first-parent", "-m", "--reverse", "--raw", "--no-abbrev", "--no-renames", "--format=%H", base + ".." + target, "--"}
+	for path := range want {
+		args = append(args, path)
+	}
+	out, err = r.ReadString(ctx, args...)
+	if err != nil {
+		return false
+	}
+	matching := map[string]bool{}
+	var commit string
+	var closest []string
+	best := 0
+	// Called as each commit ends. Equally close commits are kept oldest first, since later ones
+	// are more likely to be target moving on from the commit that held the work.
+	finish := func() {
+		switch n := len(matching); {
+		case commit == "" || n == 0 || n < best:
+		case n > best:
+			best, closest = n, []string{commit}
+		case len(closest) < maxHeldMerges:
+			closest = append(closest, commit)
+		}
+	}
+	for line := range strings.Lines(out) {
+		text := strings.TrimSpace(line)
+		switch {
+		case text == "":
+		case strings.HasPrefix(text, ":"):
+			path, blob, ok := rawChange(line)
+			if !ok {
+				return false
+			}
+			if blob == want[path] {
+				matching[path] = true
+			} else {
+				delete(matching, path)
+			}
+		default:
+			finish()
+			if best == len(want) {
+				return true
+			}
+			commit = text
+		}
+	}
+	finish()
+	if best == len(want) {
+		return true
+	}
+	return slices.ContainsFunc(closest, func(c string) bool { return r.mergeChangesNothing(ctx, ref, c) })
+}
+
+// rawChange reads a line of git's --raw output as its path and the blob it ends up as, which is
+// all zeroes when the file is deleted. A path git had to quote isn't worth unpicking.
+func rawChange(line string) (path, blob string, ok bool) {
+	info, path, found := strings.Cut(strings.TrimRight(line, "\r\n"), "\t")
+	fields := strings.Fields(info)
+	if !found || len(fields) < 5 || strings.HasPrefix(path, "\"") {
+		return "", "", false
+	}
+	return path, fields[3], true
 }
 
 // mergeChangesNothing reports whether merging ref into target would leave target exactly as
@@ -173,9 +296,22 @@ func countCherry(out string) (missing, landed int) {
 // each check can take a second on a big repository. It returns what it has if ctx runs out.
 func (r *Repo) MergedBranches(ctx context.Context, names, targets []string) map[string]BranchMerge {
 	merged := map[string]BranchMerge{}
+	for name, state := range r.BranchStates(ctx, names, targets) {
+		if state.How != "" {
+			merged[name] = state
+		}
+	}
+	return merged
+}
+
+// BranchStates is MergedBranches with the branches it found not merged too, and how many of
+// their commits aren't. A branch it had no time for isn't there.
+func (r *Repo) BranchStates(ctx context.Context, names, targets []string) map[string]BranchMerge {
+	merged := map[string]BranchMerge{}
 	if len(targets) == 0 {
 		return merged
 	}
+	targets = r.distinctTargets(ctx, targets)
 	above := make(map[string][]string, len(names))
 	for _, name := range names {
 		for _, b := range r.branchesContaining(ctx, name) {
@@ -193,7 +329,7 @@ func (r *Repo) MergedBranches(ctx context.Context, names, targets []string) map[
 		}
 		inherited := false
 		for _, b := range above[name] {
-			if m, ok := merged[b]; ok {
+			if m, ok := merged[b]; ok && m.How != "" {
 				merged[name] = BranchMerge{Target: m.Target, How: SquashedIn}
 				inherited = true
 				break
@@ -202,9 +338,7 @@ func (r *Repo) MergedBranches(ctx context.Context, names, targets []string) map[
 		if inherited {
 			continue
 		}
-		if state := r.mergeIntoAny(ctx, "refs/heads/"+name, targets); state.How != "" {
-			merged[name] = state
-		}
+		merged[name] = r.mergeIntoAny(ctx, "refs/heads/"+name, targets)
 	}
 	return merged
 }
