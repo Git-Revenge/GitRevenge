@@ -24,6 +24,9 @@ type FileStatus struct {
 	Added   int  `json:"added"`
 	Deleted int  `json:"deleted"`
 	Binary  bool `json:"binary,omitempty"`
+	// CaseClash means this file's name differs from another tracked file's only by letter
+	// case, on a filesystem that can't keep them apart (see MarkCaseClashes).
+	CaseClash bool `json:"caseClash,omitempty"`
 }
 
 // Staged reports whether the file has changes in the index.

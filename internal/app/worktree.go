@@ -27,6 +27,7 @@ func (a *App) WorkingTree(path string) (WorkingTree, error) {
 		return WorkingTree{}, err
 	}
 	r.Git.CountLines(ctx, &st)
+	r.Git.MarkCaseClashes(ctx, &st)
 	return WorkingTree{Status: st, Signing: r.Git.CommitSigning(ctx), Identity: r.Git.CommitIdentity(ctx)}, nil
 }
 
