@@ -22,6 +22,10 @@ export function BranchAction(arg1, arg2, arg3) {
   return window['go']['app']['App']['BranchAction'](arg1, arg2, arg3);
 }
 
+export function BranchMergeState(arg1, arg2) {
+  return window['go']['app']['App']['BranchMergeState'](arg1, arg2);
+}
+
 export function CancelClone() {
   return window['go']['app']['App']['CancelClone']();
 }

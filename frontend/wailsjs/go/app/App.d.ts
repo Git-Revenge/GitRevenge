@@ -16,6 +16,8 @@ export function Blame(arg1:string,arg2:string,arg3:string):Promise<Array<git.Bla
 
 export function BranchAction(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
+export function BranchMergeState(arg1:string,arg2:string):Promise<git.BranchMerge>;
+
 export function CancelClone():Promise<void>;
 
 export function CancelNetwork(arg1:string):Promise<void>;
