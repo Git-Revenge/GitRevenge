@@ -16,7 +16,7 @@
   import type { DiffTarget } from './diff/DiffView.svelte'
   import Lazy from './ui/Lazy.svelte'
   import GraphView from './graph/GraphView.svelte'
-  import type { RefLabel } from './graph/draw'
+  import { laneX, type Layout, type RefLabel } from './graph/draw'
   import type { Ref, Row } from './graph/rowCache'
   import { session } from './session.svelte'
   import Sidebar from './Sidebar.svelte'
@@ -55,6 +55,8 @@
   /** Files with uncommitted changes; null until the first answer, so nothing claims "clean". */
   let changes = $state<number | null>(null)
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
+  /** Where the graph's columns are, so the row of changes above it lines up with them. */
+  let graphLayout = $state<Layout>()
 
   let dialog = $state<DialogSpec | null>(null)
   let remotesOpen = $state(false)
@@ -173,19 +175,27 @@
     <button
       class="wip"
       class:active={view === 'wip'}
+      aria-pressed={view === 'wip'}
+      style:--node="{graphLayout ? graphLayout.refW + laneX(0, graphLayout.m) : 22}px"
+      style:--text="{graphLayout?.textX ?? 44}px"
       onclick={() => {
         view = 'wip'
         if (diff?.mode === 'commit') diff = null
       }}
     >
-      <span class="dot" class:dirty={!!changes}>{#if changes !== null}<Icon name={changes > 0 ? 'st-modified' : 'check'} />{/if}</span>
-      <span class="wip-title">{changes ? 'Uncommitted changes' : 'Working tree'}</span>
-      {#if changes !== null}<span class="meta">{changes > 0 ? `${changes} ${changes === 1 ? 'file' : 'files'}` : 'clean'}</span>{/if}
+      <span class="dot" class:dirty={!!changes}>{#if changes && changes > 0}<span class="ring"></span>{:else if changes !== null}<Icon name="check" />{/if}</span>
+      <span class="wip-title">{changes ? `${changes} ${changes === 1 ? 'file' : 'files'} changed` : 'Working tree'}</span>
+      {#if changes && session.activeTab?.head}
+        <span class="where">{session.activeTab.head.startsWith('detached') ? session.activeTab.head : `on ${session.activeTab.head}`}</span>
+      {:else if changes === 0}
+        <span class="meta">clean</span>
+      {/if}
+      {#if changes}<span class="review">Review</span>{/if}
     </button>
     <!-- The graph stays mounted while a diff is open, so scroll position and selection
          survive returning to it. -->
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {onSelect} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {onSelect} onLayout={(l) => (graphLayout = l)} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           openMenu(commitMenuItems(row, refs, ctx), x, y)}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
@@ -341,12 +351,15 @@
     display: none;
   }
 
+  /* A quiet row that lines up with the graph below: a dashed node where the work will land,
+     and its words where commit messages start. */
   .wip {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
     min-height: 38px;
-    padding: 0 14px;
+    padding: 0 14px 0 var(--text);
     background: none;
     border: none;
     border-bottom: 1px dotted var(--paper-edge);
@@ -360,16 +373,49 @@
   }
 
   .wip.active {
-    background: var(--selected);
+    background: var(--paper-warm);
   }
 
   .wip-title {
-    font-style: italic;
-    color: var(--ink-soft);
+    font-weight: 500;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  .where {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-mute);
+  }
+
+  .review {
+    flex: none;
+    margin-left: auto;
+    padding: 3px 10px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--link) 12%, transparent);
+    font-size: 14px;
+    color: var(--link);
+  }
+
+  .ring {
+    box-sizing: border-box;
+    width: 14px;
+    height: 14px;
+    border: 2px dashed var(--lane-0);
+    border-radius: 50%;
   }
 
   .dot {
+    position: absolute;
+    left: calc(var(--node) - 8px);
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
     /* The icon's size, kept while there's no icon yet so the title doesn't shift. */
     min-width: 16px;
     min-height: 16px;

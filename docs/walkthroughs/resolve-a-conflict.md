@@ -9,7 +9,7 @@ Maya switched the dashboard's wind readings to knots on `main`. Meanwhile Sam, o
 
 1. **Merge.** In the sidebar, open the `feature` folder, right-click `metric-units`, and choose **Merge feature/metric-units into main**. Git merges everything it can and stops at the conflict. A banner at the top says *Merge in progress* and how many files conflict.
 
-2. **Find the conflicted files.** Click **Uncommitted changes**. Conflicted files are listed first, under **Conflicts**.
+2. **Find the conflicted files.** Click the row at the top of the graph that says how many files changed. Conflicted files are listed first, under **Conflicts**.
 
 3. **Decide, file by file.** For each file, either:
 

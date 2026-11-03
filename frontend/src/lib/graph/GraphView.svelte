@@ -19,6 +19,7 @@
     onSelect,
     onContext,
     onDrop,
+    onLayout,
     onSelectedRefs,
   }: {
     path: string
@@ -28,6 +29,8 @@
     onDrop?: (source: Row, sourceRefs: Ref[], target: Row, targetRefs: Ref[], x: number, y: number) => void
     /** auto is true for the automatic selection of HEAD when the graph first loads. */
     onSelect?: (row: Row | undefined, auto: boolean) => void
+    /** Where the graph's columns are, whenever they move. */
+    onLayout?: (layout: Layout) => void
     /** Labels for the selected commit's refs, whenever they change. They can load after the selection. */
     onSelectedRefs?: (labels: RefLabel[]) => void
   } = $props()
@@ -282,7 +285,10 @@
     }
     const firstLane = minCol === Infinity ? 0 : laneWindow(minCol, maxCol, sel && selected >= first && selected < last ? sel.col : null, laneCapacity(graphW, m))
     const lay = layoutColumns(w, graphW, density, firstLane, remote)
-    if (!columns || columns.width !== lay.width || columns.graphW !== lay.graphW || columns.density !== lay.density) columns = lay
+    if (!columns || columns.width !== lay.width || columns.graphW !== lay.graphW || columns.density !== lay.density) {
+      columns = lay
+      onLayout?.(lay)
+    }
     const th = theme()
     const now = Date.now() / 1000
     labelSpans.clear()
