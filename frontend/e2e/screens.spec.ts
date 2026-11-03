@@ -302,7 +302,7 @@ test.describe('commit graph', () => {
   test.describe('hovering over labels', () => {
     const id = '0'.repeat(40)
     const graphRefs = { [id]: [branch('main', { head: true, branchKind: 'trunk' }), remote('origin/main', { branchKind: 'trunk' }), remote('fork/main', { branchKind: 'trunk' }), tag('v1.0'), branch('feature/a-rather-long-branch-name')] }
-    const scenario = { graphRows: 5, graphRefs, responses: { Refs: [], CommitSignatures: [] } }
+    const scenario = { graphRows: 5, graphRefs, responses: { Refs: graphRefs[id], CommitSignatures: [] } }
     /** The first row's labels, in the label column. */
     const overLabels = async (page: Page) => {
       const box = (await page.locator('.scroller').boundingBox())!
@@ -319,7 +319,10 @@ test.describe('commit graph', () => {
       const { x, y } = await overLabels(page)
       await page.mouse.move(x, y)
       const list = page.locator('.ref-expand')
-      for (const name of ['main', 'origin/main', 'fork/main', '◆ v1.0', 'feature/a-rather-long-branch-name']) await expect(list.getByText(name, { exact: true })).toBeVisible()
+      for (const name of ['main', '◆ v1.0', 'feature/a-rather-long-branch-name']) await expect(list.getByText(name, { exact: true })).toBeVisible()
+      // The same branch, wherever it lives, takes one row that says where.
+      await expect(list.getByText('local · origin · fork', { exact: true })).toBeVisible()
+      await expect(list.locator('.chip')).toHaveCount(3)
       await page.mouse.move(x + 600, y)
       await expect(list).toHaveCount(0)
     })
@@ -490,11 +493,11 @@ test.describe('commit graph', () => {
     await open(page, 'repoView', {
       graphRows: 3,
       graphRefs: { [id]: [branch('main', { head: true, branchKind: 'trunk' }), remote('origin/main', { branchKind: 'trunk' }), tag('v1.0')] },
-      responses: { Refs: [], CommitSignatures: [], WorkingTree: { status: { files: [] } }, CommitDetail: { commit, files: [] } },
+      responses: { Refs: [remote('origin/main')], CommitSignatures: [], WorkingTree: { status: { files: [] } }, CommitDetail: { commit, files: [] } },
     })
     const box = (await page.locator('.scroller').boundingBox())!
     await page.mouse.click(box.x + 500, box.y + 26)
-    const list = page.getByRole('definition').filter({ hasText: 'origin/main' })
+    const list = page.getByRole('definition').filter({ hasText: 'local · origin' })
     await expect(list).toBeVisible()
     await expect(list.getByText('main', { exact: true })).toBeVisible()
     await expect(list.getByText('◆ v1.0')).toBeVisible()

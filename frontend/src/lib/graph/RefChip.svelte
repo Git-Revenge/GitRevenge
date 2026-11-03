@@ -1,27 +1,27 @@
 <script lang="ts">
   import { kindInfo } from '../branchKinds'
   import Icon from '../ui/Icon.svelte'
-  import type { Ref } from './rowCache'
+  import type { RefLabel } from './draw'
 
   let {
-    ref,
+    label,
     lane = 'var(--ink-mute)',
   }: {
-    ref: Ref
+    label: RefLabel
     /** The colour of the commit's lane, for a branch with no kind of its own. */
     lane?: string
   } = $props()
 
+  let ref = $derived(label.ref)
   let isBranch = $derived(ref.kind === 'local' || ref.kind === 'remote')
   let kind = $derived(isBranch ? kindInfo(ref.branchKind) : undefined)
   let color = $derived(ref.kind === 'tag' ? 'var(--lane-4)' : kind ? `var(${kind.token})` : lane)
-  let mark = $derived(ref.kind === 'tag' ? '◆ ' : ref.kind === 'stash' ? '≡ ' : '')
 </script>
 
 <span class="chip" class:head={ref.head} style:--chip={color}>
   {#if kind}<Icon name={kind.icon} size={12} />{/if}
-  <span class="name">{mark}{ref.short}</span>
-  {#if ref.kind === 'remote'}<Icon name="remote" size={12} />{/if}
+  <span class="name">{label.text}</span>
+  {#if label.places.length}<span class="places">{label.places.join(' · ')}</span>{/if}
 </span>
 
 <style>
@@ -51,13 +51,21 @@
     overflow-wrap: anywhere;
   }
 
+  .places {
+    flex: none;
+    margin-left: 4px;
+    color: var(--ink-mute);
+  }
+
   .head {
     font-weight: 600;
     color: var(--on-accent);
     background: var(--chip);
   }
 
-  .head :global(svg) {
+  .head :global(svg),
+  .head .places {
     color: inherit;
+    font-weight: 400;
   }
 </style>

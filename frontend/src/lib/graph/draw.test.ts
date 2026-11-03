@@ -181,6 +181,14 @@ describe('refLabels', () => {
     expect(said([tracking, ref('fork/feature/topic', 'remote'), ref('origin/feature/topic', 'remote')])).toEqual([['topic', 2]])
   })
 
+  it('says where each name lives', () => {
+    const places = (refs: Ref[]) => refLabels(refs).map((l) => l.places)
+    expect(places([ref('main', 'local'), ref('origin/main', 'remote'), ref('fork/main', 'remote')])).toEqual([['local', 'origin', 'fork']])
+    expect(places([ref('wip', 'local')])).toEqual([['local']])
+    expect(places([ref('origin/x', 'remote')])).toEqual([['origin']])
+    expect(places([ref('v1', 'tag')])).toEqual([[]])
+  })
+
   it('keeps different branches apart', () => {
     expect(said([ref('origin/a', 'remote'), ref('fork/b', 'remote')])).toEqual([
       ['a', 1],
