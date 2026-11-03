@@ -29,7 +29,7 @@ Column headers name what's in each column. In compact rows with enough width, th
 
 Drag the left edge of the panel on the right to resize it, or use the arrow keys on it, and double-click the edge to reset it. Git Revenge remembers the width for each repository. Once it's wide enough, the panel lays out in two columns.
 
-Selecting a commit shows its details on the right: author, committer, message, [notes](history.md#notes), [signature](history.md#signatures) and the files it changed. Trailers such as `Co-authored-by` and `Closes` are listed on their own, and `#14` links to the issue on your repository's host.
+Selecting a commit shows it on the right. The top of the panel has its subject, author, a button to copy its SHA, a link to its parent, and an **Actions** menu. Tabs under that show the **Message**, the **Files** it changed with their line counts, its **Trailers** such as `Co-authored-by` and `Closes` (`#14` links to the issue on your repository's host), and **Details** such as [notes](history.md#notes) and its [signature](history.md#signatures). The tab you pick stays picked as you move between commits. Once the panel is wide enough, the files stay beside the other tabs.
 
 ![A selected commit, with its message, trailers, author, a git note and the files it changed](../img/commit-details-light.webp#gh-light-mode-only)
 ![A selected commit, with its message, trailers, author, a git note and the files it changed](../img/commit-details-dark.webp#gh-dark-mode-only)

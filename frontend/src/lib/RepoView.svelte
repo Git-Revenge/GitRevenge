@@ -249,7 +249,7 @@
   {#if view === 'wip'}
     <WorkingTreePanel {path} current={diff} openFile={(t) => (diff = t)} />
   {:else if selected}
-    <CommitPanel {path} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} />
+    <CommitPanel {path} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} onReveal={revealCommit} onActions={(x, y) => selected && openMenu(commitMenuItems(selected, graph.refsOf(selected.id), ctx), x, y)} />
   {/if}
     </div>
   {/if}
