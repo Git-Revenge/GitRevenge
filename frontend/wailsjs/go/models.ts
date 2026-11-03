@@ -1107,6 +1107,7 @@ export namespace git {
 	    added: number;
 	    deleted: number;
 	    binary?: boolean;
+	    caseClash?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new FileStatus(source);
@@ -1124,6 +1125,7 @@ export namespace git {
 	        this.added = source["added"];
 	        this.deleted = source["deleted"];
 	        this.binary = source["binary"];
+	        this.caseClash = source["caseClash"];
 	    }
 	}
 	export class Identity {

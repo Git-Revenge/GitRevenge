@@ -1061,6 +1061,43 @@ test.describe('before the first load has answered', () => {
       await expect(page.getByRole('button', { name: 'Resolve 1 conflict to commit' })).toBeDisabled()
     })
 
+    // #428: a kernel checkout on Windows shows 13 changes nobody made.
+    test.describe('files that differ only by case', () => {
+      const clash = (path: string) => file(path, '.', 'M', { caseClash: true })
+
+      test('says they may not be your edits, and marks them', async ({ page }) => {
+        await open(page, 'workingTree', scenario([clash('net/xt_DSCP.c'), clash('net/xt_HL.c'), file('real.txt', '.', 'M')]))
+        await expect(page.getByRole('note')).toContainText('These 2 may not be your edits.')
+        await expect(page.getByText('case clash')).toHaveCount(2)
+      })
+
+      test('the tick at the top leaves them out', async ({ page }) => {
+        await open(page, 'workingTree', scenario([clash('net/xt_DSCP.c'), file('real.txt', '.', 'M')]))
+        await page.getByRole('checkbox', { name: 'Tick all 1' }).click()
+        await expect.poll(() => calls(page, 'StageFiles')).toEqual([['/r', ['real.txt']]])
+      })
+
+      test('can still be ticked one at a time', async ({ page }) => {
+        await open(page, 'workingTree', scenario([clash('net/xt_DSCP.c'), file('real.txt', '.', 'M')]))
+        await tick(page, 'net/xt_DSCP.c').click()
+        await expect.poll(() => calls(page, 'StageFiles')).toEqual([['/r', ['net/xt_DSCP.c']]])
+      })
+
+      test('the notice can be set aside, without staging or changing anything', async ({ page }) => {
+        await open(page, 'workingTree', scenario([clash('net/xt_DSCP.c'), clash('net/xt_HL.c')]))
+        await page.getByRole('button', { name: 'Leave these 2 out' }).click()
+        await expect(page.getByRole('note')).toHaveCount(0)
+        await expect(tick(page, 'net/xt_DSCP.c')).not.toBeChecked()
+        expect(await calls(page, 'StageFiles')).toEqual([])
+      })
+
+      test('no notice without a clash', async ({ page }) => {
+        await open(page, 'workingTree', scenario([file('real.txt', '.', 'M')]))
+        await expect(page.getByRole('checkbox', { name: 'Tick all 1' })).toBeVisible()
+        await expect(page.getByRole('note')).toHaveCount(0)
+      })
+    })
+
     test('says so when there is nothing to commit', async ({ page }) => {
       await open(page, 'workingTree', scenario([]))
       await expect(page.getByText('Nothing to commit')).toBeVisible()

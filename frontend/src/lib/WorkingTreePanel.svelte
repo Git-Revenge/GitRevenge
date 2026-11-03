@@ -3,6 +3,9 @@
    * never rendered, so it needn't be reactive. */
   // eslint-disable-next-line svelte/prefer-svelte-reactivity
   const drafts = new Map<string, { summary: string; body: string }>()
+  /** Repositories where the person set the case-clash notice aside, for this session. */
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const caseNoticeSeen = new Set<string>()
 </script>
 
 <script lang="ts">
@@ -127,8 +130,18 @@
   const tickOf = (f: git.FileStatus): Tick => (!isStaged(f) ? 'none' : isUnstaged(f) ? 'part' : 'all')
 
   let listed = $derived(files.filter((f) => !f.conflicted))
-  let ticked = $derived(listed.filter((f) => tickOf(f) !== 'none').length)
-  let allTicked = $derived(listed.length > 0 && listed.every((f) => tickOf(f) === 'all'))
+  // svelte-ignore state_referenced_locally
+  let caseNoticeHidden = $state(caseNoticeSeen.has(path))
+  let clashes = $derived(listed.filter((f) => f.caseClash))
+  function hideCaseNotice() {
+    caseNoticeSeen.add(path)
+    caseNoticeHidden = true
+  }
+  /** What the tick at the top covers. Case clashes aren't real edits, so they stay out unless
+   * they're all there is. */
+  let tickable = $derived(clashes.length < listed.length ? listed.filter((f) => !f.caseClash) : listed)
+  let ticked = $derived(tickable.filter((f) => tickOf(f) !== 'none').length)
+  let allTicked = $derived(tickable.length > 0 && tickable.every((f) => tickOf(f) === 'all'))
 
   /** Opens a file's changes: what's still unstaged, if any is. */
   function show(f: git.FileStatus) {
@@ -151,8 +164,9 @@
     const box = e.currentTarget as HTMLInputElement
     box.checked = allTicked
     box.indeterminate = ticked > 0 && !allTicked
-    if (allTicked) void unstage([])
-    else void stage([])
+    const paths = tickable.map((f) => f.path)
+    if (allTicked) void unstage(tickable.length === listed.length ? [] : paths)
+    else void stage(tickable.length === listed.length ? [] : paths)
   }
 
   async function act(fn: () => Promise<void>) {
@@ -267,6 +281,7 @@
       <span class="path">{fileName(f.path)}</span>
       {#if f.origPath}<span class="from">from {f.origPath}</span>{/if}
       {#if tick === 'part'}<span class="partly">partly staged</span>{/if}
+      {#if f.caseClash}<span class="partly" title="Another file has the same name in different letter case">case clash</span>{/if}
       {#if f.binary}
         <span class="binary">binary</span>
       {:else if f.added || f.deleted}
@@ -317,6 +332,13 @@
       </div>
     </form>
   {/if}
+  {#if clashes.length && !caseNoticeHidden}
+    <div class="notice" role="note">
+      <strong>{clashes.length === 1 ? 'This may not be your edit.' : `These ${clashes.length} may not be your edits.`}</strong>
+      {clashes.length === 1 ? 'Its name differs' : 'Each name differs'} from another file's only by letter case, which this computer can't keep apart, so git sees a change you never made.
+      <button class="btn sm secondary" onclick={hideCaseNotice}>{clashes.length === 1 ? 'Leave it out' : `Leave these ${clashes.length} out`}</button>
+    </div>
+  {/if}
   <div class="lists">
     {#if conflicted.length}
       <section class="conflicts">
@@ -343,7 +365,7 @@
           {#if wt}
             <label class="tick-all">
               <input type="checkbox" class="tick" checked={allTicked} indeterminate={ticked > 0 && !allTicked} disabled={busy || !listed.length} onchange={tickAllChanged} />
-              <span class="meta">{allTicked ? `All ${listed.length} ticked` : ticked ? `${ticked} of ${listed.length} ticked` : `Tick all ${listed.length}`}</span>
+              <span class="meta">{allTicked ? `All ${tickable.length} ticked` : ticked ? `${ticked} of ${tickable.length} ticked` : `Tick all ${tickable.length}`}</span>
             </label>
           {:else}
             <span class="meta">Files</span>
@@ -456,6 +478,24 @@
     .lists {
       grid-column: 1;
     }
+  }
+
+  .notice {
+    margin: 2px 16px 8px 20px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--warning) 14%, transparent);
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  .notice strong {
+    font-weight: 600;
+  }
+
+  .notice :global(.btn) {
+    display: block;
+    margin-top: 8px;
   }
 
   .next {
