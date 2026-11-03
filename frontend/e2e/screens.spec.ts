@@ -239,13 +239,35 @@ test.describe('commit graph', () => {
       expect(busy).toBeGreaterThan(idle * 2)
     })
 
-    test("a row carries its lane's colour from the node toward the message", async ({ page }) => {
+    test("a branch's row carries its lane's colour from the node toward the message", async ({ page }) => {
       await open(page, 'graph', scenario)
       await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '20')
       // Between the node and the message, on an unselected row: lane 2's wash and nothing else.
       await expect.poll(() => inkAt(page, lane(2) + 15, 78)).toBeGreaterThan(0)
       // Left of the node, between two idle lanes: nothing at all.
       expect(await inkAt(page, lane(1) + 8, 78)).toBe(0)
+      // The gap between rows stays clear, so a run of commits doesn't merge into a block.
+      expect(await inkAt(page, lane(2) + 15, 104)).toBe(0)
+    })
+
+    for (const kind of ['trunk', 'docs']) {
+      test(`a ${kind} row has no wash`, async ({ page }) => {
+        const rows = graphData.map((r) => ({ ...r, kind }))
+        await open(page, 'graph', { ...scenario, graphData: rows })
+        await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '20')
+        // The lane itself draws, so the row has painted by now.
+        await expect.poll(() => inkAt(page, lane(2), 78)).toBeGreaterThan(0)
+        expect(await inkAt(page, lane(2) + 15, 78)).toBe(0)
+      })
+    }
+
+    test('the wash stops before the message', async ({ page }) => {
+      await open(page, 'graph', scenario)
+      await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '20')
+      await expect.poll(() => inkAt(page, lane(2) + 15, 78)).toBeGreaterThan(0)
+      // Three lanes wide: the message starts at 150 + (2 * 10 + 3 * 16) + 6 = 224. Past the
+      // subject's first letters, on the row's clear lower edge, is nothing.
+      expect(await inkAt(page, 230, 78 + 18)).toBe(0)
     })
 
     test("the author button searches for the selected commit's author", async ({ page }) => {
