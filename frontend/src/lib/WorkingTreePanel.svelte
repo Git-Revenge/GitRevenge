@@ -541,7 +541,7 @@
       {#if onMenu}
         <button type="button" class="btn sm quiet" title="Add Co-authored-by, Closes and other trailers" onclick={trailerMenu}><Icon name="plus" size={13} />Trailer</button>
       {/if}
-      <label class="form-check"><input type="checkbox" bind:checked={amend} onchange={toggleAmend} /> Amend last commit</label>
+      <label class="form-check" title="Amend the last commit"><input type="checkbox" bind:checked={amend} onchange={toggleAmend} /> Amend</label>
       {#if wt?.signing.enabled}
         <button type="button" class="signed meta" title="commit.gpgsign is set; key: {wt.signing.key || 'default'}. Change in Git Config." onclick={() => gitConfig.showKey(path, 'commit.gpgSign')}
           >Signed · {wt.signing.format}</button
@@ -984,10 +984,17 @@
     color: var(--warning);
   }
 
+  /* Wraps between its items, not inside them, when the panel is narrow. */
   .row {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
+    gap: 4px 8px;
+  }
+
+  .row > :global(*) {
+    white-space: nowrap;
   }
 
   .signed {
