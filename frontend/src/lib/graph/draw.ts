@@ -536,11 +536,11 @@ export function sortRefs(refs: Ref[]): Ref[] {
   return [...refs].sort((a, b) => labelRank(a) - labelRank(b) || Number(a.kind === 'remote') - Number(b.kind === 'remote'))
 }
 
-/** A label as drawn: what it says, and whether the name is also on a remote. */
+/** A label as drawn: what it says, and how many remotes the name is on. */
 export interface RefLabel {
   ref: Ref
   text: string
-  remote: boolean
+  remotes: number
 }
 
 /** The remote a remote branch is on, assuming a remote's name has no slash in it. */
@@ -559,25 +559,42 @@ export function mainRemote(refs: Ref[]): string {
   return remotes.size === 1 ? [...remotes][0] : ''
 }
 
-/** Labels for a commit's refs, in display order. The main remote's prefix gives way to the
- * remote icon. A local branch shares a label with the remote branch it tracks on this commit;
- * one that tracks nothing shares a label with its namesake on the main remote. Other remotes
- * keep their prefix, so `origin/x` and `fork/x` stay apart. */
+/** Labels for a commit's refs, in display order. Remote branches of the same name share a
+ * label, with a count of the remotes. A local branch shares a label with the remote branch it
+ * tracks on this commit, and its namesakes; one that tracks nothing shares a label with its
+ * namesake on the main remote. The main remote's prefix gives way to the remote icon, and a
+ * branch on just one other remote keeps its prefix, so `fork/x` stays apart from `x`. */
 export function refLabels(refs: Ref[], main = 'origin'): RefLabel[] {
   const sorted = sortRefs(refs)
-  const shorts = new Set(refs.map((r) => r.short))
-  /** The remote branch this local branch folds with, if it's on this commit. */
-  const foldsWith = (r: Ref) => (r.upstream ? r.upstream : `${main}/${r.short}`)
-  const folded = new Set(sorted.filter((r) => r.kind === 'local' && shorts.has(foldsWith(r))).map(foldsWith))
-  const prefix = main ? `${main}/` : ''
-  const shortened = (r: Ref) => (prefix && r.short.startsWith(prefix) && r.short !== `${main}/HEAD` ? r.short.slice(prefix.length) : r.short)
+  const branchOf = (r: Pick<Ref, 'short'>) => r.short.slice(remoteOf(r).length + 1)
+  const isHeadRef = (r: Ref) => branchOf(r) === 'HEAD'
+  /** The remote branches on this commit, by branch name. */
+  const onRemotes = new Map<string, Ref[]>()
+  for (const r of sorted) {
+    if (r.kind !== 'remote' || isHeadRef(r)) continue
+    const name = branchOf(r)
+    onRemotes.set(name, [...(onRemotes.get(name) ?? []), r])
+  }
+  /** The branch name a local branch folds with, if it's on this commit. */
+  const foldsWith = (r: Ref) => {
+    if (r.upstream) return onRemotes.get(branchOf({ short: r.upstream }))?.some((o) => o.short === r.upstream) ? branchOf({ short: r.upstream }) : null
+    return onRemotes.get(r.short)?.some((o) => remoteOf(o) === main) ? r.short : null
+  }
+  const labelled = new Set<string>()
   const labels: RefLabel[] = []
   for (const r of sorted) {
     if (r.kind === 'remote') {
-      if (!folded.has(r.short)) labels.push({ ref: r, text: shortened(r), remote: true })
+      if (labelled.has(r.short)) continue
+      const same = isHeadRef(r) ? [r] : (onRemotes.get(branchOf(r)) ?? [r])
+      for (const o of same) labelled.add(o.short)
+      labels.push({ ref: r, text: !isHeadRef(r) && (same.length > 1 || remoteOf(r) === main) ? branchOf(r) : r.short, remotes: same.length })
+    } else if (r.kind === 'local') {
+      const name = foldsWith(r)
+      const same = name === null ? [] : (onRemotes.get(name) ?? [])
+      for (const o of same) labelled.add(o.short)
+      labels.push({ ref: r, text: r.short, remotes: same.length })
     } else {
-      const mark = r.kind === 'tag' ? '◆ ' : r.kind === 'stash' ? '≡ ' : ''
-      labels.push({ ref: r, text: mark + r.short, remote: r.kind === 'local' && shorts.has(foldsWith(r)) })
+      labels.push({ ref: r, text: (r.kind === 'tag' ? '◆ ' : '≡ ') + r.short, remotes: 0 })
     }
   }
   return labels
@@ -602,10 +619,10 @@ function drawLabels(
   ctx.save()
   setFont(ctx, `12px ${MONO}`)
   for (let i = 0; i < labels.length; i++) {
-    const { ref: r, text, remote } = labels[i]
+    const { ref: r, text, remotes } = labels[i]
     const remaining = labels.length - i
     const more = remaining > 1 ? ` +${remaining - 1}` : ''
-    const extra = 14 + (labelKind(r) ? KIND_ICON_W : 0) + (r.stackDepth ? KIND_ICON_W : 0) + (remote ? KIND_ICON_W : 0)
+    const extra = 14 + (labelKind(r) ? KIND_ICON_W : 0) + (r.stackDepth ? KIND_ICON_W : 0) + remoteMarkWidth(ctx, remotes)
     let w = ctx.measureText(text).width + extra
     if (x + w > end) {
       // Out of room: one clipped label that also counts the rest, while enough of its name is left.
@@ -613,7 +630,7 @@ function drawLabels(
       if (clipped !== null) {
         const label = clipped + more
         w = ctx.measureText(label).width + extra
-        drawLabel(ctx, label, x, mid, w, h, r, color, theme, remote)
+        drawLabel(ctx, label, x, mid, w, h, r, color, theme, remotes)
         x += w + 5
         break
       }
@@ -629,16 +646,22 @@ function drawLabels(
       }
       break
     }
-    drawLabel(ctx, text, x, mid, w, h, r, color, theme, remote)
+    drawLabel(ctx, text, x, mid, w, h, r, color, theme, remotes)
     x += w + 5
   }
   ctx.restore()
   return x + 3
 }
 
+/** The width of a label's remote icon, and its count when there's more than one remote. */
+function remoteMarkWidth(ctx: CanvasRenderingContext2D, remotes: number): number {
+  if (!remotes) return 0
+  return KIND_ICON_W + (remotes > 1 ? ctx.measureText(String(remotes)).width + 2 : 0)
+}
+
 /** One ref label: a soft wash of the lane colour, like the brand's tags. The checked-out
  * branch is solid; tags take the ochre wash whatever their lane. */
-function drawLabel(ctx: CanvasRenderingContext2D, text: string, x: number, mid: number, w: number, h: number, r: Ref, color: string, theme: Theme, remote: boolean) {
+function drawLabel(ctx: CanvasRenderingContext2D, text: string, x: number, mid: number, w: number, h: number, r: Ref, color: string, theme: Theme, remotes: number) {
   const y = mid - h / 2
   const kind = labelKind(r)
   const kindColor = kind ? theme.kinds?.[kind.kind] : undefined
@@ -704,11 +727,16 @@ function drawLabel(ctx: CanvasRenderingContext2D, text: string, x: number, mid: 
   ctx.fillStyle = r.head ? theme.bg : r.kind === 'remote' || kind?.kind === 'bot' ? theme.muted : theme.fg
   ctx.textBaseline = 'middle'
   ctx.fillText(text, tx, mid + 0.5)
-  const cloud = remote ? iconPath('remote') : undefined
+  const cloud = remotes ? iconPath('remote') : undefined
   if (cloud) {
     const size = 11
+    const cloudX = tx + ctx.measureText(text).width + 3
+    if (remotes > 1) {
+      ctx.fillStyle = r.head ? theme.bg : theme.muted
+      ctx.fillText(String(remotes), cloudX + size + 2, mid + 0.5)
+    }
     ctx.save()
-    ctx.translate(tx + ctx.measureText(text).width + 3, mid - size / 2)
+    ctx.translate(cloudX, mid - size / 2)
     ctx.scale(size / 24, size / 24)
     ctx.lineWidth = 2.4
     ctx.lineCap = 'round'
