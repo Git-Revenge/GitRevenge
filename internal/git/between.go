@@ -29,10 +29,16 @@ func (r *Repo) CommitsBetween(ctx context.Context, exclude, include string, limi
 	if err != nil {
 		return nil, 0, err
 	}
-	out, err = r.ReadString(ctx, "log", "--max-count="+strconv.Itoa(limit), "--format=%H%x00%h%x00%an%x00%P%x00%s", span)
+	out, err = r.ReadString(ctx, "log", "--max-count="+strconv.Itoa(limit), "--format="+commitLineFormat, span)
 	if err != nil {
 		return nil, 0, err
 	}
+	return parseCommitLines(out), total, nil
+}
+
+const commitLineFormat = "%H%x00%h%x00%an%x00%P%x00%s"
+
+func parseCommitLines(out string) []CommitLine {
 	var commits []CommitLine
 	for line := range strings.Lines(out) {
 		f := strings.SplitN(strings.TrimRight(line, "\r\n"), "\x00", 5)
@@ -40,7 +46,26 @@ func (r *Repo) CommitsBetween(ctx context.Context, exclude, include string, limi
 			commits = append(commits, CommitLine{ID: f[0], Short: f[1], Author: f[2], Merge: len(strings.Fields(f[3])) > 1, Subject: f[4]})
 		}
 	}
-	return commits, total, nil
+	return commits
+}
+
+// CommitsOnlyOn is CommitsBetween leaving out commits whose change exclude has anyway, as it
+// does for its own commits after a rebase. What's left would really be lost.
+func (r *Repo) CommitsOnlyOn(ctx context.Context, exclude, include string, limit int) ([]CommitLine, int, error) {
+	span := exclude + "..." + include
+	out, err := r.ReadString(ctx, "rev-list", "--count", "--cherry-pick", "--right-only", span)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := strconv.Atoi(strings.TrimSpace(out))
+	if err != nil {
+		return nil, 0, err
+	}
+	out, err = r.ReadString(ctx, "log", "--cherry-pick", "--right-only", "--max-count="+strconv.Itoa(limit), "--format="+commitLineFormat, span)
+	if err != nil {
+		return nil, 0, err
+	}
+	return parseCommitLines(out), total, nil
 }
 
 // UpstreamOf returns the short name of branch's upstream, or "" if it has none, or none that

@@ -37,6 +37,54 @@ type Repo struct {
 	Objects *git.ObjectReader
 	watcher *watch.Watcher
 	graph   *graphLoader
+	changes changeGate
+}
+
+// changeGate holds back reports of changes while an operation runs.
+type changeGate struct {
+	mu      sync.Mutex
+	holding int
+	held    watch.Kind
+	deliver func(watch.Kind)
+}
+
+// report passes k on, or keeps it for when the gate opens.
+func (g *changeGate) report(k watch.Kind) {
+	g.mu.Lock()
+	if g.holding > 0 {
+		g.held |= k
+		g.mu.Unlock()
+		return
+	}
+	deliver := g.deliver
+	g.mu.Unlock()
+	if deliver != nil {
+		deliver(k)
+	}
+}
+
+// Quietly runs op without reloading or refreshing for what it changes until it's done, then
+// does so once. A multi-step git operation changes refs many times, and each change starts
+// reads of the same files git is renaming, which on Windows makes git wait and try again.
+func (r *Repo) Quietly(op func()) {
+	g := &r.changes
+	g.mu.Lock()
+	g.holding++
+	g.mu.Unlock()
+	defer func() {
+		g.mu.Lock()
+		g.holding--
+		var held watch.Kind
+		if g.holding == 0 {
+			held, g.held = g.held, 0
+		}
+		deliver := g.deliver
+		g.mu.Unlock()
+		if held != 0 && deliver != nil {
+			deliver(held)
+		}
+	}()
+	op()
 }
 
 // Graph returns the commit graph to display and whether a (re)load is in progress.
@@ -355,6 +403,16 @@ func (m *Manager) Settings() *settings.Store { return m.settings }
 // the repo still works, it just won't refresh on its own.
 func (m *Manager) watchLocked(r *Repo) *watch.Watcher {
 	onChange := m.onChange
+	r.changes.mu.Lock()
+	r.changes.deliver = func(k watch.Kind) {
+		if k.Has(watch.Head) || k.Has(watch.Refs) {
+			r.graph.reload()
+		}
+		if onChange != nil {
+			onChange(r.Path, k)
+		}
+	}
+	r.changes.mu.Unlock()
 	w, err := watch.New(watch.Options{
 		Root:   r.Path,
 		GitDir: r.GitDir,
@@ -365,14 +423,7 @@ func (m *Manager) watchLocked(r *Repo) *watch.Watcher {
 			}
 			return kept
 		},
-		OnChange: func(k watch.Kind) {
-			if k.Has(watch.Head) || k.Has(watch.Refs) {
-				r.graph.reload()
-			}
-			if onChange != nil {
-				onChange(r.Path, k)
-			}
-		},
+		OnChange: r.changes.report,
 	})
 	if err != nil {
 		log.Printf("watching %s: %v", r.Path, err)

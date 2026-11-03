@@ -81,6 +81,9 @@ A stack of three or more becomes a group, named after its bottom branch, with th
 Right-click a group to work on the whole stack:
 
 - **Check out top of stack** and **New branch on top**. A stack that forks offers each of its tops.
+- **Update stack**, for after its lower branches merge. It fetches, moves the branches not yet merged onto the Trunk's upstream, and offers to delete the merged ones. A stack that forks can't move as one.
+- **Rebase stack onto…** moves every branch onto another, keeping each in place, and checks out the top. One Undo puts them all back. If it stops on a conflict, fix it and Continue, or Abort to put everything back. Undo isn't offered after a rebase that stopped for conflicts.
+- **Push stack** force pushes its unmerged branches with a lease. Each remote takes all of them or none. It asks first only when a push would really lose commits from the remote, naming them, or when a branch is one that asks before a force push. Commits a rebase rewrote with the same changes don't count.
 - **Unstack** shows its branches separately again. It doesn't change their history, and the message it leaves has **Undo**.
 - **Delete stack** deletes every branch in it. If all of them are merged it goes straight ahead, with **Undo** in the message it leaves. If any aren't, it asks first and names the unmerged work. It leaves alone the checked-out branch and anything checked out in a worktree, hidden, protected by its kind, or built on by a branch that stays.
 

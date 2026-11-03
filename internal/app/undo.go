@@ -31,6 +31,8 @@ type undoEntry struct {
 	From string
 	// Branches are the branches deleted together, for kindBranchesDelete.
 	Branches []branchAt
+	// Moves are the branches kindStackMove moved.
+	Moves []branchMove
 }
 
 type undoKind string
@@ -48,6 +50,8 @@ const (
 	kindBranchesDelete undoKind = "branches-delete"
 	// kindBranchMove is pulling a branch that isn't checked out: only that branch moved.
 	kindBranchMove undoKind = "branch-move"
+	// kindStackMove is a whole stack rebased: every branch moved, and maybe the checkout.
+	kindStackMove undoKind = "stack-move"
 )
 
 // undoStacks holds undo and redo history per repository.
@@ -177,7 +181,8 @@ func (a *App) step(path string, undo bool) error {
 	e := stack[len(stack)-1]
 	u.mu.Unlock()
 
-	if err := apply(context.Background(), r.Git, e, undo); err != nil {
+	r.Quietly(func() { err = apply(context.Background(), r.Git, e, undo) })
+	if err != nil {
 		return err
 	}
 	u.mu.Lock()
@@ -195,6 +200,8 @@ func apply(ctx context.Context, g *git.Repo, e undoEntry, undo bool) error {
 		expect, target = e.Before, e.After
 	}
 	switch e.Kind {
+	case kindStackMove:
+		return applyStackMove(ctx, g, e, expect, target, undo)
 	case kindBranchesDelete:
 		// Undo recreates every branch; redo deletes them again. A branch that came back some
 		// other way in between is left alone.

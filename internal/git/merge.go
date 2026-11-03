@@ -46,6 +46,12 @@ func (r *Repo) RebaseOnto(ctx context.Context, onto, upstream string) error {
 	return r.conflictAware(ctx, Cmd{Args: []string{"rebase", "--onto", onto, upstream}, Env: []string{"GIT_EDITOR=true"}})
 }
 
+// RebaseStack moves top's commits after upstream onto onto, and every branch among them along
+// with it: `git rebase --update-refs --onto onto upstream top`. It leaves top checked out.
+func (r *Repo) RebaseStack(ctx context.Context, onto, upstream, top string) error {
+	return r.conflictAware(ctx, Cmd{Args: []string{"rebase", "--update-refs", "--onto", onto, upstream, top}, Env: []string{"GIT_EDITOR=true"}})
+}
+
 // Rebase replays the current branch's commits onto ref.
 func (r *Repo) Rebase(ctx context.Context, onto string) error {
 	return r.conflictAware(ctx, Cmd{Args: []string{"rebase", onto}, Env: []string{"GIT_EDITOR=true"}})
