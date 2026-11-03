@@ -74,6 +74,8 @@ A branch is **stacked** when it builds on another branch that hasn't merged yet:
 
 Git Revenge works this out from history. In the sidebar, a stacked branch sits under the branch it builds on, indented, even when its name would put it in another folder. Hover over it to see what it's stacked on and its place in the stack (**2 of 3**). In the graph, its chip carries a small stack mark.
 
+A stack of three or more becomes a group, named after its bottom branch, with the top of the stack first. Click the group to open or close it. A group whose branches have all merged starts closed and says **merged**.
+
 If the guess is wrong, right-click the branch and choose **Stack `name` on…**: pick the right branch, **Not stacked**, or **Detect automatically** to go back to the guess.
 
 ### Restacking after the branch below merges
