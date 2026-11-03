@@ -960,7 +960,7 @@ test.describe('before the first load has answered', () => {
       await expect(page.getByText('Files', { exact: true })).toBeVisible()
       await expect(page.getByRole('button', { name: 'Commit', exact: true })).toBeVisible()
       await expect(page.getByText('1 of 2 ticked')).toBeVisible()
-      await expect(page.getByRole('button', { name: 'Commit 1 file' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Tick a file to commit it' }).or(page.getByRole('button', { name: 'Describe it to commit 1 file' }))).toBeVisible()
     })
 
     test('Ctrl+Enter before status has loaded commits once it has', async ({ page }) => {
@@ -977,7 +977,7 @@ test.describe('before the first load has answered', () => {
       await open(page, 'workingTree', panel([file('b.txt', '.', 'M')]))
       await summary(page).fill('Early')
       await page.keyboard.press('Control+Enter')
-      await expect(page.getByRole('button', { name: 'Commit 0 files' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Tick a file to commit it' })).toBeVisible()
       expect(await calls(page, 'CommitChanges')).toEqual([])
       await expect(summary(page)).toHaveValue('Early')
     })
@@ -1038,6 +1038,27 @@ test.describe('before the first load has answered', () => {
       await open(page, 'workingTree', scenario([file('part.txt', 'M', 'M')]))
       await page.locator('button.name', { hasText: 'part.txt' }).click()
       await expect.poll(async () => (await events(page, 'open')).at(-1)?.[0]).toMatchObject({ mode: 'unstaged', file: 'part.txt' })
+    })
+
+    // #426: "Commit 0 files" sat disabled without saying what was missing.
+    test('the button and the line under the heading say the next step', async ({ page }) => {
+      await open(page, 'workingTree', scenario([file('a.txt', '.', 'M')]))
+      await expect(page.getByRole('button', { name: 'Tick a file to commit it' })).toBeDisabled()
+      await expect(page.getByText('Tick what belongs in this commit')).toBeVisible()
+    })
+
+    test('then asks what the commit does, and then names the files', async ({ page }) => {
+      await open(page, 'workingTree', scenario([file('a.txt', 'M', '.'), file('b.txt', 'A', '.')]))
+      await expect(page.getByRole('button', { name: 'Describe it to commit 2 files' })).toBeDisabled()
+      await expect(page.getByText('2 files going in. Now say what the commit does.')).toBeVisible()
+      await page.getByRole('textbox', { name: 'Commit summary' }).fill('Change things')
+      await expect(page.getByRole('button', { name: /^Commit 2 files/ })).toBeEnabled()
+    })
+
+    test('blocks the commit while there are conflicts', async ({ page }) => {
+      await open(page, 'workingTree', scenario([file('a.txt', 'U', 'U', { conflicted: true }), file('b.txt', 'M', '.')]))
+      await page.getByRole('textbox', { name: 'Commit summary' }).fill('Merge')
+      await expect(page.getByRole('button', { name: 'Resolve 1 conflict to commit' })).toBeDisabled()
     })
 
     test('says so when there is nothing to commit', async ({ page }) => {

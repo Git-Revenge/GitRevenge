@@ -8,6 +8,7 @@ Your changes are one list, by filename under their folders, with line counts. A 
 
 - Tick a file to stage it, and untick it to unstage it. A dash and **partly staged** mean only some of its changes are going in, and ticking it stages the rest.
 - The tick at the top of the list does every file at once. **Discard all** throws away everything unstaged, after asking.
+- The line under the heading and the commit button both say what's next: tick a file, describe the commit, then **Commit 3 files to main**. While there are conflicts, the button says how many are left.
 - Hover over a file for its discard button. Conflicts come first, under **Fix these first**.
 - Open a file to stage part of it. In the **Unified** diff, each hunk has a **Stage hunk** button, and you can select individual lines and stage just those. Staged changes can be unstaged the same way.
 
