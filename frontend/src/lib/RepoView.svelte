@@ -16,6 +16,7 @@
   import type { DiffTarget } from './diff/DiffView.svelte'
   import Lazy from './ui/Lazy.svelte'
   import GraphView from './graph/GraphView.svelte'
+  import type { RefLabel } from './graph/draw'
   import type { Ref, Row } from './graph/rowCache'
   import { session } from './session.svelte'
   import Sidebar from './Sidebar.svelte'
@@ -121,8 +122,8 @@
     void refreshCount()
   })
 
-  /** The branches and tags on the selected commit. */
-  let selectedRefs = $state<Ref[]>([])
+  /** Labels for the branches and tags on the selected commit. */
+  let selectedRefs = $state<RefLabel[]>([])
 
   function onSelect(row: Row | undefined, auto: boolean) {
     selected = row

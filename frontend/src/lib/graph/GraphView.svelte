@@ -10,7 +10,7 @@
   import Icon from '../ui/Icon.svelte'
   import { labelsFold, labelsUnfold } from '../ui/motion'
   import RefChip from './RefChip.svelte'
-  import { drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneVar, laneWindow, layoutColumns, mainRemote, METRICS, refColumnWidth, setLaneColors, sortRefs, type LabelSpan, type Layout, type Theme } from './draw'
+  import { drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneVar, laneWindow, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
   import { scrollMap, topAfterScroll, toScroll, type ScrollMap } from './scrollMap'
 
@@ -28,8 +28,8 @@
     onDrop?: (source: Row, sourceRefs: Ref[], target: Row, targetRefs: Ref[], x: number, y: number) => void
     /** auto is true for the automatic selection of HEAD when the graph first loads. */
     onSelect?: (row: Row | undefined, auto: boolean) => void
-    /** The selected commit's refs, whenever they change. They can load after the selection. */
-    onSelectedRefs?: (refs: Ref[]) => void
+    /** Labels for the selected commit's refs, whenever they change. They can load after the selection. */
+    onSelectedRefs?: (labels: RefLabel[]) => void
   } = $props()
 
   // The Docs and Bots visibility toggles (ADR 0009): shown when the repository has branches
@@ -140,7 +140,7 @@
   /** The last mouse position over the graph; scrolling moves rows under a still pointer. */
   let pointer: { x: number; y: number } | null = null
   /** The labels expanded by hovering over them. */
-  let expanded = $state<{ index: number; left: number; top: number; refs: Ref[]; lane: string } | null>(null)
+  let expanded = $state<{ index: number; left: number; top: number; labels: RefLabel[]; lane: string } | null>(null)
   let lastSelectedRefs = ''
 
   /** Expands the labels under the pointer, if it's over any, and closes them otherwise. */
@@ -154,12 +154,12 @@
       if (expanded) expanded = null
       return
     }
-    const refs = sortRefs(cache.refsFor(row.id))
-    const height = Math.min(refs.length, EXPANDED_REFS + 1) * CHIP_STEP + EXPAND_PAD * 2
+    const labels = refLabels(cache.refsFor(row.id), remote)
+    const height = Math.min(labels.length, EXPANDED_REFS + 1) * CHIP_STEP + EXPAND_PAD * 2
     const place = Math.round(i * rowH - top + (rowH - CHIP_STEP) / 2 - EXPAND_PAD)
     const fitted = Math.max(0, Math.min(place, viewH - height))
     if (expanded?.index === i && expanded.top === fitted) return
-    expanded = { index: i, left: span[0] - EXPAND_PAD, top: fitted, refs, lane: laneVar(row.color) }
+    expanded = { index: i, left: span[0] - EXPAND_PAD, top: fitted, labels, lane: laneVar(row.color) }
   }
   let hovered = -1
   let frame = 0
@@ -275,10 +275,10 @@
     // A history wider than the column scrolls its lanes so the nodes in view stay visible.
     const sel = cache.get(selected)
     const selectedRefs = sel ? cache.refsFor(sel.id) : []
-    const selectedKey = sel ? `${sel.id} ${selectedRefs.map((r) => r.name).join(' ')}` : ''
+    const selectedKey = sel ? `${sel.id} ${remote} ${selectedRefs.map((r) => r.name).join(' ')}` : ''
     if (selectedKey !== lastSelectedRefs) {
       lastSelectedRefs = selectedKey
-      onSelectedRefs?.(selectedRefs)
+      onSelectedRefs?.(refLabels(selectedRefs, remote))
     }
     const firstLane = minCol === Infinity ? 0 : laneWindow(minCol, maxCol, sel && selected >= first && selected < last ? sel.col : null, laneCapacity(graphW, m))
     const lay = layoutColumns(w, graphW, density, firstLane, remote)
@@ -685,11 +685,11 @@
          keyboard and screen readers, and the row underneath keeps working. -->
     {#each expanded ? [expanded] : [] as open (open.index)}
       <div class="ref-expand" aria-hidden="true" style:left="{open.left}px" style:top="{open.top}px" in:labelsUnfold out:labelsFold>
-        {#each open.refs.slice(0, EXPANDED_REFS) as r (r.name)}
-          <RefChip ref={r} lane={open.lane} />
+        {#each open.labels.slice(0, EXPANDED_REFS) as l (l.ref.name)}
+          <RefChip label={l} lane={open.lane} />
         {/each}
-        {#if open.refs.length > EXPANDED_REFS}
-          <span class="more">and {open.refs.length - EXPANDED_REFS} more</span>
+        {#if open.labels.length > EXPANDED_REFS}
+          <span class="more">and {open.labels.length - EXPANDED_REFS} more</span>
         {/if}
       </div>
     {/each}

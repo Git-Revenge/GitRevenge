@@ -567,6 +567,8 @@ export interface RefLabel {
   ref: Ref
   text: string
   remotes: number
+  /** Where this name lives, for spelling it out: "local", then each remote. Empty for tags. */
+  places: string[]
 }
 
 /** The remote a remote branch is on, assuming a remote's name has no slash in it. */
@@ -613,14 +615,14 @@ export function refLabels(refs: Ref[], main = 'origin'): RefLabel[] {
       if (labelled.has(r.short)) continue
       const same = isHeadRef(r) ? [r] : (onRemotes.get(branchOf(r)) ?? [r])
       for (const o of same) labelled.add(o.short)
-      labels.push({ ref: r, text: !isHeadRef(r) && (same.length > 1 || remoteOf(r) === main) ? branchOf(r) : r.short, remotes: same.length })
+      labels.push({ ref: r, text: !isHeadRef(r) && (same.length > 1 || remoteOf(r) === main) ? branchOf(r) : r.short, remotes: same.length, places: same.map(remoteOf) })
     } else if (r.kind === 'local') {
       const name = foldsWith(r)
       const same = name === null ? [] : (onRemotes.get(name) ?? [])
       for (const o of same) labelled.add(o.short)
-      labels.push({ ref: r, text: r.short, remotes: same.length })
+      labels.push({ ref: r, text: r.short, remotes: same.length, places: ['local', ...same.map(remoteOf)] })
     } else {
-      labels.push({ ref: r, text: (r.kind === 'tag' ? '◆ ' : '≡ ') + r.short, remotes: 0 })
+      labels.push({ ref: r, text: (r.kind === 'tag' ? '◆ ' : '≡ ') + r.short, remotes: 0, places: [] })
     }
   }
   return labels
