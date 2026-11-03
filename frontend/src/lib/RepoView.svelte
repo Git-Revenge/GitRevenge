@@ -95,6 +95,9 @@
     void refreshCount()
   })
 
+  /** The branches and tags on the selected commit. */
+  let selectedRefs = $state<Ref[]>([])
+
   function onSelect(row: Row | undefined, auto: boolean) {
     selected = row
     if (!auto) diff = null
@@ -155,7 +158,7 @@
     <!-- The graph stays mounted while a diff is open, so scroll position and selection
          survive returning to it. -->
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {onSelect} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {onSelect} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           openMenu(commitMenuItems(row, refs, ctx), x, y)}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
@@ -200,7 +203,7 @@
   {#if view === 'wip'}
     <WorkingTreePanel {path} current={diff} openFile={(t) => (diff = t)} />
   {:else if selected}
-    <CommitPanel {path} commitId={selected.id} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} />
+    <CommitPanel {path} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} />
   {/if}
 </div>
 

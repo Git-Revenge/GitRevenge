@@ -8,7 +8,9 @@
   import { theme as colorTheme } from '../theme.svelte'
   import { provideCommands } from '../commands.svelte'
   import Icon from '../ui/Icon.svelte'
-  import { drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneWindow, layoutColumns, mainRemote, METRICS, refColumnWidth, setLaneColors, type Layout, type Theme } from './draw'
+  import { labelsFold, labelsUnfold } from '../ui/motion'
+  import RefChip from './RefChip.svelte'
+  import { drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneVar, laneWindow, layoutColumns, mainRemote, METRICS, refColumnWidth, setLaneColors, sortRefs, type LabelSpan, type Layout, type Theme } from './draw'
   import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
   import { scrollMap, topAfterScroll, toScroll, type ScrollMap } from './scrollMap'
 
@@ -17,6 +19,7 @@
     onSelect,
     onContext,
     onDrop,
+    onSelectedRefs,
   }: {
     path: string
     /** Right-click on a row, with the refs pointing at it and the mouse position. */
@@ -25,6 +28,8 @@
     onDrop?: (source: Row, sourceRefs: Ref[], target: Row, targetRefs: Ref[], x: number, y: number) => void
     /** auto is true for the automatic selection of HEAD when the graph first loads. */
     onSelect?: (row: Row | undefined, auto: boolean) => void
+    /** The selected commit's refs, whenever they change. They can load after the selection. */
+    onSelectedRefs?: (refs: Ref[]) => void
   } = $props()
 
   // The Docs and Bots visibility toggles (ADR 0009): shown when the repository has branches
@@ -123,6 +128,39 @@
   /** The most lanes any row in view has used. The graph's width follows it, and only grows, so
    * the message column doesn't move while scrolling. A reload starts it again. */
   let widest = 1
+
+  /** Most refs an expanded label shows; the commit panel and right-click menu have them all. */
+  const EXPANDED_REFS = 12
+  /** A chip's height and its gap, and the padding around them, for fitting the list in view. */
+  const CHIP_STEP = 26
+  const EXPAND_PAD = 4
+  /** Where each row in view drew its labels, for hovering over them. */
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const labelSpans = new Map<number, LabelSpan>()
+  /** The last mouse position over the graph; scrolling moves rows under a still pointer. */
+  let pointer: { x: number; y: number } | null = null
+  /** The labels expanded by hovering over them. */
+  let expanded = $state<{ index: number; left: number; top: number; refs: Ref[]; lane: string } | null>(null)
+  let lastSelectedRefs = ''
+
+  /** Expands the labels under the pointer, if it's over any, and closes them otherwise. */
+  function updateExpanded() {
+    const rect = scroller?.getBoundingClientRect()
+    const i = pointer && rect && !drag?.active ? Math.floor((pointer.y - rect.top + top) / rowH) : -1
+    const span = labelSpans.get(i)
+    const x = pointer && rect ? pointer.x - rect.left : -1
+    const row = cache.get(i)
+    if (!span || !row || x < span[0] || x > span[1]) {
+      if (expanded) expanded = null
+      return
+    }
+    const refs = sortRefs(cache.refsFor(row.id))
+    const height = Math.min(refs.length, EXPANDED_REFS + 1) * CHIP_STEP + EXPAND_PAD * 2
+    const place = Math.round(i * rowH - top + (rowH - CHIP_STEP) / 2 - EXPAND_PAD)
+    const fitted = Math.max(0, Math.min(place, viewH - height))
+    if (expanded?.index === i && expanded.top === fitted) return
+    expanded = { index: i, left: span[0] - EXPAND_PAD, top: fitted, refs, lane: laneVar(row.color) }
+  }
   let hovered = -1
   let frame = 0
   /** Drag state: the row pressed and where; the row under the pointer while dragging. */
@@ -236,19 +274,28 @@
     const graphW = graphWidth(widest, (w - refColumnWidth(w)) * MAX_GRAPH_SHARE, m)
     // A history wider than the column scrolls its lanes so the nodes in view stay visible.
     const sel = cache.get(selected)
+    const selectedRefs = sel ? cache.refsFor(sel.id) : []
+    const selectedKey = sel ? `${sel.id} ${selectedRefs.map((r) => r.name).join(' ')}` : ''
+    if (selectedKey !== lastSelectedRefs) {
+      lastSelectedRefs = selectedKey
+      onSelectedRefs?.(selectedRefs)
+    }
     const firstLane = minCol === Infinity ? 0 : laneWindow(minCol, maxCol, sel && selected >= first && selected < last ? sel.col : null, laneCapacity(graphW, m))
     const lay = layoutColumns(w, graphW, density, firstLane, remote)
     if (!columns || columns.width !== lay.width || columns.graphW !== lay.graphW || columns.density !== lay.density) columns = lay
     const th = theme()
     const now = Date.now() / 1000
+    labelSpans.clear()
     for (let i = first; i < last; i++) {
       const row = cache.get(i)
       const y = i * rowH - top
       // The drop target is highlighted like a selection while dragging.
       if (!row) continue
       wantSignature(row.id)
-      drawRow(ctx, row, cache.refsFor(row.id), y, lay, th, i === selected || i === dropTarget, i === hovered, !!matchSet && !matchSet.has(i), now, sealOf(sigs.get(row.id)), { prev: cache.get(i - 1), prev2: cache.get(i - 2), next: cache.get(i + 1) })
+      const span = drawRow(ctx, row, cache.refsFor(row.id), y, lay, th, i === selected || i === dropTarget, i === hovered, !!matchSet && !matchSet.has(i), now, sealOf(sigs.get(row.id)), { prev: cache.get(i - 1), prev2: cache.get(i - 2), next: cache.get(i + 1) })
+      if (span) labelSpans.set(i, span)
     }
+    updateExpanded()
     // Lanes scrolled out on the left fade in from the edge, so the cut doesn't look like the end.
     if (firstLane > 0) {
       const fade = ctx.createLinearGradient(lay.refW, 0, lay.refW + m.pad + m.laneW, 0)
@@ -601,6 +648,8 @@
           hovered = i
           schedule()
         }
+        pointer = { x: e.clientX, y: e.clientY }
+        updateExpanded()
       }}
       onmouseup={(e) => {
         const d = drag
@@ -625,11 +674,25 @@
         drag = null
         dropTarget = -1
         hovered = -1
+        pointer = null
+        updateExpanded()
         schedule()
       }}
     >
       <div class="spacer" style:height="{map.spacer}px"></div>
     </div>
+    <!-- Hover only, and it never takes the pointer: the commit panel has the same list for the
+         keyboard and screen readers, and the row underneath keeps working. -->
+    {#each expanded ? [expanded] : [] as open (open.index)}
+      <div class="ref-expand" aria-hidden="true" style:left="{open.left}px" style:top="{open.top}px" in:labelsUnfold out:labelsFold>
+        {#each open.refs.slice(0, EXPANDED_REFS) as r (r.name)}
+          <RefChip ref={r} lane={open.lane} />
+        {/each}
+        {#if open.refs.length > EXPANDED_REFS}
+          <span class="more">and {open.refs.length - EXPANDED_REFS} more</span>
+        {/if}
+      </div>
+    {/each}
   </div>
 </div>
 
@@ -759,5 +822,29 @@
 
   .spacer {
     width: 1px;
+  }
+
+  .ref-expand {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    box-sizing: border-box;
+    max-width: min(420px, calc(100% - 16px));
+    padding: 4px;
+    border: 1px solid var(--paper-edge);
+    border-radius: 6px;
+    background: var(--paper);
+    box-shadow: var(--shadow);
+    pointer-events: none;
+  }
+
+  .more {
+    padding: 2px 7px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-mute);
   }
 </style>

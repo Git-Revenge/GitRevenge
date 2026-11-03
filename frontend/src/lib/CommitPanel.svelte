@@ -3,7 +3,9 @@
   import { CommitDetail, CommitNotes, CommitSignatures, IssueURL, SetCommitNote } from '../../wailsjs/go/app/App.js'
   import type { app, git } from '../../wailsjs/go/models'
   import { BrowserOpenURL } from '../../wailsjs/runtime/runtime.js'
-  import { formatTime } from './graph/draw'
+  import { formatTime, sortRefs } from './graph/draw'
+  import RefChip from './graph/RefChip.svelte'
+  import type { Ref } from './graph/rowCache'
   import type { DiffTarget } from './diff/DiffView.svelte'
   import { session } from './session.svelte'
   import { reflow } from './text'
@@ -15,12 +17,15 @@
   let {
     path,
     commitId,
+    refs = [],
     openFile,
     current,
     onSearch,
   }: {
     path: string
     commitId: string
+    /** The branches and tags on the commit. */
+    refs?: Ref[]
     openFile: (t: DiffTarget) => void
     /** The diff currently open, to highlight its file. */
     current?: DiffTarget | null
@@ -211,6 +216,12 @@
         </dl>
       {/if}
       <dl>
+        {#if refs.length}
+          <dt class="meta">Refs</dt>
+          <dd class="refs">
+            {#each sortRefs(refs) as r (r.name)}<RefChip ref={r} />{/each}
+          </dd>
+        {/if}
         <dt class="meta">Author</dt>
         <dd>
           {c.author.name}
@@ -364,6 +375,12 @@
     margin: 0;
     overflow-wrap: anywhere;
     font-size: 14px;
+  }
+
+  .refs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
   }
 
   .message {
