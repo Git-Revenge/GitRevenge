@@ -110,6 +110,13 @@ export const rowLand: Transition = () => ({
   },
 })
 
+/** Labels opening out from the corner they sit in, then closing back into it. */
+const unfolded = (t: number, u: number) => `opacity: ${Math.min(1, t * 1.5)}; clip-path: inset(0 ${u * 45}% ${u * 70}% 0 round 6px)`
+
+export const labelsUnfold: Transition = () => ({ duration: dur(DUR.base), easing: easeInk, css: unfolded })
+
+export const labelsFold: Transition = () => ({ duration: dur(Math.round(DUR.base * 0.7)), easing: easeExit, css: unfolded })
+
 /** A scrim or backdrop: a plain fade, in at --dur-base and out a little faster. */
 export function scrim(_node: Element, { out = false }: { out?: boolean } = {}): TransitionConfig {
   return {

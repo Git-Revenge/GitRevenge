@@ -296,7 +296,11 @@ export function clearOf(color: string): string {
   return /^#[0-9a-f]{6}$/i.test(color) ? `${color}00` : 'transparent'
 }
 
-/** Draws one row whose top edge is at y. nowSeconds dates the relative times. */
+/** Where a row's labels were drawn, from their left edge to their right. */
+export type LabelSpan = [start: number, end: number]
+
+/** Draws one row whose top edge is at y. nowSeconds dates the relative times. Returns where its
+ * labels went, if it has any. */
 export function drawRow(
   ctx: CanvasRenderingContext2D,
   row: Row,
@@ -310,7 +314,8 @@ export function drawRow(
   nowSeconds: number,
   seal?: Seal,
   near: Near = {},
-) {
+): LabelSpan | null {
+  let labelSpan: LabelSpan | null = null
   const { m } = lay
   const h = m.rowH
   const comfortable = lay.density === 'comfortable'
@@ -348,6 +353,7 @@ export function drawRow(
   // Labels in their own column, each tied to its node by a thin line.
   if (lay.refW && refs.length) {
     const end = drawLabels(ctx, refs, 8, mid, lay.refW - 16, color, theme, comfortable, lay.remote) - LABEL_TRAIL
+    labelSpan = [8, end]
     const to = Math.min(x, graphRight)
     if (end < to && x >= graphLeft) {
       ctx.globalAlpha = before * 0.45
@@ -497,7 +503,10 @@ export function drawRow(
 
   let left = lay.textX
   const subjectRight = (lay.authorW ? lay.authorX : lay.dateW ? lay.dateX : lay.shaX) - 22
-  if (!lay.refW) left = drawLabels(ctx, refs, left, line1, Math.min(subjectRight - left, (subjectRight - left) * 0.6), color, theme, comfortable, lay.remote)
+  if (!lay.refW && refs.length) {
+    left = drawLabels(ctx, refs, left, line1, Math.min(subjectRight - left, (subjectRight - left) * 0.6), color, theme, comfortable, lay.remote)
+    labelSpan = [lay.textX, left - LABEL_TRAIL]
+  }
   setFont(ctx, `${comfortable ? 14.5 : 13.5}px ${SERIF}`)
   ctx.fillStyle = docs ? theme.muted : theme.fg
   ctx.fillText(clip(ctx, row.subject, subjectRight - left), left, line1)
@@ -510,6 +519,7 @@ export function drawRow(
     ctx.letterSpacing = '0px'
   }
   ctx.restore()
+  return labelSpan
 }
 
 function disc(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string) {

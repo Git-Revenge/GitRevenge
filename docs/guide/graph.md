@@ -15,7 +15,9 @@ Your **Trunk** branch (`main`, `master` or `develop`) runs straight down the lef
 
 Each row is tinted with the colour of its line, from the commit into the start of the message, so you can tell which line a commit is on without tracing it. A line is drawn thin and faint where it's idle, and thickens around its commits.
 
-When there's room, branches and tags have their own column to the left of the graph, each joined to its commit by a thin line. A cloud marks a name that's on a remote: `origin/` is left off, and a local branch and its `origin` counterpart on the same commit share one label. Other remotes keep their name, so `fork/x` stays apart from `origin/x`. In a narrow window, labels sit in front of the commit message instead.
+When there's room, branches and tags have their own column to the left of the graph, each joined to its commit by a thin line. A cloud marks a name that's on a remote, and the prefix of your main remote is left off. Your main remote is the one the checked-out branch tracks, else `origin`, else the only remote. A local branch shares a label with the remote branch it tracks when both are on the commit. A branch on several remotes takes one label, with a count beside the cloud, and a branch on just one other remote keeps its name, such as `fork/x`. In a narrow window, labels sit in front of the commit message instead.
+
+Labels are ranked so the ones you'd most want to see come first: the checked-out branch, Trunk, Release, tags, Environment, Feature, then the rest. Whatever doesn't fit becomes **+N**. Hover over a commit's labels to expand them and see every branch and tag on it, in full. The same list is in the commit's details on the right.
 
 Column headers name what's in each column. In compact rows with enough width, the filter button beside **Author** searches for the selected commit's author.
 

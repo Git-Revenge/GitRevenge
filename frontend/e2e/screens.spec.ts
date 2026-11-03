@@ -276,6 +276,128 @@ test.describe('commit graph', () => {
     })
   })
 
+  // #418: +N didn't say what it was hiding.
+  test.describe('hovering over labels', () => {
+    const id = '0'.repeat(40)
+    const graphRefs = { [id]: [branch('main', { head: true, branchKind: 'trunk' }), remote('origin/main', { branchKind: 'trunk' }), remote('fork/main', { branchKind: 'trunk' }), tag('v1.0'), branch('feature/a-rather-long-branch-name')] }
+    const scenario = { graphRows: 5, graphRefs, responses: { Refs: [], CommitSignatures: [] } }
+    /** The first row's labels, in the label column. */
+    const overLabels = async (page: Page) => {
+      const box = (await page.locator('.scroller').boundingBox())!
+      return { x: box.x + 30, y: box.y + 26 }
+    }
+    const ready = async (page: Page) => {
+      await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '5')
+      await page.waitForTimeout(150)
+    }
+
+    test('shows every ref in full, and closes when the pointer leaves', async ({ page }) => {
+      await open(page, 'graph', scenario)
+      await ready(page)
+      const { x, y } = await overLabels(page)
+      await page.mouse.move(x, y)
+      const list = page.locator('.ref-expand')
+      for (const name of ['main', 'origin/main', 'fork/main', '◆ v1.0', 'feature/a-rather-long-branch-name']) await expect(list.getByText(name, { exact: true })).toBeVisible()
+      await page.mouse.move(x + 600, y)
+      await expect(list).toHaveCount(0)
+    })
+
+    test('the row without labels has nothing to expand', async ({ page }) => {
+      await open(page, 'graph', scenario)
+      await ready(page)
+      const { x, y } = await overLabels(page)
+      await page.mouse.move(x, y + 52)
+      await page.waitForTimeout(100)
+      await expect(page.locator('.ref-expand')).toHaveCount(0)
+    })
+
+    test('animates open and closed', async ({ page }) => {
+      await open(page, 'graph', scenario)
+      await ready(page)
+      const { x, y } = await overLabels(page)
+      await page.mouse.move(x, y)
+      const list = page.locator('.ref-expand')
+      await expect(list).toBeVisible()
+      const opening = await list.evaluate((el) => el.getAnimations().length)
+      expect(opening).toBeGreaterThan(0)
+      await expect.poll(() => list.evaluate((el) => el.getAnimations().length)).toBe(0)
+      await page.mouse.move(x + 600, y)
+      // Still there for a moment on the way out.
+      await expect(list).toHaveCount(1)
+      await expect(list).toHaveCount(0)
+    })
+
+    test('reduced motion opens it without animating', async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      await open(page, 'graph', scenario)
+      await ready(page)
+      const { x, y } = await overLabels(page)
+      await page.mouse.move(x, y)
+      const list = page.locator('.ref-expand')
+      await expect(list).toBeVisible()
+      await page.waitForTimeout(50)
+      expect(await list.evaluate((el) => getComputedStyle(el).opacity)).toBe('1')
+    })
+
+    test('stays out of the way of clicks on the row', async ({ page }) => {
+      await open(page, 'graph', scenario)
+      await ready(page)
+      const { x, y } = await overLabels(page)
+      await page.mouse.move(x, y)
+      await expect(page.locator('.ref-expand')).toBeVisible()
+      // Over the second row, under the open list.
+      await page.mouse.click(x, y + 52)
+      await expect.poll(async () => ((await events(page, 'select')).at(-1)?.[0] as { index: number } | undefined)?.index).toBe(1)
+    })
+
+    test('stops a very long list, and says how many more', async ({ page }) => {
+      const many = Array.from({ length: 20 }, (_, i) => branch(`b${i}`))
+      await open(page, 'graph', { ...scenario, graphRefs: { [id]: many } })
+      await ready(page)
+      const { x, y } = await overLabels(page)
+      await page.mouse.move(x, y)
+      const list = page.locator('.ref-expand')
+      await expect(list.getByText('and 8 more')).toBeVisible()
+      await expect(list.getByText('b11', { exact: true })).toBeVisible()
+      await expect(list.getByText('b12', { exact: true })).toHaveCount(0)
+    })
+
+    test('stays inside the view at the bottom edge', async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 260 })
+      const lastId = '4'.padStart(40, '0')
+      await open(page, 'graph', { ...scenario, graphRefs: { [lastId]: graphRefs[id] } })
+      await ready(page)
+      const view = (await page.locator('.scroller').boundingBox())!
+      await page.locator('.scroller').evaluate((el) => el.scrollTo(0, el.scrollHeight))
+      await page.waitForTimeout(100)
+      await page.mouse.move(view.x + 30, view.y + view.height - 26)
+      const list = page.locator('.ref-expand')
+      await expect(list).toBeVisible()
+      await expect.poll(async () => {
+        const b = (await list.boundingBox())!
+        return b.y + b.height <= view.y + view.height + 1
+      }).toBe(true)
+    })
+  })
+
+  // #418: the commit panel has the same list, for the keyboard and screen readers.
+  test("the commit panel lists the selected commit's refs", async ({ page }) => {
+    const id = '0'.repeat(40)
+    const person = { name: 'Ana Cruz', email: 'ana@example.com', time: 1793500000 }
+    const commit = { id, subject: 'Commit 0', body: '', trailers: [], parents: [], author: person, committer: person }
+    await open(page, 'repoView', {
+      graphRows: 3,
+      graphRefs: { [id]: [branch('main', { head: true, branchKind: 'trunk' }), remote('origin/main', { branchKind: 'trunk' }), tag('v1.0')] },
+      responses: { Refs: [], CommitSignatures: [], WorkingTree: { status: { files: [] } }, CommitDetail: { commit, files: [] } },
+    })
+    const box = (await page.locator('.scroller').boundingBox())!
+    await page.mouse.click(box.x + 500, box.y + 26)
+    const list = page.getByRole('definition').filter({ hasText: 'origin/main' })
+    await expect(list).toBeVisible()
+    await expect(list.getByText('main', { exact: true })).toBeVisible()
+    await expect(list.getByText('◆ v1.0')).toBeVisible()
+  })
+
   // #340: a selection before the first measure scrolled the graph one row down.
   test('opens at the top', async ({ page }) => {
     await open(page, 'graph', { graphRows: 500, responses: { Refs: [], CommitSignatures: [] } })
