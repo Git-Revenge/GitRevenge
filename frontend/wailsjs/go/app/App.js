@@ -134,6 +134,10 @@ export function FileImage(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['FileImage'](arg1, arg2, arg3, arg4);
 }
 
+export function ForcePushLoss(arg1) {
+  return window['go']['app']['App']['ForcePushLoss'](arg1);
+}
+
 export function GitCommands() {
   return window['go']['app']['App']['GitCommands']();
 }
@@ -284,6 +288,10 @@ export function PushCurrent(arg1, arg2) {
 
 export function PushRef(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['PushRef'](arg1, arg2, arg3, arg4);
+}
+
+export function PushedUndo(arg1, arg2) {
+  return window['go']['app']['App']['PushedUndo'](arg1, arg2);
 }
 
 export function RebasePlan(arg1, arg2) {
