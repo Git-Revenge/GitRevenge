@@ -8,7 +8,7 @@
   import { theme as colorTheme } from '../theme.svelte'
   import { provideCommands } from '../commands.svelte'
   import Icon from '../ui/Icon.svelte'
-  import { drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneWindow, layoutColumns, METRICS, setLaneColors, type Theme } from './draw'
+  import { drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneWindow, layoutColumns, METRICS, refColumnWidth, setLaneColors, type Layout, type Theme } from './draw'
   import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
   import { scrollMap, topAfterScroll, toScroll, type ScrollMap } from './scrollMap'
 
@@ -114,6 +114,11 @@
   /** Fetching rows failed, separately from reading the history; clears when a fetch works. */
   let rowError = $state('')
   let selected = $state(-1)
+  /** The column positions as last drawn, for the header above the canvas. */
+  let columns = $state<Layout>()
+  /** The most lanes any row in view has used. The graph's width follows it, and only grows, so
+   * the message column doesn't move while scrolling. A reload starts it again. */
+  let widest = 1
   let hovered = -1
   let frame = 0
   /** Drag state: the row pressed and where; the row under the pointer while dragging. */
@@ -214,22 +219,22 @@
     const last = Math.min(span, Math.ceil((top + h) / rowH))
     cache.ensure(first - OVERSCAN, last + OVERSCAN)
 
-    let lanes = 1
     let minCol = Infinity
     let maxCol = 0
     for (let i = first; i < last; i++) {
       const row = cache.get(i)
       if (!row) continue
-      lanes = Math.max(lanes, row.width)
+      widest = Math.max(widest, row.width)
       minCol = Math.min(minCol, row.col)
       maxCol = Math.max(maxCol, row.col)
     }
     const m = METRICS[density]
-    const graphW = graphWidth(lanes, w * MAX_GRAPH_SHARE, m)
+    const graphW = graphWidth(widest, (w - refColumnWidth(w)) * MAX_GRAPH_SHARE, m)
     // A history wider than the column scrolls its lanes so the nodes in view stay visible.
     const sel = cache.get(selected)
     const firstLane = minCol === Infinity ? 0 : laneWindow(minCol, maxCol, sel && selected >= first && selected < last ? sel.col : null, laneCapacity(graphW, m))
     const lay = layoutColumns(w, graphW, density, firstLane)
+    if (!columns || columns.width !== lay.width || columns.graphW !== lay.graphW || columns.density !== lay.density) columns = lay
     const th = theme()
     const now = Date.now() / 1000
     for (let i = first; i < last; i++) {
@@ -238,15 +243,15 @@
       // The drop target is highlighted like a selection while dragging.
       if (!row) continue
       wantSignature(row.id)
-      drawRow(ctx, row, cache.refsFor(row.id), y, lay, th, i === selected || i === dropTarget, i === hovered, !!matchSet && !matchSet.has(i), now, sealOf(sigs.get(row.id)))
+      drawRow(ctx, row, cache.refsFor(row.id), y, lay, th, i === selected || i === dropTarget, i === hovered, !!matchSet && !matchSet.has(i), now, sealOf(sigs.get(row.id)), { prev: cache.get(i - 1), prev2: cache.get(i - 2), next: cache.get(i + 1) })
     }
     // Lanes scrolled out on the left fade in from the edge, so the cut doesn't look like the end.
     if (firstLane > 0) {
-      const fade = ctx.createLinearGradient(0, 0, m.pad + m.laneW, 0)
+      const fade = ctx.createLinearGradient(lay.refW, 0, lay.refW + m.pad + m.laneW, 0)
       fade.addColorStop(0, th.bg)
       fade.addColorStop(1, 'transparent')
       ctx.fillStyle = fade
-      ctx.fillRect(0, 0, m.pad + m.laneW, h)
+      ctx.fillRect(lay.refW, 0, m.pad + m.laneW, h)
     }
   }
 
@@ -360,6 +365,14 @@
     schedule()
   }
 
+  /** Searches for the selected commit's author, which dims everyone else's commits. */
+  function searchAuthor() {
+    const author = cache.get(selected)?.author
+    if (!author) return
+    query = author
+    void runSearch()
+  }
+
   /** Moves to the next (or previous) match relative to the selection. */
   function jump(dir: 1 | -1) {
     if (matches.length === 0) return
@@ -448,6 +461,7 @@
       if (p.done) void loadKindToggles()
       cache.setTotal(p.rows, !p.done, p.paused, p.estimate)
       if (p.refsReady) cache.invalidate() // labels arrived after the first rows
+      if (p.reset || p.done) widest = 1
       if (p.reset && !p.done) {
         // A reload swapped in part way through its history: rows are stale.
         cache.invalidate()
@@ -534,6 +548,21 @@
       {/if}
     </span>
   </div>
+  {#if columns?.refW}
+    <div class="columns">
+      <span style:left="12px">Branch / tag</span>
+      {#if columns.graphW >= 56}<span style:left="{columns.refW + columns.m.pad}px">Graph</span>{/if}
+      <span style:left="{columns.textX}px">Message</span>
+      {#if columns.authorW}
+        <span style:left="{columns.authorX}px">
+          Author
+          <button class="btn sm quiet icon" onclick={searchAuthor} disabled={selected < 0} aria-label="Search for the selected commit's author" title="Search for the selected commit's author"><Icon name="filter" size={13} /></button>
+        </span>
+      {/if}
+      {#if columns.dateW}<span style:left="{columns.dateX}px">Date</span>{/if}
+      <span style:left="{columns.shaX}px">SHA</span>
+    </div>
+  {/if}
   <div class="viewport">
     <canvas bind:this={canvas}></canvas>
     <div
@@ -676,6 +705,30 @@
 
   .error {
     color: var(--danger);
+  }
+
+  .columns {
+    position: relative;
+    flex: none;
+    height: 28px;
+    overflow: hidden;
+    border-bottom: 1px solid var(--paper-edge);
+    background: var(--paper-warm);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+
+  .columns > span {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
   }
 
   /* The canvas paints the visible rows; the transparent scroller above it provides the

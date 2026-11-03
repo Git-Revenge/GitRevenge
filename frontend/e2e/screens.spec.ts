@@ -182,6 +182,100 @@ test.describe('commit graph', () => {
     await expect(page.getByText("Couldn't read history: the repository has gone away")).toBeVisible()
   })
 
+  // #411: reading a busy repository, with lanes, labels and columns.
+  test.describe('with many branches', () => {
+    const lanes = (columns: number[]) => columns.map((c) => ({ from: c, to: c, color: c }))
+    /** Three lanes: 0 is idle, 1 is idle, and 2 holds every commit. */
+    const graphData = Array.from({ length: 20 }, (_, i) => ({
+      index: i,
+      col: 2,
+      color: 2,
+      up: i ? lanes([0, 1, 2]) : lanes([0, 1]),
+      down: lanes([0, 1, 2]),
+      width: 3,
+      id: String(i).padStart(40, '0'),
+      parents: 1,
+      author: 'Ana Cruz',
+      authorTime: 1793500000 - i * 60,
+      subject: `Commit ${i}`,
+    }))
+    const scenario = { graphData, responses: { Refs: [], CommitSignatures: [], SearchGraph: { rows: [1], total: 1 } } }
+    // The timeline's lanes: 150 of labels, 10 of padding, then 16 a lane.
+    const lane = (col: number) => 150 + 10 + 16 * col + 8
+
+    /** How much ink is on a pixel: the canvas is clear where nothing is drawn. */
+    const inkAt = (page: Page, x: number, y: number) =>
+      page.locator('canvas').evaluate(
+        (el, [px, py]) => {
+          const dpr = window.devicePixelRatio || 1
+          return (el as HTMLCanvasElement).getContext('2d')!.getImageData(px * dpr, py * dpr, 1, 1).data[3]
+        },
+        [x, y],
+      )
+
+    test('headers name the columns when there is room', async ({ page }) => {
+      await open(page, 'graph', scenario)
+      const header = page.locator('.columns')
+      for (const name of ['Branch / tag', 'Graph', 'Message', 'SHA']) await expect(header.getByText(name)).toBeVisible()
+      // The timeline shows the author and date under the subject, not in columns of their own.
+      await expect(header.getByText('Author')).toHaveCount(0)
+    })
+
+    test('a narrow window has no column headers', async ({ page }) => {
+      await page.setViewportSize({ width: 600, height: 600 })
+      await open(page, 'graph', scenario)
+      await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '20')
+      await page.waitForTimeout(200)
+      await expect(page.locator('.columns')).toHaveCount(0)
+    })
+
+    test('idle lanes draw quieter than the one with commits', async ({ page }) => {
+      await open(page, 'graph', scenario)
+      await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '20')
+      await expect.poll(() => inkAt(page, lane(2), 78 + 22)).toBeGreaterThan(0)
+      const busy = await inkAt(page, lane(2), 78 + 22)
+      const idle = await inkAt(page, lane(1), 78 + 22)
+      expect(idle).toBeGreaterThan(0)
+      expect(busy).toBeGreaterThan(idle * 2)
+    })
+
+    test("a row carries its lane's colour from the node toward the message", async ({ page }) => {
+      await open(page, 'graph', scenario)
+      await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '20')
+      // Between the node and the message, on an unselected row: lane 2's wash and nothing else.
+      await expect.poll(() => inkAt(page, lane(2) + 15, 78)).toBeGreaterThan(0)
+      // Left of the node, between two idle lanes: nothing at all.
+      expect(await inkAt(page, lane(1) + 8, 78)).toBe(0)
+    })
+
+    test("the author button searches for the selected commit's author", async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 800 })
+      await open(page, 'graph', scenario)
+      await page.getByRole('button', { name: 'Compact' }).or(page.getByRole('button', { name: 'Timeline' })).click()
+      await page.getByRole('button', { name: "Search for the selected commit's author" }).click()
+      await expect(page.getByRole('searchbox', { name: 'Search commits' })).toHaveValue('Ana Cruz')
+      await expect.poll(() => calls(page, 'SearchGraph')).toContainEqual(['/repo', 'Ana Cruz'])
+    })
+
+    test('the message column stays put when a wider row scrolls by', async ({ page }) => {
+      const wideLater = graphData.map((r, i) => (i === 19 ? { ...r, width: 9 } : r))
+      await page.setViewportSize({ width: 1280, height: 300 })
+      await open(page, 'graph', { ...scenario, graphData: wideLater })
+      const message = page.locator('.columns').getByText('Message')
+      await expect(message).toBeVisible()
+      const before = (await message.boundingBox())!.x
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.move(box.x + 400, box.y + 100)
+      await page.mouse.wheel(0, 2000)
+      // The wider row widens the graph once, and the column holds from then on.
+      await expect.poll(async () => (await message.boundingBox())!.x).toBeGreaterThan(before)
+      const widened = (await message.boundingBox())!.x
+      await page.mouse.wheel(0, -2000)
+      await page.waitForTimeout(150)
+      expect((await message.boundingBox())!.x).toBe(widened)
+    })
+  })
+
   // #340: a selection before the first measure scrolled the graph one row down.
   test('opens at the top', async ({ page }) => {
     await open(page, 'graph', { graphRows: 500, responses: { Refs: [], CommitSignatures: [] } })
