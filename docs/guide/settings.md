@@ -49,6 +49,7 @@ On macOS, read <kbd>⌘</kbd> wherever this page says <kbd>Ctrl</kbd>. Press <kb
 | Move a page | <kbd>Page Up</kbd> / <kbd>Page Down</kbd> |
 | First or last commit | <kbd>Home</kbd> / <kbd>End</kbd> |
 | Commit the staged changes | <kbd>Ctrl</kbd>+<kbd>Enter</kbd> |
+| Next or previous file, with a diff open | <kbd>Alt</kbd>+<kbd>↓</kbd> and <kbd>Alt</kbd>+<kbd>↑</kbd> |
 | Fetch all remotes | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> |
 | Pull | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> |
 | Push the current branch | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>U</kbd> |

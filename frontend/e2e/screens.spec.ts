@@ -621,6 +621,16 @@ test.describe('commit graph', () => {
       })
     })
 
+    // #437
+    test('the arrow keys move between its files', async ({ page }) => {
+      await openCommit(page)
+      await tab(page, 'Files').click()
+      const rows = page.getByRole('tabpanel').locator('.file-row')
+      await rows.first().focus()
+      await page.keyboard.press('ArrowDown')
+      await expect(rows.nth(1)).toBeFocused()
+    })
+
     test('has no filter for a short list', async ({ page }) => {
       await openCommit(page)
       await tab(page, 'Files').click()
@@ -1225,6 +1235,51 @@ test.describe('before the first load has answered', () => {
       await page.getByRole('button', { name: 'Tree' }).click()
       await page.getByRole('button', { name: 'src/', exact: true }).click()
       await expect(page.locator('button.name')).toHaveCount(2)
+    })
+
+    // #437: reviewing files took a lot of mouse travel.
+    test.describe('from the keyboard', () => {
+      const three = [file('a/one.txt', '.', 'M'), file('a/two.txt', '.', 'M'), file('b/three.txt', '.', 'M')]
+      const row = (page: Page, name: string) => page.locator('button.name', { hasText: name })
+
+      test('the arrow keys move between files, past folder headings', async ({ page }) => {
+        await open(page, 'workingTree', scenario(three))
+        await row(page, 'one.txt').focus()
+        await page.keyboard.press('ArrowDown')
+        await expect(row(page, 'two.txt')).toBeFocused()
+        await page.keyboard.press('ArrowDown')
+        await expect(row(page, 'three.txt')).toBeFocused()
+        await page.keyboard.press('Home')
+        await expect(row(page, 'one.txt')).toBeFocused()
+        await page.keyboard.press('End')
+        await expect(row(page, 'three.txt')).toBeFocused()
+        await page.keyboard.press('ArrowUp')
+        await expect(row(page, 'two.txt')).toBeFocused()
+      })
+
+      test('Space ticks the file, without opening it', async ({ page }) => {
+        await open(page, 'workingTree', scenario(three))
+        await row(page, 'two.txt').focus()
+        await page.keyboard.press('Space')
+        await expect.poll(() => calls(page, 'StageFiles')).toEqual([['/r', ['a/two.txt']]])
+        expect(await events(page, 'open')).toEqual([])
+      })
+
+      test('Enter opens the file', async ({ page }) => {
+        await open(page, 'workingTree', scenario(three))
+        await row(page, 'two.txt').focus()
+        await page.keyboard.press('Enter')
+        await expect.poll(async () => (await events(page, 'open')).at(-1)?.[0]).toMatchObject({ file: 'a/two.txt' })
+      })
+
+      test('with a diff open, Alt and the arrows move to the next and previous file', async ({ page }) => {
+        await open(page, 'workingTree', { ...scenario(three), commandKeys: true, diffFile: 'a/two.txt' })
+        await expect(row(page, 'two.txt')).toBeVisible()
+        await page.keyboard.press('Alt+ArrowDown')
+        await expect.poll(async () => (await events(page, 'open')).at(-1)?.[0]).toMatchObject({ file: 'b/three.txt' })
+        await page.keyboard.press('Alt+ArrowUp')
+        await expect.poll(async () => (await events(page, 'open')).at(-1)?.[0]).toMatchObject({ file: 'a/one.txt' })
+      })
     })
 
     test('says so when there is nothing to commit', async ({ page }) => {

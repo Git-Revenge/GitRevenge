@@ -85,3 +85,21 @@ export function saveTreeChoice(tree: boolean) {
     // Storage unavailable; the choice lasts for this session only.
   }
 }
+
+/** The file before or after the open one in a list, if there is one. */
+export function adjacentFile<F extends { path: string }>(rows: FileRow<F>[], current: string | undefined, step: 1 | -1): F | undefined {
+  const files = rows.flatMap((r) => (r.type === 'file' ? [r.file] : []))
+  const at = files.findIndex((f) => f.path === current)
+  return at < 0 ? undefined : files[at + step]
+}
+
+/** Arrow keys, Home and End move between a list's file rows (marked data-file-row). */
+export function moveThroughRows(e: KeyboardEvent, list: HTMLElement) {
+  if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key) || e.altKey) return
+  const rows = [...list.querySelectorAll<HTMLElement>('[data-file-row]')]
+  const at = rows.indexOf(e.target as HTMLElement)
+  if (at < 0) return
+  const to = e.key === 'Home' ? 0 : e.key === 'End' ? rows.length - 1 : at + (e.key === 'ArrowDown' ? 1 : -1)
+  e.preventDefault()
+  rows[to]?.focus()
+}

@@ -12,6 +12,7 @@ Your changes are one list, by filename under their folders, with line counts. A 
 - On a filesystem that ignores letter case, such as Windows, files whose names differ only by case show as changed when nobody edited them. The panel says so and marks them **case clash**, and the tick at the top leaves them out.
 - If you aren't on a branch, the panel says so and offers **Create a branch here**, since a commit made there is easy to lose.
 - A list of five or more files gets a filter, and **Tree** switches between folders listed by their whole path and a tree whose folders open and close. The commit panel's **Files** tab has the same tools.
+- The arrow keys move through the list, <kbd>Space</kbd> ticks a file and <kbd>Enter</kbd> opens it. With a diff open, <kbd>Alt</kbd>+<kbd>↓</kbd> and <kbd>Alt</kbd>+<kbd>↑</kbd> move to the next and previous file, here and in a commit's **Files** tab.
 - Hover over a file for its discard button. Conflicts come first, under **Fix these first**.
 - Open a file to stage part of it. In the **Unified** diff, each hunk has a **Stage hunk** button, and you can select individual lines and stage just those. Staged changes can be unstaged the same way.
 

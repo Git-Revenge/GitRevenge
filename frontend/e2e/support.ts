@@ -15,6 +15,10 @@ export interface Scenario {
   graphRefs?: Record<string, unknown[]>
   selectedCommit?: string
   current?: string
+  /** Dispatches shortcuts to commands, as the app does. */
+  commandKeys?: boolean
+  /** The file whose diff is open in the working tree panel. */
+  diffFile?: string
   /** What's checked out, as the tab shows it. */
   head?: string
   menuX?: number
