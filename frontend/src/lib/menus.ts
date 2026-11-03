@@ -1,5 +1,5 @@
-import { DeleteStack, RestoreStack, StackDeletePlan, Unstack, BranchAction, BranchMergeState, HideBranch, Integrate, MarkBranchKind, PullBranch, PushRef, Refs, Restack, SetStackParent, StashAction } from '../../wailsjs/go/app/App.js'
-import { CONFIRM_DELETE, KINDS, kindWarning } from './branchKinds'
+import { DeleteStack, PushStack, RebaseStack, RestoreStack, StackDeletePlan, StackPushPlan, Unstack, UpdateStack, BranchAction, BranchMergeState, HideBranch, Integrate, MarkBranchKind, PullBranch, PushRef, Refs, Restack, SetStackParent, StashAction } from '../../wailsjs/go/app/App.js'
+import { CONFIRM_DELETE, CONFIRM_FORCE_PUSH, KINDS, kindWarning } from './branchKinds'
 import type { MenuItem } from './ContextMenu.svelte'
 import type { DialogSpec } from './Dialog.svelte'
 import type { Ref, Row } from './graph/rowCache'
@@ -473,9 +473,78 @@ export function stackItems(members: Ref[], ctx: MenuContext): MenuItem[] {
       icon: 'plus',
       run: () => ctx.openDialog(branchOnDialog(path, t.short)),
     })),
+    [
+      { label: 'Update stack', icon: 'rebase', run: () => (one ? updateStack(path, bottom, names) : tellForks()) },
+      { label: 'Rebase stack onto…', icon: 'rebase', run: () => (one ? rebaseStackDialog(ctx, names) : tellForks()) },
+      { label: 'Push stack', icon: 'push', danger: true, run: () => pushStack(ctx, members) },
+    ],
     [{ label: 'Unstack', icon: 'stack', run: () => unstack(path, bottom, names) }],
     [{ label: 'Delete stack…', icon: 'trash', run: () => deleteStack(ctx, bottom, names) }],
   )
+}
+
+/** --update-refs moves one line of commits, and rebasing each fork would duplicate what they share. */
+function tellForks() {
+  toasts.show('This stack forks, so it can’t move as one. Restack each branch on its own.')
+}
+
+async function updateStack(path: string, bottom: string, names: string[]) {
+  toasts.show('Updating the stack…')
+  const merged = await session.run(() => UpdateStack(path, names))
+  if (!merged) return
+  if (merged.length === 0) {
+    toasts.show('The stack is up to date with Trunk.')
+    return
+  }
+  const left = merged.length === names.length ? 'Everything in this stack is merged' : `Updated. ${merged.join(', ')} ${merged.length === 1 ? 'is' : 'are'} merged`
+  toasts.show(`${left}, and can be deleted.`, {
+    label: 'Delete',
+    run: async () => {
+      await session.run(() => DeleteStack(path, bottom, merged, false))
+    },
+  })
+}
+
+async function rebaseStackDialog(ctx: MenuContext, names: string[]) {
+  const refs = ((await session.run(() => Refs(ctx.path))) as Ref[] | undefined) ?? []
+  const others = refs.filter((r) => r.kind === 'local' && !names.includes(r.short))
+  const trunk = others.find((r) => r.branchKind === 'trunk') ?? others[0]
+  ctx.openDialog({
+    title: 'Rebase stack onto',
+    message: `Moves all ${names.length} branches, keeping each in place, and checks out ${names[0]}. Conflicts stop it for you to fix, branch by branch.`,
+    fields: [{ key: 'onto', label: 'Branch', type: 'select', value: trunk?.short ?? '', options: others.map((r) => ({ value: r.short, label: r.short })) }],
+    submit: 'Rebase stack',
+    run: (v) => attempt(() => RebaseStack(ctx.path, names, String(v.onto))),
+  })
+}
+
+/** Force pushing is routine after a rebase, so it only asks when something would really be lost
+ * or a branch is one that asks anyway. */
+async function pushStack(ctx: MenuContext, members: Ref[]) {
+  const { path } = ctx
+  const plan = await session.run(() => StackPushPlan(path, members.map((r) => r.short)))
+  if (!plan) return
+  if (plan.push.length === 0) {
+    toasts.show('Everything in this stack is merged, so there’s nothing to push.')
+    return
+  }
+  const send = async () => {
+    await PushStack(path, plan.push)
+    toasts.show(`Pushed ${plan.push.length === 1 ? '1 branch' : `${plan.push.length} branches`}.`)
+  }
+  const kinds = members.filter((r) => plan.push.includes(r.short)).map((r) => kindWarning(r.short, r.branchKind, CONFIRM_FORCE_PUSH)).filter(Boolean)
+  if (plan.losses.length === 0 && kinds.length === 0) {
+    await session.run(send)
+    return
+  }
+  const lost = plan.losses.map((l) => `${l.upstream} would lose:\n${l.commits.map((c) => `${c.short} ${c.subject} (${c.author})`).join('\n')}${l.total > l.commits.length ? `\nand ${l.total - l.commits.length} more` : ''}`)
+  ctx.openDialog({
+    title: `Force push ${plan.push.length === 1 ? '1 branch' : `${plan.push.length} branches`}?`,
+    message: [...kinds, ...lost, 'This replaces their history on the remote for everyone, as long as nobody has pushed since you last fetched.'].join('\n\n'),
+    submit: 'Force push anyway',
+    danger: true,
+    run: () => attempt(send),
+  })
 }
 
 function branchOnDialog(path: string, start: string): DialogSpec {

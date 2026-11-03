@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/risadams/gitrevenge/internal/branchkind"
 	"github.com/risadams/gitrevenge/internal/git"
 	"github.com/risadams/gitrevenge/internal/session"
 )
@@ -29,19 +28,12 @@ func (a *App) Restack(path, branch string) error {
 	if parent == "" {
 		return userError(branch + " isn't stacked on another branch.")
 	}
-	onto := ""
-	var parentTip string
-	for _, p := range rules.Patterns(branchkind.Trunk) {
-		for _, ref := range refs {
-			if ref.Kind == git.LocalBranch && onto == "" && branchkind.Match(p, ref.Short) {
-				// The Trunk's upstream holds the merge; the local branch may not be pulled yet.
-				onto = ref.Short
-				if ref.Upstream != "" && !ref.Gone {
-					onto = ref.Upstream
-				}
-			}
-		}
+	// The Trunk's upstream holds the merge; the local branch may not be pulled yet.
+	onto, upstream := trunkOf(refs, rules)
+	if upstream != "" {
+		onto = upstream
 	}
+	var parentTip string
 	for _, ref := range refs {
 		if ref.Kind == git.LocalBranch && ref.Short == parent {
 			parentTip = ref.Commit

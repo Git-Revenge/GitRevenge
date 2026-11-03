@@ -150,9 +150,13 @@ export function PushCurrent(arg1:string,arg2:boolean):Promise<void>;
 
 export function PushRef(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
+export function PushStack(arg1:string,arg2:Array<string>):Promise<void>;
+
 export function PushedUndo(arg1:string,arg2:boolean):Promise<app.SharedCommits>;
 
 export function RebasePlan(arg1:string,arg2:string):Promise<Array<git.RebaseItem>>;
+
+export function RebaseStack(arg1:string,arg2:Array<string>,arg3:string):Promise<void>;
 
 export function RecentRepos():Promise<Array<app.RecentRepo>>;
 
@@ -244,6 +248,8 @@ export function ShowingHidden(arg1:string):Promise<boolean>;
 
 export function StackDeletePlan(arg1:string,arg2:Array<string>):Promise<app.StackPlan>;
 
+export function StackPushPlan(arg1:string,arg2:Array<string>):Promise<app.StackPush>;
+
 export function StageFiles(arg1:string,arg2:Array<string>):Promise<void>;
 
 export function StashAction(arg1:string,arg2:string,arg3:string):Promise<void>;
@@ -269,6 +275,8 @@ export function Unstack(arg1:string,arg2:Array<string>):Promise<Record<string, s
 export function UnstageFiles(arg1:string,arg2:Array<string>):Promise<void>;
 
 export function UpdateChecks():Promise<boolean>;
+
+export function UpdateStack(arg1:string,arg2:Array<string>):Promise<Array<string>>;
 
 export function UpdateSubmodules(arg1:string):Promise<void>;
 

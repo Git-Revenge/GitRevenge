@@ -273,6 +273,17 @@ func (r *Repo) Push(ctx context.Context, p PushOptions, o NetOptions) error {
 	return err
 }
 
+// PushBranches force pushes several branches to a remote in one step, all or none, each only if
+// the remote has it where it was last seen, and records them as upstreams. A refspec is
+// "branch:refs/heads/branch".
+func (r *Repo) PushBranches(ctx context.Context, remote string, refspecs []string, o NetOptions) error {
+	args := append([]string{"push", "--progress", "--atomic", "--force-with-lease", "--set-upstream", "--", remote}, refspecs...)
+	c := o.cmd(args...)
+	c.Dir = r.dir
+	_, err := r.runner.Run(ctx, c)
+	return err
+}
+
 // IssueURL returns a pattern for links to a remote's issues, with "{n}" standing for the
 // issue number, for remotes on GitHub or GitLab (including self-hosted GitLab, recognised
 // by "gitlab" in the host name). It returns "" for anything else.

@@ -102,6 +102,56 @@ test.describe('a stack of three or more', () => {
     expect(JSON.stringify(await calls(page, 'Unstack'))).toContain('["s-top","s-mid"]')
   })
 
+  // #475
+  const choose = async (page: Page, name: string) => {
+    await page.locator('.folder', { hasText: 's-base' }).click({ button: 'right' })
+    await page.getByRole('menuitem', { name }).click()
+  }
+  const NAMES = ['s-top', 's-mid', 's-base']
+
+  test('rebases all of it onto a chosen branch', async ({ page }) => {
+    await open(page, 'repoView', stacks)
+    await choose(page, 'Rebase stack onto…')
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toContainText('Moves all 3 branches')
+    await expect(dialog.getByRole('combobox')).toHaveValue('main')
+    await dialog.getByRole('button', { name: 'Rebase stack' }).click()
+    await expect.poll(() => calls(page, 'RebaseStack')).toHaveLength(1)
+    expect(JSON.stringify(await calls(page, 'RebaseStack'))).toContain(JSON.stringify(NAMES) + ',"main"')
+  })
+
+  test('updates, from the top down', async ({ page }) => {
+    await open(page, 'repoView', { ...stacks, responses: { ...stacks.responses, UpdateStack: ['s-base'] } })
+    await choose(page, 'Update stack')
+    await expect.poll(() => calls(page, 'UpdateStack')).toHaveLength(1)
+    expect(JSON.stringify(await calls(page, 'UpdateStack'))).toContain(JSON.stringify(NAMES))
+  })
+
+  const pushPlan = (over: object) => ({ ...stacks, responses: { ...stacks.responses, StackPushPlan: { push: NAMES, merged: [], losses: [], ...over } } })
+  const pressPush = async (page: Page) => {
+    await choose(page, 'Push stack')
+    await page.getByRole('menuitem', { name: /Press again/ }).click()
+  }
+
+  test('pushes straight away when nothing would be lost', async ({ page }) => {
+    await open(page, 'repoView', pushPlan({}))
+    await pressPush(page)
+    await expect.poll(() => calls(page, 'PushStack')).toHaveLength(1)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  test('asks before pushing over someone else’s work, and names it', async ({ page }) => {
+    const c = { id: 'a', short: 'abc1234', author: 'Someone Else', subject: 'their work', merge: false }
+    await open(page, 'repoView', pushPlan({ losses: [{ branch: 's-top', upstream: 'origin/s-top', commits: [c], total: 1 }] }))
+    await pressPush(page)
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toContainText('origin/s-top would lose')
+    await expect(dialog).toContainText('abc1234 their work (Someone Else)')
+    expect(await calls(page, 'PushStack')).toHaveLength(0)
+    await dialog.getByRole('button', { name: 'Force push anyway' }).click()
+    await expect.poll(() => calls(page, 'PushStack')).toHaveLength(1)
+  })
+
   test('moves with the keyboard like a folder', async ({ page }) => {
     await open(page, 'sidebar', stacks)
     await expectOutline(page, ['main', 'Stack: s-base/', '  s-top', '  s-mid', '  s-base'])

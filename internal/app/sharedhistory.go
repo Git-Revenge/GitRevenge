@@ -77,8 +77,8 @@ func movesPushedWork(e undoEntry) bool {
 	}
 }
 
-// ForcePushLoss says which commits on the current branch's upstream a force push would replace,
-// as far as the last fetch knows.
+// ForcePushLoss says which commits on the current branch's upstream a force push would lose, as
+// far as the last fetch knows. A commit rebased or amended with the same change isn't lost.
 func (a *App) ForcePushLoss(path string) (SharedCommits, error) {
 	r, err := a.openRepo(path)
 	if err != nil {
@@ -93,7 +93,7 @@ func (a *App) ForcePushLoss(path string) (SharedCommits, error) {
 	if upstream == "" {
 		return SharedCommits{}, nil
 	}
-	commits, total, err := r.Git.CommitsBetween(ctx, head.Commit, upstream, maxListedCommits)
+	commits, total, err := r.Git.CommitsOnlyOn(ctx, head.Commit, upstream, maxListedCommits)
 	if err != nil || total == 0 {
 		return SharedCommits{}, nil
 	}

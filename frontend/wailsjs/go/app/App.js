@@ -290,12 +290,20 @@ export function PushRef(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['PushRef'](arg1, arg2, arg3, arg4);
 }
 
+export function PushStack(arg1, arg2) {
+  return window['go']['app']['App']['PushStack'](arg1, arg2);
+}
+
 export function PushedUndo(arg1, arg2) {
   return window['go']['app']['App']['PushedUndo'](arg1, arg2);
 }
 
 export function RebasePlan(arg1, arg2) {
   return window['go']['app']['App']['RebasePlan'](arg1, arg2);
+}
+
+export function RebaseStack(arg1, arg2, arg3) {
+  return window['go']['app']['App']['RebaseStack'](arg1, arg2, arg3);
 }
 
 export function RecentRepos() {
@@ -478,6 +486,10 @@ export function StackDeletePlan(arg1, arg2) {
   return window['go']['app']['App']['StackDeletePlan'](arg1, arg2);
 }
 
+export function StackPushPlan(arg1, arg2) {
+  return window['go']['app']['App']['StackPushPlan'](arg1, arg2);
+}
+
 export function StageFiles(arg1, arg2) {
   return window['go']['app']['App']['StageFiles'](arg1, arg2);
 }
@@ -528,6 +540,10 @@ export function UnstageFiles(arg1, arg2) {
 
 export function UpdateChecks() {
   return window['go']['app']['App']['UpdateChecks']();
+}
+
+export function UpdateStack(arg1, arg2) {
+  return window['go']['app']['App']['UpdateStack'](arg1, arg2);
 }
 
 export function UpdateSubmodules(arg1) {

@@ -166,7 +166,7 @@ describe('a stack', () => {
   ]
 
   it('offers the top of the stack, then Unstack and Delete', () => {
-    expect(labels(stackItems(stack, ctx('main')))).toEqual(['Check out top of stack (top)', 'New branch on top…', 'Unstack', 'Delete stack…'])
+    expect(labels(stackItems(stack, ctx('main')))).toEqual(['Check out top of stack (top)', 'New branch on top…', 'Update stack', 'Rebase stack onto…', 'Push stack', 'Unstack', 'Delete stack…'])
   })
 
   it('names each top when it forks', () => {
