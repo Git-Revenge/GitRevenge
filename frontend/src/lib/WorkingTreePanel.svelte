@@ -366,10 +366,33 @@
   .panel {
     display: flex;
     flex-direction: column;
-    width: 420px;
-    min-width: 300px;
+    flex: 1;
+    min-width: 0;
     border-left: 1px solid var(--paper-edge);
     background: var(--paper);
+  }
+
+  /* With room for it, the commit form sits beside the files. */
+  @container right-panel (min-width: 620px) {
+    .panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      grid-template-rows: auto auto minmax(0, 1fr);
+    }
+
+    .composer {
+      grid-column: 2;
+      grid-row: 1 / -1;
+      border-left: 1px solid var(--paper-edge);
+    }
+
+    .composer textarea {
+      flex: 1;
+    }
+
+    .lists {
+      grid-column: 1;
+    }
   }
 
   .top {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import { CommitRow, WorkingTree } from '../../wailsjs/go/app/App.js'
   import { provideCommands } from './commands.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
@@ -8,6 +9,7 @@
   import WorktreesDialog from './WorktreesDialog.svelte'
   import Toolbar from './Toolbar.svelte'
   import Icon from './ui/Icon.svelte'
+  import { DEFAULT_WIDTH, fitWidth, loadRightPanel, maxWidth, MIN_WIDTH, saveRightPanel } from './rightPanel'
   import { commitMenuItems, branchAtDialog, checkoutRef, dropItems, newBranchDialog, refItems, type MenuContext } from './menus'
   import ReflogDialog from './ReflogDialog.svelte'
   import CommitPanel from './CommitPanel.svelte'
@@ -20,6 +22,30 @@
   import WorkingTreePanel from './WorkingTreePanel.svelte'
 
   let { path }: { path: string } = $props()
+
+  const storage = (): Pick<Storage, 'getItem' | 'setItem'> => localStorage
+  let right = $state(loadRightPanel(untrack(() => path), storage()))
+  $effect(() => saveRightPanel(path, $state.snapshot(right), storage()))
+  let windowWidth = $state(0)
+  /** The panel's width now. Before the first measure there's nothing to fit it to. */
+  let rightWidth = $derived(windowWidth ? fitWidth(right.width, windowWidth) : right.width)
+
+  // Dragging the panel's edge, or the arrow keys on it, resizes the panel.
+  let rightDrag: { x: number; width: number } | null = null
+  function startRightResize(e: PointerEvent) {
+    rightDrag = { x: e.clientX, width: rightWidth }
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  }
+  function rightResize(e: PointerEvent) {
+    if (rightDrag) right.width = fitWidth(rightDrag.width + rightDrag.x - e.clientX, windowWidth)
+  }
+  function rightResizeKey(e: KeyboardEvent) {
+    const step = e.key === 'ArrowLeft' ? 16 : e.key === 'ArrowRight' ? -16 : 0
+    if (step) right.width = fitWidth(rightWidth + step, windowWidth)
+    else if (e.key === 'Home') right.width = DEFAULT_WIDTH
+    else return
+    e.preventDefault()
+  }
 
   let graph: GraphView
   let selected = $state<Row | undefined>()
@@ -128,7 +154,7 @@
   }
 </script>
 
-<div class="repo">
+<div class="repo" bind:clientWidth={windowWidth}>
   <Sidebar
     {path}
     selectedCommit={selected?.id}
@@ -200,10 +226,31 @@
       </div>
     {/if}
   </div>
+  {#if view === 'wip' || selected}
+    <div class="right" style:width="{rightWidth}px">
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+      <div
+        class="edge"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize the right panel"
+        aria-valuenow={rightWidth}
+        aria-valuemin={MIN_WIDTH}
+        aria-valuemax={maxWidth(windowWidth)}
+        tabindex="0"
+        title="Drag to resize. Double-click to reset."
+        onpointerdown={startRightResize}
+        onpointermove={rightResize}
+        onpointerup={() => (rightDrag = null)}
+        ondblclick={() => (right.width = DEFAULT_WIDTH)}
+        onkeydown={rightResizeKey}
+      ></div>
   {#if view === 'wip'}
     <WorkingTreePanel {path} current={diff} openFile={(t) => (diff = t)} />
   {:else if selected}
     <CommitPanel {path} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} />
+  {/if}
+    </div>
   {/if}
 </div>
 
@@ -254,6 +301,39 @@
   .graph {
     flex: 1;
     min-height: 0;
+  }
+
+  /* The panels inside lay out by this width, not the window's: see their container queries. */
+  .right {
+    position: relative;
+    flex: none;
+    display: flex;
+    min-height: 0;
+    container: right-panel / inline-size;
+  }
+
+  .edge {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -3px;
+    width: 6px;
+    z-index: 3;
+    cursor: col-resize;
+    touch-action: none;
+    transition: background-color var(--dur-quick);
+  }
+
+  .edge:hover,
+  .edge:focus-visible {
+    background: var(--link);
+    outline: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .edge {
+      transition: none;
+    }
   }
 
   .hidden {

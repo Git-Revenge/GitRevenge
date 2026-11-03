@@ -27,6 +27,8 @@ Column headers name what's in each column. In compact rows with enough width, th
 - <kbd>Page Up</kbd> and <kbd>Page Down</kbd> move a page at a time.
 - <kbd>Home</kbd> and <kbd>End</kbd> go to the newest and oldest commits.
 
+Drag the left edge of the panel on the right to resize it, or use the arrow keys on it, and double-click the edge to reset it. Git Revenge remembers the width for each repository. Once it's wide enough, the panel lays out in two columns.
+
 Selecting a commit shows its details on the right: author, committer, message, [notes](history.md#notes), [signature](history.md#signatures) and the files it changed. Trailers such as `Co-authored-by` and `Closes` are listed on their own, and `#14` links to the issue on your repository's host.
 
 ![A selected commit, with its message, trailers, author, a git note and the files it changed](../img/commit-details-light.webp#gh-light-mode-only)

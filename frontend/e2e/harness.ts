@@ -183,6 +183,7 @@ const mounts = {
     mount(WorkingTreePanel, { target: host, props: { path: '/r', openFile: () => {}, onCommitted: record('committed') } })
   },
   async repoView() {
+    host.style.cssText = 'display:block;height:100vh'
     const { default: RepoView } = await import('../src/lib/RepoView.svelte')
     mount(RepoView, { target: host, props: { path: '/r' } })
   },
