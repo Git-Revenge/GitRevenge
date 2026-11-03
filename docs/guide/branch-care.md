@@ -78,6 +78,12 @@ Git Revenge works this out from history. In the sidebar, a stacked branch sits u
 
 A stack of three or more becomes a group, named after its bottom branch, with the top of the stack first. Click the group to open or close it. A group whose branches have all merged starts closed and says **merged**.
 
+Right-click a group to work on the whole stack:
+
+- **Check out top of stack** and **New branch on top**. A stack that forks offers each of its tops.
+- **Unstack** shows its branches separately again. It doesn't change their history, and the message it leaves has **Undo**.
+- **Delete stack** deletes every branch in it. If all of them are merged it goes straight ahead, with **Undo** in the message it leaves. If any aren't, it asks first and names the unmerged work. It leaves alone the checked-out branch and anything checked out in a worktree, hidden, protected by its kind, or built on by a branch that stays.
+
 If the guess is wrong, right-click the branch and choose **Stack `name` on…**: pick the right branch, **Not stacked**, or **Detect automatically** to go back to the guess.
 
 ### Restacking after the branch below merges

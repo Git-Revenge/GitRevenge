@@ -10,7 +10,7 @@
   import Toolbar from './Toolbar.svelte'
   import Icon from './ui/Icon.svelte'
   import { DEFAULT_WIDTH, fitWidth, loadRightPanel, maxWidth, MIN_WIDTH, saveRightPanel } from './rightPanel'
-  import { commitMenuItems, branchAtDialog, checkoutRef, dropItems, newBranchDialog, refItems, type MenuContext } from './menus'
+  import { commitMenuItems, branchAtDialog, checkoutRef, dropItems, newBranchDialog, refItems, stackItems, type MenuContext } from './menus'
   import ReflogDialog from './ReflogDialog.svelte'
   import CommitPanel from './CommitPanel.svelte'
   import type { DiffTarget } from './diff/DiffView.svelte'
@@ -175,6 +175,7 @@
     onNewBranch={() => (dialog = newBranchDialog(ctx))}
     onManageRemotes={() => (remotesOpen = true)}
     onContext={(ref, x, y) => openMenu(refItems(ref, ctx), x, y)}
+    onStackContext={(members, x, y) => openMenu(stackItems(members, ctx), x, y)}
     onMenu={openMenu}
     onManageWorktrees={() => (worktreesOpen = true)}
     openDialog={ctx.openDialog}

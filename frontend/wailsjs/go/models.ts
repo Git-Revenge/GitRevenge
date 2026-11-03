@@ -748,6 +748,54 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class UnmergedBranch {
+	    name: string;
+	    commits: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new UnmergedBranch(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.commits = source["commits"];
+	    }
+	}
+	export class StackPlan {
+	    delete: string[];
+	    keep: string[];
+	    unmerged: UnmergedBranch[];
+	
+	    static createFrom(source: any = {}) {
+	        return new StackPlan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.delete = source["delete"];
+	        this.keep = source["keep"];
+	        this.unmerged = this.convertValues(source["unmerged"], UnmergedBranch);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	export class UndoInfo {
 	    undo: string;
@@ -763,6 +811,7 @@ export namespace app {
 	        this.redo = source["redo"];
 	    }
 	}
+	
 	export class UpdateInfo {
 	    current: string;
 	    latest: string;

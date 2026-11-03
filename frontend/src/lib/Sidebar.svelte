@@ -25,6 +25,7 @@
     onNewBranch,
     onManageRemotes,
     onContext,
+    onStackContext,
     onMenu,
     onManageWorktrees,
     openDialog,
@@ -38,6 +39,7 @@
     onNewBranch?: () => void
     onManageRemotes?: () => void
     onContext?: (ref: Ref, x: number, y: number) => void
+    onStackContext?: (members: Ref[], x: number, y: number) => void
     onMenu?: (items: MenuItem[], x: number, y: number) => void
     onManageWorktrees?: () => void
     openDialog: (spec: DialogSpec) => void
@@ -136,9 +138,11 @@
 
   function openMenuFor(index: number) {
     const row = rows[index]
-    if (row?.type !== 'ref' || !onContext) return
     const box = document.getElementById(rowId(index))?.getBoundingClientRect()
-    onContext(row.ref, (box?.left ?? 0) + 32, box?.bottom ?? 0)
+    const x = (box?.left ?? 0) + 32
+    const y = box?.bottom ?? 0
+    if (row?.type === 'ref') onContext?.(row.ref, x, y)
+    else if (row?.members) onStackContext?.(row.members, x, y)
   }
 
   let typed = ''
@@ -392,7 +396,7 @@
             aria-expanded={row.type === 'folder' ? row.open : undefined}
             aria-selected={row.type === 'ref' && !!selectedCommit && row.ref.commit === selectedCommit}
           >
-            <SidebarRow {row} {filter} {selectedCommit} mergedInto={row.type === 'ref' && row.ref.kind === 'local' ? merged[row.ref.short] : undefined} onFolderClick={clickFolder} onRefClick={clickRef} {onActivate} {onContext} />
+            <SidebarRow {row} {onStackContext} {filter} {selectedCommit} mergedInto={row.type === 'ref' && row.ref.kind === 'local' ? merged[row.ref.short] : undefined} onFolderClick={clickFolder} onRefClick={clickRef} {onActivate} {onContext} />
           </li>
         {/each}
       </ul>

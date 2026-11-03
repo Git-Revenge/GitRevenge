@@ -54,6 +54,8 @@ export function DeletableBranches(arg1:string,arg2:Array<string>):Promise<Array<
 
 export function DeleteMergedBranches(arg1:string,arg2:Array<string>):Promise<Array<string>>;
 
+export function DeleteStack(arg1:string,arg2:string,arg3:Array<string>,arg4:boolean):Promise<Array<string>>;
+
 export function DiscardFiles(arg1:string,arg2:Array<string>):Promise<void>;
 
 export function EffectiveGitConfig(arg1:string):Promise<Array<git.ConfigEntry>>;
@@ -188,6 +190,8 @@ export function RestoreGitConfig(arg1:string,arg2:string):Promise<app.ConfigDoc>
 
 export function RestoreSession():Promise<app.SessionState>;
 
+export function RestoreStack(arg1:string,arg2:Array<string>,arg3:Record<string, string>):Promise<void>;
+
 export function RunOperationAction(arg1:string,arg2:string):Promise<void>;
 
 export function SaveFile(arg1:string,arg2:string,arg3:string):Promise<string>;
@@ -234,6 +238,8 @@ export function SetWorkTreeContent(arg1:string,arg2:string,arg3:string,arg4:stri
 
 export function ShowingHidden(arg1:string):Promise<boolean>;
 
+export function StackDeletePlan(arg1:string,arg2:Array<string>):Promise<app.StackPlan>;
+
 export function StageFiles(arg1:string,arg2:Array<string>):Promise<void>;
 
 export function StashAction(arg1:string,arg2:string,arg3:string):Promise<void>;
@@ -253,6 +259,8 @@ export function Undo(arg1:string):Promise<void>;
 export function UndoState(arg1:string):Promise<app.UndoInfo>;
 
 export function UnsetGitConfig(arg1:string,arg2:string,arg3:string):Promise<app.ConfigDoc>;
+
+export function Unstack(arg1:string,arg2:Array<string>):Promise<Record<string, string>>;
 
 export function UnstageFiles(arg1:string,arg2:Array<string>):Promise<void>;
 

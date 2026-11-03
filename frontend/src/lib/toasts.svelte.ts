@@ -36,10 +36,11 @@ EventsOn('notice', (e: { path: string; message: string }) => {
 })
 
 /** Cleanup on pull: say what was deleted, with Undo while it's still the next undo. */
-EventsOn('branches:cleaned', (e: { path: string; branches: string[]; undoLabel: string }) => {
+EventsOn('branches:cleaned', (e: { path: string; branches: string[]; undoLabel: string; merged: boolean }) => {
   const n = e.branches.length
   const names = n <= 3 ? e.branches.join(', ') : `${e.branches.slice(0, 2).join(', ')} and ${n - 2} more`
-  toasts.show(`Deleted ${n === 1 ? 'a merged branch' : `${n} merged branches`}: ${names}`, {
+  const kind = e.merged ? 'merged branch' : 'branch'
+  toasts.show(`Deleted ${n === 1 ? `a ${kind}` : `${n} ${kind}es`}: ${names}`, {
     label: 'Undo',
     run: async () => {
       const state = await session.run(() => UndoState(e.path))

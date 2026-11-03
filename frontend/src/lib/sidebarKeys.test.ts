@@ -107,6 +107,7 @@ describe('acting on a row', () => {
     expect(press('F10', 1, true)).toEqual({ type: 'menu' })
     expect(press('F10', 1)).toBeNull()
     expect(press('ContextMenu', 0)).toBeNull()
+    expect(treeAction({ key: 'ContextMenu', shiftKey: false }, [{ ...rows[0], stack: true } as TreeRow], 0, 10)).toEqual({ type: 'menu' })
     expect(press('F10', 0, true)).toBeNull()
   })
 })

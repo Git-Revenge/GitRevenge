@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { Ref, Row } from './graph/rowCache'
 import { session } from './session.svelte'
-import { commitItems, commitMenuItems, deleteBranchDialog, dropItems, groups, refItems, upstreamDialog, type MenuContext } from './menus'
+import { stackItems, commitItems, commitMenuItems, deleteBranchDialog, dropItems, groups, refItems, upstreamDialog, type MenuContext } from './menus'
+
+// Its messages listen for events from the app, which isn't here.
+vi.mock('./toasts.svelte', () => ({ toasts: { show: vi.fn() } }))
 
 const row = (id: string): Row => ({ index: 0, col: 0, color: 0, up: [], down: [], width: 1, id, parents: 1, author: '', authorTime: 0, subject: '' })
 const ref = (short: string, kind: Ref['kind'], head = false): Ref => ({
@@ -151,6 +154,33 @@ describe('deleting a branch', () => {
     const d = deleteBranchDialog('/r', { ...topic, branchKind: 'trunk' }, { target: 'main', how: 'merged', unmerged: 0 })
     expect(d.message).toMatch(/trunk/i)
     expect(d.danger).toBe(true)
+  })
+})
+
+// #474
+describe('a stack', () => {
+  const stack = [
+    { ...ref('top', 'local'), stackParent: 'mid' },
+    { ...ref('mid', 'local'), stackParent: 'bottom' },
+    ref('bottom', 'local'),
+  ]
+
+  it('offers the top of the stack, then Unstack and Delete', () => {
+    expect(labels(stackItems(stack, ctx('main')))).toEqual(['Check out top of stack (top)', 'New branch on top…', 'Unstack', 'Delete stack…'])
+  })
+
+  it('names each top when it forks', () => {
+    const forked = [{ ...ref('other', 'local'), stackParent: 'mid' }, ...stack]
+    const got = labels(stackItems(forked, ctx('main')))
+    expect(got).toContain('Check out other')
+    expect(got).toContain('Check out top')
+    expect(got).toContain('New branch on other…')
+    expect(got).toContain('New branch on top…')
+  })
+
+  it('has nothing to check out when already on top', () => {
+    const items = stackItems([{ ...stack[0], head: true }, stack[1], stack[2]], ctx('top'))
+    expect(items.find((i) => i.label?.startsWith('Check out'))?.disabled).toBe(true)
   })
 })
 

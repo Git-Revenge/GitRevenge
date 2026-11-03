@@ -64,8 +64,8 @@ func (a *App) MergedBranches(path string) (map[string]string, error) {
 	return out, nil
 }
 
-func (a *App) mergedBranches(ctx context.Context, r *session.Repo) (map[string]git.BranchMerge, error) {
-	refs := r.Refs().All
+// mergeTargetsFor lists what to compare branches with, in general rather than for one branch.
+func (a *App) mergeTargetsFor(ctx context.Context, r *session.Repo) ([]string, error) {
 	remotes, err := r.Git.Remotes(ctx)
 	if err != nil {
 		return nil, err
@@ -74,7 +74,15 @@ func (a *App) mergedBranches(ctx context.Context, r *session.Repo) (map[string]g
 	for i, rm := range remotes {
 		remoteNames[i] = rm.Name
 	}
-	targets := mergeTargets(refs, a.branchRules(r.Path), remoteNames, "")
+	return mergeTargets(r.Refs().All, a.branchRules(r.Path), remoteNames, ""), nil
+}
+
+func (a *App) mergedBranches(ctx context.Context, r *session.Repo) (map[string]git.BranchMerge, error) {
+	refs := r.Refs().All
+	targets, err := a.mergeTargetsFor(ctx, r)
+	if err != nil {
+		return nil, err
+	}
 	var names []string
 	for _, ref := range refs {
 		if ref.Kind == git.LocalBranch && (ref.Gone || ref.StackParentMerged) && !slices.Contains(targets, ref.Short) {
@@ -173,15 +181,9 @@ func (a *App) DeleteMergedBranches(path string, names []string) ([]string, error
 		return !ok
 	})
 	safe := a.deletableBranches(ctx, r, still)
-	current, err := r.Git.Refs(ctx)
+	refs, err := a.currentRefs(ctx, r, safe)
 	if err != nil {
 		return nil, err
-	}
-	var refs []git.Ref
-	for _, ref := range current {
-		if ref.Kind == git.LocalBranch && slices.Contains(safe, ref.Short) {
-			refs = append(refs, ref)
-		}
 	}
 	gone := a.deleteMerged(ctx, r, refs)
 	if gone == nil {
