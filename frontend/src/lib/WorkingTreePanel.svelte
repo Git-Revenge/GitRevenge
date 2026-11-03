@@ -21,7 +21,8 @@
   } from '../../wailsjs/go/app/App.js'
   import type { app, git } from '../../wailsjs/go/models'
   import type { DiffTarget } from './diff/DiffView.svelte'
-  import { fileGroups, fileName } from './fileList'
+  import { FILTER_FROM, fileName, fileRows, readTreeChoice } from './fileList'
+  import FileListTools from './FileListTools.svelte'
   import { gitConfig } from './gitconfig/config.svelte'
   import { session } from './session.svelte'
   import Icon, { type IconName } from './ui/Icon.svelte'
@@ -151,6 +152,14 @@
   let ticked = $derived(tickable.filter((f) => tickOf(f) !== 'none').length)
   let allTicked = $derived(tickable.length > 0 && tickable.every((f) => tickOf(f) === 'all'))
 
+  let fileQuery = $state('')
+  let fileTree = $state(readTreeChoice())
+  let closedFolders = $state(new Set<string>())
+  let rows = $derived(fileRows(listed, { query: fileQuery, tree: fileTree, closed: closedFolders }))
+  function toggleFolder(p: string) {
+    closedFolders = new Set(closedFolders.has(p) ? [...closedFolders].filter((c) => c !== p) : [...closedFolders, p])
+  }
+
   /** Opens a file's changes: what's still unstaged, if any is. */
   function show(f: git.FileStatus) {
     openFile({ mode: isUnstaged(f) ? 'unstaged' : 'staged', file: f.path, oldPath: f.origPath })
@@ -279,10 +288,10 @@
   }
 </script>
 
-{#snippet fileRow(f: git.FileStatus)}
+{#snippet fileRow(f: git.FileStatus, depth: number)}
   {@const st = status(f, !isUnstaged(f))}
   {@const tick = tickOf(f)}
-  <li class:active={isOpen(f)} class:going={tick !== 'none'} class:landed={landed?.has(f.path)}>
+  <li class:active={isOpen(f)} class:going={tick !== 'none'} class:landed={landed?.has(f.path)} style:--depth={depth}>
     <input type="checkbox" class="tick" aria-label="Include {f.path} in the commit" checked={tick === 'all'} indeterminate={tick === 'part'} disabled={busy} onchange={(e) => tickChanged(e, f)} />
     <button class="name" onclick={() => show(f)} title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}>
       <span class="code s-{st.kind}" title={st.label}><Icon name={st.icon} size={14} /><span class="visually-hidden">{st.label}</span></span>
@@ -397,12 +406,25 @@
             {/if}
           {/if}
         </header>
-        {#each fileGroups(listed) as g (g.folder)}
-          {#if g.folder}<div class="folder" title={g.folder}>{g.folder}/</div>{/if}
-          <ul>
-            {#each g.files as f (f.path)}{@render fileRow(f)}{/each}
-          </ul>
-        {/each}
+        {#if listed.length >= FILTER_FROM}
+          <div class="file-tools"><FileListTools bind:query={fileQuery} bind:tree={fileTree} /></div>
+        {/if}
+        <ul>
+          {#each rows as r (r.key)}
+            {#if r.type === 'folder'}
+              <li class="folder-row" style:--depth={r.depth}>
+                {#if r.collapsible}
+                  <button class="folder" aria-expanded={r.open} title={r.path} onclick={() => toggleFolder(r.path)}><Icon name="chevron" size={12} />{r.name}/</button>
+                {:else}
+                  <div class="folder" title={r.path}>{r.name}</div>
+                {/if}
+              </li>
+            {:else}
+              {@render fileRow(r.file, r.depth)}
+            {/if}
+          {/each}
+        </ul>
+        {#if fileQuery.trim() && !rows.length}<p class="clean">No files match that.</p>{/if}
       </section>
     {/if}
   </div>
@@ -553,8 +575,38 @@
     background: color-mix(in srgb, var(--accent) 7%, transparent);
   }
 
+  .file-tools {
+    margin: 6px 16px 2px 20px;
+  }
+
+  li {
+    padding-left: calc(var(--depth, 0) * 14px);
+  }
+
+  li.folder-row:hover {
+    background: none;
+  }
+
+  button.folder {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    width: 100%;
+    padding: 2px 0;
+    text-align: left;
+  }
+
+  button.folder :global(svg) {
+    flex: none;
+    transition: transform var(--dur-quick);
+  }
+
+  button.folder[aria-expanded='true'] :global(svg) {
+    transform: rotate(90deg);
+  }
+
   .folder {
-    margin: 8px 16px 0 46px;
+    margin: 8px 16px 0 38px;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;

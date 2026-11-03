@@ -3,7 +3,8 @@
   import { CommitDetail, CommitNotes, CommitSignatures, IssueURL, SetCommitNote } from '../../wailsjs/go/app/App.js'
   import type { app, git } from '../../wailsjs/go/models'
   import { BrowserOpenURL, ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
-  import { fileGroups, fileName } from './fileList'
+  import { FILTER_FROM, fileName, fileRows, readTreeChoice } from './fileList'
+  import FileListTools from './FileListTools.svelte'
   import { TWO_COLUMNS } from './rightPanel'
   import { formatTime, type RefLabel } from './graph/draw'
   import RefChip from './graph/RefChip.svelte'
@@ -91,6 +92,19 @@
     const list = (e.currentTarget as HTMLElement).parentElement
     list?.querySelectorAll<HTMLElement>('[role=tab]')[to]?.focus()
   }
+
+  let fileQuery = $state('')
+  let fileTree = $state(readTreeChoice())
+  let closedFolders = $state(new Set<string>())
+  let rows = $derived(fileRows(info?.files ?? [], { query: fileQuery, tree: fileTree, closed: closedFolders }))
+  function toggleFolder(path: string) {
+    closedFolders = new Set(closedFolders.has(path) ? [...closedFolders].filter((p) => p !== path) : [...closedFolders, path])
+  }
+  // A filter is for the commit it was typed on.
+  $effect(() => {
+    void commitId
+    fileQuery = ''
+  })
 
   /** How many of a long Cc list show until asked for the rest. */
   const CC_SHOWN = 2
@@ -270,13 +284,25 @@
     <span class="meta label">Files changed</span>
     {#if info && info.commit.parents.length > 1}<span class="merge-note" title="Changes are shown against the first parent">First parent</span>{/if}
   </div>
+  {#if (info?.files.length ?? 0) >= FILTER_FROM}
+    <div class="file-tools"><FileListTools bind:query={fileQuery} bind:tree={fileTree} /></div>
+  {/if}
   <div class="files">
-    {#each fileGroups(info?.files ?? []) as g (g.folder)}
-      {#if g.folder}<div class="folder" title={g.folder}>{g.folder}/</div>{/if}
-      <ul>
-        {#each g.files as f (f.path)}
-          <li>
+    <ul>
+      {#each rows as r (r.key)}
+        {#if r.type === 'folder'}
+          <li class="folder-row" style:--depth={r.depth}>
+            {#if r.collapsible}
+              <button class="folder" aria-expanded={r.open} title={r.path} onclick={() => toggleFolder(r.path)}><Icon name="chevron" size={12} />{r.name}/</button>
+            {:else}
+              <div class="folder" title={r.path}>{r.name}</div>
+            {/if}
+          </li>
+        {:else}
+          {@const f = r.file}
+          <li style:--depth={r.depth}>
             <button
+              class="file-row"
               class:active={current?.mode === 'commit' && current.commit === commitId && current.file === f.path}
               onclick={() => showFile(f)}
               title={f.oldPath ? `${f.oldPath} → ${f.path}` : f.path}
@@ -292,9 +318,10 @@
               {/if}
             </button>
           </li>
-        {/each}
-      </ul>
-    {/each}
+        {/if}
+      {/each}
+    </ul>
+    {#if fileQuery.trim() && !rows.length}<p class="muted">No files match that.</p>{/if}
   </div>
 {/snippet}
 
@@ -646,6 +673,45 @@
   .merge-note {
     font-size: 13px;
     color: var(--ink-mute);
+  }
+
+  .file-tools {
+    margin-bottom: 6px;
+  }
+
+  .side-files .file-tools {
+    margin-left: 20px;
+    margin-right: 12px;
+  }
+
+  .files li {
+    padding-left: calc(var(--depth, 0) * 14px);
+  }
+
+  button.folder {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    width: 100%;
+    margin-top: 2px;
+    padding: 2px 0;
+    border: 0;
+    background: none;
+    text-align: left;
+  }
+
+  button.folder :global(svg) {
+    flex: none;
+    transition: transform var(--dur-quick);
+  }
+
+  button.folder[aria-expanded='true'] :global(svg) {
+    transform: rotate(90deg);
+  }
+
+  button.folder:hover:not(:disabled) {
+    background: none;
+    color: var(--ink);
   }
 
   .folder {
