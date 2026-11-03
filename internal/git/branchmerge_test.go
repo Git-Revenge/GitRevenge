@@ -126,6 +126,67 @@ func TestBranchMergeState(t *testing.T) {
 		}
 	})
 
+	// #461: a stack, each branch of several commits, squash-merged a branch at a time.
+	t.Run("a stack squash-merged a branch at a time", func(t *testing.T) {
+		fx, g := branched(t, "a1.txt", "a2.txt")
+		fx.Git("branch", "bottom", "topic")
+		fx.Checkout("topic")
+		fx.Git("branch", "-m", "middle")
+		fx.CommitFile("b1.txt", "b1\n", "add b1")
+		fx.CommitFile("b2.txt", "b2\n", "add b2")
+		fx.Branch("top")
+		fx.CommitFile("c1.txt", "c1\n", "add c1")
+		fx.CommitFile("c2.txt", "c2\n", "add c2")
+		fx.Checkout("main")
+		for _, b := range []string{"bottom", "middle", "top"} {
+			fx.Git("merge", "-q", "--squash", b)
+			fx.Commit("squash " + b)
+		}
+		for _, b := range []string{"bottom", "middle", "top"} {
+			if got := g.BranchMergeState(ctx, b, []string{"main"}); got.How == "" || got.Unmerged != 0 {
+				t.Errorf("%s: got %+v", b, got)
+			}
+		}
+	})
+
+	t.Run("a lower branch counts through the merged branch above it, even if it would conflict", func(t *testing.T) {
+		fx, g := branched(t, "a.txt")
+		fx.Checkout("topic")
+		fx.CommitFile("shared.txt", "first draft\n", "start shared")
+		fx.Git("branch", "bottom")
+		fx.CommitFile("shared.txt", "final\n", "finish shared")
+		fx.Checkout("main")
+		fx.Git("merge", "-q", "--squash", "topic")
+		fx.Commit("squash the top")
+		// Alone, the lower branch adds a different shared.txt, so merging it would conflict.
+		if _, err := fx.TryGit("merge-tree", "--write-tree", "main", "bottom"); err == nil {
+			t.Fatal("the fixture should conflict")
+		}
+		if got := g.BranchMergeState(ctx, "bottom", []string{"main"}); got.How == "" || got.Unmerged != 0 {
+			t.Errorf("got %+v", got)
+		}
+	})
+
+	t.Run("work on top of a merged stack still counts as unmerged", func(t *testing.T) {
+		fx, g := branched(t, "a.txt", "b.txt")
+		fx.Git("merge", "-q", "--squash", "topic")
+		fx.Commit("squashed")
+		fx.Git("checkout", "-q", "-b", "above", "topic")
+		fx.CommitFile("more.txt", "more\n", "more work")
+		fx.Checkout("main")
+		if got := g.BranchMergeState(ctx, "above", []string{"main"}); got.How != "" {
+			t.Errorf("got %+v: more.txt would be lost", got)
+		}
+	})
+
+	t.Run("a branch under an unmerged one stays unmerged", func(t *testing.T) {
+		fx, g := branched(t, "a.txt", "b.txt")
+		fx.Git("branch", "above", "topic")
+		if got := g.BranchMergeState(ctx, "topic", []string{"main"}); got.How != "" {
+			t.Errorf("got %+v", got)
+		}
+	})
+
 	t.Run("a target that doesn't exist isn't a merge", func(t *testing.T) {
 		_, g := branched(t, "a.txt")
 		if got := g.BranchMergeState(ctx, "topic", []string{"nope"}); got.How != "" {
