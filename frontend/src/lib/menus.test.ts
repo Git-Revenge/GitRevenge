@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Ref, Row } from './graph/rowCache'
-import { commitItems, commitMenuItems, dropItems, groups, refItems, upstreamDialog, type MenuContext } from './menus'
+import { commitItems, commitMenuItems, deleteBranchDialog, dropItems, groups, refItems, upstreamDialog, type MenuContext } from './menus'
 
 const row = (id: string): Row => ({ index: 0, col: 0, color: 0, up: [], down: [], width: 1, id, parents: 1, author: '', authorTime: 0, subject: '' })
 const ref = (short: string, kind: Ref['kind'], head = false): Ref => ({
@@ -109,6 +109,47 @@ describe('refItems', () => {
   it('keeps checkout and delete on the checked-out branch, disabled', () => {
     const items = refItems(ref('main', 'local', true), ctx('main'))
     expect(items.filter((i) => i.disabled).map((i) => i.label)).toEqual(['Checkout main', 'Delete main…'])
+  })
+})
+
+// #444: a squash-merged branch made you force the delete.
+describe('deleting a branch', () => {
+  const topic = ref('topic', 'local')
+  const forced = (d: ReturnType<typeof deleteBranchDialog>) => (d.fields ?? []).some((f) => f.key === 'force')
+
+  it('needs no tick when it was merged', () => {
+    const d = deleteBranchDialog('/r', topic, { target: 'main', how: 'merged', unmerged: 0 })
+    expect(forced(d)).toBe(false)
+    expect(d.message).toContain('already merged into main')
+    expect(d.danger).toBe(false)
+  })
+
+  it('needs no tick when its changes landed by a squash or rebase', () => {
+    const d = deleteBranchDialog('/r', topic, { target: 'origin/main', how: 'squashed', unmerged: 0 })
+    expect(forced(d)).toBe(false)
+    expect(d.message).toContain('already on origin/main')
+  })
+
+  it('takes a tick and says what would be lost otherwise', () => {
+    const d = deleteBranchDialog('/r', topic, { target: 'main', how: '', unmerged: 2 })
+    expect(forced(d)).toBe(true)
+    expect(d.message).toContain('2 commits are not on main')
+    expect(d.danger).toBe(true)
+    expect(deleteBranchDialog('/r', topic, { target: 'main', how: '', unmerged: 1 }).message).toContain('1 commit is not on main')
+  })
+
+  it('takes a tick when it could not tell', () => {
+    for (const merge of [null, { target: '', how: '', unmerged: 0 }]) {
+      const d = deleteBranchDialog('/r', topic, merge)
+      expect(forced(d)).toBe(true)
+      expect(d.message).toContain('removed locally')
+    }
+  })
+
+  it('still warns about a kind that asks first', () => {
+    const d = deleteBranchDialog('/r', { ...topic, branchKind: 'trunk' }, { target: 'main', how: 'merged', unmerged: 0 })
+    expect(d.message).toMatch(/trunk/i)
+    expect(d.danger).toBe(true)
   })
 })
 

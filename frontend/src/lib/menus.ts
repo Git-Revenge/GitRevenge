@@ -1,4 +1,4 @@
-import { BranchAction, HideBranch, Integrate, MarkBranchKind, PullBranch, PushRef, Refs, Restack, SetStackParent, StashAction } from '../../wailsjs/go/app/App.js'
+import { BranchAction, BranchMergeState, HideBranch, Integrate, MarkBranchKind, PullBranch, PushRef, Refs, Restack, SetStackParent, StashAction } from '../../wailsjs/go/app/App.js'
 import { CONFIRM_DELETE, KINDS, kindWarning } from './branchKinds'
 import type { MenuItem } from './ContextMenu.svelte'
 import type { DialogSpec } from './Dialog.svelte'
@@ -61,6 +61,34 @@ async function attempt(fn: () => Promise<unknown>): Promise<string | void> {
 }
 
 const branch = (path: string, action: string, ...args: string[]) => BranchAction(path, action, args)
+
+/** Whether a branch's work is on another branch (git.BranchMerge in Go). */
+export interface BranchMerge {
+  target: string
+  how: string
+  unmerged: number
+}
+
+/** Confirms deleting a local branch. If its work is known to be on another branch there's
+ * nothing to force; otherwise it takes a tick, and says what would be lost if it can. */
+export function deleteBranchDialog(path: string, ref: Ref, merge: BranchMerge | null): DialogSpec {
+  const warning = kindWarning(ref.short, ref.branchKind, CONFIRM_DELETE)
+  const text = (...parts: (string | undefined)[]) => parts.filter(Boolean).join(' ')
+  const title = `Delete branch ${ref.short}?`
+  if (merge?.how) {
+    const landed = merge.how === 'squashed' ? `Its changes are already on ${merge.target}, from a squash or a rebase.` : `It's already merged into ${merge.target}.`
+    return { title, message: text(warning, landed), submit: 'Delete', danger: !!warning, run: () => attempt(() => branch(path, 'delete', ref.short, 'true')) }
+  }
+  const losing = merge?.target && merge.unmerged ? `${merge.unmerged === 1 ? '1 commit is' : `${merge.unmerged} commits are`} not on ${merge.target}.` : 'The branch is removed locally. Its commits stay reachable from other branches if merged.'
+  return {
+    title,
+    message: text(warning, losing),
+    fields: [{ key: 'force', label: 'Delete even if it has unmerged commits', type: 'checkbox' }],
+    submit: 'Delete',
+    danger: true,
+    run: (v) => attempt(() => branch(path, 'delete', ref.short, v.force ? 'true' : '')),
+  }
+}
 
 /** The remote a local branch pushes to: its upstream's remote, else "origin". */
 function remoteOf(ref: Ref): { remote: string; branch: string } {
@@ -219,17 +247,11 @@ export function refItems(ref: Ref, ctx: MenuContext): MenuItem[] {
             label: `Delete ${ref.short}…`,
             icon: 'trash',
             disabled: ref.head,
-            run: () =>
-              openDialog({
-                title: `Delete branch ${ref.short}?`,
-                message: [kindWarning(ref.short, ref.branchKind, CONFIRM_DELETE), 'The branch is removed locally. Its commits stay reachable from other branches if merged.']
-                  .filter(Boolean)
-                  .join(' '),
-                fields: [{ key: 'force', label: 'Delete even if it has unmerged commits', type: 'checkbox' }],
-                submit: 'Delete',
-                danger: true,
-                run: (v) => attempt(() => branch(path, 'delete', ref.short, v.force ? 'true' : '')),
-              }),
+            run: async () => {
+              // Not knowing just means asking, as if the branch weren't merged.
+              const merge = await BranchMergeState(path, ref.short).catch(() => null)
+              openDialog(deleteBranchDialog(path, ref, merge))
+            },
           },
         ],
       )
