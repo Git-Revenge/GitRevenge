@@ -20,6 +20,10 @@ type FileStatus struct {
 	Untracked  bool `json:"untracked"`
 	Conflicted bool `json:"conflicted"`
 	Submodule  bool `json:"submodule"`
+	// Added and Deleted count changed lines against HEAD, staged or not (see CountLines).
+	Added   int  `json:"added"`
+	Deleted int  `json:"deleted"`
+	Binary  bool `json:"binary,omitempty"`
 }
 
 // Staged reports whether the file has changes in the index.

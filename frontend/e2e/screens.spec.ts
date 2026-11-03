@@ -957,11 +957,9 @@ test.describe('before the first load has answered', () => {
 
     test('claims no counts until status has loaded', async ({ page }) => {
       await open(page, 'workingTree', panel([file('a.txt', 'M', '.'), file('b.txt', '.', 'M')]))
-      await expect(page.getByText('Unstaged', { exact: true })).toBeVisible()
-      await expect(page.getByText('Staged', { exact: true })).toBeVisible()
+      await expect(page.getByText('Files', { exact: true })).toBeVisible()
       await expect(page.getByRole('button', { name: 'Commit', exact: true })).toBeVisible()
-      await expect(page.getByText('Unstaged · 1')).toBeVisible()
-      await expect(page.getByText('Staged · 1', { exact: true })).toBeVisible()
+      await expect(page.getByText('1 of 2 ticked')).toBeVisible()
       await expect(page.getByRole('button', { name: 'Commit 1 file' })).toBeVisible()
     })
 
@@ -982,6 +980,83 @@ test.describe('before the first load has answered', () => {
       await expect(page.getByRole('button', { name: 'Commit 0 files' })).toBeVisible()
       expect(await calls(page, 'CommitChanges')).toEqual([])
       await expect(summary(page)).toHaveValue('Early')
+    })
+  })
+
+  // #425: two lists, and paths cut off where the filename is.
+  test.describe('the list of changes', () => {
+    const file = (path: string, index: string, workTree: string, extra: object = {}) => ({ path, index, workTree, untracked: false, conflicted: false, ...extra })
+    const scenario = (files: unknown[]) => ({ responses: { WorkingTree: { status: { files }, identity: { name: 'A', email: 'a@b' }, signing: { enabled: false } } } })
+    const tick = (page: Page, path: string) => page.getByRole('checkbox', { name: `Include ${path} in the commit` })
+
+    test('shows files by name under their folders, with line counts', async ({ page }) => {
+      await open(page, 'workingTree', scenario([file('src/lib/a.ts', '.', 'M', { added: 12, deleted: 3 }), file('b.png', '.', 'M', { binary: true })]))
+      await expect(page.getByText('src/lib/', { exact: true })).toBeVisible()
+      const row = page.getByRole('button', { name: /a\.ts/ })
+      await expect(row).toContainText('+12')
+      await expect(row).toContainText('−3')
+      await expect(page.getByRole('button', { name: /b\.png/ })).toContainText('binary')
+    })
+
+    test('a tick shows whether a file is going in, all or part of it', async ({ page }) => {
+      await open(page, 'workingTree', scenario([file('none.txt', '.', 'M'), file('all.txt', 'M', '.'), file('part.txt', 'M', 'M')]))
+      await expect(tick(page, 'none.txt')).not.toBeChecked()
+      await expect(tick(page, 'all.txt')).toBeChecked()
+      expect(await tick(page, 'part.txt').evaluate((e) => (e as HTMLInputElement).indeterminate)).toBe(true)
+      await expect(page.getByText('partly staged')).toBeVisible()
+    })
+
+    test('ticking stages a file, and unticking unstages it', async ({ page }) => {
+      await open(page, 'workingTree', scenario([file('none.txt', '.', 'M'), file('all.txt', 'M', '.')]))
+      await tick(page, 'none.txt').click()
+      await expect.poll(() => calls(page, 'StageFiles')).toEqual([['/r', ['none.txt']]])
+      await tick(page, 'all.txt').click()
+      await expect.poll(() => calls(page, 'UnstageFiles')).toEqual([['/r', ['all.txt']]])
+    })
+
+    test('ticking a partly staged file stages the rest', async ({ page }) => {
+      await open(page, 'workingTree', scenario([file('part.txt', 'M', 'M')]))
+      await tick(page, 'part.txt').click()
+      await expect.poll(() => calls(page, 'StageFiles')).toEqual([['/r', ['part.txt']]])
+    })
+
+    test('a failed stage leaves the tick as it was', async ({ page }) => {
+      await open(page, 'workingTree', { ...scenario([file('none.txt', '.', 'M')]), failures: { StageFiles: 'nope' } })
+      await tick(page, 'none.txt').click()
+      await expect.poll(() => calls(page, 'StageFiles').then((c) => c.length)).toBe(1)
+      await expect(tick(page, 'none.txt')).not.toBeChecked()
+    })
+
+    test('the tick at the top stages everything, then unstages everything', async ({ page }) => {
+      await open(page, 'workingTree', scenario([file('a.txt', '.', 'M'), file('b.txt', 'M', '.')]))
+      await expect(page.getByText('1 of 2 ticked')).toBeVisible()
+      await page.getByRole('checkbox', { name: '1 of 2 ticked' }).click()
+      await expect.poll(() => calls(page, 'StageFiles')).toEqual([['/r', []]])
+    })
+
+    test('opening a partly staged file shows what is still unstaged', async ({ page }) => {
+      await open(page, 'workingTree', scenario([file('part.txt', 'M', 'M')]))
+      await page.locator('button.name', { hasText: 'part.txt' }).click()
+      await expect.poll(async () => (await events(page, 'open')).at(-1)?.[0]).toMatchObject({ mode: 'unstaged', file: 'part.txt' })
+    })
+
+    test('says so when there is nothing to commit', async ({ page }) => {
+      await open(page, 'workingTree', scenario([]))
+      await expect(page.getByText('Nothing to commit')).toBeVisible()
+    })
+
+    test('conflicts come first', async ({ page }) => {
+      await open(page, 'workingTree', scenario([file('a.txt', 'U', 'U', { conflicted: true }), file('b.txt', '.', 'M')]))
+      await expect(page.getByText('Fix these first · 1')).toBeVisible()
+      await expect(tick(page, 'a.txt')).toHaveCount(0)
+    })
+
+    test('the description opens on request', async ({ page }) => {
+      await open(page, 'workingTree', scenario([file('a.txt', '.', 'M')]))
+      const description = page.getByRole('textbox', { name: 'Commit description' })
+      await expect(description).toBeHidden()
+      await page.getByRole('button', { name: 'Description' }).click()
+      await expect(description).toBeVisible()
     })
   })
 

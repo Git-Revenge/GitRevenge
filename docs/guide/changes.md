@@ -4,8 +4,11 @@ Click **Uncommitted changes** at the top of the graph (or choose **Show uncommit
 
 ## Staging
 
-- **Stage all** and **Unstage all** move everything at once. **Discard all** throws away everything unstaged, after asking.
-- Each file has its own stage and discard buttons.
+Your changes are one list, by filename under their folders, with line counts. A tick means the file goes in the commit.
+
+- Tick a file to stage it, and untick it to unstage it. A dash and **partly staged** mean only some of its changes are going in, and ticking it stages the rest.
+- The tick at the top of the list does every file at once. **Discard all** throws away everything unstaged, after asking.
+- Hover over a file for its discard button. Conflicts come first, under **Fix these first**.
 - Open a file to stage part of it. In the **Unified** diff, each hunk has a **Stage hunk** button, and you can select individual lines and stage just those. Staged changes can be unstaged the same way.
 
 ![A unified diff with Stage hunk and Discard hunk buttons](../img/diff-unified-light.webp#gh-light-mode-only)

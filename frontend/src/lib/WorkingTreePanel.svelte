@@ -18,6 +18,7 @@
   } from '../../wailsjs/go/app/App.js'
   import type { app, git } from '../../wailsjs/go/models'
   import type { DiffTarget } from './diff/DiffView.svelte'
+  import { fileGroups, fileName } from './fileList'
   import { gitConfig } from './gitconfig/config.svelte'
   import { session } from './session.svelte'
   import Icon, { type IconName } from './ui/Icon.svelte'
@@ -64,6 +65,8 @@
   let summary = $state(draft.summary)
   let body = $state(draft.body)
   let amend = $state(false)
+  /** The description opens on request; a draft already has it open. */
+  let showBody = $state(draft.body !== '')
   /** The draft set aside while amending, restored if amend is unticked. */
   let stash: { summary: string; body: string } | null = null
 
@@ -95,12 +98,40 @@
     void refresh()
   })
 
-  function show(f: git.FileStatus, inStaged: boolean) {
-    openFile({ mode: inStaged ? 'staged' : 'unstaged', file: f.path, oldPath: f.origPath })
+  /** How much of a file is going in the commit. */
+  type Tick = 'none' | 'part' | 'all'
+  const isStaged = (f: git.FileStatus) => !f.untracked && !f.conflicted && f.index !== '.'
+  const isUnstaged = (f: git.FileStatus) => !f.conflicted && (f.untracked || f.workTree !== '.')
+  const tickOf = (f: git.FileStatus): Tick => (!isStaged(f) ? 'none' : isUnstaged(f) ? 'part' : 'all')
+
+  let listed = $derived(files.filter((f) => !f.conflicted))
+  let ticked = $derived(listed.filter((f) => tickOf(f) !== 'none').length)
+  let allTicked = $derived(listed.length > 0 && listed.every((f) => tickOf(f) === 'all'))
+
+  /** Opens a file's changes: what's still unstaged, if any is. */
+  function show(f: git.FileStatus) {
+    openFile({ mode: isUnstaged(f) ? 'unstaged' : 'staged', file: f.path, oldPath: f.origPath })
   }
 
-  const isOpen = (f: git.FileStatus, inStaged: boolean) =>
-    current?.file === f.path && current.mode === (inStaged ? 'staged' : 'unstaged')
+  const isOpen = (f: git.FileStatus) => current?.file === f.path && (current.mode === 'staged' || current.mode === 'unstaged')
+
+  /** A tick shows what's staged, not what was clicked, so a failed stage doesn't leave it wrong. */
+  function tickChanged(e: Event, f: git.FileStatus) {
+    const box = e.currentTarget as HTMLInputElement
+    const tick = tickOf(f)
+    box.checked = tick === 'all'
+    box.indeterminate = tick === 'part'
+    if (tick === 'all') void unstage([f.path])
+    else void stage([f.path])
+  }
+
+  function tickAllChanged(e: Event) {
+    const box = e.currentTarget as HTMLInputElement
+    box.checked = allTicked
+    box.indeterminate = ticked > 0 && !allTicked
+    if (allTicked) void unstage([])
+    else void stage([])
+  }
 
   async function act(fn: () => Promise<void>) {
     busy = true
@@ -111,25 +142,25 @@
 
   // Rows that just moved between the lists land with a rose wash that fades, so the eye
   // follows them (the row-land keyframes in style.css).
-  let landed = $state<{ staged: boolean; paths: Set<string> } | null>(null)
+  let landed = $state<Set<string> | null>(null)
   let landedTimer: ReturnType<typeof setTimeout> | undefined
 
-  function land(staged: boolean, paths: string[]) {
+  function land(paths: string[]) {
     clearTimeout(landedTimer)
-    landed = { staged, paths: new Set(paths) }
+    landed = new Set(paths)
     landedTimer = setTimeout(() => (landed = null), 1000)
   }
 
   async function stage(paths: string[]) {
     const moving = paths.length ? paths : unstaged.filter((f) => !f.conflicted).map((f) => f.path)
     await act(() => StageFiles(path, paths))
-    land(true, moving)
+    land(moving)
   }
 
   async function unstage(paths: string[]) {
     const moving = paths.length ? paths : staged.map((f) => f.path)
     await act(() => UnstageFiles(path, paths))
-    land(false, moving)
+    land(moving)
   }
 
   async function discard(paths: string[]) {
@@ -204,12 +235,22 @@
   }
 </script>
 
-{#snippet fileRow(f: git.FileStatus, inStaged: boolean)}
-  {@const st = status(f, inStaged)}
-  <li class:active={isOpen(f, inStaged)} class:landed={landed?.staged === inStaged && landed.paths.has(f.path)}>
-    <button class="name" onclick={() => show(f, inStaged)} title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}>
+{#snippet fileRow(f: git.FileStatus)}
+  {@const st = status(f, !isUnstaged(f))}
+  {@const tick = tickOf(f)}
+  <li class:active={isOpen(f)} class:going={tick !== 'none'} class:landed={landed?.has(f.path)}>
+    <input type="checkbox" class="tick" aria-label="Include {f.path} in the commit" checked={tick === 'all'} indeterminate={tick === 'part'} disabled={busy} onchange={(e) => tickChanged(e, f)} />
+    <button class="name" onclick={() => show(f)} title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}>
       <span class="code s-{st.kind}" title={st.label}><Icon name={st.icon} size={14} /><span class="visually-hidden">{st.label}</span></span>
-      <span class="path">{f.origPath ? `${f.origPath} → ${f.path}` : f.path}</span>
+      <span class="path">{fileName(f.path)}</span>
+      {#if f.origPath}<span class="from">from {f.origPath}</span>{/if}
+      {#if tick === 'part'}<span class="partly">partly staged</span>{/if}
+      {#if f.binary}
+        <span class="binary">binary</span>
+      {:else if f.added || f.deleted}
+        <span class="added">+{f.added}</span>
+        <span class="deleted">−{f.deleted}</span>
+      {/if}
     </button>
     {#if confirmDiscard?.length === 1 && confirmDiscard[0] === f.path}
       <span class="confirm">
@@ -217,15 +258,8 @@
         <button class="btn sm danger" onclick={() => discard([f.path])}>Yes</button>
         <button class="btn sm secondary" onclick={() => (confirmDiscard = null)}>No</button>
       </span>
-    {:else if inStaged}
-      <button class="btn sm quiet icon row-act" disabled={busy} onclick={() => unstage([f.path])} title="Unstage" aria-label="Unstage {f.path}"><Icon name="minus" size={14} /></button>
-    {:else}
-      {#if !f.conflicted}
-        <button class="btn sm quiet icon row-act" disabled={busy} onclick={() => (confirmDiscard = [f.path])} title="Discard changes" aria-label="Discard changes to {f.path}"
-          ><Icon name="undo" size={14} /></button
-        >
-      {/if}
-      <button class="btn sm quiet icon row-act" disabled={busy} onclick={() => stage([f.path])} title="Stage" aria-label="Stage {f.path}"><Icon name="plus" size={14} /></button>
+    {:else if isUnstaged(f)}
+      <button class="btn sm quiet icon row-act" disabled={busy} onclick={() => (confirmDiscard = [f.path])} title="Discard changes" aria-label="Discard changes to {f.path}"><Icon name="undo" size={14} /></button>
     {/if}
   </li>
 {/snippet}
@@ -263,7 +297,7 @@
   <div class="lists">
     {#if conflicted.length}
       <section class="conflicts">
-        <header><span class="meta">Conflicts · {conflicted.length}</span></header>
+        <header><span class="meta">Fix these first · {conflicted.length}</span></header>
         <ul>
           {#each conflicted as f (f.path)}
             <li class:active={current?.mode === 'conflict' && current.file === f.path}>
@@ -271,51 +305,46 @@
                 <span class="code c-!">!</span>
                 <span class="path">{f.path}</span>
               </button>
-              <button class="btn sm quiet" disabled={busy} title="Resolve with ours" onclick={() => act(() => TakeConflictSide(path, f.path, 'ours'))}
-                >Ours</button
-              >
-              <button class="btn sm quiet" disabled={busy} title="Resolve with theirs" onclick={() => act(() => TakeConflictSide(path, f.path, 'theirs'))}
-                >Theirs</button
-              >
+              <button class="btn sm quiet" disabled={busy} title="Resolve with ours" onclick={() => act(() => TakeConflictSide(path, f.path, 'ours'))}>Ours</button>
+              <button class="btn sm quiet" disabled={busy} title="Resolve with theirs" onclick={() => act(() => TakeConflictSide(path, f.path, 'theirs'))}>Theirs</button>
             </li>
           {/each}
         </ul>
       </section>
     {/if}
-    <section>
-      <header>
-        <span class="meta">Unstaged{wt ? ` · ${unstaged.length}` : ''}</span>
-        {#if unstaged.length}
-          {#if confirmDiscard && confirmDiscard.length > 1}
-            <span class="confirm">
-              Discard all unstaged changes?
-              <button class="btn sm danger" onclick={() => discard(confirmDiscard ?? [])}>Yes</button>
-              <button class="btn sm secondary" onclick={() => (confirmDiscard = null)}>No</button>
-            </span>
+    {#if wt && files.length === 0}
+      <p class="clean">Nothing to commit: your working tree matches the last commit.</p>
+    {:else}
+      <section>
+        <header>
+          {#if wt}
+            <label class="tick-all">
+              <input type="checkbox" class="tick" checked={allTicked} indeterminate={ticked > 0 && !allTicked} disabled={busy || !listed.length} onchange={tickAllChanged} />
+              <span class="meta">{allTicked ? `All ${listed.length} ticked` : ticked ? `${ticked} of ${listed.length} ticked` : `Tick all ${listed.length}`}</span>
+            </label>
           {:else}
-            <button
-              class="btn sm text"
-              disabled={busy}
-              onclick={() => (confirmDiscard = unstaged.filter((f) => !f.conflicted).map((f) => f.path))}
-              title="Discard all unstaged changes">Discard all</button
-            >
-            <button class="btn sm text" disabled={busy} onclick={() => stage([])}>Stage all</button>
+            <span class="meta">Files</span>
           {/if}
-        {/if}
-      </header>
-      <ul>
-        {#each unstaged as f (f.path)}{@render fileRow(f, false)}{/each}
-      </ul>
-    </section>
-    <section>
-      <header>
-        <span class="meta">Staged{wt ? ` · ${staged.length}` : ''}</span>
-        {#if staged.length}<button class="btn sm text" disabled={busy} onclick={() => unstage([])}>Unstage all</button>{/if}
-      </header>
-      <ul>
-        {#each staged as f (f.path)}{@render fileRow(f, true)}{/each}
-      </ul>
-    </section>
+          {#if unstaged.length}
+            {#if confirmDiscard && confirmDiscard.length > 1}
+              <span class="confirm">
+                Discard all unstaged changes?
+                <button class="btn sm danger" onclick={() => discard(confirmDiscard ?? [])}>Yes</button>
+                <button class="btn sm secondary" onclick={() => (confirmDiscard = null)}>No</button>
+              </span>
+            {:else}
+              <button class="btn sm text" disabled={busy} onclick={() => (confirmDiscard = unstaged.filter((f) => !f.conflicted).map((f) => f.path))} title="Discard all unstaged changes">Discard all</button>
+            {/if}
+          {/if}
+        </header>
+        {#each fileGroups(listed) as g (g.folder)}
+          {#if g.folder}<div class="folder" title={g.folder}>{g.folder}/</div>{/if}
+          <ul>
+            {#each g.files as f (f.path)}{@render fileRow(f)}{/each}
+          </ul>
+        {/each}
+      </section>
+    {/if}
   </div>
 
   <form
@@ -325,15 +354,18 @@
       void commit()
     }}
   >
-    <span class="meta label">Commit message</span>
+    <label class="what" for="commit-summary">What does this commit do?</label>
     <div class="summary">
-      <input bind:value={summary} placeholder="Summary (required)" aria-label="Commit summary" />
+      <input id="commit-summary" bind:value={summary} aria-label="Commit summary" />
       <span class="count" class:long={summary.length > 72} title="Keep summaries under about 72 characters"
         >{summary.length}</span
       >
     </div>
-    <textarea bind:value={body} placeholder="Description" rows="4" aria-label="Commit description"></textarea>
+    <textarea class:folded={!showBody && !body} bind:value={body} placeholder="Why, and anything a reviewer should know" rows="4" aria-label="Commit description"></textarea>
     <div class="row">
+      {#if !showBody && !body}
+        <button type="button" class="btn sm quiet add-body" onclick={() => (showBody = true)}><Icon name="plus" size={13} />Description</button>
+      {/if}
       <label class="form-check"><input type="checkbox" bind:checked={amend} onchange={toggleAmend} /> Amend last commit</label>
       {#if wt?.signing.enabled}
         <button type="button" class="signed meta" title="commit.gpgsign is set; key: {wt.signing.key || 'default'}. Change in Git Config." onclick={() => gitConfig.showKey(path, 'commit.gpgSign')}
@@ -390,9 +422,106 @@
       flex: 1;
     }
 
+    .composer textarea.folded {
+      display: block;
+    }
+
+    .add-body {
+      display: none;
+    }
+
     .lists {
       grid-column: 1;
     }
+  }
+
+  .clean {
+    margin: 12px 16px 12px 20px;
+    color: var(--ink-soft);
+  }
+
+  .tick-all {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .tick {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--accent);
+  }
+
+  li .tick {
+    margin-left: 12px;
+  }
+
+  li.going {
+    background: color-mix(in srgb, var(--accent) 7%, transparent);
+  }
+
+  .folder {
+    margin: 8px 16px 0 46px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-mute);
+  }
+
+  .from,
+  .partly,
+  .binary {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-mute);
+  }
+
+  .from {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .added,
+  .deleted {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .added,
+  .binary {
+    margin-left: auto;
+  }
+
+  .added {
+    color: var(--success);
+  }
+
+  .deleted {
+    color: var(--danger);
+  }
+
+  .what {
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+
+  .folded {
+    display: none;
+  }
+
+  .add-body {
+    margin-right: auto;
   }
 
   .top {
@@ -495,9 +624,9 @@
     flex: 1;
     display: flex;
     align-items: baseline;
-    gap: 10px;
+    gap: 8px;
     min-width: 0;
-    padding: 6px 12px;
+    padding: 6px 12px 6px 10px;
     border-radius: 0;
     text-align: left;
   }

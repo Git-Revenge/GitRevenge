@@ -1104,6 +1104,9 @@ export namespace git {
 	    untracked: boolean;
 	    conflicted: boolean;
 	    submodule: boolean;
+	    added: number;
+	    deleted: number;
+	    binary?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new FileStatus(source);
@@ -1118,6 +1121,9 @@ export namespace git {
 	        this.untracked = source["untracked"];
 	        this.conflicted = source["conflicted"];
 	        this.submodule = source["submodule"];
+	        this.added = source["added"];
+	        this.deleted = source["deleted"];
+	        this.binary = source["binary"];
 	    }
 	}
 	export class Identity {
