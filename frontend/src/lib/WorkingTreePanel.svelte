@@ -17,6 +17,8 @@
     StageFiles,
     UnstageFiles,
     TakeConflictSide,
+    Undo,
+    UndoState,
     WorkingTree,
   } from '../../wailsjs/go/app/App.js'
   import type { app, git } from '../../wailsjs/go/models'
@@ -256,6 +258,28 @@
     }
   }
 
+  /** The commit just made, while undoing it is still the next undo. */
+  let justCommitted = $state<{ id: string; summary: string; body: string; undo: string } | null>(null)
+
+  async function undoCommit() {
+    const done = justCommitted
+    if (!done) return
+    justCommitted = null
+    // Something else may have happened since; undo must not take that back instead.
+    const state = await session.run(() => UndoState(path))
+    if (state?.undo !== done.undo) return
+    busy = true
+    await session.run(() => Undo(path))
+    busy = false
+    // A new message started since then stays: it's newer than the old one.
+    if (!summary.trim() && !body.trim()) {
+      summary = done.summary
+      body = done.body
+      showBody ||= done.body !== ''
+    }
+    await refresh()
+  }
+
   async function commit() {
     if (!wt && !amend && summary.trim()) {
       commitWaiting = true
@@ -264,9 +288,13 @@
     if (!canCommit) return
     busy = true
     const message = body.trim() ? `${summary.trim()}\n\n${body.trim()}` : summary.trim()
+    const committed = { summary: summary.trim(), body: body.trim() }
     const id = await session.run(() => CommitChanges(path, message, amend))
     busy = false
     if (id) {
+      const state = await session.run(() => UndoState(path))
+      justCommitted = state?.undo ? { id, ...committed, undo: state.undo } : null
+      showBody = false
       summary = ''
       body = ''
       amend = false
@@ -458,6 +486,12 @@
       void commit()
     }}
   >
+    {#if justCommitted}
+      <p class="committed" role="status">
+        Committed <code>{justCommitted.id.slice(0, 7)}</code>
+        <button type="button" class="btn sm text" disabled={busy} onclick={undoCommit}>Undo</button>
+      </p>
+    {/if}
     <label class="what" for="commit-summary">What does this commit do?</label>
     <div class="summary">
       <input id="commit-summary" bind:value={summary} aria-label="Commit summary" />
@@ -672,6 +706,15 @@
 
   .deleted {
     color: var(--danger);
+  }
+
+  .committed {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin: 0;
+    font-size: 14px;
+    color: var(--ink-soft);
   }
 
   .what {
