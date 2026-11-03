@@ -21,7 +21,8 @@
   } from '../../wailsjs/go/app/App.js'
   import type { app, git } from '../../wailsjs/go/models'
   import type { DiffTarget } from './diff/DiffView.svelte'
-  import { FILTER_FROM, fileName, fileRows, readTreeChoice } from './fileList'
+  import { provideCommands } from './commands.svelte'
+  import { adjacentFile, FILTER_FROM, fileName, fileRows, moveThroughRows, readTreeChoice } from './fileList'
   import FileListTools from './FileListTools.svelte'
   import { gitConfig } from './gitconfig/config.svelte'
   import { session } from './session.svelte'
@@ -160,6 +161,26 @@
     closedFolders = new Set(closedFolders.has(p) ? [...closedFolders].filter((c) => c !== p) : [...closedFolders, p])
   }
 
+  // Moving between files while reading their diffs.
+  provideCommands(() => {
+    if (current?.mode !== 'staged' && current?.mode !== 'unstaged') return []
+    const step = (d: 1 | -1) => () => {
+      const f = adjacentFile(rows, current?.file, d)
+      if (f) show(f)
+    }
+    return [
+      { id: 'diff.nextFile', group: 'View', title: 'Next file', keywords: 'diff', shortcut: 'Alt+ArrowDown', run: step(1) },
+      { id: 'diff.prevFile', group: 'View', title: 'Previous file', keywords: 'diff', shortcut: 'Alt+ArrowUp', run: step(-1) },
+    ]
+  })
+
+  /** Space on a file row ticks it, as it would on the checkbox; Enter opens it. */
+  function rowKey(e: KeyboardEvent) {
+    if (e.key !== ' ') return
+    e.preventDefault()
+    ;(e.currentTarget as HTMLElement).closest('li')?.querySelector<HTMLInputElement>('.tick')?.click()
+  }
+
   /** Opens a file's changes: what's still unstaged, if any is. */
   function show(f: git.FileStatus) {
     openFile({ mode: isUnstaged(f) ? 'unstaged' : 'staged', file: f.path, oldPath: f.origPath })
@@ -293,7 +314,7 @@
   {@const tick = tickOf(f)}
   <li class:active={isOpen(f)} class:going={tick !== 'none'} class:landed={landed?.has(f.path)} style:--depth={depth}>
     <input type="checkbox" class="tick" aria-label="Include {f.path} in the commit" checked={tick === 'all'} indeterminate={tick === 'part'} disabled={busy} onchange={(e) => tickChanged(e, f)} />
-    <button class="name" onclick={() => show(f)} title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}>
+    <button class="name" data-file-row onkeydown={rowKey} onclick={() => show(f)} title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}>
       <span class="code s-{st.kind}" title={st.label}><Icon name={st.icon} size={14} /><span class="visually-hidden">{st.label}</span></span>
       <span class="path">{fileName(f.path)}</span>
       {#if f.origPath}<span class="from">from {f.origPath}</span>{/if}
@@ -409,7 +430,8 @@
         {#if listed.length >= FILTER_FROM}
           <div class="file-tools"><FileListTools bind:query={fileQuery} bind:tree={fileTree} /></div>
         {/if}
-        <ul>
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <ul onkeydown={(e) => moveThroughRows(e, e.currentTarget)}>
           {#each rows as r (r.key)}
             {#if r.type === 'folder'}
               <li class="folder-row" style:--depth={r.depth}>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fileFolder, fileGroups, fileName, fileRows } from './fileList'
+import { adjacentFile, fileFolder, fileGroups, fileName, fileRows } from './fileList'
 
 const f = (path: string) => ({ path })
 
@@ -53,6 +53,25 @@ describe('fileRows', () => {
 
   it('opens closed folders while filtering, so a match shows', () => {
     expect(said(fileRows(files, { tree: true, query: 'b.ts', closed: new Set(['src']) }))).toEqual(['[src]', ' [lib]', '  src/lib/b.ts'])
+  })
+})
+
+describe('adjacentFile', () => {
+  const rows = fileRows([f('a/one.ts'), f('a/two.ts'), f('b/three.ts')])
+
+  it('steps over folder headings', () => {
+    expect(adjacentFile(rows, 'a/two.ts', 1)?.path).toBe('b/three.ts')
+    expect(adjacentFile(rows, 'b/three.ts', -1)?.path).toBe('a/two.ts')
+  })
+
+  it('stops at the ends', () => {
+    expect(adjacentFile(rows, 'a/one.ts', -1)).toBeUndefined()
+    expect(adjacentFile(rows, 'b/three.ts', 1)).toBeUndefined()
+  })
+
+  it('has nothing to step from if the open file is not in the list', () => {
+    expect(adjacentFile(rows, 'gone.ts', 1)).toBeUndefined()
+    expect(adjacentFile(rows, undefined, 1)).toBeUndefined()
   })
 })
 

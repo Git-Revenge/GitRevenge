@@ -3,7 +3,8 @@
   import { CommitDetail, CommitNotes, CommitSignatures, IssueURL, SetCommitNote } from '../../wailsjs/go/app/App.js'
   import type { app, git } from '../../wailsjs/go/models'
   import { BrowserOpenURL, ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
-  import { FILTER_FROM, fileName, fileRows, readTreeChoice } from './fileList'
+  import { provideCommands } from './commands.svelte'
+  import { adjacentFile, FILTER_FROM, fileName, fileRows, moveThroughRows, readTreeChoice } from './fileList'
   import FileListTools from './FileListTools.svelte'
   import { TWO_COLUMNS } from './rightPanel'
   import { formatTime, type RefLabel } from './graph/draw'
@@ -104,6 +105,19 @@
   $effect(() => {
     void commitId
     fileQuery = ''
+  })
+
+  // Moving between files while reading their diffs.
+  provideCommands(() => {
+    if (current?.mode !== 'commit') return []
+    const step = (d: 1 | -1) => () => {
+      const f = adjacentFile(rows, current?.file, d)
+      if (f) showFile(f)
+    }
+    return [
+      { id: 'diff.nextFile', group: 'View', title: 'Next file', keywords: 'diff', shortcut: 'Alt+ArrowDown', run: step(1) },
+      { id: 'diff.prevFile', group: 'View', title: 'Previous file', keywords: 'diff', shortcut: 'Alt+ArrowUp', run: step(-1) },
+    ]
   })
 
   /** How many of a long Cc list show until asked for the rest. */
@@ -287,7 +301,8 @@
   {#if (info?.files.length ?? 0) >= FILTER_FROM}
     <div class="file-tools"><FileListTools bind:query={fileQuery} bind:tree={fileTree} /></div>
   {/if}
-  <div class="files">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="files" onkeydown={(e) => moveThroughRows(e, e.currentTarget)}>
     <ul>
       {#each rows as r (r.key)}
         {#if r.type === 'folder'}
@@ -303,6 +318,7 @@
           <li style:--depth={r.depth}>
             <button
               class="file-row"
+              data-file-row
               class:active={current?.mode === 'commit' && current.commit === commitId && current.file === f.path}
               onclick={() => showFile(f)}
               title={f.oldPath ? `${f.oldPath} → ${f.path}` : f.path}
