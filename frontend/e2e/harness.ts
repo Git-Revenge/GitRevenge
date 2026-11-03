@@ -180,7 +180,7 @@ const mounts = {
   async workingTree() {
     host.style.cssText = 'display:block;height:100vh'
     const { default: WorkingTreePanel } = await import('../src/lib/WorkingTreePanel.svelte')
-    mount(WorkingTreePanel, { target: host, props: { path: '/r', openFile: record('open'), onCommitted: record('committed') } })
+    mount(WorkingTreePanel, { target: host, props: { path: '/r', openFile: record('open'), onCommitted: record('committed'), onNewBranch: () => win.__events.push(['new-branch']), ...(scenario.head ? { head: scenario.head } : {}) } })
   },
   async repoView() {
     host.style.cssText = 'display:block;height:100vh'
