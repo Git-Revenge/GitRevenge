@@ -1098,6 +1098,39 @@ test.describe('before the first load has answered', () => {
       })
     })
 
+    // #429: a commit on a detached HEAD is easy to lose, and the panel didn't say so.
+    test.describe('on a detached HEAD', () => {
+      const detached = (files: unknown[]) => ({ ...scenario(files), head: 'detached at c600b04' })
+
+      test('says so, and offers a branch first', async ({ page }) => {
+        await open(page, 'workingTree', detached([file('a.txt', '.', 'M')]))
+        await expect(page.getByRole('note')).toContainText("You're not on a branch.")
+        await expect(page.getByRole('note')).toContainText('detached at c600b04')
+        await page.getByRole('button', { name: 'Create a branch here' }).click()
+        expect(await events(page, 'new-branch')).toHaveLength(1)
+      })
+
+      test('committing anyway says what it is', async ({ page }) => {
+        await open(page, 'workingTree', detached([file('a.txt', 'M', '.')]))
+        await page.getByRole('textbox', { name: 'Commit summary' }).fill('Quick fix')
+        const button = page.getByRole('button', { name: 'Commit anyway, without a branch' })
+        await expect(button).toBeEnabled()
+      })
+
+      test('says nothing without changes', async ({ page }) => {
+        await open(page, 'workingTree', detached([]))
+        await expect(page.getByText('Nothing to commit')).toBeVisible()
+        await expect(page.getByRole('note')).toHaveCount(0)
+      })
+
+      test('on a branch, names it and says nothing more', async ({ page }) => {
+        await open(page, 'workingTree', { ...scenario([file('a.txt', 'M', '.')]), head: 'main' })
+        await expect(page.getByRole('note')).toHaveCount(0)
+        await page.getByRole('textbox', { name: 'Commit summary' }).fill('Fix')
+        await expect(page.getByRole('button', { name: 'Commit 1 file to main' })).toBeEnabled()
+      })
+    })
+
     test('says so when there is nothing to commit', async ({ page }) => {
       await open(page, 'workingTree', scenario([]))
       await expect(page.getByText('Nothing to commit')).toBeVisible()

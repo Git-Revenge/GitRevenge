@@ -15,6 +15,8 @@ export interface Scenario {
   graphRefs?: Record<string, unknown[]>
   selectedCommit?: string
   current?: string
+  /** What's checked out, as the tab shows it. */
+  head?: string
   menuX?: number
   theme?: 'light' | 'dark'
 }

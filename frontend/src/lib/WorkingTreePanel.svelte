@@ -32,12 +32,19 @@
     openFile,
     current,
     onCommitted,
+    onNewBranch,
+    head,
   }: {
     path: string
     openFile: (t: DiffTarget | null) => void
     /** The diff currently open, to highlight its file. */
     current?: DiffTarget | null
     onCommitted?: (id: string) => void
+    /** Offers to start a branch at HEAD. */
+    onNewBranch?: () => void
+    /** What's checked out, as the tab shows it: a branch, or "detached at …". Defaults to the
+     * active tab's. */
+    head?: string
   } = $props()
 
   let wt = $state<app.WorkingTree | null>(null)
@@ -85,13 +92,13 @@
   let commitWaiting = $state(false)
   let canCommit = $derived(summary.trim() !== '' && (staged.length > 0 || amend) && conflicted.length === 0 && !busy)
   /** The checked-out branch, for saying where a commit will go. '' when there isn't one. */
-  let branch = $derived.by(() => {
-    const head = session.activeTab?.head ?? ''
-    return head.startsWith('detached') ? '' : head
-  })
+  let headText = $derived(head ?? session.activeTab?.head ?? '')
+  let detached = $derived(headText.startsWith('detached'))
+  let branch = $derived(detached ? '' : headText)
   const plural = (n: number, what: string) => (n === 1 ? `1 ${what}` : `${n} ${what}s`)
   /** What to do next, in a word: each step of committing leads to the next. */
   let nextStep = $derived.by(() => {
+    if (detached) return 'Make a branch first, so this work has somewhere to live.'
     if (conflicted.length) return `Fix ${conflicted.length === 1 ? 'this conflict' : `these ${conflicted.length} conflicts`}, and the commit can go ahead.`
     if (amend) return summary.trim() ? 'Ready to amend the last commit.' : 'Say what the amended commit does.'
     if (!staged.length) return 'Tick what belongs in this commit, then say what it does.'
@@ -105,6 +112,7 @@
     if (conflicted.length) return `Resolve ${plural(conflicted.length, 'conflict')} to commit`
     if (!staged.length) return 'Tick a file to commit it'
     if (!summary.trim()) return `Describe it to commit ${plural(staged.length, 'file')}`
+    if (detached) return 'Commit anyway, without a branch'
     return `Commit ${plural(staged.length, 'file')}${branch ? ` to ${branch}` : ''}`
   })
 
@@ -305,7 +313,7 @@
 <aside class="panel" onkeydown={onKey} role="region" aria-label="Uncommitted changes">
   <div class="top">
     <div class="title">
-      <span class="hand">{branch ? `on ${branch}` : 'still on your desk'}</span>
+      <span class="hand">{detached ? headText : branch ? `on ${branch}` : 'still on your desk'}</span>
       <h2>{wt && files.length ? `${plural(files.length, 'file')} changed` : 'Uncommitted changes'}</h2>
       {#if wt && files.length}<p class="next">{nextStep}</p>{/if}
     </div>
@@ -331,6 +339,13 @@
         <button type="submit" class="btn secondary" disabled={busy}>Stash</button>
       </div>
     </form>
+  {/if}
+  {#if detached && files.length}
+    <div class="notice detached" role="note">
+      <strong>You're not on a branch.</strong>
+      You're {headText}. A commit made here is easy to lose once you switch away.
+      {#if onNewBranch}<button class="btn sm" onclick={onNewBranch}>Create a branch here</button>{/if}
+    </div>
   {/if}
   {#if clashes.length && !caseNoticeHidden}
     <div class="notice" role="note">
@@ -491,6 +506,10 @@
 
   .notice strong {
     font-weight: 600;
+  }
+
+  .notice.detached {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
   }
 
   .notice :global(.btn) {
