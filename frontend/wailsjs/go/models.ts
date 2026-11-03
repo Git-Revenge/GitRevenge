@@ -842,6 +842,22 @@ export namespace git {
 	        this.origLine = source["origLine"];
 	    }
 	}
+	export class BranchMerge {
+	    target: string;
+	    how: string;
+	    unmerged: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new BranchMerge(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.target = source["target"];
+	        this.how = source["how"];
+	        this.unmerged = source["unmerged"];
+	    }
+	}
 	export class Trailer {
 	    key: string;
 	    value: string;
