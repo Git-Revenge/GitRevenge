@@ -137,8 +137,7 @@ type BranchesCleaned struct {
 	UndoLabel string `json:"undoLabel"`
 }
 
-// cleanupAfterPull deletes the branches cleanupCandidates finds, records one undo entry
-// that restores them all, and tells the UI. Failures to delete one branch skip it.
+// cleanupAfterPull deletes the branches cleanupCandidates finds, when the setting is on.
 func (a *App) cleanupAfterPull(ctx context.Context, r *session.Repo) {
 	if !a.repoSettings(r.Path).CleanupOnPull {
 		return
@@ -147,14 +146,29 @@ func (a *App) cleanupAfterPull(ctx context.Context, r *session.Repo) {
 	if err != nil || len(cands) == 0 {
 		return
 	}
+	a.deleteMerged(ctx, r, cands)
+}
+
+// deleteMerged deletes branches already known to be merged, records one undo entry that
+// restores them all, and tells the UI. Failures to delete one branch skip it. It returns the
+// names of those it deleted.
+func (a *App) deleteMerged(ctx context.Context, r *session.Repo, refs []git.Ref) []string {
+	tracking := r.Git.BranchTrackings(ctx)
+	asked := make([]string, len(refs))
+	for i, ref := range refs {
+		asked[i] = ref.Short
+	}
+	// One that can't be deleted stays, and shows as still here just below.
+	_ = r.Git.DeleteBranches(ctx, asked)
+	left, _ := r.Git.BranchNames(ctx)
 	var gone []branchAt
-	for _, ref := range cands {
-		if err := r.Git.DeleteBranch(ctx, ref.Short, true); err == nil {
-			gone = append(gone, branchAt{Name: ref.Short, Commit: ref.Commit})
+	for _, ref := range refs {
+		if !left[ref.Short] {
+			gone = append(gone, branchAt{Name: ref.Short, Commit: ref.Commit, Tracking: tracking[ref.Short]})
 		}
 	}
 	if len(gone) == 0 {
-		return
+		return nil
 	}
 	names := make([]string, len(gone))
 	for i, b := range gone {
@@ -166,12 +180,14 @@ func (a *App) cleanupAfterPull(ctx context.Context, r *session.Repo) {
 	a.undo.push(r.Path, undoEntry{Label: label, Kind: kindBranchesDelete, Branches: gone, Before: h, After: h})
 	a.undoChanged(r.Path)
 	a.emit("branches:cleaned", BranchesCleaned{Path: r.Path, Branches: names, UndoLabel: label})
+	return names
 }
 
-// branchAt is a branch and the commit it pointed at, for undoing a delete.
+// branchAt is a branch, the commit it pointed at and its upstream, for undoing a delete.
 type branchAt struct {
-	Name   string
-	Commit string
+	Name     string
+	Commit   string
+	Tracking git.BranchTracking
 }
 
 func plural(n int, one, many string) string {

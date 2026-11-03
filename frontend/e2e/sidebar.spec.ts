@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { branch, calls, events, expectOutline, open, remote, tag } from './support'
 
 const REFS = [
@@ -68,6 +68,48 @@ test.describe('a stack of three or more', () => {
     await expectOutline(page, ['main', 'Stack: s-base/', '  s-top', '  s-mid', '  s-base'])
     await page.keyboard.press('ArrowLeft')
     await expectOutline(page, ['main', 'Stack: s-base/'])
+  })
+})
+
+// #464
+test.describe('Delete all under Needs care', () => {
+  const merged = { 'fix/merged': 'main', 'old-gone': 'main' }
+  const withBoth = { ...scenario, responses: { ...scenario.responses, MergedBranches: merged, DeletableBranches: ['fix/merged', 'old-gone'], DeleteMergedBranches: ['fix/merged', 'old-gone'] } }
+  const button = (page: Page) => page.getByRole('button', { name: 'Delete all' })
+  const needsCare = (page: Page) => page.getByRole('button', { name: /Needs care/ }).click()
+
+  test('deletes what it counted, without asking first', async ({ page }) => {
+    await open(page, 'sidebar', withBoth)
+    await needsCare(page)
+    await expect(page.locator('.care-bar')).toContainText('2 safe to delete')
+    await button(page).click()
+    await expect.poll(() => calls(page, 'DeleteMergedBranches')).toHaveLength(1)
+    expect(JSON.stringify(await calls(page, 'DeleteMergedBranches'))).toContain('["fix/merged","old-gone"]')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.locator('.care-bar')).toHaveCount(0)
+    await expect(page.locator('.ref', { hasText: 'old-gone' })).toHaveCount(0)
+  })
+
+  test('stays out of the way elsewhere', async ({ page }) => {
+    await open(page, 'sidebar', withBoth)
+    await expectOutline(page, ['feature/', '  one', '    feature/two', 'main', 'fix/', '  merged', '  typo', 'old-gone'])
+    await expect(button(page)).toHaveCount(0)
+  })
+
+  // With no confirmation, it mustn't delete more than the list is showing.
+  test('goes away while filtering', async ({ page }) => {
+    await open(page, 'sidebar', withBoth)
+    await needsCare(page)
+    await expect(button(page)).toBeVisible()
+    await page.getByPlaceholder(/Filter/).fill('old')
+    await expect(button(page)).toHaveCount(0)
+  })
+
+  test('is not offered when nothing is safe to delete', async ({ page }) => {
+    await open(page, 'sidebar', { ...withBoth, responses: { ...withBoth.responses, DeletableBranches: [] } })
+    await needsCare(page)
+    await expect(page.locator('.ref', { hasText: 'old-gone' }).locator('.track')).toContainText('merged')
+    await expect(button(page)).toHaveCount(0)
   })
 })
 

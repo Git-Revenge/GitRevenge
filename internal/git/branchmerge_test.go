@@ -236,3 +236,48 @@ func TestBranchMergeState(t *testing.T) {
 		}
 	})
 }
+
+func TestBranchesTogether(t *testing.T) {
+	ctx := context.Background()
+	fx, g := branched(t, "a.txt")
+	commit := fx.Git("rev-parse", "main")[:40]
+	if err := g.CreateBranchesAt(ctx, map[string]string{"v1.2": commit, "fix/x": commit}); err != nil {
+		t.Fatal(err)
+	}
+	// Names holding dots and slashes, whose remote branch needn't exist.
+	want := BranchTracking{Remote: "origin", Merge: "refs/heads/v1.2"}
+	if err := g.SetBranchTracking(ctx, "v1.2", want); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.SetBranchTracking(ctx, "fix/x", BranchTracking{}); err != nil {
+		t.Fatal(err)
+	}
+	all := g.BranchTrackings(ctx)
+	if all["v1.2"] != want {
+		t.Errorf("got %+v in %+v", all["v1.2"], all)
+	}
+	if _, ok := all["fix/x"]; ok {
+		t.Errorf("fix/x has tracking: %+v", all)
+	}
+
+	// All or none: one that exists already stops the others.
+	if err := g.CreateBranchesAt(ctx, map[string]string{"new": commit, "v1.2": commit}); err == nil {
+		t.Error("recreating a branch should fail")
+	}
+	names, err := g.BranchNames(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if names["new"] || !names["v1.2"] || !names["fix/x"] {
+		t.Errorf("got %v", names)
+	}
+
+	// The checked-out branch stays, and the rest still go.
+	if err := g.DeleteBranches(ctx, []string{"main", "v1.2", "fix/x"}); err == nil {
+		t.Error("deleting the checked-out branch should say so")
+	}
+	names, _ = g.BranchNames(ctx)
+	if !names["main"] || names["v1.2"] || names["fix/x"] {
+		t.Errorf("got %v", names)
+	}
+}
