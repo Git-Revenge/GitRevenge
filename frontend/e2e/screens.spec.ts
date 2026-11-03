@@ -1282,6 +1282,54 @@ test.describe('before the first load has answered', () => {
       })
     })
 
+    // #438: nothing confirmed a commit, or offered a way back.
+    test.describe('after committing', () => {
+      const ready = (undo = 'Commit “Fix”') => ({
+        ...scenario([file('a.txt', 'M', '.')]),
+        responses: { ...scenario([file('a.txt', 'M', '.')]).responses, CommitChanges: 'abc1234def', UndoState: { undo } },
+      })
+      const commit = async (page: Page) => {
+        await page.getByRole('textbox', { name: 'Commit summary' }).fill('Fix')
+        await page.getByRole('button', { name: /^Commit 1 file/ }).click()
+        await expect(page.getByRole('status')).toContainText('Committed abc1234')
+      }
+
+      test('says so, and clears the form', async ({ page }) => {
+        await open(page, 'workingTree', ready())
+        await commit(page)
+        await expect(page.getByRole('textbox', { name: 'Commit summary' })).toHaveValue('')
+      })
+
+      test('Undo takes the commit back, and restores the message', async ({ page }) => {
+        await open(page, 'workingTree', ready())
+        await commit(page)
+        await page.getByRole('button', { name: 'Undo', exact: true }).click()
+        await expect.poll(() => calls(page, 'Undo')).toEqual([['/r']])
+        await expect(page.getByRole('textbox', { name: 'Commit summary' })).toHaveValue('Fix')
+        await expect(page.getByRole('status')).toHaveCount(0)
+      })
+
+      test("Undo keeps a message you've started since", async ({ page }) => {
+        await open(page, 'workingTree', ready())
+        await commit(page)
+        await page.getByRole('textbox', { name: 'Commit summary' }).fill('Newer')
+        await page.getByRole('button', { name: 'Undo', exact: true }).click()
+        await expect.poll(() => calls(page, 'Undo')).toEqual([['/r']])
+        await expect(page.getByRole('textbox', { name: 'Commit summary' })).toHaveValue('Newer')
+      })
+
+      test("doesn't undo something else that happened since", async ({ page }) => {
+        await open(page, 'workingTree', ready())
+        await commit(page)
+        await page.evaluate(() => {
+          ;(window as unknown as { __scenario: { responses: { UndoState: { undo: string } } } }).__scenario.responses.UndoState.undo = 'Delete branch x'
+        })
+        await page.getByRole('button', { name: 'Undo', exact: true }).click()
+        await expect(page.getByRole('status')).toHaveCount(0)
+        expect(await calls(page, 'Undo')).toEqual([])
+      })
+    })
+
     test('says so when there is nothing to commit', async ({ page }) => {
       await open(page, 'workingTree', scenario([]))
       await expect(page.getByText('Nothing to commit')).toBeVisible()
