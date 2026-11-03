@@ -1077,6 +1077,60 @@ test.describe('before the first load has answered', () => {
     })
   })
 
+  // #439: adding a trailer meant remembering the exact format.
+  test.describe('the trailer helper', () => {
+    const one = { path: 'a.txt', index: 'M', workTree: '.', untracked: false, conflicted: false }
+    const scenario = {
+      graphRows: 1,
+      responses: {
+        Refs: [],
+        CommitSignatures: [],
+        WorkingTree: { status: { files: [one] }, identity: { name: 'Ris Adams', email: 'ris@example.com' }, signing: { enabled: false } },
+        TrailerHints: { keys: ['Change-Id'], people: ['Ana Cruz <ana@example.com>'] },
+      },
+    }
+    const description = (page: Page) => page.getByRole('textbox', { name: 'Commit description' })
+    const openHelper = async (page: Page) => {
+      await open(page, 'repoView', scenario)
+      await page.getByRole('button', { name: 'Trailer' }).click()
+    }
+
+    test("offers the history's keys and people, then the common keys", async ({ page }) => {
+      await openHelper(page)
+      const menu = page.getByRole('menu')
+      await expect(menu.getByRole('menuitem', { name: 'Change-Id:' })).toBeVisible()
+      await expect(menu.getByRole('menuitem', { name: 'Closes:' })).toBeVisible()
+      await expect(menu.getByRole('menuitem', { name: 'Co-authored-by: Ana Cruz' })).toBeVisible()
+    })
+
+    test('adds a person in full, and opens the description', async ({ page }) => {
+      await openHelper(page)
+      await page.getByRole('menuitem', { name: 'Co-authored-by: Ana Cruz' }).click()
+      await expect(description(page)).toBeVisible()
+      await expect(description(page)).toHaveValue('Co-authored-by: Ana Cruz <ana@example.com>')
+    })
+
+    test('a key leaves the cursor ready for its value', async ({ page }) => {
+      await openHelper(page)
+      await page.getByRole('menuitem', { name: 'Closes:' }).click()
+      await expect(description(page)).toBeFocused()
+      await page.keyboard.type('#12')
+      await expect(description(page)).toHaveValue('Closes: #12')
+    })
+
+    test('signing off fills in who you are', async ({ page }) => {
+      await openHelper(page)
+      await page.getByRole('menuitem', { name: 'Signed-off-by:' }).click()
+      await expect(description(page)).toHaveValue('Signed-off-by: Ris Adams <ris@example.com>')
+    })
+
+    test('still offers the common keys without any history', async ({ page }) => {
+      await open(page, 'repoView', { ...scenario, failures: { TrailerHints: 'nope' } })
+      await page.getByRole('button', { name: 'Trailer' }).click()
+      await expect(page.getByRole('menuitem', { name: 'Closes:' })).toBeVisible()
+    })
+  })
+
   // #425: two lists, and paths cut off where the filename is.
   test.describe('the list of changes', () => {
     const file = (path: string, index: string, workTree: string, extra: object = {}) => ({ path, index, workTree, untracked: false, conflicted: false, ...extra })

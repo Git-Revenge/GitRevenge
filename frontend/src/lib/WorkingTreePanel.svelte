@@ -17,6 +17,7 @@
     StageFiles,
     UnstageFiles,
     TakeConflictSide,
+    TrailerHints,
     Undo,
     UndoState,
     WorkingTree,
@@ -26,7 +27,10 @@
   import { provideCommands } from './commands.svelte'
   import { adjacentFile, FILTER_FROM, fileName, fileRows, moveThroughRows, readTreeChoice } from './fileList'
   import FileListTools from './FileListTools.svelte'
+  import type { MenuItem } from './ContextMenu.svelte'
   import { gitConfig } from './gitconfig/config.svelte'
+  import { tick } from 'svelte'
+  import { appendTrailer, asPerson, trailerKeyChoices } from './trailers'
   import { session } from './session.svelte'
   import Icon, { type IconName } from './ui/Icon.svelte'
   import InkButton from './ui/InkButton.svelte'
@@ -37,6 +41,7 @@
     current,
     onCommitted,
     onNewBranch,
+    onMenu,
     head,
   }: {
     path: string
@@ -44,6 +49,8 @@
     /** The diff currently open, to highlight its file. */
     current?: DiffTarget | null
     onCommitted?: (id: string) => void
+    /** Opens a menu at this position. */
+    onMenu?: (items: MenuItem[], x: number, y: number) => void
     /** Offers to start a branch at HEAD. */
     onNewBranch?: () => void
     /** What's checked out, as the tab shows it: a branch, or "detached at …". Defaults to the
@@ -256,6 +263,33 @@
       ;({ summary, body } = stash)
       stash = null
     }
+  }
+
+  let bodyBox = $state<HTMLTextAreaElement>()
+
+  /** Adds a trailer to the description, and puts the cursor at the end of it to carry on. */
+  async function addTrailer(key: string, value = '') {
+    body = appendTrailer(body, key, value)
+    showBody = true
+    await tick()
+    bodyBox?.focus()
+    bodyBox?.setSelectionRange(body.length, body.length)
+  }
+
+  async function trailerMenu(e: MouseEvent) {
+    const { clientX: x, clientY: y } = e
+    // Only suggestions: without them, the common keys are still there.
+    const hints = await TrailerHints(path).catch(() => null)
+    const keys: MenuItem[] = trailerKeyChoices(hints?.keys ?? []).map((k) => {
+      const me = wt?.identity.name && wt.identity.email ? `${wt.identity.name} <${wt.identity.email}>` : ''
+      return { label: `${k}:`, run: () => void addTrailer(k, k.toLowerCase() === 'signed-off-by' ? me : '') }
+    })
+    const people: MenuItem[] = (hints?.people ?? []).map((p, i) => ({
+      label: `Co-authored-by: ${asPerson(p)?.name ?? p}`,
+      separator: i === 0,
+      run: () => void addTrailer('Co-authored-by', p),
+    }))
+    onMenu?.([...keys, ...people], x, y)
   }
 
   /** The commit just made, while undoing it is still the next undo. */
@@ -499,10 +533,13 @@
         >{summary.length}</span
       >
     </div>
-    <textarea class:folded={!showBody && !body} bind:value={body} placeholder="Why, and anything a reviewer should know" rows="4" aria-label="Commit description"></textarea>
+    <textarea bind:this={bodyBox} class:folded={!showBody && !body} bind:value={body} placeholder="Why, and anything a reviewer should know" rows="4" aria-label="Commit description"></textarea>
     <div class="row">
       {#if !showBody && !body}
         <button type="button" class="btn sm quiet add-body" onclick={() => (showBody = true)}><Icon name="plus" size={13} />Description</button>
+      {/if}
+      {#if onMenu}
+        <button type="button" class="btn sm quiet" title="Add Co-authored-by, Closes and other trailers" onclick={trailerMenu}><Icon name="plus" size={13} />Trailer</button>
       {/if}
       <label class="form-check"><input type="checkbox" bind:checked={amend} onchange={toggleAmend} /> Amend last commit</label>
       {#if wt?.signing.enabled}

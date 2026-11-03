@@ -470,6 +470,10 @@ export function Theme() {
   return window['go']['app']['App']['Theme']();
 }
 
+export function TrailerHints(arg1) {
+  return window['go']['app']['App']['TrailerHints'](arg1);
+}
+
 export function Undo(arg1) {
   return window['go']['app']['App']['Undo'](arg1);
 }

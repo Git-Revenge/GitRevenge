@@ -146,3 +146,12 @@ func commitErr(err error) error {
 	}
 	return err
 }
+
+// TrailerHints suggests trailers for a new commit, from the repository's recent history.
+func (a *App) TrailerHints(path string) (git.TrailerHints, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return git.TrailerHints{}, err
+	}
+	return r.Git.TrailerHints(context.Background()), nil
+}
