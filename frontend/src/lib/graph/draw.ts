@@ -224,11 +224,17 @@ export function refColumnWidth(width: number): number {
   return width >= 640 ? 150 : 0
 }
 
+/** Compact's date column: the longest date, `Sep 17, 2024`, then room for a signature's seal,
+ * which sits at the column's right-hand end. */
+export const DATE_COLUMN = 120
+/** How far left of the SHA a seal's centre sits. */
+export const SEAL_OFFSET = 12
+
 export function layoutColumns(width: number, graphW: number, density: Density, firstLane = 0, remote = 'origin'): Layout {
   const compact = density === 'compact'
   const refW = refColumnWidth(width)
   const shaW = 76
-  const dateW = compact && width >= 960 ? 104 : 0
+  const dateW = compact && width >= 960 ? DATE_COLUMN : 0
   const authorW = compact && width >= 800 ? 150 : 0
   const shaX = width - shaW
   const dateX = shaX - dateW
@@ -499,7 +505,7 @@ export function drawRow(
   setFont(ctx, `12px ${MONO}`)
   ctx.fillStyle = theme.muted
   ctx.fillText(row.id.slice(0, 7), lay.shaX, line1)
-  if (seal) drawSeal(ctx, lay.shaX - 10, line1 - 4, seal, theme)
+  if (seal) drawSeal(ctx, lay.shaX - SEAL_OFFSET, line1, seal, theme)
   if (lay.dateW) {
     setFont(ctx, `12px ${MONO}`)
     ctx.fillStyle = theme.muted

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clearOf, clip, clippedName, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, relativeTime, remoteOf, repeatsAuthor, rowWashed, setLaneColors, sortRefs } from './draw'
+import { clearOf, clip, DATE_COLUMN, clippedName, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, rowWashed, setLaneColors, sortRefs } from './draw'
 import type { Ref, Row } from './rowCache'
 
 describe('graph geometry', () => {
@@ -50,6 +50,14 @@ describe('columns', () => {
     expect(lay.authorX + lay.authorW).toBe(lay.dateX)
     expect(lay.dateX + lay.dateW).toBe(lay.shaX)
     expect(lay.shaX + lay.shaW).toBe(1200)
+  })
+
+  // #433: a seal touched the last digit of a date with a year in it.
+  it("leaves room for a seal after the longest date", () => {
+    const monoCharWidth = 7.3
+    const longestDate = 'Sep 17, 2024'.length * monoCharWidth
+    const sealRadius = 5.5
+    expect(DATE_COLUMN - longestDate - (SEAL_OFFSET + sealRadius)).toBeGreaterThanOrEqual(8)
   })
 
   it('drops the date before the author as the window narrows', () => {
