@@ -553,6 +553,43 @@ test.describe('commit graph', () => {
       expect(await page.evaluate(() => localStorage.getItem('gitrevenge.commitTab'))).toBe('trailers')
     })
 
+    // #436: trailers read in the order they were added, with what mattered lost among them.
+    test('groups trailers by purpose, with Cc collapsed', async ({ page }) => {
+      const line = (key: string, value: string) => ({ key, value })
+      await openCommit(page, {
+        trailers: [
+          line('Signed-off-by', 'Ana Cruz <ana@example.com>'),
+          line('Signed-off-by', 'Bo Lee <bo@example.com>'),
+          line('Closes', '#12'),
+          line('Cc', 'One <one@example.com>'),
+          line('Cc', 'Two <two@example.com>'),
+          line('Cc', 'Three <three@example.com>'),
+          line('Cc', 'Four <four@example.com>'),
+        ],
+      })
+      await tab(page, 'Trailers').click()
+      const panel = page.getByRole('tabpanel')
+      await expect(panel.getByRole('heading')).toHaveText(['Related', 'People'])
+      await expect(panel.getByText('Three')).toHaveCount(0)
+      await panel.getByRole('button', { name: '+ 2 more' }).click()
+      await expect(panel.getByText('Three')).toBeVisible()
+      await expect(panel.getByRole('button', { name: 'Show fewer' })).toBeVisible()
+      // The sign-offs stay in the order they were made.
+      const text = (await panel.textContent()) ?? ''
+      expect(text.indexOf('Ana Cruz')).toBeLessThan(text.indexOf('Bo Lee'))
+    })
+
+    test('Raw shows trailers as written', async ({ page }) => {
+      const line = (key: string, value: string) => ({ key, value })
+      await openCommit(page, { trailers: [line('Signed-off-by', 'Ana Cruz <ana@example.com>'), line('Closes', '#12')] })
+      await tab(page, 'Trailers').click()
+      const panel = page.getByRole('tabpanel')
+      await panel.getByRole('button', { name: 'Grouped' }).click()
+      await expect(panel.getByRole('heading')).toHaveCount(0)
+      const text = (await panel.textContent()) ?? ''
+      expect(text.indexOf('Signed-off-by')).toBeLessThan(text.indexOf('Closes'))
+    })
+
     test('says so when there is no description', async ({ page }) => {
       await openCommit(page, { body: '', trailers: [] })
       await expect(tab(page, 'Trailers')).toHaveCount(0)

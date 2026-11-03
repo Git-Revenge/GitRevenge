@@ -10,7 +10,7 @@
   import type { DiffTarget } from './diff/DiffView.svelte'
   import { session } from './session.svelte'
   import { reflow } from './text'
-  import { asPerson, valueParts } from './trailers'
+  import { asPerson, groupTrailers, valueParts } from './trailers'
   import Markdown from './Markdown.svelte'
   import Icon, { type IconName } from './ui/Icon.svelte'
   import Loading from './ui/Loading.svelte'
@@ -91,6 +91,14 @@
     const list = (e.currentTarget as HTMLElement).parentElement
     list?.querySelectorAll<HTMLElement>('[role=tab]')[to]?.focus()
   }
+
+  /** How many of a long Cc list show until asked for the rest. */
+  const CC_SHOWN = 2
+  let ccOpen = $state(false)
+  $effect(() => {
+    void commitId
+    ccOpen = false
+  })
 
   let copied = $state(false)
   let copiedTimer: ReturnType<typeof setTimeout> | undefined
@@ -231,6 +239,32 @@
   }
 </script>
 
+{#snippet trailerValue(key: string, value: string)}
+  {@const who = asPerson(value)}
+  {#if who}
+    {who.name}<span class="email" title={who.email}>{who.email}</span>
+  {:else}
+    {#each valueParts(value, issueURL) as part, k (k)}{#if part.href}<a href={part.href} title={part.href} onclick={(e) => openLink(e, part.href!)}>{part.text}</a>{:else}{part.text}{/if}{/each}
+  {/if}
+  {#if onSearch && key !== 'stable'}
+    <button class="find" title="Find commits with this trailer" aria-label="Find commits with {trailerQuery(key, value)}" onclick={() => onSearch(trailerQuery(key, value))}><Icon name="search" size={13} /></button>
+  {/if}
+{/snippet}
+
+{#snippet trailerSection(title: string, rows: { key: string; label: string; values: string[] }[])}
+  <section class="trailer-section">
+    <h3>{title}</h3>
+    <dl class="trailers">
+      {#each rows as row (row.key)}
+        <dt class="meta">{row.label}</dt>
+        <dd class="trailer-values">
+          {#each row.values as v, i (i)}<span class="trailer">{@render trailerValue(row.key, v)}</span>{/each}
+        </dd>
+      {/each}
+    </dl>
+  </section>
+{/snippet}
+
 {#snippet fileList()}
   <div class="files-head">
     <span class="meta label">Files changed</span>
@@ -320,22 +354,43 @@
         {:else if tab === 'files'}
           {@render fileList()}
         {:else if tab === 'trailers'}
-          <dl class="trailers" aria-label="Trailers">
-            {#each c.trailers as t, i (i)}
-              {@const who = asPerson(t.value)}
-              <dt class="meta">{t.key}</dt>
-              <dd class="trailer">
-                {#if who}
-                  {who.name}<span class="email" title={who.email}>{who.email}</span>
-                {:else}
-                  {#each valueParts(t.value, issueURL) as part, k (k)}{#if part.href}<a href={part.href} title={part.href} onclick={(e) => openLink(e, part.href!)}>{part.text}</a>{:else}{part.text}{/if}{/each}
-                {/if}
-                {#if onSearch}
-                  <button class="find" title="Find commits with this trailer" aria-label="Find commits with {trailerQuery(t.key, t.value)}" onclick={() => onSearch(trailerQuery(t.key, t.value))}><Icon name="search" size={13} /></button>
-                {/if}
-              </dd>
-            {/each}
-          </dl>
+          <div class="message-tools">
+            <button class="btn sm quiet raw-toggle" aria-pressed={raw} onclick={toggleRaw} title={raw ? 'Show the trailers grouped by purpose' : 'Show the trailers as written in the message'}>{raw ? 'Raw' : 'Grouped'}</button>
+          </div>
+          {#if raw}
+            <dl class="trailers as-written" aria-label="Trailers">
+              {#each c.trailers as t, i (i)}
+                <dt class="meta">{t.key}</dt>
+                <dd class="trailer">{@render trailerValue(t.key, t.value)}</dd>
+              {/each}
+            </dl>
+          {:else}
+            {@const g = groupTrailers(c.trailers)}
+            {#if g.related.length}{@render trailerSection('Related', g.related)}{/if}
+            {#if g.people.length || g.cc.length}
+              <section class="trailer-section">
+                <h3>People</h3>
+                <dl class="trailers">
+                  {#each g.people as row (row.key)}
+                    <dt class="meta">{row.label}</dt>
+                    <dd class="trailer-values">
+                      {#each row.values as v, i (i)}<span class="trailer">{@render trailerValue(row.key, v)}</span>{/each}
+                    </dd>
+                  {/each}
+                  {#if g.cc.length}
+                    <dt class="meta">Cc</dt>
+                    <dd class="trailer-values">
+                      {#each ccOpen ? g.cc : g.cc.slice(0, CC_SHOWN) as v, i (i)}<span class="trailer">{@render trailerValue('Cc', v)}</span>{/each}
+                      {#if g.cc.length > CC_SHOWN}
+                        <button class="btn sm text" aria-expanded={ccOpen} onclick={() => (ccOpen = !ccOpen)}>{ccOpen ? 'Show fewer' : `+ ${g.cc.length - CC_SHOWN} more`}</button>
+                      {/if}
+                    </dd>
+                  {/if}
+                </dl>
+              </section>
+            {/if}
+            {#if g.other.length}{@render trailerSection('Other', g.other)}{/if}
+          {/if}
         {:else}
           <dl class="details">
             <dt class="meta">Author</dt>
@@ -541,6 +596,31 @@
     padding-top: 12px;
     border-left: 1px solid var(--paper-edge);
     overflow-y: auto;
+  }
+
+  .trailer-section {
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed var(--hairline);
+  }
+
+  .trailer-section:last-child {
+    margin-bottom: 0;
+    border-bottom: 0;
+  }
+
+  h3 {
+    margin: 0 0 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-soft);
+  }
+
+  .trailer-values {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
   }
 
   .message-tools {
