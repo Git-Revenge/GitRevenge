@@ -668,6 +668,55 @@ test.describe('commit graph', () => {
     })
   })
 
+  // #441: the graph couldn't take the panel's width.
+  test.describe('hiding the right panel', () => {
+    const scenario = { graphRows: 3, responses: { Refs: [], CommitSignatures: [], CommitNotes: [], WorkingTree: { status: { files: [] }, signing: { enabled: false }, identity: { name: 'A', email: 'a@b' } }, CommitDetail: { commit: { id: '0'.repeat(40), subject: 'Commit 0', body: '', trailers: [], parents: [], author: { name: 'A', email: 'a@b', time: 1 }, committer: { name: 'A', email: 'a@b', time: 1 } }, files: [] } } }
+    const hide = (page: Page) => page.getByRole('button', { name: 'Hide the right panel' })
+    const show = (page: Page) => page.getByRole('button', { name: 'Show the right panel' })
+    const selectRow = async (page: Page, y: number) => {
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.click(box.x + 300, box.y + y)
+    }
+
+    test('the button hides and shows it, and the graph takes the room', async ({ page }) => {
+      await open(page, 'repoView', scenario)
+      await selectRow(page, 26)
+      await expect(page.locator('.right')).toBeVisible()
+      const before = (await page.locator('.scroller').boundingBox())!.width
+      await hide(page).click()
+      await expect(page.locator('.right')).toHaveCount(0)
+      await expect.poll(async () => (await page.locator('.scroller').boundingBox())!.width).toBeGreaterThan(before)
+      await show(page).click()
+      await expect(page.locator('.right')).toBeVisible()
+    })
+
+    test('selecting a commit does not reopen it', async ({ page }) => {
+      await open(page, 'repoView', scenario)
+      await selectRow(page, 26)
+      await hide(page).click()
+      await selectRow(page, 78)
+      await page.waitForTimeout(100)
+      await expect(page.locator('.right')).toHaveCount(0)
+    })
+
+    test('the row of changes reopens it', async ({ page }) => {
+      await open(page, 'repoView', scenario)
+      await selectRow(page, 26)
+      await hide(page).click()
+      await page.locator('button.wip').click()
+      await expect(page.locator('.right')).toBeVisible()
+    })
+
+    test('remembers across a reload', async ({ page }) => {
+      await open(page, 'repoView', scenario)
+      await selectRow(page, 26)
+      await hide(page).click()
+      await page.reload()
+      await expect(show(page)).toBeVisible()
+      await expect(page.locator('.right')).toHaveCount(0)
+    })
+  })
+
   // #418: the commit panel has the same list, for the keyboard and screen readers.
   test("the commit panel lists the selected commit's refs", async ({ page }) => {
     const id = '0'.repeat(40)

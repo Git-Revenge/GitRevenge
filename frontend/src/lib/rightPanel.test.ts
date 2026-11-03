@@ -38,9 +38,16 @@ describe('remembering the width', () => {
 
   it('keeps each repository apart', () => {
     const s = store()
-    saveRightPanel('/a', { width: 500 }, s)
+    saveRightPanel('/a', { width: 500, hidden: false }, s)
     expect(loadRightPanel('/a', s).width).toBe(500)
     expect(loadRightPanel('/b', s).width).toBe(DEFAULT_WIDTH)
+  })
+
+  it('remembers whether it is hidden', () => {
+    const s = store()
+    expect(loadRightPanel('/a', s).hidden).toBe(false)
+    saveRightPanel('/a', { width: 500, hidden: true }, s)
+    expect(loadRightPanel('/a', s).hidden).toBe(true)
   })
 
   it('ignores anything unreadable', () => {
@@ -52,6 +59,6 @@ describe('remembering the width', () => {
 
   it("doesn't mind a store that refuses", () => {
     const refusing = { getItem: () => null, setItem: () => { throw new Error('full') } }
-    expect(() => saveRightPanel('/r', { width: 500 }, refusing)).not.toThrow()
+    expect(() => saveRightPanel('/r', { width: 500, hidden: false }, refusing)).not.toThrow()
   })
 })
