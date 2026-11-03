@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { CancelNetwork, Fetch, Pull, PushCurrent, Redo, Refs, Undo, UndoState } from '../../wailsjs/go/app/App.js'
+  import { CancelNetwork, Fetch, ForcePushLoss, Pull, PushCurrent, PushedUndo, Redo, Refs, Undo, UndoState } from '../../wailsjs/go/app/App.js'
+  import type { app } from '../../wailsjs/go/models'
+  import CommitLines from './CommitLines.svelte'
+  import PushedUndoDialog from './PushedUndoDialog.svelte'
   import { CONFIRM_FORCE_PUSH, kindWarning } from './branchKinds'
   import type { Ref } from './graph/rowCache'
   import InkButton from './ui/InkButton.svelte'
@@ -39,17 +42,25 @@
     void refreshUndo()
   })
 
-  async function undo() {
-    if (!undoLabel || running) return
-    await session.run(() => Undo(path))
+  // Undoing or redoing what's already on the remote asks first. With no answer, it goes ahead:
+  // it's local, and can be taken back.
+  let pushedStep = $state<{ undo: boolean; label: string; shared: app.SharedCommits } | null>(null)
+
+  async function step(undo: boolean) {
+    const label = undo ? undoLabel : redoLabel
+    if (!label || running) return
+    const shared = await PushedUndo(path, undo).catch(() => null)
+    if (shared?.total) pushedStep = { undo, label, shared }
+    else await take(undo)
+  }
+
+  async function take(undo: boolean) {
+    await session.run(() => (undo ? Undo(path) : Redo(path)))
     await refreshUndo()
   }
 
-  async function redo() {
-    if (!redoLabel || running) return
-    await session.run(() => Redo(path))
-    await refreshUndo()
-  }
+  const undo = () => step(true)
+  const redo = () => step(false)
 
   async function run(op: string, fn: () => Promise<void>) {
     running = op
@@ -65,13 +76,14 @@
   const push = (force: boolean) => run('push', () => PushCurrent(path, force))
 
   // Force-pushing a Trunk, Release or Environment branch asks first, naming the kind.
-  let confirmForce = $state<{ branch: string; warning: string } | null>(null)
+  let confirmForce = $state<{ branch: string; warning: string; loss: app.SharedCommits | null } | null>(null)
 
   async function forcePush() {
     const refs = ((await session.run(() => Refs(path))) as Ref[] | undefined) ?? []
     const head = refs.find((r) => r.kind === 'local' && r.head)
     const warning = head ? kindWarning(head.short, head.branchKind, CONFIRM_FORCE_PUSH) : ''
-    if (warning && head) confirmForce = { branch: head.short, warning }
+    const loss = await ForcePushLoss(path).catch(() => null)
+    if (head && (warning || loss?.total)) confirmForce = { branch: head.short, warning, loss: loss?.total ? loss : null }
     else await push(true)
   }
 
@@ -161,10 +173,19 @@
   <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => (menu = null)} />
 {/if}
 
+{#if pushedStep}
+  {@const s = pushedStep}
+  <PushedUndoDialog {path} verb={s.undo ? 'Undo' : 'Redo'} label={s.label} shared={s.shared} onConfirm={() => take(s.undo)} onClose={() => (pushedStep = null)} />
+{/if}
+
 {#if confirmForce}
   {@const c = confirmForce}
   <Modal title="Force push {c.branch}?" eyebrow="careful" onClose={() => (confirmForce = null)}>
     <p class="confirm-text">{c.warning} Force pushing replaces its history on the remote for everyone, as long as nobody has pushed since you last fetched.</p>
+    {#if c.loss}
+      <p class="confirm-text loss">{c.loss.upstream} would lose {c.loss.total === 1 ? 'this commit' : `these ${c.loss.total.toLocaleString()} commits`}:</p>
+      <CommitLines commits={c.loss.commits} total={c.loss.total} />
+    {/if}
     <div class="form-actions">
       <InkButton variant="secondary" onclick={() => (confirmForce = null)}>Cancel</InkButton>
       <InkButton
@@ -179,6 +200,11 @@
 {/if}
 
 <style>
+  .loss {
+    margin-top: 12px;
+    margin-bottom: 8px;
+  }
+
   .confirm-text {
     margin: 0;
     font-size: 15px;

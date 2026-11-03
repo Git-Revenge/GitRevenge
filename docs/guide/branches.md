@@ -14,6 +14,7 @@
 
 - Right-click a branch to mark it as a kind (**Mark `name` as…**), **Hide** it, or say what it's stacked on (**Stack `name` on…**). [Branch care](branch-care.md) explains these.
 - Force pushing a Trunk, Release or Environment branch, and deleting a Trunk or Environment branch, ask first and name the kind.
+- Force pushing any branch asks first when it would replace commits on the remote, and lists them with who wrote them, as far as your last fetch knows.
 
 ## Merging, rebasing and cherry-picking
 

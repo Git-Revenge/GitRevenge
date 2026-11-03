@@ -10,6 +10,7 @@
 
 <script lang="ts">
   import {
+    PushedUndo,
     CommitChanges,
     DiscardFiles,
     LastCommitMessage,
@@ -27,6 +28,7 @@
   import { provideCommands } from './commands.svelte'
   import { adjacentFile, FILTER_FROM, fileName, fileRows, moveThroughRows, readTreeChoice } from './fileList'
   import FileListTools from './FileListTools.svelte'
+  import PushedUndoDialog from './PushedUndoDialog.svelte'
   import type { MenuItem } from './ContextMenu.svelte'
   import { gitConfig } from './gitconfig/config.svelte'
   import { tick } from 'svelte'
@@ -302,6 +304,15 @@
     // Something else may have happened since; undo must not take that back instead.
     const state = await session.run(() => UndoState(path))
     if (state?.undo !== done.undo) return
+    // Pushed since committing: this would leave the remote behind, so it asks first.
+    const shared = await PushedUndo(path, true).catch(() => null)
+    if (shared?.total) pushedUndo = { done, shared }
+    else await takeBack(done)
+  }
+
+  let pushedUndo = $state<{ done: NonNullable<typeof justCommitted>; shared: app.SharedCommits } | null>(null)
+
+  async function takeBack(done: NonNullable<typeof justCommitted>) {
     busy = true
     await session.run(() => Undo(path))
     busy = false
@@ -568,6 +579,11 @@
     </div>
   </form>
 </aside>
+
+{#if pushedUndo}
+  {@const p = pushedUndo}
+  <PushedUndoDialog {path} verb="Undo" label={p.done.undo} shared={p.shared} onConfirm={() => takeBack(p.done)} onClose={() => (pushedUndo = null)} />
+{/if}
 
 <style>
   .panel {

@@ -72,6 +72,8 @@ export function FileHistory(arg1:string,arg2:string):Promise<Array<git.FileCommi
 
 export function FileImage(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
 
+export function ForcePushLoss(arg1:string):Promise<app.SharedCommits>;
+
 export function GitCommands():Promise<Array<string>>;
 
 export function GitConfigBackupText(arg1:string,arg2:string):Promise<string>;
@@ -147,6 +149,8 @@ export function PullBranch(arg1:string,arg2:string):Promise<void>;
 export function PushCurrent(arg1:string,arg2:boolean):Promise<void>;
 
 export function PushRef(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
+export function PushedUndo(arg1:string,arg2:boolean):Promise<app.SharedCommits>;
 
 export function RebasePlan(arg1:string,arg2:string):Promise<Array<git.RebaseItem>>;
 

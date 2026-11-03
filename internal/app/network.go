@@ -288,7 +288,7 @@ func (a *App) PushCurrent(path string, force bool) error {
 		}
 		p.ForceWithLease = force
 		if err := r.Git.Push(ctx, p, o); err != nil {
-			return err
+			return pushRefusal(ctx, r.Git, st.Head, st.Upstream, err)
 		}
 		a.pushNotesTo(ctx, r, p.Remote, o)
 		return nil
@@ -379,6 +379,17 @@ func (a *App) RemoteAction(path, action string, args []string) error {
 	return branchErr(err)
 }
 
+// rejectedPushText says whether git's message is a push refused for being behind the remote.
+func rejectedPushText(s string) bool {
+	return strings.Contains(s, "[rejected]") || strings.Contains(s, "fetch first") || strings.Contains(s, "non-fast-forward")
+}
+
+// isRejectedPush is rejectedPushText for an error from git.
+func isRejectedPush(err error) bool {
+	var gerr *git.Error
+	return errors.As(err, &gerr) && rejectedPushText(gerr.Stderr)
+}
+
 // netErr explains common network failures.
 func netErr(err error) error {
 	var gerr *git.Error
@@ -404,7 +415,7 @@ func netErr(err error) error {
 		return userError("No repository was found at that URL. Check the URL, and that your account can access the repository.")
 	case strings.Contains(s, "Could not resolve host"), strings.Contains(s, "unable to access"):
 		return userError("Couldn't reach the remote. Check the URL and your network connection.\n\n" + string(gitMessage(s)))
-	case strings.Contains(s, "[rejected]") || strings.Contains(s, "fetch first") || strings.Contains(s, "non-fast-forward"):
+	case rejectedPushText(s):
 		return userError("The remote has commits you don't have. Pull first, or force push (with lease) to overwrite them.")
 	case strings.Contains(s, "stale info"):
 		return userError("The remote branch moved since you last fetched, so force push was refused to protect it. Fetch, review, then try again.")

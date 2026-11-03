@@ -41,4 +41,6 @@ If your git config signs commits (`commit.gpgsign`), commits made in Git Revenge
 
 Commits, checkouts, merges, cherry-picks, rebases, resets, reverts and pulls can be undone. Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> to undo and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> to redo. The command palette names what the next undo will reverse, such as *Undo: Commit "Fix the login form"*.
 
+Undo only ever changes your copy, and never the remote. If what you're undoing is already pushed, it asks first and lists the commits, because the remote keeps them and your next push would be refused. From there you can undo anyway, or **Revert**, which adds commits undoing them, so they're gone for everyone. The same goes for Redo. Undoing a pull doesn't ask, since it only puts your branch behind.
+
 Undo is only offered while the repository is exactly where that operation left it. If anything has moved since, whether in the app or in a terminal, it refuses rather than guess. Nothing is lost either way: the [reflog](history.md#the-reflog) keeps every earlier state.
