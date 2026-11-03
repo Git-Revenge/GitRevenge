@@ -26,6 +26,7 @@ func (a *App) WorkingTree(path string) (WorkingTree, error) {
 	if err != nil {
 		return WorkingTree{}, err
 	}
+	r.Git.CountLines(ctx, &st)
 	return WorkingTree{Status: st, Signing: r.Git.CommitSigning(ctx), Identity: r.Git.CommitIdentity(ctx)}, nil
 }
 

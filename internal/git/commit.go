@@ -128,14 +128,26 @@ func (r *Repo) ChangedFiles(ctx context.Context, c CommitDetail) ([]FileChange, 
 	return changes, nil
 }
 
-// applyNumstat fills in line counts from `--numstat -z` output: ADDED TAB DELETED TAB path
-// NUL, or for renames and copies ADDED TAB DELETED TAB NUL old NUL new NUL. A binary file has
-// - for both counts.
+// applyNumstat fills in line counts from `--numstat -z` output.
 func applyNumstat(changes []FileChange, out []byte) {
-	byPath := make(map[string]*FileChange, len(changes))
+	counts := parseNumstat(out)
 	for i := range changes {
-		byPath[changes[i].Path] = &changes[i]
+		if c, ok := counts[changes[i].Path]; ok {
+			changes[i].Added, changes[i].Deleted, changes[i].Binary = c.added, c.deleted, c.binary
+		}
 	}
+}
+
+type lineCount struct {
+	added, deleted int
+	binary         bool
+}
+
+// parseNumstat parses `--numstat -z` output, by path: ADDED TAB DELETED TAB path NUL, or for
+// renames and copies ADDED TAB DELETED TAB NUL old NUL new NUL. A binary file has - for both
+// counts.
+func parseNumstat(out []byte) map[string]lineCount {
+	counts := map[string]lineCount{}
 	f := strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
 	for i := 0; i < len(f); i++ {
 		added, rest, ok := strings.Cut(f[i], "\t")
@@ -150,14 +162,12 @@ func applyNumstat(changes []FileChange, out []byte) {
 			path = f[i+2]
 			i += 2
 		}
-		c := byPath[path]
-		if c == nil {
-			continue
-		}
-		c.Binary = added == "-" && deleted == "-"
-		c.Added, _ = strconv.Atoi(added)
-		c.Deleted, _ = strconv.Atoi(deleted)
+		c := lineCount{binary: added == "-" && deleted == "-"}
+		c.added, _ = strconv.Atoi(added)
+		c.deleted, _ = strconv.Atoi(deleted)
+		counts[path] = c
 	}
+	return counts
 }
 
 // parseNameStatus parses `--name-status -z` output: STATUS NUL path NUL, or for renames
