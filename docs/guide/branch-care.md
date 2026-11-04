@@ -13,9 +13,9 @@ Some branches aren't like the others. Git Revenge knows six **kinds**, and treat
 | **Trunk** | `main`, `master`, `develop`, `trunk` | Pinned to the left of the graph as a straight spine. Its chip is bold. |
 | **Release** | `release/*`, `releases/*`, `hotfix/*` | Marks its folder in the sidebar, newest version first. Can bound an Insights releases window. |
 | **Environment** | none | For deploy branches such as `staging` or `production`. Asks before a force push or delete. |
-| **Docs** | `gh-pages`, `gh-docs`, `docs-site` | Drawn muted in the graph, with a toggle to hide it. Left out of Insights. |
+| **Docs** | `gh-pages`, `gh-docs`, `docs-site` | Drawn muted in the graph. Left out of Insights. |
 | **Feature** | `feature/*`, `features/*`, `feat/*` | Marks its folder in the sidebar with a sprout. Otherwise it's an ordinary working branch: no extra confirmations, and it stays in Insights. |
-| **Bot** | `dependabot/*`, `renovate/*` | Marks its folder in the sidebar, which starts closed, with a toggle to hide it. Grouped as dependency updates in Insights. |
+| **Bot** | `dependabot/*`, `renovate/*` | Marks its folder in the sidebar, which starts closed. Grouped as dependency updates in Insights. |
 
 A pattern matches the branch name without its remote, so `release/*` covers `release/1.4` and `origin/release/1.4` alike. A `*` matches anything, slashes included, so `dependabot/*` catches `dependabot/npm_and_yarn/vite-7.1`. The first kind that matches wins, in the order of the table.
 
@@ -40,7 +40,7 @@ Hidden branches leave the sidebar and the graph. Commits that only they reach di
 
 - **One branch:** right-click it and choose **Hide**. Hiding `wip/x` hides `origin/wip/x` too.
 - **Patterns:** under **This repository** in Settings, list them in **Hidden branches**, such as `wip/*, archive/*`.
-- **Docs and Bots:** the **Docs** and **Bots** buttons in the graph's header show or hide every branch of that kind. They're on (showing) by default, and appear once the repository has branches of that kind.
+- **A whole kind:** the **Kinds** dropdown in the graph's header has a checkbox for each kind the repository has. Clear one to hide every branch of that kind. They all start checked (showing).
 
 When something is hidden, the sidebar says how many, under the branch lists. **Show them** brings them back for now, in italics; **Hide them again** undoes that. To unhide a branch for good, right-click it while it's showing and choose **Unhide**.
 

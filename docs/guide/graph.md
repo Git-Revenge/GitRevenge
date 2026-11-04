@@ -64,9 +64,9 @@ The sidebar works from the keyboard. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kb
 
 A [kind](branch-care.md#branch-kinds)'s icon marks a folder, or a branch on its own, and a branch's chip in the graph carries its kind's colour and icon. Branches built on other branches sit under them as a [stack](branch-care.md#stacked-branches).
 
-## Docs and Bots
+## Filtering by kind
 
-When a repository has Docs branches (such as `gh-pages`) or Bot branches (such as `dependabot/…`), the graph's header has **Docs** and **Bots** buttons to show or hide them. Docs lines are drawn faded either way. Other branches can be hidden too; see [hiding branches](branch-care.md#hiding-branches).
+When a repository has branches of any [kind](branch-care.md#branch-kinds), the graph's header has a **Kinds** dropdown with a checkbox for each one. Clear a box to hide every branch of that kind, and the button says how many kinds are hidden. Docs lines are drawn faded either way. Other branches can be hidden too; see [hiding branches](branch-care.md#hiding-branches).
 
 ## Two layouts
 

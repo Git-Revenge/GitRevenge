@@ -209,7 +209,7 @@ func (a *App) MarkBranchKind(path, name, kind string) error {
 }
 
 // SetKindVisible shows or hides every branch of a kind in the repository at path, as the
-// graph's "Show docs branches" and "Show bot branches" toggles do.
+// graph's Kinds filter does.
 func (a *App) SetKindVisible(path, kind string, visible bool) error {
 	path = a.repoKey(path)
 	if !branchkind.Valid(branchkind.Kind(kind)) {

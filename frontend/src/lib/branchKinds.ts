@@ -36,3 +36,18 @@ export function kindWarning(name: string, kind: string | undefined, kinds: reado
   if (!info || !kind || !kinds.includes(kind)) return ''
   return `${name} is ${/^[AEIOU]/.test(info.label) ? 'an' : 'a'} ${info.label} branch.`
 }
+
+export interface KindFilterRow extends KindInfo {
+  kind: Exclude<BranchKind, ''>
+  hidden: boolean
+}
+
+/** The Kinds filter's rows (ADR 0009): each kind the repository has branches of, or has
+ * hidden, so one that's filtered out can always be brought back. */
+export function kindFilterRows(refs: readonly { branchKind?: string }[], hideKinds: readonly string[]): KindFilterRow[] {
+  const present = new Set(refs.map((r) => r.branchKind))
+  const hidden = new Set(hideKinds)
+  return (Object.keys(KINDS) as Exclude<BranchKind, ''>[])
+    .filter((k) => present.has(k) || hidden.has(k))
+    .map((k) => ({ kind: k, ...KINDS[k], hidden: hidden.has(k) }))
+}
