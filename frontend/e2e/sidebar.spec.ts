@@ -31,6 +31,14 @@ test('a branch known to be merged says so, once the check has answered', async (
 })
 
 // #462
+// #505
+test('marks a branch checked out in another worktree', async ({ page }) => {
+  await open(page, 'sidebar', { responses: { Refs: [branch('main', { head: true }), branch('topic', { worktree: '/wt/topic' })] } })
+  const mark = page.getByTitle('Checked out in the worktree at /wt/topic').first()
+  await expect(mark).toBeVisible()
+  await expect(page.locator('.row.ref .worktree')).toHaveCount(1)
+})
+
 test.describe('a stack of three or more', () => {
   const STACK = [
     branch('main', { branchKind: 'trunk' }),

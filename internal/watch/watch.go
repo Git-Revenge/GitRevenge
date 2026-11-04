@@ -217,8 +217,15 @@ func classifyGitPath(rel string) Kind {
 	if strings.HasSuffix(rel, ".lock") {
 		return 0
 	}
-	first, _, _ := strings.Cut(rel, "/")
+	first, rest, _ := strings.Cut(rel, "/")
 	switch first {
+	case "worktrees":
+		// Another worktree added, removed or switched branches, which changes what the refs
+		// report. Its commits and the like are its own business.
+		if strings.HasSuffix(rest, "/HEAD") && strings.Count(rest, "/") == 1 {
+			return Refs
+		}
+		return 0
 	case "HEAD", "ORIG_HEAD":
 		return Head
 	case "refs", "packed-refs", "FETCH_HEAD":

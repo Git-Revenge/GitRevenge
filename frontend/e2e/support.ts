@@ -51,6 +51,7 @@ export interface RefOptions {
   stackParent?: string
   stackParentMerged?: boolean
   hidden?: boolean
+  worktree?: string
   subject?: string
   commit?: string
 }

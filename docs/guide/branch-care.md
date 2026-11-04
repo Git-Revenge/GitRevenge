@@ -44,6 +44,17 @@ Hidden branches leave the sidebar and the graph. Commits that only they reach di
 
 When something is hidden, the sidebar says how many, under the branch lists. **Show them** brings them back for now, in italics; **Hide them again** undoes that. To unhide a branch for good, right-click it while it's showing and choose **Unhide**.
 
+## Branches in other worktrees
+
+A branch checked out in another [worktree](repositories.md#worktrees) has a worktree mark beside its name in the sidebar and on its label in the graph. Hover over the mark to see the folder.
+
+Git won't check out or delete a branch while another worktree has it, so its menu changes:
+
+- **Open the worktree of…** replaces **Checkout**, and opens that folder as a tab. Double-clicking the branch does the same.
+- **Delete … and its worktree** removes both, after asking. If the worktree has uncommitted changes, or the branch has commits that aren't merged, you tick a box to allow losing them. If something stops the delete, neither is removed.
+
+A branch in the main worktree can't go this way, because the main worktree can't be removed. Open it and switch branches there first.
+
 ## Cleaning up merged branches
 
 Turn on **Clean up merged branches after each pull** under **This repository**. After each pull, Git Revenge then deletes local branches that meet all of these:

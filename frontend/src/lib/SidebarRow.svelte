@@ -101,6 +101,7 @@
     {#if r.head}<span class="here"><span class="visually-hidden">Checked out: </span></span>{/if}
     {#if k}<span class="kind-icon" style:color="var({k.token})" title={k.label}><Icon name={k.icon} size={13} /><span class="visually-hidden">{k.label}</span></span>{/if}
     <span class="name">{parts.pre}{#if parts.hit}<mark>{parts.hit}</mark>{/if}{parts.post}</span>
+    {#if r.worktree}<span class="worktree" title="Checked out in the worktree at {r.worktree}"><Icon name="worktree" size={13} /><span class="visually-hidden">, in a worktree</span></span>{/if}
     {#if r.hidden}<span class="visually-hidden">, hidden</span>{/if}
     {#if stackPlace(r)}<span class="visually-hidden">, {stackPlace(r)}</span>{/if}
     {#if status}<span class="track {status.tone}"><span aria-hidden="true">{status.text}</span><span class="visually-hidden">, {status.spoken}</span></span>{/if}
@@ -324,6 +325,13 @@
   }
 
   .track.muted {
+    color: var(--ink-mute);
+  }
+
+  .worktree {
+    flex: none;
+    display: inline-flex;
+    margin-left: 4px;
     color: var(--ink-mute);
   }
 

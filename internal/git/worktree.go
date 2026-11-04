@@ -85,6 +85,19 @@ func (r *Repo) AddWorktree(ctx context.Context, path, branch, newBranch string) 
 	return err
 }
 
+// BranchFullyMerged makes the check `git branch -d` makes before deleting a branch: is it
+// merged into its upstream, or into HEAD when it has none? An answer it can't get counts as
+// not merged, so nothing is lost by guessing.
+func (r *Repo) BranchFullyMerged(ctx context.Context, name string) bool {
+	into := "HEAD"
+	upstream, err := r.ReadString(ctx, "for-each-ref", "--format=%(upstream)", "refs/heads/"+name)
+	if upstream = strings.TrimSpace(upstream); err == nil && upstream != "" && r.refExists(ctx, upstream) {
+		into = upstream
+	}
+	_, err = r.Read(ctx, "merge-base", "--is-ancestor", "refs/heads/"+name, into)
+	return err == nil
+}
+
 // RemoveWorktree removes a linked worktree; force also removes one with local changes.
 func (r *Repo) RemoveWorktree(ctx context.Context, path string, force bool) error {
 	args := []string{"worktree", "remove"}

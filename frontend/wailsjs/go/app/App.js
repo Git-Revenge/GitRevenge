@@ -94,6 +94,10 @@ export function DeletableBranches(arg1, arg2) {
   return window['go']['app']['App']['DeletableBranches'](arg1, arg2);
 }
 
+export function DeleteBranchAndWorktree(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['DeleteBranchAndWorktree'](arg1, arg2, arg3, arg4);
+}
+
 export function DeleteMergedBranches(arg1, arg2) {
   return window['go']['app']['App']['DeleteMergedBranches'](arg1, arg2);
 }

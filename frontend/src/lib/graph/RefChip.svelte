@@ -21,6 +21,7 @@
 <span class="chip" class:head={ref.head} style:--chip={color}>
   {#if kind}<Icon name={kind.icon} size={12} />{/if}
   <span class="name">{label.text}</span>
+  {#if ref.worktree}<span class="worktree" title="Checked out in the worktree at {ref.worktree}"><Icon name="worktree" size={12} /><span class="visually-hidden">, in a worktree</span></span>{/if}
   {#if label.places.length}<span class="places">{label.places.join(' · ')}</span>{/if}
 </span>
 
@@ -49,6 +50,11 @@
   .name {
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+
+  .worktree {
+    flex: none;
+    display: inline-flex;
   }
 
   .places {
