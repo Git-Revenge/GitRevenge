@@ -240,8 +240,11 @@ jobs:
             if [ "${{ matrix.image }}" = "almalinux:10" ]; then
               dnf install -y dnf-plugins-core epel-release
               dnf config-manager --set-enabled crb
+              # RHEL 10 has no X server, so there's no Xvfb. Weston runs headless on Wayland.
+              dnf install -y ./dist/*.rpm weston desktop-file-utils
+            else
+              dnf install -y ./dist/*.rpm xorg-x11-server-Xvfb xorg-x11-xauth which desktop-file-utils
             fi
-            dnf install -y ./dist/*.rpm xorg-x11-server-Xvfb xorg-x11-xauth which desktop-file-utils
           fi
       - name: Check what was installed
         run: |
@@ -254,10 +257,18 @@ jobs:
           # WebKit's sandbox can't start inside a container.
           WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: 1
           HOME: /tmp/home
+          XDG_RUNTIME_DIR: /tmp/xdg
         run: |
           mkdir -p "$HOME"
+          mkdir -m 700 "$XDG_RUNTIME_DIR"
           status=0
-          timeout 20 xvfb-run -a gitrevenge || status=$?
+          if command -v weston >/dev/null; then
+            weston --backend=headless --socket=wl-check &
+            sleep 5
+            WAYLAND_DISPLAY=wl-check GDK_BACKEND=wayland timeout 20 gitrevenge || status=$?
+          else
+            timeout 20 xvfb-run -a gitrevenge || status=$?
+          fi
           # 124 means it was still running when the timeout stopped it.
           if [ "$status" != 124 ]; then
             echo "::error::The app exited with $status"
