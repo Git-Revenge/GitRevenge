@@ -17,7 +17,9 @@ func clashing(t *testing.T) (*gittest.Repo, *Repo) {
 	fx.Git("add", ".")
 	blob := fx.Git("rev-parse", ":sub/Clash.txt")
 	fx.Git("update-index", "--add", "--cacheinfo", "100644,"+trimNL(blob)+",sub/clash.txt")
-	fx.Commit("two names")
+	// Not fx.Commit: its add -A would drop the name that isn't on disk on a case-sensitive
+	// filesystem.
+	fx.Git("commit", "-m", "two names")
 	return fx, OpenRepo(newTestRunner(t), fx.Dir)
 }
 
