@@ -42,3 +42,7 @@ From #419, on commits that several branches point at:
 
 - **The kind earliest in the matching order wins a shared tip,** whether its branches are local or remote. Before this, a local branch beat a remote one and otherwise the alphabetically last name won, so `release/x` beat `feature/y` by accident of how they sort.
 - **A Docs tip with real work on it isn't muted.** If an ordinary or Feature branch points at the same commit, the lane takes that branch's kind, or none. Faded code is worse than a Docs line drawn at full strength. Checking this reads every branch, but only in a repository with a Docs tip.
+
+## Amendment, 2026-11-04
+
+From #504: the graph's Docs and Bots toggles become one **Kinds** dropdown with a checkbox for every kind the repository has, or has hidden. Any kind can now be hidden, using the same per-repository setting. An ordinary branch has no kind, so it has no checkbox.

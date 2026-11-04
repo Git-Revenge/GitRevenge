@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { KINDS } from '../branchKinds'
+  import { KINDS, kindFilterRows, type KindFilterRow } from '../branchKinds'
   import { errorText } from '../errors'
   import { onMount } from 'svelte'
   import { CommitRow, CommitSignatures, GraphRows, Refs, RepoPreferences, SearchGraph, SetKindVisible } from '../../../wailsjs/go/app/App.js'
@@ -9,6 +9,7 @@
   import { provideCommands } from '../commands.svelte'
   import Icon from '../ui/Icon.svelte'
   import { labelsFold, labelsUnfold } from '../ui/motion'
+  import KindFilter from './KindFilter.svelte'
   import RefChip from './RefChip.svelte'
   import { drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneVar, laneWindow, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
@@ -35,29 +36,25 @@
     onSelectedRefs?: (labels: RefLabel[]) => void
   } = $props()
 
-  // The Docs and Bots visibility toggles (ADR 0009): shown when the repository has branches
-  // of that kind, or has them hidden. On means visible.
   /** The repository's main remote, whose prefix labels leave off. */
   let remote = 'origin'
-  let kindToggles = $state<{ kind: 'docs' | 'bot'; label: string; icon: (typeof KINDS)['docs']['icon']; hidden: boolean }[]>([])
+  /** The Kinds filter's rows (ADR 0009). */
+  let kindRows = $state<KindFilterRow[]>([])
 
-  async function loadKindToggles() {
+  async function loadKinds() {
     const [refs, prefs] = await Promise.all([
-      // The toggles are optional: without these answers they just don't show.
+      // The filter is optional: without these answers it just doesn't show.
       Refs(path).catch(() => []),
       RepoPreferences(path).catch(() => null),
     ])
     remote = mainRemote(refs as Ref[])
     schedule()
-    const hidden = new Set(prefs?.hideKinds ?? [])
-    kindToggles = (['docs', 'bot'] as const)
-      .filter((k) => hidden.has(k) || (refs as Ref[]).some((r) => r.branchKind === k))
-      .map((k) => ({ kind: k, label: k === 'docs' ? 'Docs' : 'Bots', icon: KINDS[k].icon, hidden: hidden.has(k) }))
+    kindRows = kindFilterRows(refs as Ref[], prefs?.hideKinds ?? [])
   }
 
-  async function toggleKind(kind: string, hidden: boolean) {
-    await session.run(() => SetKindVisible(path, kind, hidden))
-    await loadKindToggles()
+  async function setKindVisible(kind: string, visible: boolean) {
+    await session.run(() => SetKindVisible(path, kind, visible))
+    await loadKinds()
   }
 
   /** Rows fetched beyond the viewport, so short scrolls never show blanks. */
@@ -517,10 +514,10 @@
     // The canvas paints with the bundled fonts; repaint once they finish loading.
     void document.fonts.ready.then(schedule)
     document.fonts.addEventListener('loadingdone', schedule)
-    void loadKindToggles()
+    void loadKinds()
     const off = EventsOn('graph:progress', (p: GraphProgress) => {
       if (p.path !== path) return
-      if (p.done) void loadKindToggles()
+      if (p.done) void loadKinds()
       cache.setTotal(p.rows, !p.done, p.paused, p.estimate)
       if (p.refsReady) cache.invalidate() // labels arrived after the first rows
       if (p.reset || p.done) widest = 1
@@ -569,16 +566,7 @@
     {:else}
       <span class="meta">{total.toLocaleString()} commits</span>
     {/if}
-    {#each kindToggles as k (k.kind)}
-      <button
-        class="btn sm quiet"
-        onclick={() => toggleKind(k.kind, k.hidden)}
-        aria-pressed={!k.hidden}
-        title={k.hidden ? `Show ${k.label.toLowerCase()} branches` : `Hide ${k.label.toLowerCase()} branches`}
-      >
-        <Icon name={k.icon} size={14} />{k.label}
-      </button>
-    {/each}
+    {#if kindRows.length}<KindFilter rows={kindRows} onToggle={setKindVisible} />{/if}
     <button
       class="btn sm quiet density"
       onclick={() => session.run(() => colorTheme.toggleDensity())}

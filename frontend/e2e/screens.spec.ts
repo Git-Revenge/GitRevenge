@@ -124,6 +124,51 @@ test.describe('commit graph', () => {
     return (await events(page, 'context-row')).at(-1)?.[0]
   }
 
+  test.describe('the Kinds filter', () => {
+    const refs = [branch('main', { branchKind: 'trunk' }), branch('docs/site', { branchKind: 'docs' }), branch('dependabot/x', { branchKind: 'bot' }), branch('plain')]
+    const shown = { graphRows: 3, responses: { CommitSignatures: [], Refs: refs, RepoPreferences: { hideKinds: [] } } }
+
+    test('has a checkbox for each kind in the repository, and hides one when it is cleared', async ({ page }) => {
+      await open(page, 'graph', shown)
+      await page.getByRole('button', { name: 'Kinds' }).click()
+      await expect(page.getByRole('checkbox')).toHaveCount(3)
+      const docs = page.getByRole('checkbox', { name: 'Docs' })
+      await expect(docs).toBeChecked()
+      await docs.click()
+      await expect.poll(() => calls(page, 'SetKindVisible')).toEqual([['/repo', 'docs', false]])
+    })
+
+    test('says when a kind is filtered out, and can bring it back', async ({ page }) => {
+      await open(page, 'graph', { graphRows: 3, responses: { CommitSignatures: [], Refs: [branch('main', { branchKind: 'trunk' })], RepoPreferences: { hideKinds: ['docs'] } } })
+      const button = page.getByRole('button', { name: /Kinds/ })
+      await expect(button).toHaveText(/1 hidden/)
+      await button.click()
+      const docs = page.getByRole('checkbox', { name: 'Docs' })
+      await expect(docs).not.toBeChecked()
+      await docs.click()
+      await expect.poll(() => calls(page, 'SetKindVisible')).toEqual([['/repo', 'docs', true]])
+    })
+
+    test('closes on Escape, handing focus back, and on a click elsewhere', async ({ page }) => {
+      await open(page, 'graph', shown)
+      const button = page.getByRole('button', { name: 'Kinds' })
+      await button.click()
+      await expect(page.getByRole('checkbox', { name: 'Trunk' })).toBeFocused()
+      await page.keyboard.press('Escape')
+      await expect(page.getByRole('checkbox')).toHaveCount(0)
+      await expect(button).toBeFocused()
+      await button.click()
+      await page.locator('.scroller').click({ position: { x: 400, y: 200 } })
+      await expect(page.getByRole('checkbox')).toHaveCount(0)
+    })
+
+    test('stays away when the repository has no kinds', async ({ page }) => {
+      await open(page, 'graph', { graphRows: 3, responses: { CommitSignatures: [], Refs: [branch('plain')], RepoPreferences: { hideKinds: [] } } })
+      await expect(page.getByText('3 commits')).toBeVisible()
+      await expect(page.getByRole('button', { name: /Kinds/ })).toHaveCount(0)
+    })
+  })
+
   // #383: the new toggles took the room the count had, and the search count ran off the edge.
   test.describe('in a narrow column', () => {
     const narrow = { graphRows: 32, responses: { CommitSignatures: [], Refs: [branch('docs/site', { branchKind: 'docs' }), branch('dependabot/x', { branchKind: 'bot' })] } }
@@ -131,7 +176,7 @@ test.describe('commit graph', () => {
     test('the header keeps the commit count on one line', async ({ page }) => {
       await page.setViewportSize({ width: 640, height: 600 })
       await open(page, 'graph', narrow)
-      await expect(page.getByRole('button', { name: 'Bots' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Kinds' })).toBeVisible()
       const count = page.getByText('32 commits')
       await expect(count).toBeVisible()
       const box = (await count.boundingBox())!
