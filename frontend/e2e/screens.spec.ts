@@ -842,17 +842,24 @@ test.describe('start page', () => {
     const from = middle((await first.locator('.repo-grip').boundingBox())!)
     await page.mouse.move(from.x, from.y)
     await page.mouse.down()
-    const before = await page.evaluate(() => {
-      const scroller = [...document.querySelectorAll('*')].find((e) => e.scrollHeight > e.clientHeight + 40 && getComputedStyle(e).overflowY !== 'visible')
-      return (scroller ?? document.scrollingElement)!.scrollTop
-    })
+    const scrollTop = () =>
+      page.evaluate(() => {
+        const scroller = [...document.querySelectorAll('*')].find((e) => e.scrollHeight > e.clientHeight + 40 && getComputedStyle(e).overflowY !== 'visible')
+        return (scroller ?? document.scrollingElement)!.scrollTop
+      })
+    const before = await scrollTop()
     await page.mouse.wheel(0, 60)
-    await page.waitForTimeout(150)
-    const moved = await page.evaluate(() => {
-      const scroller = [...document.querySelectorAll('*')].find((e) => e.scrollHeight > e.clientHeight + 40 && getComputedStyle(e).overflowY !== 'visible')
-      return (scroller ?? document.scrollingElement)!.scrollTop
-    })
-    expect(moved).toBeGreaterThan(before)
+    // A wheel event scrolls asynchronously, so wait for it to land and settle.
+    await expect.poll(scrollTop).toBeGreaterThan(before)
+    let last = -1
+    await expect
+      .poll(async () => {
+        const now = await scrollTop()
+        const settled = now === last
+        last = now
+        return settled
+      })
+      .toBe(true)
     // Where the third row is now, not where it was when the drag began.
     const target = (await card(page, 'Work').locator('[data-repo]').nth(2).boundingBox())!
     await page.mouse.move(from.x, target.y + target.height - 2)
