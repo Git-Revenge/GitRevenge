@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/git-revenge/gitrevenge/internal/gittest"
@@ -12,8 +13,16 @@ import (
 // second clone that can add to the remote.
 func pullBranchApp(t *testing.T) (*App, string, *gittest.Repo, *gittest.Repo) {
 	t.Helper()
+	return pullBranchAppWithHook(t, nil)
+}
+
+// pullBranchAppWithHook is pullBranchApp with an event hook. Opening the repository starts
+// goroutines that emit, so the hook has to be in place before that.
+func pullBranchAppWithHook(t *testing.T, hook func(name string, data any)) (*App, string, *gittest.Repo, *gittest.Repo) {
+	t.Helper()
 	isolateGit(t)
 	a := newTestApp(t)
+	a.emitHook = hook
 	local, remote := gittest.WithRemote(t, 1)
 	local.Git("checkout", "-q", "-b", "feat")
 	local.CommitFile("feat.txt", "1", "feat 1")
@@ -29,13 +38,15 @@ func pullBranchApp(t *testing.T) (*App, string, *gittest.Repo, *gittest.Repo) {
 }
 
 func TestPullBranchNoticesAndUndo(t *testing.T) {
-	a, path, local, other := pullBranchApp(t)
+	var mu sync.Mutex
 	var notices []string
-	a.emitHook = func(name string, data any) {
+	a, path, local, other := pullBranchAppWithHook(t, func(name string, data any) {
 		if n, ok := data.(Notice); ok && name == "notice" {
+			mu.Lock()
 			notices = append(notices, n.Message)
+			mu.Unlock()
 		}
-	}
+	})
 	start := local.Git("rev-parse", "feat")
 	tip := other.CommitFile("two.txt", "2", "two")
 	other.Git("push", "-q")
@@ -67,6 +78,8 @@ func TestPullBranchNoticesAndUndo(t *testing.T) {
 	if err := a.PullBranch(path, "feat"); err != nil {
 		t.Fatal(err)
 	}
+	mu.Lock()
+	defer mu.Unlock()
 	if len(notices) != 2 || !strings.Contains(notices[0], "into feat") || notices[1] != "feat is already up to date." {
 		t.Fatalf("notices = %q", notices)
 	}

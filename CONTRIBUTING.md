@@ -27,7 +27,7 @@ go test ./...
 cd frontend && npm run check && npm run lint && npm test && npm run test:browser
 ```
 
-Also run `golangci-lint run`. CI runs everything on Windows and macOS.
+Also run `golangci-lint run`. CI runs everything on Windows, macOS and Linux.
 
 ## Guidelines
 
