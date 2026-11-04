@@ -1,0 +1,52 @@
+# Packages the binary that wails build leaves in build/bin. VERSION comes from the release
+# workflow, and so does RPM_WEBKIT, because RHEL 9 and 10 name WebKitGTK differently.
+name: gitrevenge
+arch: amd64
+platform: linux
+version: ${VERSION}
+section: vcs
+priority: optional
+maintainer: Ris Adams
+vendor: Git Revenge
+homepage: https://gitrevenge.com
+license: Apache-2.0
+description: A fast, local-only desktop git client, built for very large repositories.
+contents:
+  - src: build/bin/gitrevenge
+    dst: /usr/bin/gitrevenge
+    file_info:
+      mode: 0755
+  - src: build/linux/gitrevenge.desktop
+    dst: /usr/share/applications/gitrevenge.desktop
+    file_info:
+      mode: 0644
+  - src: build/appicon.svg
+    dst: /usr/share/icons/hicolor/scalable/apps/gitrevenge.svg
+    file_info:
+      mode: 0644
+  - src: build/appicon.png
+    dst: /usr/share/icons/hicolor/1024x1024/apps/gitrevenge.png
+    file_info:
+      mode: 0644
+  - src: LICENSE
+    dst: /usr/share/doc/gitrevenge/LICENSE
+    file_info:
+      mode: 0644
+overrides:
+  deb:
+    depends:
+      - git (>= 1:2.40)
+      - libc6 (>= 2.34)
+      - libgtk-3-0t64
+      - libwebkit2gtk-4.1-0
+    recommends:
+      - git-lfs
+      - xdg-utils
+  rpm:
+    depends:
+      - git >= 2.40
+      - gtk3
+      - ${RPM_WEBKIT}
+    recommends:
+      - git-lfs
+      - xdg-utils

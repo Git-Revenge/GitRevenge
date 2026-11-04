@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Git Revenge
+Comment=A fast, local-only desktop git client
+Exec=gitrevenge
+Icon=gitrevenge
+Terminal=false
+Categories=Development;RevisionControl;
+StartupWMClass=gitrevenge
