@@ -52,21 +52,23 @@
         onclick={(e) => open(e, part.href!)}>{part.text}</a
       >{:else}{part.text}{/if}{/each}{/snippet}
 
-{#snippet inline(list: Token[])}{#each list as t, i (i)}{#if t.type === 'text' && 'tokens' in t && t.tokens?.length}{@render inline(
+<!-- inLink: already inside an <a>, so nothing here may become another one. -->
+{#snippet inline(list: Token[], inLink = false)}{#each list as t, i (i)}{#if t.type === 'text' && 'tokens' in t && t.tokens?.length}{@render inline(
         t.tokens,
-      )}{:else if t.type === 'text' || t.type === 'escape'}{@render links(t.text)}{:else if t.type === 'strong'}<strong
-        >{@render inline((t as Tokens.Strong).tokens)}</strong
-      >{:else if t.type === 'em'}<em>{@render inline((t as Tokens.Em).tokens)}</em>{:else if t.type === 'del'}<del
-        >{@render inline((t as Tokens.Del).tokens)}</del
+        inLink,
+      )}{:else if t.type === 'text' || t.type === 'escape'}{#if inLink}{t.text}{:else}{@render links(t.text)}{/if}{:else if t.type === 'strong'}<strong
+        >{@render inline((t as Tokens.Strong).tokens, inLink)}</strong
+      >{:else if t.type === 'em'}<em>{@render inline((t as Tokens.Em).tokens, inLink)}</em>{:else if t.type === 'del'}<del
+        >{@render inline((t as Tokens.Del).tokens, inLink)}</del
       >{:else if t.type === 'codespan'}<code>{t.text}</code>{:else if t.type === 'br'}<br />{:else if t.type === 'link'}<a
         href={(t as Tokens.Link).href}
         title={(t as Tokens.Link).href}
-        onclick={(e) => open(e, (t as Tokens.Link).href)}>{@render inline((t as Tokens.Link).tokens)}</a
+        onclick={(e) => open(e, (t as Tokens.Link).href)}>{@render inline((t as Tokens.Link).tokens, true)}</a
       >{:else if t.type === 'image'}{#if resolveImage && RELATIVE.test((t as Tokens.Image).href)}<MarkdownImage
           src={(t as Tokens.Image).href}
           alt={(t as Tokens.Image).text}
           resolve={resolveImage}
-        />{:else}<a href={(t as Tokens.Image).href} title="Image (not loaded)" onclick={(e) => open(e, (t as Tokens.Image).href)}
+        />{:else if inLink}{(t as Tokens.Image).text || (t as Tokens.Image).href}{:else}<a href={(t as Tokens.Image).href} title="Image (not loaded)" onclick={(e) => open(e, (t as Tokens.Image).href)}
           >{(t as Tokens.Image).text || (t as Tokens.Image).href}</a
         >{/if}{:else if t.type === 'checkbox'}<input type="checkbox" checked={(t as Tokens.Checkbox).checked} disabled />{:else if t.type === 'math'}<MathView
           tex={(t as unknown as MathToken).text}
