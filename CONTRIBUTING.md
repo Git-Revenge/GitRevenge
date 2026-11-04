@@ -27,7 +27,7 @@ go test ./...
 cd frontend && npm run check && npm run lint && npm test && npm run test:browser
 ```
 
-Also run `golangci-lint run`. CI runs everything on Windows, macOS and Linux.
+Also run `golangci-lint run` and, with `npx playwright install webkit`, `npm run test:browser:webkit`. CI runs everything on Windows, macOS and Linux.
 
 ## Guidelines
 
