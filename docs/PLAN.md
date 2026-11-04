@@ -156,7 +156,7 @@ Each feature area has an epic issue. Its tasks are tracked as sub-issues, each s
 - **Testing.**
   - Go tests run against fixture repos that are built on the fly with real git.
   - Vitest covers frontend logic.
-  - CI runs on Windows and macOS.
+  - CI runs on Windows, macOS and Linux.
 - **Linting.** `golangci-lint`, `svelte-check` and `eslint`.
 
 ## Distribution
