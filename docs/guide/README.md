@@ -1,6 +1,6 @@
 # User guide
 
-Git Revenge is a desktop git client for Windows and macOS. It's built to stay quick on very large repositories, and it does all its work through the `git` you already have installed, so your config, hooks, credential helpers and SSH agent all keep working.
+Git Revenge is a desktop git client for Windows, macOS and Linux. It's built to stay quick on very large repositories, and it does all its work through the `git` you already have installed, so your config, hooks, credential helpers and SSH agent all keep working.
 
 There are no accounts, no cloud features and no AI. The only request the app makes on its own is a check for a newer release at startup, and you can switch that off in [Settings](settings.md).
 

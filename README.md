@@ -2,7 +2,7 @@
   <img src="build/social-preview.png" alt="Git Revenge: a fast, local-only desktop git client, built for very large repositories" width="720">
 </p>
 
-Git Revenge is a desktop git client for Windows and macOS that stays fast on huge repositories. It's a Go app that drives the `git` you already have installed. There are no accounts, no cloud features and no AI.
+Git Revenge is a desktop git client for Windows, macOS and Linux that stays fast on huge repositories. It's a Go app that drives the `git` you already have installed. There are no accounts, no cloud features and no AI.
 
 > **Status:** early development. The latest release is [`0.9.1`](https://github.com/Git-Revenge/GitRevenge/releases/tag/v0.9.1), and `0.10.0` is in progress.
 
@@ -25,10 +25,11 @@ No accounts, no cloud sync, no telemetry. Git Revenge uses your own git config, 
 
 ## Install
 
-Grab the Windows installer or the macOS disk image from the [latest release](https://github.com/Git-Revenge/GitRevenge/releases/latest).
+Grab the Windows installer, the macOS disk image, or a Linux `.deb` or `.rpm` (from 0.10.0) from the [latest release](https://github.com/Git-Revenge/GitRevenge/releases/latest).
 
 - **macOS:** the disk image is signed and notarized (since 0.6.0).
 - **Windows:** the installer isn't signed yet, so SmartScreen will warn you before it runs.
+- **Linux:** Ubuntu 24.04, Debian 13, RHEL 9, and RHEL 10 with EPEL, or newer. See the [install guide](docs/guide/install.md).
 
 ## Requirements
 

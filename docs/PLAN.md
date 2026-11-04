@@ -19,14 +19,14 @@ This document records the decisions from the initial requirements session (2026-
 
 ## Platforms
 
-- **Windows and macOS are first-class.** Linux is a nice-to-have.
+- **Windows, macOS and Linux are first-class.** Linux means Ubuntu 24.04, Debian 13, RHEL 9, and RHEL 10 with EPEL, or newer ([ADR-0010](adr/0010-linux-first-class.md)).
 - Requires a system `git` **>= 2.40**. `git-lfs` is required for LFS features.
 
 ## Architecture
 
 | Concern | Decision | ADR |
 |---|---|---|
-| App shell | Wails v2 desktop app (WebView2 / WKWebView) | [0001](adr/0001-wails-desktop-shell.md) |
+| App shell | Wails v2 desktop app (WebView2 / WKWebView / WebKitGTK) | [0001](adr/0001-wails-desktop-shell.md) |
 | Git engine | System `git` CLI behind a thin Go layer | [0002](adr/0002-system-git-cli.md) |
 | Frontend | Svelte 5 + TypeScript + Vite; canvas commit graph; CodeMirror 6 for diffs | [0003](adr/0003-svelte-canvas-graph.md) |
 | Credentials | Existing helpers first; askpass bridge into the UI | [0004](adr/0004-askpass-bridge.md) |
