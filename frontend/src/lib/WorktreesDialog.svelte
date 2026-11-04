@@ -73,7 +73,7 @@
   }
 
   async function remove(w: git.Worktree) {
-    if (await run(() => RemoveWorktree(path, w.path, force))) {
+    if (await run(async () => session.closeRemoved(w.path, await RemoveWorktree(path, w.path, force)))) {
       confirmRemove = ''
       force = false
     }

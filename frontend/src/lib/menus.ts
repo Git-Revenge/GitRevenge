@@ -124,8 +124,7 @@ export function deleteWorktreeBranchDialog(path: string, ref: Ref, tree: BranchW
     danger: true,
     run: (v) =>
       attempt(async () => {
-        await DeleteBranchAndWorktree(path, ref.short, !!v.changes, !!merge?.how || !!v.commits)
-        await session.closeRemoved(tree.path)
+        await session.closeRemoved(tree.path, await DeleteBranchAndWorktree(path, ref.short, !!v.changes, !!merge?.how || !!v.commits))
       }),
   }
 }

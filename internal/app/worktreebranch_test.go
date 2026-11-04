@@ -2,7 +2,9 @@ package app
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -72,7 +74,7 @@ func TestPlainDeleteOfABranchInAWorktreeNamesWhy(t *testing.T) {
 
 func TestDeleteBranchAndWorktree(t *testing.T) {
 	a, fx, path, dir := worktreeFixture(t)
-	if err := a.DeleteBranchAndWorktree(path, "feature", false, true); err != nil {
+	if _, err := a.DeleteBranchAndWorktree(path, "feature", false, true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {
@@ -85,7 +87,7 @@ func TestDeleteBranchAndWorktree(t *testing.T) {
 
 func TestDeleteBranchAndWorktreeTouchesNothingIfCommitsWouldBeLost(t *testing.T) {
 	a, fx, path, dir := worktreeFixture(t)
-	err := a.DeleteBranchAndWorktree(path, "feature", false, false)
+	_, err := a.DeleteBranchAndWorktree(path, "feature", false, false)
 	if err == nil || !strings.Contains(err.Error(), "aren't merged") {
 		t.Fatalf("err = %v", err)
 	}
@@ -102,7 +104,7 @@ func TestDeleteBranchAndWorktreeNeedsATickForUncommittedChanges(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "new.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	err := a.DeleteBranchAndWorktree(path, "feature", false, true)
+	_, err := a.DeleteBranchAndWorktree(path, "feature", false, true)
 	if err == nil {
 		t.Fatal("removed a worktree with uncommitted changes")
 	}
@@ -112,7 +114,7 @@ func TestDeleteBranchAndWorktreeNeedsATickForUncommittedChanges(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "new.txt")); err != nil {
 		t.Errorf("the change is gone: %v", err)
 	}
-	if err := a.DeleteBranchAndWorktree(path, "feature", true, true); err != nil {
+	if _, err := a.DeleteBranchAndWorktree(path, "feature", true, true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {
@@ -125,7 +127,7 @@ func TestDeleteBranchAndWorktreeWhenTheFolderIsAlreadyGone(t *testing.T) {
 	if err := os.RemoveAll(dir); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.DeleteBranchAndWorktree(path, "feature", false, true); err != nil {
+	if _, err := a.DeleteBranchAndWorktree(path, "feature", false, true); err != nil {
 		t.Fatal(err)
 	}
 	if branchExists(fx, "feature") {
@@ -140,14 +142,63 @@ func TestDeleteBranchAndWorktreeWithTheWorktreeOpenInATab(t *testing.T) {
 		t.Fatal(err)
 	}
 	loadedPage(t, a, other.Path)
-	if err := a.DeleteBranchAndWorktree(path, "feature", false, true); err != nil {
+	if _, err := a.DeleteBranchAndWorktree(path, "feature", false, true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {
 		t.Errorf("worktree folder still there: %v", err)
 	}
+	if _, err := a.openRepo(other.Path); err == nil {
+		t.Error("the worktree's tab is still open")
+	}
+	// The UI drops the tab next, which is fine with it already closed.
 	if err := a.CloseRepo(other.Path); err != nil {
 		t.Errorf("closing the tab afterwards: %v", err)
+	}
+}
+
+func TestARefusedRemovalLeavesTheWorktreesTabOpen(t *testing.T) {
+	a, _, path, dir := worktreeFixture(t)
+	other, err := a.OpenRepo(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "new.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.DeleteBranchAndWorktree(path, "feature", false, true); err == nil {
+		t.Fatal("removed a worktree with uncommitted changes")
+	}
+	if _, err := a.openRepo(other.Path); err != nil {
+		t.Errorf("the tab closed: %v", err)
+	}
+}
+
+// A process with its current folder in the worktree stops Windows deleting the folder, as a
+// terminal or editor does. Git drops the worktree anyway, so the branch can still go.
+func TestDeleteBranchAndWorktreeWithSomethingElseHoldingTheFolder(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("only Windows stops a folder in use being deleted")
+	}
+	a, fx, path, dir := worktreeFixture(t)
+	holder := exec.Command("ping", "-n", "60", "127.0.0.1")
+	holder.Dir = dir
+	if err := holder.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = holder.Process.Kill()
+		_ = holder.Wait()
+	})
+	leftover, err := a.DeleteBranchAndWorktree(path, "feature", false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if leftover == "" {
+		t.Error("didn't mention the folder left behind")
+	}
+	if branchExists(fx, "feature") {
+		t.Error("branch still there")
 	}
 }
 
@@ -157,7 +208,7 @@ func TestDeleteBranchAndWorktreeRefusesTheMainWorktree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = a.DeleteBranchAndWorktree(tab.Path, "main", false, true)
+	_, err = a.DeleteBranchAndWorktree(tab.Path, "main", false, true)
 	if err == nil || !strings.Contains(err.Error(), "main worktree") {
 		t.Fatalf("err = %v", err)
 	}
@@ -172,7 +223,7 @@ func TestDeleteBranchAndWorktreeRefusesTheOneOpenHere(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = a.DeleteBranchAndWorktree(tab.Path, "feature", false, true)
+	_, err = a.DeleteBranchAndWorktree(tab.Path, "feature", false, true)
 	if err == nil || !strings.Contains(err.Error(), "open here") {
 		t.Fatalf("err = %v", err)
 	}
@@ -196,7 +247,7 @@ func TestAWorktreeAddedOrRemovedInTheAppUpdatesTheBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForWorktree(t, a, tab.Path, "feature", true)
-	if err := a.RemoveWorktree(tab.Path, dir, false); err != nil {
+	if _, err := a.RemoveWorktree(tab.Path, dir, false); err != nil {
 		t.Fatal(err)
 	}
 	waitForWorktree(t, a, tab.Path, "feature", false)
@@ -215,6 +266,48 @@ func TestAWorktreeChangedOutsideTheAppUpdatesTheBranch(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "wt")
 	fx.Git("worktree", "add", dir, "feature")
 	waitForWorktree(t, a, tab.Path, "feature", true)
+}
+
+// waitForBranch waits for the graph to list a branch made outside the app, which only the file
+// watcher can report.
+func waitForBranch(t *testing.T, a *App, path, name string) {
+	t.Helper()
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+		if localRef(t, a, path, name) != nil {
+			return
+		}
+	}
+	t.Fatalf("%s was never noticed", name)
+}
+
+func TestClosingAWorktreesTabKeepsTheMainTabWatching(t *testing.T) {
+	a, fx, path, dir := worktreeFixture(t)
+	other, err := a.OpenRepo(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loadedPage(t, a, other.Path)
+	if err := a.CloseRepo(other.Path); err != nil {
+		t.Fatal(err)
+	}
+	fx.Git("branch", "made-outside")
+	waitForBranch(t, a, path, "made-outside")
+}
+
+func TestClosingTheMainTabKeepsAWorktreesTabWatching(t *testing.T) {
+	a, fx, path, dir := worktreeFixture(t)
+	other, err := a.OpenRepo(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Loaded first, so only the watcher can report what comes next.
+	loadedPage(t, a, other.Path)
+	if err := a.CloseRepo(path); err != nil {
+		t.Fatal(err)
+	}
+	// A worktree's tab watches its own git folder, so switching branches is what it can see.
+	fx.Git("-C", dir, "checkout", "-q", "-b", "made-outside")
+	waitForBranch(t, a, other.Path, "made-outside")
 }
 
 func waitForWorktree(t *testing.T, a *App, path, name string, want bool) {
