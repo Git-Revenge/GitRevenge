@@ -53,7 +53,7 @@ export function ConflictFile(arg1:string,arg2:string):Promise<git.ConflictFile>;
 
 export function DeletableBranches(arg1:string,arg2:Array<string>):Promise<Array<string>>;
 
-export function DeleteBranchAndWorktree(arg1:string,arg2:string,arg3:boolean,arg4:boolean):Promise<void>;
+export function DeleteBranchAndWorktree(arg1:string,arg2:string,arg3:boolean,arg4:boolean):Promise<string>;
 
 export function DeleteMergedBranches(arg1:string,arg2:Array<string>):Promise<Array<string>>;
 
@@ -181,7 +181,7 @@ export function RemoveGitConfigSection(arg1:string,arg2:string):Promise<app.Conf
 
 export function RemoveRecentRepo(arg1:string):Promise<void>;
 
-export function RemoveWorktree(arg1:string,arg2:string,arg3:boolean):Promise<void>;
+export function RemoveWorktree(arg1:string,arg2:string,arg3:boolean):Promise<string>;
 
 export function RenameGitConfigKey(arg1:string,arg2:string,arg3:string):Promise<app.ConfigDoc>;
 

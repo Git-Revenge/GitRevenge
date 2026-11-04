@@ -92,12 +92,13 @@ class Session {
     }
   }
 
-  /** Closes the tab on a worktree whose folder has been removed, if there is one. Git and the
-   * app can spell a path differently, so they're compared loosely. */
-  async closeRemoved(dir: string) {
+  /** Closes the tab on a worktree that's been removed, if there is one, and says if its folder
+   * had to stay. Git and the app can spell a path differently, so they're compared loosely. */
+  async closeRemoved(dir: string, leftover = '') {
     const key = (p: string) => p.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase()
     const tab = this.tabs.find((t) => key(t.path) === key(dir))
     if (tab) await this.close(tab.path)
+    if (leftover) this.error = `The worktree is gone, but its folder couldn't be deleted because something is using it: ${leftover}`
   }
 
   async select(path: string) {

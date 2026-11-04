@@ -178,7 +178,7 @@ func TestWorktreeBindings(t *testing.T) {
 	if err != nil || len(list) != 3 || list[1].Branch != "existing" || list[2].Branch != "brand-new" {
 		t.Fatalf("worktrees = %+v, %v", list, err)
 	}
-	if err := a.RemoveWorktree(tab.Path, list[2].Path, false); err != nil {
+	if _, err := a.RemoveWorktree(tab.Path, list[2].Path, false); err != nil {
 		t.Fatal(err)
 	}
 }

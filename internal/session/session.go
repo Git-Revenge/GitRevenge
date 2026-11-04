@@ -320,8 +320,18 @@ func (m *Manager) Close(path string) error {
 	if i < 0 {
 		return nil
 	}
-	m.repos[i].close()
+	closed := m.repos[i]
+	closed.close()
 	m.repos = slices.Delete(m.repos, i, i+1)
+	// The file watching library keeps one tree of watches for the whole process. Stopping a watch
+	// inside another one, as a linked worktree's git folder is inside the main repository's, also
+	// silences the outer one. Starting them again brings them back.
+	for _, r := range m.repos {
+		if r.watcher != nil && watchesOverlap(closed, r) {
+			r.watcher.Close()
+			r.watcher = m.watchLocked(r)
+		}
+	}
 	return m.settings.Update(func(s *settings.Settings) {
 		s.OpenTabs = m.pathsLocked()
 		if fsutil.SamePath(s.ActiveTab, path) {
@@ -331,6 +341,23 @@ func (m *Manager) Close(path string) error {
 			}
 		}
 	})
+}
+
+// watchesOverlap reports whether one repository's watched folders are inside the other's, as
+// with a linked worktree or a submodule and the repository holding it.
+func watchesOverlap(a, b *Repo) bool {
+	inside := func(dir, base string) bool {
+		rel, err := filepath.Rel(base, dir)
+		return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+	}
+	for _, x := range []string{a.Path, a.GitDir} {
+		for _, y := range []string{b.Path, b.GitDir} {
+			if inside(x, y) || inside(y, x) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // SetActive records which tab is selected. An empty path means the start page.

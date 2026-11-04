@@ -98,8 +98,7 @@
       danger: true,
       run: async (v) => {
         try {
-          await RemoveWorktree(path, w.path, !!v.force)
-          await session.closeRemoved(w.path)
+          await session.closeRemoved(w.path, await RemoveWorktree(path, w.path, !!v.force))
           await load()
         } catch (e) {
           return errorText(e)
