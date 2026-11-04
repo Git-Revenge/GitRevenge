@@ -45,6 +45,8 @@ type Ref struct {
 	// Hidden marks a branch the repository's hide patterns match (set by the session, not
 	// by git).
 	Hidden bool `json:"hidden,omitempty"`
+	// Focused marks a branch the graph is focused on (set by the session).
+	Focused bool `json:"focused,omitempty"`
 	// BranchKind is the branch's kind from the repository's patterns ("trunk", "release",
 	// "environment", "docs", "bot", "feature"), or "" for an ordinary branch (set by the session).
 	BranchKind string `json:"branchKind,omitempty"`

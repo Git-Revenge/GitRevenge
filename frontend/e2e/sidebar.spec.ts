@@ -30,6 +30,12 @@ test('a branch known to be merged says so, once the check has answered', async (
   await expect(row.locator('.track')).not.toContainText('parent')
 })
 
+// #506
+test('marks the branch the graph is focused on', async ({ page }) => {
+  await open(page, 'sidebar', { responses: { Refs: [branch('main', { head: true }), branch('topic', { focused: true })] } })
+  await expect(page.locator('.row.ref .focused')).toHaveCount(1)
+})
+
 // #462
 // #505
 test('marks a branch checked out in another worktree', async ({ page }) => {

@@ -1447,6 +1447,7 @@ export namespace git {
 	    gone: boolean;
 	    worktree?: string;
 	    hidden?: boolean;
+	    focused?: boolean;
 	    branchKind?: string;
 	    stackParent?: string;
 	    stackDepth?: number;
@@ -1472,6 +1473,7 @@ export namespace git {
 	        this.gone = source["gone"];
 	        this.worktree = source["worktree"];
 	        this.hidden = source["hidden"];
+	        this.focused = source["focused"];
 	        this.branchKind = source["branchKind"];
 	        this.stackParent = source["stackParent"];
 	        this.stackDepth = source["stackDepth"];
@@ -1829,6 +1831,25 @@ export namespace graph {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.rows = source["rows"];
 	        this.total = source["total"];
+	    }
+	}
+
+}
+
+export namespace session {
+	
+	export class Focus {
+	    branch: string;
+	    stack: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Focus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.branch = source["branch"];
+	        this.stack = source["stack"];
 	    }
 	}
 

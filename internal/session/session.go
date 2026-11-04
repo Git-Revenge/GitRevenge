@@ -133,6 +133,13 @@ func (r *Repo) SetShowHidden(show bool) { r.graph.SetShowHidden(show) }
 // ShowingHidden reports whether hidden branches are being shown.
 func (r *Repo) ShowingHidden() bool { return r.graph.ShowingHidden() }
 
+// SetFocus narrows the graph to one branch or stack, or back to everything with the zero
+// Focus, for this session only, and reloads it.
+func (r *Repo) SetFocus(focus Focus) { r.graph.SetFocus(focus) }
+
+// Focus returns what the graph is focused on.
+func (r *Repo) Focus() Focus { return r.graph.Focus() }
+
 // Rules returns the branch rules (kinds and hide patterns) in a repository's settings.
 func Rules(rs settings.RepoSettings) branchkind.Rules {
 	overrides := map[branchkind.Kind][]string{}

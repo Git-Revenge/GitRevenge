@@ -3,6 +3,7 @@
 import {app} from '../models';
 import {git} from '../models';
 import {gitconfig} from '../models';
+import {session} from '../models';
 import {settings} from '../models';
 import {graph} from '../models';
 
@@ -89,6 +90,8 @@ export function GitConfigKeys():Promise<Array<string>>;
 export function GitConfigScopes(arg1:string):Promise<app.ConfigScopes>;
 
 export function GraphDensity():Promise<string>;
+
+export function GraphFocus(arg1:string):Promise<session.Focus>;
 
 export function GraphRows(arg1:string,arg2:number,arg3:number):Promise<app.GraphPage>;
 
@@ -221,6 +224,8 @@ export function SetGitConfigTab(arg1:string):Promise<void>;
 export function SetGitConfigText(arg1:string,arg2:string):Promise<app.ConfigDoc>;
 
 export function SetGraphDensity(arg1:string):Promise<void>;
+
+export function SetGraphFocus(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function SetInsightsTab(arg1:string):Promise<void>;
 

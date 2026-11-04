@@ -316,8 +316,9 @@
   onMount(() => {
     void load()
     // Refs are re-read with every graph reload.
-    return EventsOn('graph:progress', (p: { path: string; done: boolean }) => {
-      if (p.path === path && p.done) void load()
+    // A reload of a large history pauses instead of finishing, and reset marks its swap.
+    return EventsOn('graph:progress', (p: { path: string; done: boolean; reset?: boolean }) => {
+      if (p.path === path && (p.done || p.reset)) void load()
     })
   })
 </script>

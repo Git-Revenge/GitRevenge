@@ -68,6 +68,14 @@ A [kind](branch-care.md#branch-kinds)'s icon marks a folder, or a branch on its 
 
 When a repository has branches of any [kind](branch-care.md#branch-kinds), the graph's header has a **Kinds** dropdown with a checkbox for each one. Clear a box to hide every branch of that kind, and the button says how many kinds are hidden. Docs lines are drawn faded either way. Other branches can be hidden too; see [hiding branches](branch-care.md#hiding-branches).
 
+## Focusing on a branch
+
+Focus is the opposite of [hiding a branch](branch-care.md#hiding-branches): it shows only that branch. Right-click a branch, in the sidebar or the graph, and choose **Focus on …**. A branch in a [stack](branch-care.md#stacked-branches) also offers **Focus on the stack of …**, and a stack's own menu offers **Focus on this stack**, which shows every branch in it.
+
+The graph then shows the branch, its remote-tracking copies, and the history they're built on. Other branches' labels stay on commits that are still showing, so you can see where the branch left them. Stashes and the checked-out branch's other commits leave the view, and the commit panel and working tree still work as usual.
+
+Only one focus exists at a time, and choosing another replaces it. The graph's header says what's focused. To go back to everything, click the **×** there, or right-click the branch and choose **Stop focusing**. A focus lasts until you close the tab, or until its branch is deleted.
+
 ## Two layouts
 
 The default **timeline** layout gives each commit two lines: the subject, and the author and date. A commit's circle shows the author's initials, and shrinks to a dot when the same author's previous commit on that line is just above it. **Compact rows** fits one commit per line, so you see more history at once. Switch between them with the button in the graph's header, or in [Settings](settings.md).

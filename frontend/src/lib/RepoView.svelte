@@ -148,7 +148,7 @@
     const row = await session.run(() => CommitRow(path, commit))
     if (row === undefined) return
     if (row < 0) {
-      session.error = 'That commit isn’t in the graph: it isn’t on any branch. Start a branch there to bring it back.'
+      session.error = graph.focused() ? 'That commit isn’t part of what the graph is focused on. Stop focusing to see it.' : 'That commit isn’t in the graph: it isn’t on any branch. Start a branch there to bring it back.'
       return
     }
     diff = null
@@ -159,7 +159,7 @@
     const row = await session.run(() => CommitRow(path, ref.commit))
     if (row === undefined) return
     if (row < 0) {
-      session.error = `${ref.short} points at a commit that isn't in the graph yet.`
+      session.error = graph.focused() ? `${ref.short} isn't part of what the graph is focused on. Stop focusing to see it.` : `${ref.short} points at a commit that isn't in the graph yet.`
       return
     }
     graph.reveal(row)

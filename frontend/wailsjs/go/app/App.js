@@ -170,6 +170,10 @@ export function GraphDensity() {
   return window['go']['app']['App']['GraphDensity']();
 }
 
+export function GraphFocus(arg1) {
+  return window['go']['app']['App']['GraphFocus'](arg1);
+}
+
 export function GraphRows(arg1, arg2, arg3) {
   return window['go']['app']['App']['GraphRows'](arg1, arg2, arg3);
 }
@@ -432,6 +436,10 @@ export function SetGitConfigText(arg1, arg2) {
 
 export function SetGraphDensity(arg1) {
   return window['go']['app']['App']['SetGraphDensity'](arg1);
+}
+
+export function SetGraphFocus(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SetGraphFocus'](arg1, arg2, arg3);
 }
 
 export function SetInsightsTab(arg1) {

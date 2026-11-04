@@ -133,6 +133,38 @@ test.describe('commit graph', () => {
     return (await events(page, 'context-row')).at(-1)?.[0]
   }
 
+  // #506
+  test.describe('focused on a branch', () => {
+    const scenario = (focus: unknown) => ({ graphRows: 3, responses: { CommitSignatures: [], Refs: [], GraphFocus: focus } })
+
+    test('says so, and stops when asked', async ({ page }) => {
+      await open(page, 'graph', scenario({ branch: 'topic', stack: false }))
+      await expect(page.getByText('Focused on topic')).toBeVisible()
+      await page.getByRole('button', { name: 'Stop focusing' }).click()
+      await expect.poll(() => calls(page, 'SetGraphFocus')).toEqual([['/repo', '', false]])
+    })
+
+    test('names a stack', async ({ page }) => {
+      await open(page, 'graph', scenario({ branch: 'topic', stack: true }))
+      await expect(page.getByText('Focused on the stack of topic')).toBeVisible()
+    })
+
+    test('says nothing without a focus', async ({ page }) => {
+      for (const focus of [null, { branch: '', stack: false }]) {
+        await open(page, 'graph', scenario(focus))
+        await expect(page.getByText('3 commits')).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Stop focusing' })).toHaveCount(0)
+      }
+    })
+
+    test('keeps the header on one line with a long name in a narrow column', async ({ page }) => {
+      await page.setViewportSize({ width: 640, height: 600 })
+      await open(page, 'graph', scenario({ branch: 'feature/a-very-long-branch-name-that-goes-on-and-on-and-on-and-on-and-on', stack: false }))
+      await expect(page.getByRole('button', { name: 'Stop focusing' })).toBeVisible()
+      expect(await page.locator('.status').evaluate((e) => e.scrollWidth - e.clientWidth)).toBe(0)
+    })
+  })
+
   test.describe('the Kinds filter', () => {
     const refs = [branch('main', { branchKind: 'trunk' }), branch('docs/site', { branchKind: 'docs' }), branch('dependabot/x', { branchKind: 'bot' }), branch('plain')]
     const shown = { graphRows: 3, responses: { CommitSignatures: [], Refs: refs, RepoPreferences: { hideKinds: [] } } }
