@@ -39,6 +39,9 @@ type Ref struct {
 	Behind   int    `json:"behind"`
 	// Gone means the upstream is configured but no longer exists.
 	Gone bool `json:"gone"`
+	// Worktree is the folder of the other worktree this branch is checked out in, for local
+	// branches. It's empty for the branch checked out here.
+	Worktree string `json:"worktree,omitempty"`
 	// Hidden marks a branch the repository's hide patterns match (set by the session, not
 	// by git).
 	Hidden bool `json:"hidden,omitempty"`
@@ -64,7 +67,7 @@ type Ref struct {
 // refFormat deliberately avoids %(refname:short): git makes it unambiguous by comparing
 // every ref against all others, which is quadratic (about 1.9s for 2,000 branches).
 // Stripping the namespace prefix gives the same display name at no cost.
-const refFormat = "%(refname)%00%(objectname)%00%(*objectname)%00%(HEAD)%00%(creatordate:unix)"
+const refFormat = "%(refname)%00%(objectname)%00%(*objectname)%00%(HEAD)%00%(creatordate:unix)%00%(worktreepath)"
 
 // upstreamFormat is separate because it's nearly all of the cost. Git spends about 125µs per ref
 // per upstream field, even on a ref with no upstream: 5s of the 5.2s for 20,000 branches. So
@@ -86,7 +89,7 @@ func (r *Repo) Refs(ctx context.Context) ([]Ref, error) {
 		sc.Buffer(make([]byte, 64*1024), 1024*1024)
 		for sc.Scan() {
 			f := bytes.Split(sc.Bytes(), []byte{0})
-			if len(f) != 5 {
+			if len(f) != 6 {
 				continue
 			}
 			ref := Ref{
@@ -102,6 +105,9 @@ func (r *Repo) Refs(ctx context.Context) ([]Ref, error) {
 			case strings.HasPrefix(ref.Name, "refs/heads/"):
 				ref.Kind = LocalBranch
 				ref.Short, ok = strings.CutPrefix(ref.Name, "refs/heads/")
+				if !ref.Head {
+					ref.Worktree = string(f[5])
+				}
 			case strings.HasPrefix(ref.Name, "refs/remotes/"):
 				if strings.HasSuffix(ref.Name, "/HEAD") {
 					continue

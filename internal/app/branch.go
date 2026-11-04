@@ -68,7 +68,7 @@ func branchErr(err error) error {
 	case errors.Is(err, git.ErrNotMerged):
 		return userError("This branch has commits that aren't merged anywhere. Delete it anyway to discard them.")
 	case errors.Is(err, git.ErrCurrentBranch):
-		return userError("You can't delete the branch that is checked out. Switch to another branch first.")
+		return userError("This branch is checked out, here or in another worktree. Switch to another branch there first.")
 	}
 	var gerr *git.Error
 	if errors.As(err, &gerr) && gerr.Stderr != "" {

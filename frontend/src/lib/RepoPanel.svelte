@@ -99,6 +99,7 @@
       run: async (v) => {
         try {
           await RemoveWorktree(path, w.path, !!v.force)
+          await session.closeRemoved(w.path)
           await load()
         } catch (e) {
           return errorText(e)

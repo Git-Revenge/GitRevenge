@@ -34,6 +34,8 @@ export interface Ref {
   ahead: number
   behind: number
   gone: boolean
+  /** The folder of the other worktree this branch is checked out in. */
+  worktree?: string
   /** A branch the repository's hide patterns match. */
   hidden?: boolean
   /** The branch's kind (ADR 0009), or empty for an ordinary branch. */

@@ -436,6 +436,7 @@ export function stackPlace(r: Ref): string {
 export function refTooltip(r: Ref, mergedInto?: string): string {
   const lines = [r.kind === 'stash' ? r.subject || r.short : r.short]
   if (r.head) lines.push('Checked out')
+  if (r.worktree) lines.push(`Checked out in the worktree at ${r.worktree}`)
   if (mergedInto) lines.push(`Its work is already on ${mergedInto}, so it's safe to delete`)
   else if (r.stackParentMerged) lines.push(`${r.stackParent} was merged. Right-click, Restack, to move this branch onto the Trunk.`)
   if (stackPlace(r)) lines.push(stackPlace(r))

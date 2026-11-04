@@ -2,6 +2,15 @@ import { expect, test, type Locator, type Page } from '@playwright/test'
 import { branch, calls, events, open, remote, tag, textUnderFloor } from './support'
 
 test.describe('commit menu', () => {
+  // #505
+  test('opens the worktree of a branch checked out in one', async ({ page }) => {
+    await open(page, 'commitMenu', { responses: { Refs: [branch('topic', { worktree: '/wt/topic' })] } })
+    await page.getByRole('menuitem', { name: 'topic', exact: true }).click()
+    await expect(page.getByRole('menuitem', { name: 'Checkout topic' })).toHaveCount(0)
+    await page.getByRole('menuitem', { name: 'Open the worktree of topic' }).click()
+    await expect.poll(() => calls(page, 'OpenRepo')).toEqual([['/wt/topic']])
+  })
+
   // #323: repeated labels threw each_key_duplicate, and no menu appeared.
   test('opens on a commit with two or more branches', async ({ page }) => {
     await open(page, 'commitMenu', { responses: { Refs: [branch('main', { head: true }), remote('origin/main')] } })

@@ -133,19 +133,23 @@ func TestDebounceCoalescesBursts(t *testing.T) {
 
 func TestClassifyGitPath(t *testing.T) {
 	tests := map[string]Kind{
-		"HEAD":                  Head,
-		"refs/heads/main":       Refs,
-		"refs/heads/main.lock":  0,
-		"packed-refs":           Refs,
-		"index":                 Index,
-		"index.lock":            0,
-		"MERGE_HEAD":            State,
-		"rebase-merge/done":     State,
-		"config":                Config,
-		"objects/ab/cdef":       0,
-		"logs/HEAD":             0,
-		"FETCH_HEAD":            Refs,
-		"refs/remotes/origin/x": Refs,
+		"HEAD":                   Head,
+		"refs/heads/main":        Refs,
+		"refs/heads/main.lock":   0,
+		"packed-refs":            Refs,
+		"index":                  Index,
+		"index.lock":             0,
+		"MERGE_HEAD":             State,
+		"rebase-merge/done":      State,
+		"config":                 Config,
+		"objects/ab/cdef":        0,
+		"logs/HEAD":              0,
+		"FETCH_HEAD":             Refs,
+		"refs/remotes/origin/x":  Refs,
+		"worktrees/wt/HEAD":      Refs,
+		"worktrees/wt/index":     0,
+		"worktrees/wt/ORIG_HEAD": 0,
+		"worktrees/wt/logs/HEAD": 0,
 	}
 	for path, want := range tests {
 		if got := classifyGitPath(path); got != want {

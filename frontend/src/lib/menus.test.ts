@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Ref, Row } from './graph/rowCache'
 import { session } from './session.svelte'
-import { stackItems, commitItems, commitMenuItems, deleteBranchDialog, dropItems, groups, refItems, upstreamDialog, type MenuContext } from './menus'
+import { stackItems, commitItems, commitMenuItems, deleteBranchDialog, deleteWorktreeBranchDialog, dropItems, groups, refItems, upstreamDialog, type MenuContext } from './menus'
 
 // Its messages listen for events from the app, which isn't here.
 vi.mock('./toasts.svelte', () => ({ toasts: { show: vi.fn() } }))
@@ -113,6 +113,55 @@ describe('refItems', () => {
   it('keeps checkout and delete on the checked-out branch, disabled', () => {
     const items = refItems(ref('main', 'local', true), ctx('main'))
     expect(items.filter((i) => i.disabled).map((i) => i.label)).toEqual(['Checkout main', 'Delete main…'])
+  })
+})
+
+// #505
+describe('a branch in another worktree', () => {
+  const topic = { ...ref('topic', 'local'), worktree: '/wt/topic' }
+  const ctx = { path: '/r', current: () => 'main', openDialog: () => {}, openRebase: () => {}, openReflog: () => {} } as unknown as MenuContext
+  const keys = (d: ReturnType<typeof deleteWorktreeBranchDialog>) => (d.fields ?? []).map((f) => f.key)
+  const linked = { path: '/wt/topic', main: false, prunable: false }
+
+  it('opens the worktree instead of checking out, and offers no pull', () => {
+    const labels = refItems({ ...topic, upstream: 'origin/topic' }, ctx).map((i) => i.label)
+    expect(labels).toContain('Open the worktree of topic')
+    expect(labels).not.toContain('Checkout topic')
+    expect(labels).not.toContain('Pull topic')
+    expect(labels).toContain('Delete topic and its worktree…')
+  })
+
+  it('leaves a branch that is not in a worktree alone', () => {
+    const labels = refItems(ref('topic', 'local'), ctx).map((i) => i.label)
+    expect(labels).toContain('Checkout topic')
+    expect(labels).toContain('Delete topic…')
+  })
+
+  it('says which folder goes, and asks about changes and unmerged commits', () => {
+    const d = deleteWorktreeBranchDialog('/r', topic, linked, { target: 'main', how: '', unmerged: 2 })
+    expect(d.message).toContain('/wt/topic')
+    expect(d.message).toContain('2 commits are not on main')
+    expect(keys(d)).toEqual(['changes', 'commits'])
+    expect(d.danger).toBe(true)
+  })
+
+  it('needs no tick for commits once they are merged', () => {
+    const d = deleteWorktreeBranchDialog('/r', topic, linked, { target: 'main', how: 'squashed', unmerged: 0 })
+    expect(keys(d)).toEqual(['changes'])
+    expect(d.message).toContain('already on main')
+  })
+
+  it('has nothing to lose in a folder that is already gone', () => {
+    const d = deleteWorktreeBranchDialog('/r', topic, { ...linked, prunable: true }, { target: 'main', how: 'merged', unmerged: 0 })
+    expect(keys(d)).toEqual([])
+    expect(d.message).toContain('already gone')
+  })
+
+  it('offers to open the main worktree, which it can not remove', () => {
+    const d = deleteWorktreeBranchDialog('/r', topic, { path: '/src', main: true, prunable: false }, null)
+    expect(d.submit).toBe('Open the main worktree')
+    expect(d.danger).toBeFalsy()
+    expect(d.fields).toBeUndefined()
   })
 })
 

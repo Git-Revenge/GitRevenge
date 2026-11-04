@@ -92,6 +92,14 @@ class Session {
     }
   }
 
+  /** Closes the tab on a worktree whose folder has been removed, if there is one. Git and the
+   * app can spell a path differently, so they're compared loosely. */
+  async closeRemoved(dir: string) {
+    const key = (p: string) => p.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase()
+    const tab = this.tabs.find((t) => key(t.path) === key(dir))
+    if (tab) await this.close(tab.path)
+  }
+
   async select(path: string) {
     this.active = path
     await this.run(() => SetActiveRepo(path))

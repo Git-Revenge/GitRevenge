@@ -1445,6 +1445,7 @@ export namespace git {
 	    ahead: number;
 	    behind: number;
 	    gone: boolean;
+	    worktree?: string;
 	    hidden?: boolean;
 	    branchKind?: string;
 	    stackParent?: string;
@@ -1469,6 +1470,7 @@ export namespace git {
 	        this.ahead = source["ahead"];
 	        this.behind = source["behind"];
 	        this.gone = source["gone"];
+	        this.worktree = source["worktree"];
 	        this.hidden = source["hidden"];
 	        this.branchKind = source["branchKind"];
 	        this.stackParent = source["stackParent"];

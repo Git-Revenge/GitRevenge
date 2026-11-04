@@ -1,4 +1,4 @@
-import { DeleteStack, PushStack, RebaseStack, RestoreStack, StackDeletePlan, StackPushPlan, Unstack, UpdateStack, BranchAction, BranchMergeState, HideBranch, Integrate, MarkBranchKind, PullBranch, PushRef, Refs, Restack, SetStackParent, StashAction } from '../../wailsjs/go/app/App.js'
+import { DeleteBranchAndWorktree, DeleteStack, PushStack, RebaseStack, RestoreStack, StackDeletePlan, StackPushPlan, Unstack, UpdateStack, BranchAction, BranchMergeState, HideBranch, Integrate, MarkBranchKind, PullBranch, PushRef, Refs, Restack, SetStackParent, StashAction, Worktrees } from '../../wailsjs/go/app/App.js'
 import { CONFIRM_DELETE, CONFIRM_FORCE_PUSH, KINDS, kindWarning } from './branchKinds'
 import type { MenuItem } from './ContextMenu.svelte'
 import type { DialogSpec } from './Dialog.svelte'
@@ -88,6 +88,45 @@ export function deleteBranchDialog(path: string, ref: Ref, merge: BranchMerge | 
     submit: 'Delete',
     danger: true,
     run: (v) => attempt(() => branch(path, 'delete', ref.short, v.force ? 'true' : '')),
+  }
+}
+
+/** The fields of git.Worktree that deleting a branch needs. */
+export interface BranchWorktree {
+  path: string
+  main: boolean
+  prunable: boolean
+}
+
+/** Confirms deleting a branch that's checked out in another worktree. A linked worktree goes
+ * with it; the main one can't be removed, so that dialog offers to open it instead. */
+export function deleteWorktreeBranchDialog(path: string, ref: Ref, tree: BranchWorktree, merge: BranchMerge | null): DialogSpec {
+  if (tree.main) {
+    return {
+      title: `${ref.short} is checked out in the main worktree`,
+      message: `Git won't delete a branch that's checked out, and the main worktree at ${tree.path} can't be removed. Open it and switch to another branch there first.`,
+      submit: 'Open the main worktree',
+      run: () => attempt(() => session.open(tree.path)),
+    }
+  }
+  const warning = kindWarning(ref.short, ref.branchKind, CONFIRM_DELETE)
+  const where = tree.prunable ? `Its worktree's folder, ${tree.path}, is already gone, so only git's record of it goes.` : `It's checked out in the worktree at ${tree.path}, and that folder is deleted too.`
+  const landed = merge?.how ? (merge.how === 'squashed' ? `Its changes are already on ${merge.target}, from a squash or a rebase.` : `It's already merged into ${merge.target}.`) : ''
+  const losing = !merge?.how && merge?.target && merge.unmerged ? `${merge.unmerged === 1 ? '1 commit is' : `${merge.unmerged} commits are`} not on ${merge.target}.` : ''
+  return {
+    title: `Delete ${ref.short} and its worktree?`,
+    message: [warning, where, landed, losing].filter(Boolean).join(' '),
+    fields: [
+      ...(tree.prunable ? [] : [{ key: 'changes', label: 'Delete even if the worktree has uncommitted changes', type: 'checkbox' as const }]),
+      ...(merge?.how ? [] : [{ key: 'commits', label: 'Delete even if it has unmerged commits', type: 'checkbox' as const }]),
+    ],
+    submit: 'Delete both',
+    danger: true,
+    run: (v) =>
+      attempt(async () => {
+        await DeleteBranchAndWorktree(path, ref.short, !!v.changes, !!merge?.how || !!v.commits)
+        await session.closeRemoved(tree.path)
+      }),
   }
 }
 
@@ -197,10 +236,14 @@ export function refItems(ref: Ref, ctx: MenuContext): MenuItem[] {
       return groups(
         [
           // The checked-out branch keeps these items, disabled, so the menu's shape doesn't shift.
-          { label: `Checkout ${ref.short}`, icon: 'branch', disabled: ref.head, run: () => session.run(() => branch(path, 'checkout', ref.short)) },
+          // Git won't check out a branch that's in another worktree, so that one goes there instead.
+          ref.worktree
+            ? { label: `Open the worktree of ${ref.short}`, icon: 'worktree', run: () => session.open(ref.worktree!) }
+            : { label: `Checkout ${ref.short}`, icon: 'branch', disabled: ref.head, run: () => session.run(() => branch(path, 'checkout', ref.short)) },
           ...(ref.head ? [] : integrateItems(ctx, ref.short, ref.short)),
           // Only moves the branch, so it's safe beside uncommitted changes on the current one.
-          ...(ref.head || !ref.upstream || ref.gone
+          // Git won't move a branch another worktree has checked out.
+          ...(ref.head || ref.worktree || !ref.upstream || ref.gone
             ? []
             : [{ label: `Pull ${ref.short}`, icon: 'pull' as const, run: () => session.run(() => PullBranch(path, ref.short)) }]),
           ...(ref.head
@@ -246,13 +289,15 @@ export function refItems(ref: Ref, ctx: MenuContext): MenuItem[] {
         [markItem(ctx, ref, ref.short), stackItem(ctx, ref), hideItem(ctx, ref, ref.short)],
         [
           {
-            label: `Delete ${ref.short}…`,
+            label: ref.worktree ? `Delete ${ref.short} and its worktree…` : `Delete ${ref.short}…`,
             icon: 'trash',
             disabled: ref.head,
             run: async () => {
               // Not knowing just means asking, as if the branch weren't merged.
               const merge = await BranchMergeState(path, ref.short).catch(() => null)
-              openDialog(deleteBranchDialog(path, ref, merge))
+              // Asked again, since the worktree may have changed since the refs were read.
+              const tree = ref.worktree ? (await Worktrees(path).catch(() => [])).find((w) => w.branch === ref.short) : undefined
+              openDialog(tree ? deleteWorktreeBranchDialog(path, ref, tree, merge) : deleteBranchDialog(path, ref, merge))
             },
           },
         ],
@@ -617,5 +662,7 @@ export function newBranchDialog(ctx: MenuContext): DialogSpec {
 /** Double-click on a ref in the sidebar checks it out. */
 export function checkoutRef(path: string, ref: Ref) {
   if (ref.kind === 'stash' || ref.head) return
+  // Git won't check out a branch that's in another worktree, so this goes there instead.
+  if (ref.worktree) return void session.open(ref.worktree)
   void session.run(() => branch(path, 'checkout', ref.kind === 'tag' ? ref.name : ref.short))
 }
