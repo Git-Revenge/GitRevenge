@@ -34,6 +34,8 @@ export interface Ref {
   ahead: number
   behind: number
   gone: boolean
+  /** A branch the graph is focused on. */
+  focused?: boolean
   /** The folder of the other worktree this branch is checked out in. */
   worktree?: string
   /** A branch the repository's hide patterns match. */

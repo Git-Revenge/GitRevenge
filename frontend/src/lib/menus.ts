@@ -1,4 +1,4 @@
-import { DeleteBranchAndWorktree, DeleteStack, PushStack, RebaseStack, RestoreStack, StackDeletePlan, StackPushPlan, Unstack, UpdateStack, BranchAction, BranchMergeState, HideBranch, Integrate, MarkBranchKind, PullBranch, PushRef, Refs, Restack, SetStackParent, StashAction, Worktrees } from '../../wailsjs/go/app/App.js'
+import { DeleteBranchAndWorktree, DeleteStack, PushStack, RebaseStack, RestoreStack, StackDeletePlan, StackPushPlan, Unstack, UpdateStack, BranchAction, BranchMergeState, HideBranch, Integrate, MarkBranchKind, PullBranch, PushRef, Refs, Restack, SetGraphFocus, SetStackParent, StashAction, Worktrees } from '../../wailsjs/go/app/App.js'
 import { CONFIRM_DELETE, CONFIRM_FORCE_PUSH, KINDS, kindWarning } from './branchKinds'
 import type { MenuItem } from './ContextMenu.svelte'
 import type { DialogSpec } from './Dialog.svelte'
@@ -148,6 +148,17 @@ function hideItem(ctx: MenuContext, ref: Ref, name: string): MenuItem {
   }
 }
 
+/** Focus the graph on a branch (named without its remote), or on the stack it's in. Focus is
+ * one at a time, so a focused branch only offers to end it. */
+function focusItems(ctx: MenuContext, ref: Ref, name: string): MenuItem[] {
+  const focus = (branch: string, stack: boolean) => () => session.run(() => SetGraphFocus(ctx.path, branch, stack))
+  if (ref.focused) return [{ label: 'Stop focusing', icon: 'focus', run: focus('', false) }]
+  return [
+    { label: `Focus on ${name}`, icon: 'focus', run: focus(name, false) },
+    ...(ref.stackSize && ref.kind === 'local' ? [{ label: `Focus on the stack of ${name}`, icon: 'focus' as const, run: focus(name, true) }] : []),
+  ]
+}
+
 /** Mark a branch (named without its remote) as one of the kinds, or ordinary. */
 function markItem(ctx: MenuContext, ref: Ref, name: string): MenuItem {
   return {
@@ -286,7 +297,8 @@ export function refItems(ref: Ref, ctx: MenuContext): MenuItem[] {
         ref.stackParentMerged && !session.merged[path]?.[ref.short]
           ? [{ label: `Restack ${ref.short} (${ref.stackParent} was merged)`, icon: 'rebase', run: () => session.run(() => Restack(ctx.path, ref.short)) }]
           : [],
-        [markItem(ctx, ref, ref.short), stackItem(ctx, ref), hideItem(ctx, ref, ref.short)],
+        [...focusItems(ctx, ref, ref.short), hideItem(ctx, ref, ref.short)],
+        [markItem(ctx, ref, ref.short), stackItem(ctx, ref)],
         [
           {
             label: ref.worktree ? `Delete ${ref.short} and its worktree…` : `Delete ${ref.short}…`,
@@ -307,7 +319,8 @@ export function refItems(ref: Ref, ctx: MenuContext): MenuItem[] {
         const [remote, ...rest] = ref.short.split('/')
         return groups(
           [{ label: `Checkout ${ref.short}`, icon: 'branch', run: () => session.run(() => branch(path, 'checkout', ref.short)) }, ...integrateItems(ctx, ref.short, ref.short)],
-          [markItem(ctx, ref, rest.join('/')), hideItem(ctx, ref, rest.join('/'))],
+          [...focusItems(ctx, ref, rest.join('/')), hideItem(ctx, ref, rest.join('/'))],
+          [markItem(ctx, ref, rest.join('/'))],
           [
             {
               label: `Delete ${ref.short} from ${remote}`,
@@ -522,6 +535,11 @@ export function stackItems(members: Ref[], ctx: MenuContext): MenuItem[] {
       { label: 'Update stack', icon: 'rebase', run: () => (one ? updateStack(path, bottom, names) : tellForks()) },
       { label: 'Rebase stack onto…', icon: 'rebase', run: () => (one ? rebaseStackDialog(ctx, names) : tellForks()) },
       { label: 'Push stack', icon: 'push', danger: true, run: () => pushStack(ctx, members) },
+    ],
+    [
+      members.every((r) => r.focused)
+        ? { label: 'Stop focusing', icon: 'focus', run: () => session.run(() => SetGraphFocus(path, '', false)) }
+        : { label: 'Focus on this stack', icon: 'focus', run: () => session.run(() => SetGraphFocus(path, bottom, true)) },
     ],
     [{ label: 'Unstack', icon: 'stack', run: () => unstack(path, bottom, names) }],
     [{ label: 'Delete stack…', icon: 'trash', run: () => deleteStack(ctx, bottom, names) }],

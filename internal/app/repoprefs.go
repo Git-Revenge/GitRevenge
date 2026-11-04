@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/git-revenge/gitrevenge/internal/branchkind"
+	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/session"
 	"github.com/git-revenge/gitrevenge/internal/settings"
 )
@@ -299,6 +300,41 @@ func (a *App) ShowingHidden(path string) (bool, error) {
 		return false, err
 	}
 	return r.ShowingHidden(), nil
+}
+
+// SetGraphFocus narrows the graph of the repository at path to one branch, or with stack to the
+// stack it's in, replacing any focus it had. An empty branch ends the focus. It lasts for this
+// session, or until the branch goes.
+func (a *App) SetGraphFocus(path, branch string, stack bool) error {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return err
+	}
+	if branch == "" {
+		r.SetFocus(session.Focus{})
+		return nil
+	}
+	refs := r.Refs().All
+	known := slices.ContainsFunc(refs, func(ref git.Ref) bool {
+		if ref.Kind == git.LocalBranch {
+			return ref.Short == branch
+		}
+		return ref.Kind == git.RemoteBranch && strings.HasSuffix(ref.Short, "/"+branch)
+	})
+	if !known {
+		return userError("There's no branch named " + branch + " to focus on.")
+	}
+	r.SetFocus(session.Focus{Branch: branch, Stack: stack})
+	return nil
+}
+
+// GraphFocus returns what the graph of the repository at path is focused on.
+func (a *App) GraphFocus(path string) (session.Focus, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return session.Focus{}, err
+	}
+	return r.Focus(), nil
 }
 
 // repoKey is the path a repository's settings are kept under: its work tree root, so a

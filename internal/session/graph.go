@@ -2,6 +2,8 @@ package session
 
 import (
 	"context"
+	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -50,11 +52,13 @@ type graphLoader struct {
 	mu sync.Mutex
 	// showHidden puts hidden branches back in the graph, for this session only.
 	showHidden bool
-	current    *graph.Graph
-	refs       *RefIndex
-	loading    bool
-	paused     bool
-	estimate   int
+	// focus narrows the graph to one branch or stack, for this session only.
+	focus    Focus
+	current  *graph.Graph
+	refs     *RefIndex
+	loading  bool
+	paused   bool
+	estimate int
 	// want is the furthest row the UI has asked for.
 	want int
 	// unbounded counts callers that need the reader to keep going (finding a commit,
@@ -93,10 +97,18 @@ func newRefIndex(refs []git.Ref) *RefIndex {
 	return idx
 }
 
+// Focus narrows the graph to one branch, or to the whole stack it's in: the opposite of hiding
+// a branch. As with hiding, the name has no remote, so its remote-tracking copies come too. The
+// zero Focus is no focus.
+type Focus struct {
+	Branch string `json:"branch"`
+	Stack  bool   `json:"stack"`
+}
+
 // annotate sets each branch's kind and whether the rules hide it. Unless they're being
 // shown, hidden branches stay in All (the sidebar counts them) but get no label in the
-// graph.
-func (idx *RefIndex) annotate(rules branchkind.Rules, remotes []string, show bool) {
+// graph. A focused branch (focused holds full ref names) always gets its label.
+func (idx *RefIndex) annotate(rules branchkind.Rules, remotes []string, show bool, focused map[string]bool) {
 	idx.ByCommit = make(map[string][]git.Ref, len(idx.All))
 	for i, r := range idx.All {
 		name := r.Short
@@ -108,7 +120,8 @@ func (idx *RefIndex) annotate(rules branchkind.Rules, remotes []string, show boo
 			idx.All[i].Hidden = rules.Hidden(name)
 			idx.All[i].BranchKind = string(rules.Kind(name))
 		}
-		if !idx.All[i].Hidden || show {
+		idx.All[i].Focused = focused[r.Name]
+		if !idx.All[i].Hidden || show || idx.All[i].Focused {
 			idx.ByCommit[r.Commit] = append(idx.ByCommit[r.Commit], idx.All[i])
 		}
 	}
@@ -130,6 +143,60 @@ func (l *graphLoader) ShowingHidden() bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.showHidden
+}
+
+// SetFocus narrows the graph to focus, replacing any focus it had, and reloads it.
+func (l *graphLoader) SetFocus(focus Focus) {
+	l.mu.Lock()
+	changed := l.focus != focus
+	l.focus = focus
+	l.mu.Unlock()
+	if changed {
+		l.reload()
+	}
+}
+
+// Focus returns what the graph is focused on.
+func (l *graphLoader) Focus() Focus {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.focus
+}
+
+// focusedRefs returns the full names of the refs focus covers, which is none once its branch
+// has gone.
+func (l *graphLoader) focusedRefs(ctx context.Context, focus Focus, rules branchkind.Rules, remotes []string) (map[string]bool, error) {
+	names := []string{focus.Branch}
+	if focus.Stack && l.stackOverrides != nil {
+		list, err := l.repo.Refs(ctx)
+		if err != nil {
+			return nil, err
+		}
+		names = StackMembers(focus.Branch, Stacks(ctx, l.repo, list, rules, l.stackOverrides()))
+	}
+	wanted := map[string]bool{}
+	for _, n := range names {
+		wanted["refs/heads/"+n] = true
+		for _, rm := range remotes {
+			wanted["refs/remotes/"+rm+"/"+n] = true
+		}
+	}
+	args := []string{"for-each-ref", "--format=%(refname)"}
+	for ref := range wanted {
+		args = append(args, ref)
+	}
+	out, err := l.repo.ReadString(ctx, args...)
+	if err != nil {
+		return nil, err
+	}
+	found := map[string]bool{}
+	// A pattern also matches what's under it, so refs/heads/a would bring in refs/heads/a/b.
+	for ref := range strings.Lines(out) {
+		if ref = strings.TrimSpace(ref); wanted[ref] {
+			found[ref] = true
+		}
+	}
+	return found, nil
 }
 
 // refResult is a load's refs, or the error reading them.
@@ -239,6 +306,7 @@ func (l *graphLoader) reload() {
 	}
 	l.loading = true
 	show := l.showHidden
+	focus := l.focus
 	l.mu.Unlock()
 	rules := branchkind.New(nil, nil)
 	if l.rules != nil {
@@ -253,6 +321,23 @@ func (l *graphLoader) reload() {
 			}
 		}
 
+		var focused map[string]bool
+		if focus != (Focus{}) {
+			var err error
+			focused, err = l.focusedRefs(ctx, focus, rules, remotes)
+			if ctx.Err() != nil {
+				return // superseded or closed; the newer load reports
+			}
+			if err == nil && len(focused) == 0 {
+				// Its branch has gone, so there's nothing left to focus on.
+				l.mu.Lock()
+				if l.focus == focus {
+					l.focus = Focus{}
+				}
+				l.mu.Unlock()
+			}
+		}
+
 		// Read refs alongside the log rather than before it: with thousands of refs they can
 		// take longer than the first screen of history.
 		refsCh := make(chan refResult, 1)
@@ -262,7 +347,7 @@ func (l *graphLoader) reload() {
 				annotateStacks(list, Stacks(ctx, l.repo, list, rules, l.stackOverrides()))
 			}
 			idx := newRefIndex(list)
-			idx.annotate(rules, remotes, show)
+			idx.annotate(rules, remotes, show, focused)
 			first := false
 			l.mu.Lock()
 			if l.refs == nil && ctx.Err() == nil {
@@ -297,7 +382,14 @@ func (l *graphLoader) reload() {
 		g.Pin(pins)
 		g.SetTipKinds(kinds)
 		opts := git.LogOptions{Extra: stashIDs}
-		if !show {
+		if len(focused) > 0 {
+			// Only what the focus reaches: not HEAD, tags or stashes.
+			opts = git.LogOptions{}
+			for ref := range focused {
+				opts.Revs = append(opts.Revs, ref)
+			}
+			slices.Sort(opts.Revs)
+		} else if !show {
 			opts.Exclude, opts.Remotes = rules.Hide(), remotes
 		}
 

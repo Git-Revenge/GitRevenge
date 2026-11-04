@@ -2,7 +2,7 @@
   import { KINDS, kindFilterRows, type KindFilterRow } from '../branchKinds'
   import { errorText } from '../errors'
   import { onMount } from 'svelte'
-  import { CommitRow, CommitSignatures, GraphRows, Refs, RepoPreferences, SearchGraph, SetKindVisible } from '../../../wailsjs/go/app/App.js'
+  import { CommitRow, CommitSignatures, GraphFocus, GraphRows, Refs, RepoPreferences, SearchGraph, SetGraphFocus, SetKindVisible } from '../../../wailsjs/go/app/App.js'
   import { session } from '../session.svelte'
   import { EventsOn } from '../../../wailsjs/runtime/runtime.js'
   import { theme as colorTheme } from '../theme.svelte'
@@ -55,6 +55,27 @@
   async function setKindVisible(kind: string, visible: boolean) {
     await session.run(() => SetKindVisible(path, kind, visible))
     await loadKinds()
+  }
+
+  /** What the graph is focused on, if anything: the opposite of hiding a branch. */
+  let focus = $state<{ branch: string; stack: boolean } | null>(null)
+  let focusLabel = $derived(focus ? (focus.stack ? `the stack of ${focus.branch}` : focus.branch) : '')
+
+  /** Whether the graph is focused, so a branch outside it can be explained. */
+  export function focused(): boolean {
+    return !!focus
+  }
+
+  /** Reads the focus, reporting whether it's a new one to show from the top. */
+  async function loadFocus(): Promise<boolean> {
+    const was = focusLabel
+    const next = await GraphFocus(path).catch(() => null)
+    focus = next?.branch ? next : null
+    return !!focus && focusLabel !== was
+  }
+
+  function stopFocusing() {
+    void session.run(() => SetGraphFocus(path, '', false))
   }
 
   /** Rows fetched beyond the viewport, so short scrolls never show blanks. */
@@ -362,10 +383,13 @@
   /** The commit selected before a reload, so the selection follows it to its new row. */
   let selectedId = ''
 
+  /** Keeps the selection on its commit after a reload. A new focus starts from its top. */
   async function followSelection() {
+    const refocused = await loadFocus()
+    if (refocused) scrollTo(0)
     if (selected < 0) return
     const id = selectedId
-    const row = id ? await CommitRow(path, id).catch(() => -1) : -1
+    const row = refocused ? 0 : id ? await CommitRow(path, id).catch(() => -1) : -1
     // The selection moved while that was being asked, to HEAD or by the person: it stands.
     if (selectedId !== id) return
     // If the commit is gone (e.g. amended), stay on the same position but refresh details.
@@ -458,6 +482,7 @@
   }
 
   provideCommands(() => [
+    ...(focus ? [{ id: 'graph.stopFocus', group: 'View', title: `Stop focusing on ${focusLabel}`, run: stopFocusing }] : []),
     {
       id: 'graph.search',
       group: 'View',
@@ -515,6 +540,7 @@
     void document.fonts.ready.then(schedule)
     document.fonts.addEventListener('loadingdone', schedule)
     void loadKinds()
+    void loadFocus()
     const off = EventsOn('graph:progress', (p: GraphProgress) => {
       if (p.path !== path) return
       if (p.done) void loadKinds()
@@ -575,6 +601,12 @@
     >
       <Icon name={density === 'compact' ? 'rows' : 'timeline'} size={14} />{density === 'compact' ? 'Compact' : 'Timeline'}
     </button>
+    {#if focus}
+      <span class="focus" title="Only {focusLabel} and what it's built on are showing">
+        <Icon name="focus" size={13} /><span class="focus-name">Focused on {focusLabel}</span>
+        <button class="btn sm quiet icon" onclick={stopFocusing} aria-label="Stop focusing" title="Stop focusing, and show every branch again"><Icon name="close" size={13} /></button>
+      </span>
+    {/if}
     <span class="search">
       <Icon name="search" size={14} />
       <input
@@ -752,6 +784,26 @@
     border-color: var(--link);
     outline: none;
     box-shadow: 0 0 0 3px var(--selection);
+  }
+
+  .focus {
+    flex: 0 1 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    padding-left: 8px;
+    border-radius: 5px;
+    font-size: 13px;
+    color: var(--ink-soft);
+    background: color-mix(in srgb, var(--accent-a) 14%, transparent);
+  }
+
+  .focus-name {
+    overflow: hidden;
+    max-width: 260px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .step.up {

@@ -442,6 +442,7 @@ export function refTooltip(r: Ref, mergedInto?: string): string {
   if (stackPlace(r)) lines.push(stackPlace(r))
   if (r.gone) lines.push('Upstream branch was deleted')
   else if (r.ahead || r.behind) lines.push(`${r.ahead} ahead, ${r.behind} behind ${r.upstream}`)
+  if (r.focused) lines.push('The graph is focused on this')
   if (r.hidden) lines.push('Hidden: shown for now')
   return lines.join('\n')
 }

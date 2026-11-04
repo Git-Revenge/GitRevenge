@@ -52,6 +52,25 @@ func Stacks(ctx context.Context, g *git.Repo, refs []git.Ref, rules branchkind.R
 	return parents
 }
 
+// StackMembers returns every branch in the same stack as branch, including branch, given
+// each stacked branch's parent. A branch with no stack is alone in its list.
+func StackMembers(branch string, parents map[string]string) []string {
+	root := func(b string) string {
+		for parents[b] != "" {
+			b = parents[b]
+		}
+		return b
+	}
+	top := root(branch)
+	members := []string{top}
+	for child := range parents {
+		if root(child) == top {
+			members = append(members, child)
+		}
+	}
+	return members
+}
+
 // annotateStacks sets each local branch's stack parent, depth and the stack's height.
 func annotateStacks(refs []git.Ref, parents map[string]string) {
 	children := map[string]bool{}

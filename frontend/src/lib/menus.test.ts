@@ -116,6 +116,39 @@ describe('refItems', () => {
   })
 })
 
+// #506
+describe('focusing the graph', () => {
+  const ctx = { path: '/r', current: () => 'main', openDialog: () => {}, openRebase: () => {}, openReflog: () => {} } as unknown as MenuContext
+  const labels = (items: { label: string }[]) => items.map((i) => i.label)
+
+  it('offers a branch, and its stack when it has one', () => {
+    expect(labels(refItems(ref('topic', 'local'), ctx))).toContain('Focus on topic')
+    expect(labels(refItems(ref('topic', 'local'), ctx))).not.toContain('Focus on the stack of topic')
+    const stacked = labels(refItems({ ...ref('topic', 'local'), stackParent: 'low', stackDepth: 2, stackSize: 2 }, ctx))
+    expect(stacked).toContain('Focus on topic')
+    expect(stacked).toContain('Focus on the stack of topic')
+  })
+
+  it('names a remote branch without its remote, as hiding does', () => {
+    expect(labels(refItems(ref('origin/topic', 'remote'), ctx))).toContain('Focus on topic')
+  })
+
+  it('only offers to stop on what is focused', () => {
+    const items = labels(refItems({ ...ref('topic', 'local'), focused: true, stackSize: 2 }, ctx))
+    expect(items).toContain('Stop focusing')
+    expect(items.filter((l) => l.startsWith('Focus on'))).toEqual([])
+  })
+
+  it('is on the menu of a stack', () => {
+    const members = [
+      { ...ref('top', 'local'), stackParent: 'low', stackDepth: 2, stackSize: 2 },
+      { ...ref('low', 'local'), stackDepth: 1, stackSize: 2 },
+    ]
+    expect(labels(stackItems(members, ctx))).toContain('Focus on this stack')
+    expect(labels(stackItems(members.map((m) => ({ ...m, focused: true })), ctx))).toContain('Stop focusing')
+  })
+})
+
 // #505
 describe('a branch in another worktree', () => {
   const topic = { ...ref('topic', 'local'), worktree: '/wt/topic' }
@@ -215,7 +248,7 @@ describe('a stack', () => {
   ]
 
   it('offers the top of the stack, then Unstack and Delete', () => {
-    expect(labels(stackItems(stack, ctx('main')))).toEqual(['Check out top of stack (top)', 'New branch on top…', 'Update stack', 'Rebase stack onto…', 'Push stack', 'Unstack', 'Delete stack…'])
+    expect(labels(stackItems(stack, ctx('main')))).toEqual(['Check out top of stack (top)', 'New branch on top…', 'Update stack', 'Rebase stack onto…', 'Push stack', 'Focus on this stack', 'Unstack', 'Delete stack…'])
   })
 
   it('names each top when it forks', () => {
