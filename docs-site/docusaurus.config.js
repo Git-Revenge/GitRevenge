@@ -27,7 +27,7 @@ const baseUrl = process.env.BASE_URL || '/';
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'Git Revenge',
-  tagline: 'A fast, local-only desktop git client for Windows and macOS, built for very large repositories.',
+  tagline: 'A fast, local-only desktop git client for Windows, macOS and Linux, built for very large repositories.',
   favicon: 'img/favicon.svg',
 
   url: 'https://gitrevenge.com',

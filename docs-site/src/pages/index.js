@@ -42,7 +42,7 @@ const features = [
 const docLinks = [
   {
     title: 'Install',
-    desc: 'Windows and macOS, and what you need first.',
+    desc: 'Windows, macOS and Linux, and what you need first.',
     to: '/docs/guide/install',
     accent: 'rose',
   },
@@ -98,7 +98,7 @@ function Hero() {
         <em className="hero-title-em">Revenge.</em>
       </h1>
       <p className="hero-subtitle">
-        A desktop git client for Windows and macOS that stays fast on huge repositories. It
+        A desktop git client for Windows, macOS and Linux that stays fast on huge repositories. It
         drives the git you already have, and keeps everything on your machine.
       </p>
       <div className="hero-buttons">

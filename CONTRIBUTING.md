@@ -29,6 +29,8 @@ cd frontend && npm run check && npm run lint && npm test && npm run test:browser
 
 Also run `golangci-lint run`. CI runs everything on Windows, macOS and Linux.
 
+On Linux, the app needs GTK and WebKitGTK to build (on Ubuntu or Debian: `sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev`), and `wails build` needs `-tags webkit2_41`.
+
 ## Guidelines
 
 - **Tests.** Go tests build fixture repositories on the fly with real git. Frontend logic is covered with Vitest. Anything about how a screen renders or responds is covered in `frontend/e2e` with Playwright, which mounts the real component in a real browser against a stubbed Go backend, so it doesn't need `wails dev`: add a mount to `harness.ts` if the component needs one, then a test. Add a test with each fix or feature.

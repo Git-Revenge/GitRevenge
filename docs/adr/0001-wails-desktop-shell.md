@@ -1,6 +1,6 @@
 # 0001 — Wails desktop shell
 
-- Status: Accepted
+- Status: Accepted. Linux became first-class in [ADR-0010](0010-linux-first-class.md), and it uses WebKitGTK.
 - Date: 2026-10-28
 
 ## Context
