@@ -30,8 +30,9 @@ jobs:
       - run: npm run check
       - run: npm run lint
       - run: npm test
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:browser
+      - run: npm run test:browser:webkit
       - run: npm run build
       - run: npm run bundle-budget
 
