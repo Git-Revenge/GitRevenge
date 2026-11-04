@@ -396,3 +396,22 @@ func TestGraphReloadWhilePausedSwapsAtTheLimit(t *testing.T) {
 		t.Fatalf("full graph = %v rows, %v; want 21", g.Len(), err)
 	}
 }
+
+func TestOpenSaysWhenItCantWatch(t *testing.T) {
+	m, _ := newManager(t)
+	failure := errors.New("no watching today")
+	m.startWatch = func(watch.Options) (*watch.Watcher, error) { return nil, failure }
+	var gotPath string
+	var gotErr error
+	m.OnWatchFailed(func(path string, err error) { gotPath, gotErr = path, err })
+
+	fx := gittest.New(t)
+	fx.Linear(1)
+	r, err := m.Open(context.Background(), fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotPath != r.Path || !errors.Is(gotErr, failure) {
+		t.Fatalf("OnWatchFailed got %q, %v", gotPath, gotErr)
+	}
+}

@@ -81,6 +81,7 @@ func (a *App) sessions() (*session.Manager, error) {
 			a.sess.SetReadAhead(n)
 		}
 		a.sess.OnGraph(a.emitGraphProgress)
+		a.sess.OnWatchFailed(func(path string, err error) { a.notice(path, watchFailedMessage(err)) })
 		a.sess.OnChange(func(path string, k watch.Kind) {
 			a.emit("repo:changed", RepoChange{Path: path, Kinds: k.Names()})
 		})
