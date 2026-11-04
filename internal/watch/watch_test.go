@@ -1,7 +1,10 @@
 package watch
 
 import (
+	"errors"
+	"fmt"
 	"slices"
+	"syscall"
 	"testing"
 	"time"
 
@@ -154,5 +157,23 @@ func TestClassifyGitPath(t *testing.T) {
 func TestKindNames(t *testing.T) {
 	if got := (Head | WorkTree).Names(); !slices.Equal(got, []string{"head", "worktree"}) {
 		t.Fatalf("Names = %v", got)
+	}
+}
+
+func TestIsLimit(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		want bool
+	}{
+		{syscall.ENOSPC, true},
+		{syscall.EMFILE, true},
+		{fmt.Errorf("watching: %w", syscall.ENOSPC), true},
+		{syscall.ENOENT, false},
+		{errors.New("no space left on device"), false},
+		{nil, false},
+	} {
+		if got := IsLimit(tc.err); got != tc.want {
+			t.Errorf("IsLimit(%v) = %v, want %v", tc.err, got, tc.want)
+		}
 	}
 }

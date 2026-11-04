@@ -2,17 +2,26 @@
 //
 // It uses one native recursive subscription per tree (ReadDirectoryChangesW on Windows,
 // FSEvents on macOS) rather than a watch per directory, so cost does not grow with the
-// size of the work tree.
+// size of the work tree. Linux has no such subscription: inotify takes one watch per
+// directory, ignored ones included, so a big tree can run into the system's limits.
 package watch
 
 import (
+	"errors"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/syncthing/notify"
 )
+
+// IsLimit reports whether New failed because of the system's inotify limits: ENOSPC is too
+// many watches, and EMFILE is too many inotify instances.
+func IsLimit(err error) bool {
+	return errors.Is(err, syscall.ENOSPC) || errors.Is(err, syscall.EMFILE)
+}
 
 // Kind says what part of the repository changed. Values combine as a bit set.
 type Kind uint8
