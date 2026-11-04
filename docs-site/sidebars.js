@@ -64,6 +64,7 @@ const sidebars = {
             { type: 'doc', id: 'adr/git-config-editing', label: 'ADR-0007 Editing git config' },
             { type: 'doc', id: 'adr/insights-from-repository-state', label: 'ADR-0008 Reproducible insights' },
             { type: 'doc', id: 'adr/branch-kinds', label: 'ADR-0009 Branch kinds' },
+            { type: 'doc', id: 'adr/linux-first-class', label: 'ADR-0010 Linux is first-class' },
           ],
         },
       ],
