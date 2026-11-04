@@ -6,6 +6,7 @@ import (
 
 	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/session"
+	"github.com/git-revenge/gitrevenge/internal/watch"
 )
 
 // Notice is the payload of the "notice" event: something worth a toast that isn't an
@@ -13,6 +14,16 @@ import (
 type Notice struct {
 	Path    string `json:"path"`
 	Message string `json:"message"`
+}
+
+// watchFailedMessage explains why a repository won't refresh on its own.
+func watchFailedMessage(err error) string {
+	const stale = "Git Revenge can't watch this repository, so changes made outside the app won't show up on their own."
+	if watch.IsLimit(err) {
+		return stale + " It needs more inotify watches than your system allows: raise fs.inotify.max_user_watches" +
+			" and fs.inotify.max_user_instances, then open it again."
+	}
+	return stale
 }
 
 func (a *App) notice(path, message string) {

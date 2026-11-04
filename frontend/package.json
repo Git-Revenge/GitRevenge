@@ -10,7 +10,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests --dir src",
-    "test:browser": "playwright test",
+    "test:browser": "playwright test --project=chromium",
+    "test:browser:webkit": "playwright test --project=webkit",
     "bundle-budget": "node scripts/bundle-budget.mjs"
   },
   "devDependencies": {

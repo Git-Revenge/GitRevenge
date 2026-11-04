@@ -23,6 +23,39 @@ const html = (text: string, issueURL = '', extra: Record<string, unknown> = {}) 
   withoutComments(render(Markdown, { props: { text, issueURL, ...extra } }).body).replace(/ class="[^"]*"/g, '')
 
 describe('Markdown', () => {
+  describe('links inside links', () => {
+    const links = (out: string) => out.match(/<a /g)?.length ?? 0
+
+    it('makes a bare URL one link, so a click opens it once', () => {
+      const out = html('See https://example.com/x for details')
+      expect(links(out)).toBe(1)
+      expect(out).toContain('>https://example.com/x</a>')
+    })
+
+    it('leaves an issue reference in the text of a link alone', () => {
+      const out = html('[fixes #12](https://example.com/x)', 'https://example.com/issues/{n}')
+      expect(links(out)).toBe(1)
+      expect(out).toContain('fixes #12</a>')
+    })
+
+    it('keeps formatting in the text of a link without linking it again', () => {
+      const out = html('[**https://example.com/y**](https://example.com/x)')
+      expect(links(out)).toBe(1)
+      expect(out).toContain('<strong>https://example.com/y</strong>')
+    })
+
+    it('shows an unloaded image in a link as its alt text, so a badge opens only the link', () => {
+      const out = html('[![build](https://example.com/badge.svg)](https://example.com/ci)')
+      expect(links(out)).toBe(1)
+      expect(out).toContain('>build</a>')
+      expect(out).not.toContain('badge.svg')
+    })
+
+    it('still links text outside a link', () => {
+      expect(links(html('#12 and [docs](https://example.com/x)', 'https://example.com/issues/{n}'))).toBe(2)
+    })
+  })
+
   it('renders emphasis, code, lists and links', () => {
     const out = html('Some **bold**, *em* and `x < y`.\n\n- one\n- two\n\nSee [docs](https://example.com).')
     expect(out).toContain('<strong>bold</strong>')

@@ -160,10 +160,13 @@ type Manager struct {
 	settings *settings.Store
 	now      func() time.Time
 
-	mu       sync.Mutex
-	repos    []*Repo // tab order
-	onChange func(path string, k watch.Kind)
-	onGraph  func(path string, p GraphProgress)
+	mu            sync.Mutex
+	repos         []*Repo // tab order
+	onChange      func(path string, k watch.Kind)
+	onWatchFailed func(path string, err error)
+	// startWatch is watch.New, except in tests.
+	startWatch func(watch.Options) (*watch.Watcher, error)
+	onGraph    func(path string, p GraphProgress)
 	// readAhead overrides DefaultReadAhead; tests use it.
 	readAhead int
 }
@@ -184,9 +187,17 @@ func (m *Manager) OnChange(fn func(path string, k watch.Kind)) {
 	m.onChange = fn
 }
 
+// OnWatchFailed registers fn to be called when an open repository can't be watched, so it
+// won't refresh on its own. Call it before opening repositories.
+func (m *Manager) OnWatchFailed(fn func(path string, err error)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.onWatchFailed = fn
+}
+
 // NewManager returns a Manager with no open repositories.
 func NewManager(runner *git.Runner, store *settings.Store) *Manager {
-	return &Manager{runner: runner, settings: store, now: time.Now}
+	return &Manager{runner: runner, settings: store, now: time.Now, startWatch: watch.New}
 }
 
 // SetReadAhead sets how many rows the graph reader loads past the furthest row requested
@@ -413,7 +424,7 @@ func (m *Manager) watchLocked(r *Repo) *watch.Watcher {
 		}
 	}
 	r.changes.mu.Unlock()
-	w, err := watch.New(watch.Options{
+	w, err := m.startWatch(watch.Options{
 		Root:   r.Path,
 		GitDir: r.GitDir,
 		FilterWorkTree: func(paths []string) []string {
@@ -427,6 +438,9 @@ func (m *Manager) watchLocked(r *Repo) *watch.Watcher {
 	})
 	if err != nil {
 		log.Printf("watching %s: %v", r.Path, err)
+		if m.onWatchFailed != nil {
+			m.onWatchFailed(r.Path, err)
+		}
 		return nil
 	}
 	return w
