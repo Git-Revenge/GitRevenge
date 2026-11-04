@@ -340,11 +340,22 @@ test.describe('commit graph', () => {
       await open(page, 'graph', scenario)
       await ready(page)
       const { x, y } = await overLabels(page)
+      // Counted as it starts: looking afterwards can land before it begins or after it ends.
+      await page.evaluate(() => {
+        const animate = Element.prototype.animate
+        const win = window as unknown as { __opening: number }
+        win.__opening = 0
+        Element.prototype.animate = function (...args) {
+          if (this.classList.contains('ref-expand')) win.__opening++
+          return animate.apply(this, args)
+        }
+      })
       await page.mouse.move(x, y)
       const list = page.locator('.ref-expand')
       await expect(list).toBeVisible()
-      const opening = await list.evaluate((el) => el.getAnimations().length)
-      expect(opening).toBeGreaterThan(0)
+      await expect
+        .poll(() => page.evaluate(() => (window as unknown as { __opening: number }).__opening))
+        .toBeGreaterThan(0)
       await expect.poll(() => list.evaluate((el) => el.getAnimations().length)).toBe(0)
       await page.mouse.move(x + 600, y)
       // Still there for a moment on the way out.
@@ -959,6 +970,9 @@ test.describe('upstream dialog', () => {
       await open(page, 'upstreamDialog', { responses: { Refs: refs }, failures: { BranchAction: 'nope' }, delays: { BranchAction: 150 } })
       await save(page).click()
       await expect(page.getByRole('alert')).toBeVisible()
+      // Chromium does this by itself. WebKit doesn't focus a clicked button, so focus never left
+      // the dialog, and it needs a push to get here.
+      await page.evaluate(() => (document.activeElement as HTMLElement).blur())
       await expect.poll(() => page.evaluate(() => document.activeElement === document.body)).toBe(true)
     }
 
@@ -1048,7 +1062,7 @@ test.describe('before the first load has answered', () => {
   test.describe('commit panel', () => {
     const file = (path: string, index: string, workTree: string) => ({ path, index, workTree, untracked: false, conflicted: false })
     const panel = (files: unknown[]) => ({
-      delays: { WorkingTree: 600 },
+      delays: { WorkingTree: 1500 },
       responses: { CommitChanges: 'abc', WorkingTree: { status: { files }, identity: { name: 'A', email: 'a@b' }, signing: { enabled: false } } },
     })
     const summary = (page: Page) => page.getByRole('textbox', { name: 'Commit summary' })
@@ -1544,8 +1558,12 @@ test('draws a commit with several refs', async ({ page }) => {
 })
 
 test('loading text waits, so a fast load does not flash', async ({ page }) => {
+  // On a stopped clock, so a slow browser can't reach the delay before the first check.
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
   await open(page, 'loading')
   await expect(page.getByRole('status')).toHaveCount(0)
+  await page.clock.runFor(1000)
   await expect(page.getByRole('status')).toContainText('Loading…')
 })
 

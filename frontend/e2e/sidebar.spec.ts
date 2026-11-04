@@ -22,7 +22,7 @@ test('leads with the checked-out branch, then Trunk, folders and loose branches'
 
 // #463: every merged branch in a stack said "parent merged".
 test('a branch known to be merged says so, once the check has answered', async ({ page }) => {
-  await open(page, 'sidebar', { ...scenario, delays: { MergedBranches: 300 }, responses: { ...scenario.responses, MergedBranches: { 'fix/merged': 'main', 'old-gone': 'main' } } })
+  await open(page, 'sidebar', { ...scenario, delays: { MergedBranches: 1000 }, responses: { ...scenario.responses, MergedBranches: { 'fix/merged': 'main', 'old-gone': 'main' } } })
   const row = page.locator('.ref', { hasText: 'merged' }).filter({ hasNotText: 'old-gone' }).first()
   await expect(page.locator('.ref', { hasText: 'old-gone' })).toContainText('gone')
   await expect(row.locator('.track')).toHaveText(/parent merged/)

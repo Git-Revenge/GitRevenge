@@ -13,10 +13,15 @@ export default defineConfig({
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: 'http://localhost:5183',
-    channel,
     viewport: { width: 1280, height: 800 },
     trace: 'retain-on-failure',
   },
+  // Linux runs the app in WebKit, so it's tested too. Playwright's WebKit isn't WebKitGTK, so this
+  // checks compatibility, not rendering or speed.
+  projects: [
+    { name: 'chromium', use: { browserName: 'chromium', channel } },
+    { name: 'webkit', use: { browserName: 'webkit' } },
+  ],
   webServer: {
     command: 'npx vite --port 5183 --strictPort',
     url: 'http://localhost:5183/e2e/harness.html',
