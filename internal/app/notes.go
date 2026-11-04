@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 
-	"github.com/risadams/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
 // CommitNotes returns the commit's git notes from every notes ref, the default first.

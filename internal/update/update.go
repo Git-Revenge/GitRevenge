@@ -13,7 +13,7 @@ import (
 )
 
 // LatestURL is the GitHub API endpoint for the newest published, non-pre-release release.
-const LatestURL = "https://api.github.com/repos/risadams/GitRevenge/releases/latest"
+const LatestURL = "https://api.github.com/repos/Git-Revenge/GitRevenge/releases/latest"
 
 // Release is the newest published release.
 type Release struct {

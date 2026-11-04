@@ -73,7 +73,7 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          args=(-clean -platform "${{ matrix.platform }}" -ldflags "-X github.com/risadams/gitrevenge/internal/version.Version=${{ steps.version.outputs.version }}")
+          args=(-clean -platform "${{ matrix.platform }}" -ldflags "-X github.com/git-revenge/gitrevenge/internal/version.Version=${{ steps.version.outputs.version }}")
           if [ "$RUNNER_OS" = "Windows" ]; then args+=(-nsis); fi
           wails build "${args[@]}"
 

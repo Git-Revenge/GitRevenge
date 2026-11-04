@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/session"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/session"
 )
 
 // Restack moves a stacked branch whose parent was merged onto the Trunk: with a squash

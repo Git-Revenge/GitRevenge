@@ -13,12 +13,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/risadams/gitrevenge/internal/branchkind"
-	"github.com/risadams/gitrevenge/internal/fsutil"
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/graph"
-	"github.com/risadams/gitrevenge/internal/settings"
-	"github.com/risadams/gitrevenge/internal/watch"
+	"github.com/git-revenge/gitrevenge/internal/branchkind"
+	"github.com/git-revenge/gitrevenge/internal/fsutil"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/graph"
+	"github.com/git-revenge/gitrevenge/internal/settings"
+	"github.com/git-revenge/gitrevenge/internal/watch"
 )
 
 // ErrNotRepo means the chosen folder is not inside a git work tree.

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 // threeBranchStack makes a stack of s1, s2, s3 on main, two commits each, with main moved on since. It

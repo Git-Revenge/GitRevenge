@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 func TestTrailerHints(t *testing.T) {

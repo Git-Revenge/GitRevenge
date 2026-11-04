@@ -41,7 +41,7 @@ export default function NotFoundContent() {
         </div>
         <p className="not-found-report">
           Followed a link here from these docs?{' '}
-          <Link to="https://github.com/risadams/GitRevenge/issues/new?title=Broken+link+on+the+docs+site">
+          <Link to="https://github.com/Git-Revenge/GitRevenge/issues/new?title=Broken+link+on+the+docs+site">
             Say which one
           </Link>
           , and it will be fixed.

@@ -2,11 +2,11 @@
 
 ## Supported versions
 
-Git Revenge is pre-1.0. Only the [latest release](https://github.com/risadams/GitRevenge/releases/latest) receives security fixes.
+Git Revenge is pre-1.0. Only the [latest release](https://github.com/Git-Revenge/GitRevenge/releases/latest) receives security fixes.
 
 ## Reporting a vulnerability
 
-Please report vulnerabilities privately through [GitHub's security advisories](https://github.com/risadams/GitRevenge/security/advisories/new). Don't open a public issue or pull request.
+Please report vulnerabilities privately through [GitHub's security advisories](https://github.com/Git-Revenge/GitRevenge/security/advisories/new). Don't open a public issue or pull request.
 
 Include the affected version, your operating system, and steps to reproduce. We aim to acknowledge a report within a week and to agree a fix and disclosure timeline with you.
 

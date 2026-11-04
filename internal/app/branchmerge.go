@@ -5,9 +5,9 @@ import (
 	"slices"
 	"time"
 
-	"github.com/risadams/gitrevenge/internal/branchkind"
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/session"
+	"github.com/git-revenge/gitrevenge/internal/branchkind"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/session"
 )
 
 // branchMergeTimeout bounds the check when deleting a branch. An old branch on a huge

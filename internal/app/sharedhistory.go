@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/risadams/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
 // maxListedCommits is how many commits a warning names.

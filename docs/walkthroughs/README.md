@@ -18,7 +18,7 @@ The walkthroughs all use Tidewater, a small made-up project: a dashboard for a n
 You can build the same repository and follow along. You need `git` and a bash shell; on Windows, use Git Bash, which comes with Git for Windows.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/risadams/GitRevenge/main/docs-site/scripts/demo-repo.sh -o demo-repo.sh
+curl -fsSL https://raw.githubusercontent.com/Git-Revenge/GitRevenge/main/docs-site/scripts/demo-repo.sh -o demo-repo.sh
 bash demo-repo.sh ~/gitrevenge-practice
 ```
 

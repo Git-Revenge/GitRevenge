@@ -10,8 +10,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 
-	"github.com/risadams/gitrevenge/internal/app"
-	"github.com/risadams/gitrevenge/internal/askpass"
+	"github.com/git-revenge/gitrevenge/internal/app"
+	"github.com/git-revenge/gitrevenge/internal/askpass"
 )
 
 //go:embed all:frontend/dist

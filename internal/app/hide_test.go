@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 // loadedPage waits for the graph of path to finish loading and returns its first rows.

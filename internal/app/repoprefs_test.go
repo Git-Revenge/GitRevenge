@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/branchkind"
+	"github.com/git-revenge/gitrevenge/internal/branchkind"
 )
 
 func kindOf(p RepoPreferences, k branchkind.Kind) KindPatterns {

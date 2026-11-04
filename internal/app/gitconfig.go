@@ -9,9 +9,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/gitconfig"
-	"github.com/risadams/gitrevenge/internal/settings"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/gitconfig"
+	"github.com/git-revenge/gitrevenge/internal/settings"
 )
 
 // gitConfigs holds the config files open in the Git Config tab (ADR-0007).

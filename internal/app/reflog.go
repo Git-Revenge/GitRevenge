@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 
-	"github.com/risadams/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
 // maxReflog caps how many reflog entries are listed; reflogs keep 90 days by default.

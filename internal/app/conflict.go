@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/risadams/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
 // ConflictFile returns the base, ours, theirs and merged versions of a conflicted file.

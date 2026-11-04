@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/risadams/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
 // BranchAction runs a branch or tag operation from the UI. Arguments by action:

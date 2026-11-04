@@ -105,7 +105,7 @@ function Hero() {
         <Link className="hero-button-primary" to="/docs/guide">
           Get started
         </Link>
-        <Link className="hero-button-secondary" to="https://github.com/risadams/GitRevenge/releases/latest">
+        <Link className="hero-button-secondary" to="https://github.com/Git-Revenge/GitRevenge/releases/latest">
           Download
         </Link>
       </div>

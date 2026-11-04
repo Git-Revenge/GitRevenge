@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 // isolatedConfigRunner returns a runner whose global config is a temp file with content,

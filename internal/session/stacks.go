@@ -3,8 +3,8 @@ package session
 import (
 	"context"
 
-	"github.com/risadams/gitrevenge/internal/branchkind"
-	"github.com/risadams/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/branchkind"
+	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
 // Stacks returns which local branch each local branch is stacked on: inferred from history

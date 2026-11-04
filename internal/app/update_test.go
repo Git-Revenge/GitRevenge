@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/version"
+	"github.com/git-revenge/gitrevenge/internal/version"
 )
 
 func TestCheckForUpdate(t *testing.T) {

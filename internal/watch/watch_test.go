@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 // recorder collects reported kinds.

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 func newTestObjectReader(t *testing.T) (*ObjectReader, *gittest.Repo) {

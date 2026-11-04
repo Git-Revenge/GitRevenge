@@ -5,7 +5,7 @@
 // resolve.
 const path = require('path');
 
-const repo = 'https://github.com/risadams/GitRevenge';
+const repo = 'https://github.com/Git-Revenge/GitRevenge';
 const root = path.resolve(__dirname, '../../..');
 const docs = path.join(root, 'docs');
 const page = /\.mdx?$/;

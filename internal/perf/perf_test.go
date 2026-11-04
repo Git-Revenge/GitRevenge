@@ -18,11 +18,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/risadams/gitrevenge/internal/branchkind"
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/graph"
-	"github.com/risadams/gitrevenge/internal/session"
-	"github.com/risadams/gitrevenge/internal/settings"
+	"github.com/git-revenge/gitrevenge/internal/branchkind"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/graph"
+	"github.com/git-revenge/gitrevenge/internal/session"
+	"github.com/git-revenge/gitrevenge/internal/settings"
 )
 
 const (

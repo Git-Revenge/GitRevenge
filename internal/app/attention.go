@@ -5,8 +5,8 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/risadams/gitrevenge/internal/branchkind"
-	"github.com/risadams/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/branchkind"
+	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
 // Thresholds decide when a branch signal is a flag. Zero means the default.

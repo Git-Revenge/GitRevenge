@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 // refsAfterReload waits for the refs to match want after a settings change reloads them.

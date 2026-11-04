@@ -37,7 +37,7 @@ func TestLatest(t *testing.T) {
 	var gotUA, gotAccept string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotUA, gotAccept = r.Header.Get("User-Agent"), r.Header.Get("Accept")
-		_, _ = w.Write([]byte(`{"tag_name":"v0.7.0","html_url":"https://github.com/risadams/GitRevenge/releases/tag/v0.7.0","draft":false}`))
+		_, _ = w.Write([]byte(`{"tag_name":"v0.7.0","html_url":"https://github.com/Git-Revenge/GitRevenge/releases/tag/v0.7.0","draft":false}`))
 	}))
 	defer srv.Close()
 
@@ -45,7 +45,7 @@ func TestLatest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rel.Version != "0.7.0" || rel.URL != "https://github.com/risadams/GitRevenge/releases/tag/v0.7.0" {
+	if rel.Version != "0.7.0" || rel.URL != "https://github.com/Git-Revenge/GitRevenge/releases/tag/v0.7.0" {
 		t.Errorf("release = %+v", rel)
 	}
 	if gotUA != "GitRevenge/0.6.0" || gotAccept != "application/vnd.github+json" {

@@ -4,7 +4,7 @@
 
 Git Revenge is a desktop git client for Windows and macOS that stays fast on huge repositories. It's a Go app that drives the `git` you already have installed. There are no accounts, no cloud features and no AI.
 
-> **Status:** early development. The latest release is [`0.9.0`](https://github.com/risadams/GitRevenge/releases/tag/v0.9.0), and `0.9.1` is in progress.
+> **Status:** early development. The latest release is [`0.9.0`](https://github.com/Git-Revenge/GitRevenge/releases/tag/v0.9.0), and `0.9.1` is in progress.
 
 ## What it does
 
@@ -25,7 +25,7 @@ No accounts, no cloud sync, no telemetry. Git Revenge uses your own git config, 
 
 ## Install
 
-Grab the Windows installer or the macOS disk image from the [latest release](https://github.com/risadams/GitRevenge/releases/latest).
+Grab the Windows installer or the macOS disk image from the [latest release](https://github.com/Git-Revenge/GitRevenge/releases/latest).
 
 - **macOS:** the disk image is signed and notarized (since 0.6.0).
 - **Windows:** the installer isn't signed yet, so SmartScreen will warn you before it runs.
@@ -73,7 +73,7 @@ Performance checks run against a large repository of your choice; see [Performan
 - [Architecture decision records](docs/adr/).
 - [Releasing](docs/RELEASING.md).
 - [Accessibility](ACCESSIBILITY.md), [contributing](CONTRIBUTING.md), [code of conduct](CODE_OF_CONDUCT.md) and [security policy](SECURITY.md).
-- Work is tracked in [issues](https://github.com/risadams/GitRevenge/issues), grouped by [milestone](https://github.com/risadams/GitRevenge/milestones).
+- Work is tracked in [issues](https://github.com/Git-Revenge/GitRevenge/issues), grouped by [milestone](https://github.com/Git-Revenge/GitRevenge/milestones).
 
 ## License
 

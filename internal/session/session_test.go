@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/risadams/gitrevenge/internal/fsutil"
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/gittest"
-	"github.com/risadams/gitrevenge/internal/settings"
-	"github.com/risadams/gitrevenge/internal/watch"
+	"github.com/git-revenge/gitrevenge/internal/fsutil"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/settings"
+	"github.com/git-revenge/gitrevenge/internal/watch"
 )
 
 func newManager(t *testing.T) (*Manager, *settings.Store) {

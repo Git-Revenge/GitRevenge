@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 // fourCommits returns a repo with base + a, b, c and the plan for a..c.

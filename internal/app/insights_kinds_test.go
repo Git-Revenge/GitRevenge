@@ -6,8 +6,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/branchkind"
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/branchkind"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 // A repository with release branches, a gh-pages site, a bot's merged branch and a commit by

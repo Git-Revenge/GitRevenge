@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/risadams/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
 // Integrate merges, cherry-picks, rebases, resets or reverts on the current branch:

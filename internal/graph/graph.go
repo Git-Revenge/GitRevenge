@@ -16,7 +16,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/risadams/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
 const checkpointEvery = 128

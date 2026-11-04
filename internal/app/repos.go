@@ -11,10 +11,10 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/session"
-	"github.com/risadams/gitrevenge/internal/settings"
-	"github.com/risadams/gitrevenge/internal/watch"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/session"
+	"github.com/git-revenge/gitrevenge/internal/settings"
+	"github.com/git-revenge/gitrevenge/internal/watch"
 )
 
 // RepoTab describes an open repository for the tab bar.

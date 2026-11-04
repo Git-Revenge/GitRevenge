@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 func TestConflictBindings(t *testing.T) {
