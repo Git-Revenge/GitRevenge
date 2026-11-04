@@ -1,0 +1,13 @@
+What to test
+
+CI only proved the packages install and the app stays running, so this is what the release candidate is for. Ideally on a real Linux desktop, in rough order of importance:
+1. Does the window draw? This is the NVIDIA blank-window risk. If it's blank, try WEBKIT_DISABLE_DMABUF_RENDERER=1 gitrevenge.
+2. Launcher: does it appear in the app menu with the right icon, and does the running window group under that icon?
+3. Everyday use: open a repo, commit, and push or pull, including a credential prompt.
+4. Graph speed: how does scrolling feel on a large repo, especially on a slower machine?
+
+You can also run a smaller check yourself in WSL. Your distro is Debian 13-based, so the .deb should install, and it would test the real package on a real display, though not a real Linux desktop:
+wsl -d WLinux
+gh release download v0.10.0-rc.1 --repo Git-Revenge/GitRevenge --pattern '*.deb'
+sudo apt install ./GitRevenge-*.deb && gitrevenge
+If gh isn't installed in WSL, download the .deb from the release page instead. Since WSL exposes Windows' git-lfs.exe, you may see the false LFS banner from earlier there. It's specific to WSL, so you can ignore it.
