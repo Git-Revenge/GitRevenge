@@ -209,6 +209,9 @@ jobs:
     # missing library stops the release instead of reaching someone's machine.
     name: Install on ${{ matrix.image }}
     needs: build
+    # Not held back by another platform's build, such as no macOS runner being free. Publishing
+    # still needs every build to have passed. A package that didn't build fails here too.
+    if: ${{ !cancelled() }}
     strategy:
       fail-fast: false
       matrix:
