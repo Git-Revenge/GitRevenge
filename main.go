@@ -35,6 +35,7 @@ func main() {
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 26, G: 22, B: 20, A: 1},
+		Linux:            linuxOptions(),
 		OnStartup:        a.Startup,
 		OnBeforeClose:    beforeClose,
 		OnShutdown:       a.Shutdown,

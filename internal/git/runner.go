@@ -213,7 +213,8 @@ func (e *Error) MissingLFS() bool {
 
 // lfsInstallHint replaces git's raw output when git-lfs is missing.
 const lfsInstallHint = "This repository uses Git LFS, but git-lfs isn't installed. Install it from https://git-lfs.com " +
-	"(on macOS: brew install git-lfs), then restart Git Revenge."
+	"(on macOS: brew install git-lfs; on Ubuntu or Debian: sudo apt install git-lfs; on RHEL: sudo dnf install git-lfs), " +
+	"then restart Git Revenge."
 
 func (e *Error) Error() string {
 	if e.MissingLFS() {
