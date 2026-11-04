@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/risadams/gitrevenge/internal/branchkind"
-	"github.com/risadams/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/branchkind"
+	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
 // InsightsInputs are the choices an insights result depends on, besides the repository

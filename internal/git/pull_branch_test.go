@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 // pullBranchFixture is a clone on main with a local feat tracking origin/feat, and a second

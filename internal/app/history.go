@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 
-	"github.com/risadams/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
 // FileHistory lists commits that changed file, newest first, following renames.

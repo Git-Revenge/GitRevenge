@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
 func searchGraph(t *testing.T) *Graph {

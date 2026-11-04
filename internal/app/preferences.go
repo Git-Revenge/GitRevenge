@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/settings"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/settings"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 

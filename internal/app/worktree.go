@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/risadams/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
 // WorkingTree is what the changes panel shows.

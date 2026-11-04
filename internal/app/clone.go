@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/risadams/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
 // cloneKey registers the clone in the running network operations. Only one clone runs at a

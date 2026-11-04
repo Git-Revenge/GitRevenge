@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/settings"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/settings"
 )
 
 // Insights results are kept in memory for the session (ADR-0008: nothing is stored). Each

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/risadams/gitrevenge/internal/fsutil"
+	"github.com/git-revenge/gitrevenge/internal/fsutil"
 )
 
 // Worktree is a working tree of the repository: the main one or a linked one.

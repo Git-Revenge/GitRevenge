@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 func TestRemotesManage(t *testing.T) {
@@ -163,9 +163,9 @@ func TestPushRejectedAndForceWithLease(t *testing.T) {
 
 func TestIssueURL(t *testing.T) {
 	cases := map[string]string{
-		"https://github.com/risadams/GitRevenge.git":     "https://github.com/risadams/GitRevenge/issues/{n}",
-		"git@github.com:risadams/GitRevenge.git":         "https://github.com/risadams/GitRevenge/issues/{n}",
-		"ssh://git@github.com/risadams/GitRevenge":       "https://github.com/risadams/GitRevenge/issues/{n}",
+		"https://github.com/Git-Revenge/GitRevenge.git":  "https://github.com/Git-Revenge/GitRevenge/issues/{n}",
+		"git@github.com:Git-Revenge/GitRevenge.git":      "https://github.com/Git-Revenge/GitRevenge/issues/{n}",
+		"ssh://git@github.com/Git-Revenge/GitRevenge":    "https://github.com/Git-Revenge/GitRevenge/issues/{n}",
 		"https://user:token@github.com/o/r.git":          "https://github.com/o/r/issues/{n}",
 		"https://gitlab.com/group/sub/proj.git":          "https://gitlab.com/group/sub/proj/-/issues/{n}",
 		"ssh://git@gitlab.example.com:2222/team/app.git": "https://gitlab.example.com/team/app/-/issues/{n}",

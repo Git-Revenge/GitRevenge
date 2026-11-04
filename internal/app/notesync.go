@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/session"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/session"
 )
 
 // Notice is the payload of the "notice" event: something worth a toast that isn't an

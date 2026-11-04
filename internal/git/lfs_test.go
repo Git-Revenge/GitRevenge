@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 func TestLFSStatusTrackUntrack(t *testing.T) {

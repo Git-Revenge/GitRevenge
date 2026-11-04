@@ -1,4 +1,4 @@
-module github.com/risadams/gitrevenge
+module github.com/git-revenge/gitrevenge
 
 go 1.27.3
 

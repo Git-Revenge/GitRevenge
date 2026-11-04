@@ -33,7 +33,7 @@ const config = {
   url: 'https://gitrevenge.com',
   baseUrl,
 
-  organizationName: 'risadams',
+  organizationName: 'Git-Revenge',
   projectName: 'GitRevenge',
   trailingSlash: false,
 
@@ -79,7 +79,7 @@ const config = {
         docs: {
           path: '../docs',
           sidebarPath: require.resolve('./sidebars.js'),
-          editUrl: ({ docPath }) => `https://github.com/risadams/GitRevenge/edit/main/docs/${docPath}`,
+          editUrl: ({ docPath }) => `https://github.com/Git-Revenge/GitRevenge/edit/main/docs/${docPath}`,
           beforeDefaultRemarkPlugins: [repoLinks],
         },
         blog: false,
@@ -113,7 +113,7 @@ const config = {
             label: 'Docs',
           },
           {
-            href: 'https://github.com/risadams/GitRevenge/releases',
+            href: 'https://github.com/Git-Revenge/GitRevenge/releases',
             label: 'Releases',
             position: 'left',
           },
@@ -129,7 +129,7 @@ const config = {
             className: 'header-sponsor-link',
           },
           {
-            href: 'https://github.com/risadams/GitRevenge',
+            href: 'https://github.com/Git-Revenge/GitRevenge',
             position: 'right',
             className: 'header-github-link',
             'aria-label': 'GitHub repository',
@@ -149,10 +149,10 @@ const config = {
               <span><em>Git Revenge</em>, a git client</span>
             </div>
             <nav class="footer-bar__links" aria-label="Footer navigation">
-              <a href="https://github.com/risadams/GitRevenge">GitHub</a>
-              <a href="https://github.com/risadams/GitRevenge/releases">Releases</a>
-              <a href="https://github.com/risadams/GitRevenge/issues">Issues</a>
-              <a href="https://github.com/risadams/GitRevenge/security/policy">Security</a>
+              <a href="https://github.com/Git-Revenge/GitRevenge">GitHub</a>
+              <a href="https://github.com/Git-Revenge/GitRevenge/releases">Releases</a>
+              <a href="https://github.com/Git-Revenge/GitRevenge/issues">Issues</a>
+              <a href="https://github.com/Git-Revenge/GitRevenge/security/policy">Security</a>
               <a href="https://github.com/sponsors/risadams">Sponsor</a>
             </nav>
             <div class="footer-bar__copy">© ${new Date().getFullYear()} Ris Adams · Apache-2.0 · ${version}</div>

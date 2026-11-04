@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/risadams/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
 // sigCache remembers signature checks per repository: verifying runs gpg, ssh-keygen or

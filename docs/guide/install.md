@@ -1,6 +1,6 @@
 # Installing
 
-Download the Windows installer or the macOS disk image from the [latest release](https://github.com/risadams/GitRevenge/releases/latest).
+Download the Windows installer or the macOS disk image from the [latest release](https://github.com/Git-Revenge/GitRevenge/releases/latest).
 
 - **macOS:** the disk image is signed and notarized, so it opens like any other app.
 - **Windows:** the installer isn't signed yet, so SmartScreen warns you before it runs. Choose **More info**, then **Run anyway**.

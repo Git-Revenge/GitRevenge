@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/risadams/gitrevenge/internal/fsutil"
+	"github.com/git-revenge/gitrevenge/internal/fsutil"
 )
 
 // schemaVersion is bumped when the file format changes incompatibly.

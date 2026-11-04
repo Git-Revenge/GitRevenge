@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 // #474

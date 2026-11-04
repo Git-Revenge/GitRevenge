@@ -9,9 +9,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/session"
-	"github.com/risadams/gitrevenge/internal/settings"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/session"
+	"github.com/git-revenge/gitrevenge/internal/settings"
 )
 
 // groupConcurrency bounds how many repositories a dashboard or batch touches at once.

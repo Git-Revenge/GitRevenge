@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 // fakeID makes a deterministic 40-hex-digit ID from n.

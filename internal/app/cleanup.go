@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/risadams/gitrevenge/internal/branchkind"
-	"github.com/risadams/gitrevenge/internal/fsutil"
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/session"
+	"github.com/git-revenge/gitrevenge/internal/branchkind"
+	"github.com/git-revenge/gitrevenge/internal/fsutil"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/session"
 )
 
 // Cleanup on pull deletes local branches whose upstream was deleted and that have nothing

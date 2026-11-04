@@ -1,6 +1,6 @@
 package app
 
-import "github.com/risadams/gitrevenge/internal/settings"
+import "github.com/git-revenge/gitrevenge/internal/settings"
 
 // Theme returns the saved theme: "light", "dark", or "" to follow the operating system.
 func (a *App) Theme() (string, error) {

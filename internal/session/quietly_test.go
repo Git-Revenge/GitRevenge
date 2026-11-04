@@ -3,7 +3,7 @@ package session
 import (
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/watch"
+	"github.com/git-revenge/gitrevenge/internal/watch"
 )
 
 func TestQuietly(t *testing.T) {

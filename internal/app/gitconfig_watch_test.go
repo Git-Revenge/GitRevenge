@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 // #377: the global config usually sits in the home folder, and watching that folder silenced

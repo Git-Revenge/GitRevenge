@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/risadams/gitrevenge/internal/fsutil"
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/session"
+	"github.com/git-revenge/gitrevenge/internal/fsutil"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/session"
 )
 
 // An undo entry records one operation that moved history, so it can be reversed.

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 // branched makes a repository with main, and a topic branch off it with these files,

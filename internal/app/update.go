@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/risadams/gitrevenge/internal/settings"
-	"github.com/risadams/gitrevenge/internal/update"
-	"github.com/risadams/gitrevenge/internal/version"
+	"github.com/git-revenge/gitrevenge/internal/settings"
+	"github.com/git-revenge/gitrevenge/internal/update"
+	"github.com/git-revenge/gitrevenge/internal/version"
 )
 
 // UpdateInfo says whether a newer release than this build exists.

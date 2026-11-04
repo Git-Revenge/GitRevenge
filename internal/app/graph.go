@@ -6,9 +6,9 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/graph"
-	"github.com/risadams/gitrevenge/internal/session"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/graph"
+	"github.com/git-revenge/gitrevenge/internal/session"
 )
 
 // maxGraphPage caps one GraphRows request so a bad caller can't ask for a million rows.

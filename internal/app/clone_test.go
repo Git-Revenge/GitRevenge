@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 func TestCloneOpensAsRepo(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 func TestSplitTrailers(t *testing.T) {

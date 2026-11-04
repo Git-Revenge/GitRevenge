@@ -5,7 +5,7 @@ package main
 import (
 	"os"
 
-	"github.com/risadams/gitrevenge/internal/askpass"
+	"github.com/git-revenge/gitrevenge/internal/askpass"
 )
 
 func main() {

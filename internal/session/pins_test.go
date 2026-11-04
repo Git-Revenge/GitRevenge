@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/branchkind"
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/branchkind"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 // tipKindsOf opens the fixture and returns the kind of each kinded tip.

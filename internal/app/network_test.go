@@ -14,9 +14,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/askpass"
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/askpass"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 // isolateGit keeps the user's git config (and credential helpers such as Git Credential

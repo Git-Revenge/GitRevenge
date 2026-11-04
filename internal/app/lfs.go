@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/session"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/session"
 )
 
 // LFSInfo is what the LFS section of the sidebar shows.

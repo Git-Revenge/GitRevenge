@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 func undoLabel(t *testing.T, a *App, path string) UndoInfo {

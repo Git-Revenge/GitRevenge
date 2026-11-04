@@ -6,10 +6,10 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/risadams/gitrevenge/internal/askpass"
-	"github.com/risadams/gitrevenge/internal/git"
-	"github.com/risadams/gitrevenge/internal/session"
-	"github.com/risadams/gitrevenge/internal/version"
+	"github.com/git-revenge/gitrevenge/internal/askpass"
+	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/session"
+	"github.com/git-revenge/gitrevenge/internal/version"
 )
 
 // App holds application-wide state. Its exported methods are callable from the frontend.

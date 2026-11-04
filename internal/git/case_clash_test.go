@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 // clashing makes a repository whose index holds two names differing only by case, whatever

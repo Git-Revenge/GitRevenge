@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/risadams/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 func currentBranch(t *testing.T, fx *gittest.Repo) string {

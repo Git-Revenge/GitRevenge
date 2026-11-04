@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/risadams/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
 // StashSave stashes local changes. includeUntracked also stashes untracked files.
