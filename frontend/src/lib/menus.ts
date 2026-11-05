@@ -1,4 +1,4 @@
-import { DeleteBranchAndWorktree, DeleteStack, PushStack, RebaseStack, RestoreStack, StackDeletePlan, StackPushPlan, Unstack, UpdateStack, BranchAction, BranchMergeState, HideBranch, Integrate, MarkBranchKind, PullBranch, PushRef, Refs, Restack, SetGraphFocus, SetStackParent, StashAction, Worktrees } from '../../wailsjs/go/app/App.js'
+import { DeleteBranchAndWorktree, DeleteStack, PushStack, RebaseStack, RestoreStack, StackDeletePlan, StackPushPlan, Unstack, UpdateStack, BranchAction, BranchMergeState, HideBranch, Integrate, MarkBranchKind, Pull, PullBranch, PushBranch, PushRef, Refs, Restack, SetGraphFocus, SetStackParent, StashAction, Worktrees } from '../../wailsjs/go/app/App.js'
 import { CONFIRM_DELETE, CONFIRM_FORCE_PUSH, KINDS, kindWarning } from './branchKinds'
 import type { MenuItem } from './ContextMenu.svelte'
 import type { DialogSpec } from './Dialog.svelte'
@@ -129,10 +129,13 @@ export function deleteWorktreeBranchDialog(path: string, ref: Ref, tree: BranchW
   }
 }
 
-/** The remote a local branch pushes to: its upstream's remote, else "origin". */
-function remoteOf(ref: Ref): { remote: string; branch: string } {
-  const [remote, ...rest] = ref.upstream.split('/')
-  return ref.upstream ? { remote, branch: rest.join('/') } : { remote: 'origin', branch: ref.short }
+/** The Push item's label. Without an upstream the backend chooses the remote, so it isn't named here.
+ * An upstream with no slash is a local branch, which Push doesn't go to. */
+function pushLabel(ref: Ref): string {
+  const slash = ref.upstream.indexOf('/')
+  if (slash < 0) return `Push ${ref.short}`
+  const sameName = ref.upstream.slice(slash + 1) === ref.short
+  return `Push ${ref.short} to ${sameName ? ref.upstream.slice(0, slash) : ref.upstream}`
 }
 
 const push = (path: string, remote: string, kind: string, name: string) => () => session.run(() => PushRef(path, remote, kind, name))
@@ -251,20 +254,13 @@ export function refItems(ref: Ref, ctx: MenuContext): MenuItem[] {
             ? { label: `Open the worktree of ${ref.short}`, icon: 'worktree', run: () => session.open(ref.worktree!) }
             : { label: `Checkout ${ref.short}`, icon: 'branch', disabled: ref.head, run: () => session.run(() => branch(path, 'checkout', ref.short)) },
           ...(ref.head ? [] : integrateItems(ctx, ref.short, ref.short)),
-          // Only moves the branch, so it's safe beside uncommitted changes on the current one.
-          // Git won't move a branch another worktree has checked out.
-          ...(ref.head || ref.worktree || !ref.upstream || ref.gone
+          // On the checked-out branch this is the toolbar's Pull. On any other it only moves the
+          // branch, so it's safe beside uncommitted changes. Git won't move a branch another
+          // worktree has checked out.
+          ...(ref.worktree || !ref.upstream || ref.gone
             ? []
-            : [{ label: `Pull ${ref.short}`, icon: 'pull' as const, run: () => session.run(() => PullBranch(path, ref.short)) }]),
-          ...(ref.head
-            ? []
-            : [
-                {
-                  label: `Push ${ref.short} to ${remoteOf(ref).remote}`,
-                  icon: 'push' as const,
-                  run: push(path, remoteOf(ref).remote, 'branch', ref.short),
-                },
-              ]),
+            : [{ label: `Pull ${ref.short}`, icon: 'pull' as const, run: () => session.run(() => (ref.head ? Pull(path, '') : PullBranch(path, ref.short))) }]),
+          { label: pushLabel(ref), icon: 'push', run: () => session.run(() => PushBranch(path, ref.short)) },
         ],
         [
           {

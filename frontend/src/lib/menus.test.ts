@@ -1,7 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Ref, Row } from './graph/rowCache'
+import { Pull, PullBranch, PushBranch } from '../../wailsjs/go/app/App.js'
 import { session } from './session.svelte'
 import { stackItems, commitItems, commitMenuItems, deleteBranchDialog, deleteWorktreeBranchDialog, dropItems, groups, refItems, upstreamDialog, type MenuContext } from './menus'
+
+vi.mock('../../wailsjs/go/app/App.js', async (original) => ({
+  ...(await original<typeof import('../../wailsjs/go/app/App.js')>()),
+  Pull: vi.fn(async () => {}),
+  PullBranch: vi.fn(async () => {}),
+  PushBranch: vi.fn(async () => {}),
+}))
 
 // Its messages listen for events from the app, which isn't here.
 vi.mock('./toasts.svelte', () => ({ toasts: { show: vi.fn() } }))
@@ -291,10 +299,48 @@ describe('Pull on a branch', () => {
     expect(pull(tracking)).toEqual(['Pull feat'])
   })
 
-  it('is not offered on the checked-out branch, or without an upstream', () => {
-    expect(pull({ ...tracking, head: true })).toEqual([])
+  it('is offered on the checked-out branch too', () => {
+    expect(pull({ ...tracking, head: true })).toEqual(['Pull feat'])
+  })
+
+  it('is not offered without an upstream', () => {
     expect(pull(ref('feat', 'local'))).toEqual([])
     expect(pull({ ...tracking, gone: true })).toEqual([])
+  })
+
+  it('goes through the toolbar\'s pull on the checked-out branch, and fast-forwards any other', async () => {
+    const item = (r: Ref) => refItems(r, ctx('main')).find((i) => i.label === 'Pull feat')!
+    await item({ ...tracking, head: true }).run?.()
+    expect(Pull).toHaveBeenCalledWith('/r', '')
+    expect(PullBranch).not.toHaveBeenCalled()
+    await item(tracking).run?.()
+    expect(PullBranch).toHaveBeenCalledWith('/r', 'feat')
+  })
+})
+
+describe('Push on a branch', () => {
+  const push = (r: Ref) => labels(refItems(r, ctx('main'))).filter((l) => l.startsWith('Push'))
+
+  it('names the remote it goes to', () => {
+    expect(push({ ...ref('feat', 'local'), upstream: 'origin/feat' })).toEqual(['Push feat to origin'])
+    expect(push({ ...ref('feat', 'local'), upstream: 'fork/a/feat' })).toEqual(['Push feat to fork/a/feat'])
+  })
+
+  it('names the remote branch when it is called something else', () => {
+    expect(push({ ...ref('feat', 'local'), upstream: 'origin/other' })).toEqual(['Push feat to origin/other'])
+  })
+
+  it('names no remote when there is no upstream, or the upstream is a local branch', () => {
+    expect(push(ref('feat', 'local'))).toEqual(['Push feat'])
+    expect(push({ ...ref('feat', 'local'), upstream: 'main' })).toEqual(['Push feat'])
+  })
+
+  it('is offered on the checked-out branch and on one in another worktree', async () => {
+    expect(push({ ...ref('feat', 'local', true), upstream: 'origin/feat' })).toEqual(['Push feat to origin'])
+    const inTree = { ...ref('feat', 'local'), worktree: '/wt/feat' }
+    expect(push(inTree)).toEqual(['Push feat'])
+    await refItems(inTree, ctx('main')).find((i) => i.label === 'Push feat')!.run?.()
+    expect(PushBranch).toHaveBeenCalledWith('/r', 'feat')
   })
 })
 

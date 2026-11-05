@@ -1691,6 +1691,37 @@ import Kept from 'kept'
   })
 })
 
+// #516
+test.describe('pushing and pulling one branch from its menu', () => {
+  const refs = [branch('main', { head: true, upstream: 'origin/main' }), branch('feat', { upstream: 'origin/other' }), branch('fresh')]
+  const item = async (page: Page, submenu: string, name: string) => {
+    await open(page, 'commitMenu', { responses: { Refs: refs } })
+    await page.getByRole('menuitem', { name: submenu, exact: true }).hover()
+    await page.getByRole('menuitem', { name, exact: true }).click()
+  }
+
+  test('pushes a branch that is not checked out', async ({ page }) => {
+    await item(page, 'feat', 'Push feat to origin/other')
+    await expect.poll(() => calls(page, 'PushBranch')).toEqual([['/r', 'feat']])
+  })
+
+  test('pushes a branch that has no upstream yet', async ({ page }) => {
+    await item(page, 'fresh', 'Push fresh')
+    await expect.poll(() => calls(page, 'PushBranch')).toEqual([['/r', 'fresh']])
+  })
+
+  test('pushes the checked-out branch', async ({ page }) => {
+    await item(page, 'main', 'Push main to origin')
+    await expect.poll(() => calls(page, 'PushBranch')).toEqual([['/r', 'main']])
+  })
+
+  test('pulls the checked-out branch the way the toolbar does', async ({ page }) => {
+    await item(page, 'main', 'Pull main')
+    await expect.poll(() => calls(page, 'Pull')).toEqual([['/r', '']])
+    expect(await calls(page, 'PullBranch')).toEqual([])
+  })
+})
+
 test.describe('views loaded on demand', () => {
   test('shows the view once its code loads', async ({ page }) => {
     await open(page, 'lazy')

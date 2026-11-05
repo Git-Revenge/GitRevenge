@@ -265,34 +265,82 @@ func (a *App) PushCurrent(path string, force bool) error {
 		if st.Head == "" {
 			return userError("HEAD is detached. Check out a branch to push it.")
 		}
-		p := git.PushOptions{Refspec: st.Head}
-		if remote, branch, ok := strings.Cut(st.Upstream, "/"); ok {
-			p.Remote, p.Refspec = remote, st.Head+":"+branch
-		} else {
-			remotes, err := r.Git.Remotes(ctx)
-			if err != nil {
-				return err
-			}
-			switch {
-			case len(remotes) == 0:
-				return userError("This repository has no remotes. Add one first.")
-			case len(remotes) == 1:
-				p.Remote = remotes[0].Name
-			default:
-				p.Remote = "origin"
-				if !hasRemote(remotes, "origin") {
-					return userError("This branch has no upstream and there's no \"origin\" remote. Set an upstream first.")
-				}
-			}
-			p.SetUpstream = true
+		p, upstream, err := pushTarget(ctx, r.Git, st.Head)
+		if err != nil {
+			return err
 		}
 		p.ForceWithLease = force
 		if err := r.Git.Push(ctx, p, o); err != nil {
-			return pushRefusal(ctx, r.Git, st.Head, st.Upstream, err)
+			return pushRefusal(ctx, r.Git, st.Head, upstream, err)
 		}
 		a.pushNotesTo(ctx, r, p.Remote, o)
 		return nil
 	})
+}
+
+// PushBranch pushes one branch, checked out or not, to the same place PushCurrent would. It says
+// what happened, since a branch that isn't checked out changes nothing else on screen.
+func (a *App) PushBranch(path, branch string) error {
+	return a.runNetwork(path, "push", func(ctx context.Context, r *session.Repo, o git.NetOptions) error {
+		p, upstream, err := pushTarget(ctx, r.Git, branch)
+		if err != nil {
+			return err
+		}
+		// Asked before pushing, which moves the remote-tracking branch.
+		current := upstream != "" && sameCommit(ctx, r.Git, "refs/heads/"+branch, "refs/remotes/"+upstream)
+		if err := r.Git.Push(ctx, p, o); err != nil {
+			return pushRefusal(ctx, r.Git, branch, upstream, err)
+		}
+		a.pushNotesTo(ctx, r, p.Remote, o)
+		where := p.Remote
+		if upstream != "" && upstream != p.Remote+"/"+branch {
+			where = upstream
+		}
+		if current {
+			a.notice(r.Path, branch+" is already up to date on "+where+".")
+		} else {
+			a.notice(r.Path, "Pushed "+branch+" to "+where+".")
+		}
+		return nil
+	})
+}
+
+// pushTarget works out where a branch pushes: to its upstream if it tracks a remote branch,
+// otherwise to the only remote (or "origin"), recording that as the upstream. upstream is the
+// short name of what it already tracks there, or "".
+func pushTarget(ctx context.Context, g *git.Repo, branch string) (p git.PushOptions, upstream string, err error) {
+	source := "refs/heads/" + branch
+	// A remote of "." means it tracks a local branch, which isn't somewhere to push.
+	if remote, merge, err := g.BranchUpstream(ctx, branch); err == nil && remote != "." {
+		upstream = remote + "/" + strings.TrimPrefix(merge, "refs/heads/")
+		return git.PushOptions{Remote: remote, Refspec: source + ":" + merge}, upstream, nil
+	}
+	remotes, err := g.Remotes(ctx)
+	if err != nil {
+		return p, "", err
+	}
+	p = git.PushOptions{Refspec: source, SetUpstream: true}
+	switch {
+	case len(remotes) == 0:
+		return p, "", userError("This repository has no remotes. Add one first.")
+	case len(remotes) == 1:
+		p.Remote = remotes[0].Name
+	case hasRemote(remotes, "origin"):
+		p.Remote = "origin"
+	default:
+		return p, "", userError("This branch has no upstream and there's no \"origin\" remote. Set an upstream first.")
+	}
+	return p, "", nil
+}
+
+// sameCommit reports whether two refs both exist and point at the same commit.
+func sameCommit(ctx context.Context, g *git.Repo, a, b string) bool {
+	first, err := g.ReadString(ctx, "rev-parse", "--verify", "-q", a)
+	if err != nil {
+		return false
+	}
+	second, err := g.ReadString(ctx, "rev-parse", "--verify", "-q", b)
+	return err == nil && first == second
 }
 
 func hasRemote(rs []git.Remote, name string) bool {
@@ -304,11 +352,10 @@ func hasRemote(rs []git.Remote, name string) bool {
 	return false
 }
 
-// PushRef pushes or deletes one ref on a remote: kind is "branch", "tag", "delete-branch"
-// or "delete-tag".
+// PushRef pushes a tag, or deletes a ref from a remote: kind is "tag", "delete-branch" or
+// "delete-tag". PushBranch pushes branches.
 func (a *App) PushRef(path, remote, kind, name string) error {
 	refspec := map[string]string{
-		"branch":        "refs/heads/" + name,
 		"tag":           "refs/tags/" + name,
 		"delete-branch": ":refs/heads/" + name,
 		"delete-tag":    ":refs/tags/" + name,
