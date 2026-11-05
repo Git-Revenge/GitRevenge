@@ -17,6 +17,7 @@ Some files read better rendered than as text. In the **File** layout, these get 
 | Files | Shown as |
 |---|---|
 | Markdown (`.md`, `.markdown`) | formatted text, including LaTeX math and Mermaid diagrams |
+| MDX (`.mdx`) | the same, showing the Markdown it contains. Imports, exports and frontmatter are hidden, a component shows what's inside it, and one with nothing inside shows its name. None of its code runs |
 | CSV and TSV (`.csv`, `.tsv`, `.tab`) | a table you can sort by any column |
 | JSON, YAML and TOML | a tree you can expand and search |
 | LaTeX (`.tex`, `.latex`) | typeset math |

@@ -1,11 +1,15 @@
 <script lang="ts">
   // A markdown file rendered as a document. Relative images load from the repository at the
-  // same version; relative links open that file. Remote images aren't fetched.
+  // same version; relative links open that file. Remote images aren't fetched. MDX shows as the
+  // Markdown it contains; none of its code runs.
   import Markdown from '../../Markdown.svelte'
   import type { PreviewProps } from './registry'
+  import { mdxToMarkdown } from '../../markdown/mdx'
   import { resolveInRepo } from './paths'
 
   let { path, text, loadImage, openFile }: PreviewProps = $props()
+
+  let markdown = $derived(/\.mdx$/i.test(path) ? mdxToMarkdown(text) : text)
 
   async function resolveImage(src: string): Promise<string> {
     const file = resolveInRepo(path, src)
@@ -18,7 +22,7 @@
   }
 </script>
 
-<div class="preview"><Markdown {text} document math {resolveImage} {onLink} /></div>
+<div class="preview"><Markdown text={markdown} document math {resolveImage} {onLink} /></div>
 
 <style>
   .preview {

@@ -170,6 +170,12 @@ const mounts = {
     const { default: RebaseEditor } = await import('../src/lib/RebaseEditor.svelte')
     mount(RebaseEditor, { target: host, props: { path: '/r', base: 'b'.repeat(40), onClose: record('close') } })
   },
+  async markdownPreview() {
+    const { previewerFor } = await import('../src/lib/diff/previews/registry')
+    const { path, text } = scenario.responses?.File as { path: string; text: string }
+    const component = previewerFor(path)!.component
+    mount(component, { target: host, props: { path, text, loadImage: async () => '', openFile: record('openFile') } })
+  },
   async upstreamDialog() {
     const { default: Dialog } = await import('../src/lib/Dialog.svelte')
     const { upstreamDialog } = await import('../src/lib/menus')
@@ -246,6 +252,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'rebaseEditor':
     await mounts.rebaseEditor()
+    break
+  case 'markdownPreview':
+    await mounts.markdownPreview()
     break
   case 'upstreamDialog':
     await mounts.upstreamDialog()
