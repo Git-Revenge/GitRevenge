@@ -151,6 +151,8 @@ export function Pull(arg1:string,arg2:string):Promise<void>;
 
 export function PullBranch(arg1:string,arg2:string):Promise<void>;
 
+export function PushBranch(arg1:string,arg2:string):Promise<void>;
+
 export function PushCurrent(arg1:string,arg2:boolean):Promise<void>;
 
 export function PushRef(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
