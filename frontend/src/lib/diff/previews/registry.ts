@@ -33,7 +33,7 @@ export interface Previewer {
  * <img> element, where its scripts never run.
  */
 export const PREVIEWERS: Previewer[] = [
-  { id: 'markdown', matches: (p) => /\.(md|markdown|mdown|mkd|mkdn)$/i.test(p), component: MarkdownPreview },
+  { id: 'markdown', matches: (p) => /\.(md|mdx|markdown|mdown|mkd|mkdn)$/i.test(p), component: MarkdownPreview },
   { id: 'csv', matches: (p) => /\.(csv|tsv|tab)$/i.test(p), component: CsvPreview },
   { id: 'structured', matches: (p) => formatOf(p) !== null, component: TreePreview },
   { id: 'tex', matches: (p) => /\.(tex|latex)$/i.test(p), component: TexPreview },

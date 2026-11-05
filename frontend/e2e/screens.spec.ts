@@ -1626,6 +1626,71 @@ test.describe('pulling a branch that is not checked out', () => {
   })
 })
 
+// #517
+test.describe('an MDX file in the rendered preview', () => {
+  const text = `---
+title: Getting started
+---
+
+import Tabs from './Tabs'
+export const version = alert('ran')
+
+# Getting started
+
+{/* a note for authors */}
+
+Some **bold** text with a [link](other.mdx) and \`<Inline />\` code.
+
+<Tabs>
+  <TabItem value="one" onClick={() => alert('ran')}>
+    Inside a tab
+
+    - first
+    - second
+  </TabItem>
+</Tabs>
+
+<Figure src="a.png" />
+
+\`\`\`jsx
+import Kept from 'kept'
+<Kept />
+\`\`\`
+`
+
+  test('renders the Markdown and hides the code around it', async ({ page }) => {
+    const dialogs: string[] = []
+    page.on('dialog', (d) => {
+      dialogs.push(d.message())
+      void d.dismiss()
+    })
+    await open(page, 'markdownPreview', { responses: { File: { path: 'docs/start.mdx', text } } })
+    await expect(page.getByRole('heading', { name: 'Getting started' })).toBeVisible()
+    await expect(page.locator('strong')).toHaveText('bold')
+    await expect(page.locator('li')).toHaveText(['first', 'second'])
+    await expect(page.locator('p', { hasText: 'Inside a tab' })).toBeVisible()
+    await expect(page.locator('code', { hasText: '<Inline />' })).toBeVisible()
+    await expect(page.locator('code', { hasText: '<Figure />' })).toBeVisible()
+    await expect(page.locator('pre code')).toHaveText("import Kept from 'kept'\n<Kept />\n")
+
+    const shown = (await page.locator('.preview').innerText()).replace(/\s+/g, ' ')
+    for (const hidden of ['title:', 'import Tabs', 'export const', 'a note for authors', '<Tabs', 'TabItem', 'onClick']) expect(shown).not.toContain(hidden)
+    expect(dialogs).toEqual([])
+  })
+
+  test('opens a relative link', async ({ page }) => {
+    await open(page, 'markdownPreview', { responses: { File: { path: 'docs/start.mdx', text } } })
+    await page.getByRole('link', { name: 'link' }).click()
+    await expect.poll(() => events(page, 'openFile')).toEqual([['docs/other.mdx']])
+  })
+
+  test('leaves a plain Markdown file as it was', async ({ page }) => {
+    await open(page, 'markdownPreview', { responses: { File: { path: 'a.md', text: '# T\n\nimport x\n\n<Tabs>\n' } } })
+    await expect(page.locator('.preview')).toContainText('import x')
+    await expect(page.locator('.preview')).toContainText('<Tabs>')
+  })
+})
+
 test.describe('views loaded on demand', () => {
   test('shows the view once its code loads', async ({ page }) => {
     await open(page, 'lazy')
