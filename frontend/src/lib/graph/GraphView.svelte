@@ -20,7 +20,6 @@
     onSelect,
     onContext,
     onDrop,
-    onLayout,
     onSelectedRefs,
   }: {
     path: string
@@ -30,8 +29,6 @@
     onDrop?: (source: Row, sourceRefs: Ref[], target: Row, targetRefs: Ref[], x: number, y: number) => void
     /** auto is true for the automatic selection of HEAD when the graph first loads. */
     onSelect?: (row: Row | undefined, auto: boolean) => void
-    /** Where the graph's columns are, whenever they move. */
-    onLayout?: (layout: Layout) => void
     /** Labels for the selected commit's refs, whenever they change. They can load after the selection. */
     onSelectedRefs?: (labels: RefLabel[]) => void
   } = $props()
@@ -267,6 +264,8 @@
     const dpr = window.devicePixelRatio || 1
     const w = scroller.clientWidth
     const h = scroller.clientHeight
+    // Hidden while a file is open. Coming back resizes it, which draws it again.
+    if (!w || !h) return
     if (h !== viewH) viewH = h
     if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
       canvas.width = Math.round(w * dpr)
@@ -305,7 +304,6 @@
     const lay = layoutColumns(w, graphW, density, firstLane, remote)
     if (!columns || columns.width !== lay.width || columns.graphW !== lay.graphW || columns.density !== lay.density) {
       columns = lay
-      onLayout?.(lay)
     }
     const th = theme()
     const now = Date.now() / 1000
@@ -855,6 +853,9 @@
     position: relative;
     flex: 1;
     min-height: 0;
+    /* The canvas keeps its size until the next frame. If it overflowed when the column header
+       arrived, an outer scrollbar would narrow the graph enough to send the header away again. */
+    overflow: hidden;
   }
 
   canvas {

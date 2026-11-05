@@ -16,7 +16,7 @@
   import type { DiffTarget } from './diff/DiffView.svelte'
   import Lazy from './ui/Lazy.svelte'
   import GraphView from './graph/GraphView.svelte'
-  import { laneX, type Layout, type RefLabel } from './graph/draw'
+  import type { RefLabel } from './graph/draw'
   import type { Ref, Row } from './graph/rowCache'
   import { session } from './session.svelte'
   import Sidebar from './Sidebar.svelte'
@@ -56,7 +56,6 @@
   let changes = $state<number | null>(null)
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
   /** Where the graph's columns are, so the row of changes above it lines up with them. */
-  let graphLayout = $state<Layout>()
 
   let dialog = $state<DialogSpec | null>(null)
   let remotesOpen = $state(false)
@@ -187,8 +186,6 @@
       class="wip"
       class:active={view === 'wip'}
       aria-pressed={view === 'wip'}
-      style:--node="{graphLayout ? graphLayout.refW + laneX(0, graphLayout.m) : 22}px"
-      style:--text="{graphLayout?.textX ?? 44}px"
       onclick={() => {
         view = 'wip'
         right.hidden = false
@@ -209,7 +206,7 @@
     <!-- The graph stays mounted while a diff is open, so scroll position and selection
          survive returning to it. -->
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {onSelect} onLayout={(l) => (graphLayout = l)} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {onSelect} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           openMenu(commitMenuItems(row, refs, ctx), x, y)}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
@@ -365,8 +362,8 @@
     display: none;
   }
 
-  /* A quiet row that lines up with the graph below: a dashed node where the work will land,
-     and its words where commit messages start. */
+  /* A quiet row at the left of the panel. It keeps its place whatever the graph below is doing,
+     including when a file has replaced it. */
   .wip-row {
     flex: none;
     display: flex;
@@ -388,7 +385,7 @@
     align-items: center;
     gap: 10px;
     min-height: 38px;
-    padding: 0 14px 0 var(--text);
+    padding: 0 14px 0 44px;
     background: none;
     border: none;
     border-radius: 0;
@@ -440,7 +437,7 @@
 
   .dot {
     position: absolute;
-    left: calc(var(--node) - 8px);
+    left: 14px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
