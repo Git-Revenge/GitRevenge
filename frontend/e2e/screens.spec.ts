@@ -1124,8 +1124,6 @@ test.describe('before the first load has answered', () => {
     const titleLeft = async () => (await bar(page).locator('.wip-title').boundingBox())!.x
     await expect(bar(page)).toContainText('Working tree')
     await expect(bar(page)).not.toContainText(/clean/i)
-    // The row lines up with the graph, which has to draw once to say where that is.
-    await page.waitForTimeout(100)
     const before = await titleLeft()
     await expect(bar(page)).toContainText(/clean/i)
     expect(await titleLeft()).toBe(before)
@@ -1221,15 +1219,29 @@ test.describe('before the first load has answered', () => {
       expect(color).not.toBe(selected)
     })
 
-    test('lines its words up with the commit messages', async ({ page }) => {
+    // #514: it followed the graph's columns, and sat under its own circle with a file open.
+    test('keeps its place whatever the graph is doing', async ({ page }) => {
       await page.setViewportSize({ width: 1600, height: 800 })
       await open(page, 'repoView', dirty([one]))
       await expect(bar(page)).toContainText('1 file changed')
-      await expect.poll(async () => {
-        const title = (await bar(page).locator('.wip-title').boundingBox())!
-        const message = (await page.locator('.columns').getByText('Message').boundingBox())!
-        return Math.abs(title.x - message.x)
-      }).toBeLessThanOrEqual(1)
+      const title = bar(page).locator('.wip-title')
+      await expect(page.locator('.columns')).toBeVisible()
+      const wide = (await title.boundingBox())!.x
+      expect(wide - (await page.locator('.main').boundingBox())!.x).toBe(44)
+
+      await page.setViewportSize({ width: 900, height: 800 })
+      await expect(page.locator('.columns')).toHaveCount(0)
+      expect((await title.boundingBox())!.x).toBe(wide)
+
+      await page.setViewportSize({ width: 1600, height: 800 })
+      await bar(page).click()
+      await page.getByRole('button', { name: /a\.txt/ }).first().click()
+      await expect(page.locator('.scroller')).toBeHidden()
+      await page.waitForTimeout(100)
+      const left = (await title.boundingBox())!.x
+      expect(left).toBe(wide)
+      const dot = (await bar(page).locator('.dot').boundingBox())!
+      expect(dot.x + dot.width).toBeLessThanOrEqual(left)
     })
   })
 
