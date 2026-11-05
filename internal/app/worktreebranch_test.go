@@ -305,9 +305,122 @@ func TestClosingTheMainTabKeepsAWorktreesTabWatching(t *testing.T) {
 	if err := a.CloseRepo(path); err != nil {
 		t.Fatal(err)
 	}
-	// A worktree's tab watches its own git folder, so switching branches is what it can see.
-	fx.Git("-C", dir, "checkout", "-q", "-b", "made-outside")
+	fx.Git("branch", "made-outside")
 	waitForBranch(t, a, other.Path, "made-outside")
+}
+
+// openWorktreeTab opens dir as a tab and waits for its first load, so that only the watcher can
+// report what comes next.
+func openWorktreeTab(t *testing.T, a *App, dir string) string {
+	t.Helper()
+	tab, err := a.OpenRepo(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loadedPage(t, a, tab.Path)
+	return tab.Path
+}
+
+func waitForSubject(t *testing.T, a *App, path, subject string) {
+	t.Helper()
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+		for _, r := range loadedPage(t, a, path).Rows {
+			if r.Subject == subject {
+				return
+			}
+		}
+	}
+	t.Fatalf("%q never appeared", subject)
+}
+
+// #512: refs live in the git folder a linked worktree shares with the main one.
+func TestAWorktreesTabNoticesABranchMadeElsewhere(t *testing.T) {
+	a, fx, _, dir := worktreeFixture(t)
+	path := openWorktreeTab(t, a, dir)
+	fx.Git("branch", "made-outside")
+	waitForBranch(t, a, path, "made-outside")
+}
+
+func TestAWorktreesTabNoticesACommitInTheMainWorktree(t *testing.T) {
+	a, fx, _, dir := worktreeFixture(t)
+	path := openWorktreeTab(t, a, dir)
+	fx.CommitFile("elsewhere.txt", "1", "committed in main")
+	waitForSubject(t, a, path, "committed in main")
+}
+
+func TestAWorktreesTabNoticesACommitMadeInItOutsideTheApp(t *testing.T) {
+	a, fx, _, dir := worktreeFixture(t)
+	path := openWorktreeTab(t, a, dir)
+	fx.Git("-C", dir, "commit", "--allow-empty", "-m", "committed in a terminal")
+	waitForSubject(t, a, path, "committed in a terminal")
+}
+
+func TestAWorktreesTabNoticesTheMainWorktreeSwitchingBranch(t *testing.T) {
+	a, fx, _, dir := worktreeFixture(t)
+	path := openWorktreeTab(t, a, dir)
+	fx.Git("branch", "next")
+	waitForBranch(t, a, path, "next")
+	fx.Git("checkout", "-q", "next")
+	waitForWorktree(t, a, path, "next", true)
+}
+
+func TestTheMainTabStillNoticesThingsWithAWorktreeTabOpen(t *testing.T) {
+	a, fx, path, dir := worktreeFixture(t)
+	openWorktreeTab(t, a, dir)
+	fx.Git("branch", "made-outside")
+	waitForBranch(t, a, path, "made-outside")
+}
+
+func TestClosingOneWorktreesTabKeepsAnothersWatching(t *testing.T) {
+	a, fx, _, dir := worktreeFixture(t)
+	second := filepath.Join(t.TempDir(), "second-wt")
+	fx.Git("worktree", "add", "-b", "second", second)
+	closing := openWorktreeTab(t, a, dir)
+	staying := openWorktreeTab(t, a, second)
+	if err := a.CloseRepo(closing); err != nil {
+		t.Fatal(err)
+	}
+	fx.Git("branch", "made-outside")
+	waitForBranch(t, a, staying, "made-outside")
+}
+
+// A session can restore tabs in any order, so the inner watch can start first.
+func TestTheMainTabOpenedAfterAWorktreesTabBothWatch(t *testing.T) {
+	a, fx, path, dir := worktreeFixture(t)
+	other := openWorktreeTab(t, a, dir)
+	if err := a.CloseRepo(path); err != nil {
+		t.Fatal(err)
+	}
+	path = openWorktreeTab(t, a, fx.Dir)
+	fx.Git("branch", "made-outside")
+	waitForBranch(t, a, path, "made-outside")
+	waitForBranch(t, a, other, "made-outside")
+}
+
+func TestClosingOneOfThreeTabsKeepsTheOtherTwoWatching(t *testing.T) {
+	a, fx, path, dir := worktreeFixture(t)
+	second := filepath.Join(t.TempDir(), "second-wt")
+	fx.Git("worktree", "add", "-b", "second", second)
+	closing := openWorktreeTab(t, a, dir)
+	staying := openWorktreeTab(t, a, second)
+	if err := a.CloseRepo(closing); err != nil {
+		t.Fatal(err)
+	}
+	fx.Git("branch", "made-outside")
+	waitForBranch(t, a, path, "made-outside")
+	waitForBranch(t, a, staying, "made-outside")
+}
+
+func TestReopeningAWorktreesTabKeepsEveryTabWatching(t *testing.T) {
+	a, fx, path, dir := worktreeFixture(t)
+	other := openWorktreeTab(t, a, dir)
+	if err := a.CloseRepo(other); err != nil {
+		t.Fatal(err)
+	}
+	other = openWorktreeTab(t, a, dir)
+	fx.Git("branch", "made-outside")
+	waitForBranch(t, a, path, "made-outside")
+	waitForBranch(t, a, other, "made-outside")
 }
 
 func waitForWorktree(t *testing.T, a *App, path, name string, want bool) {
