@@ -32,12 +32,15 @@ type Repo struct {
 	// Path is the absolute work tree root; it is also the repo's ID.
 	Path string
 	// GitDir is the absolute git directory (usually Path/.git).
-	GitDir  string
-	Git     *git.Repo
-	Objects *git.ObjectReader
-	watcher *watch.Watcher
-	graph   *graphLoader
-	changes changeGate
+	GitDir string
+	// CommonDir is the git directory shared by all of its worktrees: GitDir, except in a linked
+	// worktree.
+	CommonDir string
+	Git       *git.Repo
+	Objects   *git.ObjectReader
+	watcher   *watch.Watcher
+	graph     *graphLoader
+	changes   changeGate
 }
 
 // changeGate holds back reports of changes while an operation runs.
@@ -217,18 +220,18 @@ func (m *Manager) SetReadAhead(n int) {
 
 // Resolve returns the work tree root containing path.
 func (m *Manager) Resolve(ctx context.Context, path string) (string, error) {
-	root, _, err := m.resolve(ctx, path)
+	root, _, _, err := m.resolve(ctx, path)
 	return root, err
 }
 
-// resolve returns the work tree root and git directory containing path.
-func (m *Manager) resolve(ctx context.Context, path string) (root, gitDir string, err error) {
+// resolve returns the work tree root, git directory and common git directory containing path.
+func (m *Manager) resolve(ctx context.Context, path string) (root, gitDir, commonDir string, err error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	if info, err := os.Stat(abs); err != nil || !info.IsDir() {
-		return "", "", fmt.Errorf("%s: folder not found", abs)
+		return "", "", "", fmt.Errorf("%s: folder not found", abs)
 	}
 	// --show-toplevel fails outside a work tree, so classify the folder first.
 	out, err := m.runner.Output(ctx, git.Cmd{
@@ -239,40 +242,41 @@ func (m *Manager) resolve(ctx context.Context, path string) (root, gitDir string
 	if err != nil {
 		var gerr *git.Error
 		if errors.As(err, &gerr) && strings.Contains(gerr.Stderr, "not a git repository") {
-			return "", "", fmt.Errorf("%s: %w", abs, ErrNotRepo)
+			return "", "", "", fmt.Errorf("%s: %w", abs, ErrNotRepo)
 		}
-		return "", "", err
+		return "", "", "", err
 	}
 	f := strings.Fields(out)
 	if len(f) != 2 {
-		return "", "", fmt.Errorf("unexpected rev-parse output %q", out)
+		return "", "", "", fmt.Errorf("unexpected rev-parse output %q", out)
 	}
 	switch f[0] + " " + f[1] {
 	case "true false":
-		return "", "", fmt.Errorf("%s: %w", abs, ErrBare)
+		return "", "", "", fmt.Errorf("%s: %w", abs, ErrBare)
 	case "false false":
 		// Inside a .git directory.
-		return "", "", fmt.Errorf("%s: %w", abs, ErrNotRepo)
+		return "", "", "", fmt.Errorf("%s: %w", abs, ErrNotRepo)
 	}
 	out, err = m.runner.Output(ctx, git.Cmd{
 		Dir:      abs,
-		Args:     []string{"rev-parse", "--show-toplevel", "--absolute-git-dir"},
+		Args:     []string{"rev-parse", "--show-toplevel", "--absolute-git-dir", "--path-format=absolute", "--git-common-dir"},
 		ReadOnly: true,
 	})
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	lines := strings.Split(out, "\n")
-	if len(lines) != 2 {
-		return "", "", fmt.Errorf("unexpected rev-parse output %q", out)
+	if len(lines) != 3 {
+		return "", "", "", fmt.Errorf("unexpected rev-parse output %q", out)
 	}
-	return filepath.Clean(filepath.FromSlash(lines[0])), filepath.Clean(filepath.FromSlash(lines[1])), nil
+	clean := func(p string) string { return filepath.Clean(filepath.FromSlash(p)) }
+	return clean(lines[0]), clean(lines[1]), clean(lines[2]), nil
 }
 
 // Open opens the repository containing path as a tab, or returns it if already open, and
 // records it as most recently used and active.
 func (m *Manager) Open(ctx context.Context, path string) (*Repo, error) {
-	root, gitDir, err := m.resolve(ctx, path)
+	root, gitDir, commonDir, err := m.resolve(ctx, path)
 	if err != nil {
 		return nil, err
 	}
@@ -282,10 +286,11 @@ func (m *Manager) Open(ctx context.Context, path string) (*Repo, error) {
 	r := m.findLocked(root)
 	if r == nil {
 		r = &Repo{
-			Path:    root,
-			GitDir:  gitDir,
-			Git:     git.OpenRepo(m.runner, root),
-			Objects: git.NewObjectReader(m.runner, root),
+			Path:      root,
+			GitDir:    gitDir,
+			CommonDir: commonDir,
+			Git:       git.OpenRepo(m.runner, root),
+			Objects:   git.NewObjectReader(m.runner, root),
 		}
 		onGraph := m.onGraph
 		ahead := m.readAhead
@@ -325,12 +330,17 @@ func (m *Manager) Close(path string) error {
 	m.repos = slices.Delete(m.repos, i, i+1)
 	// The file watching library keeps one tree of watches for the whole process. Stopping a watch
 	// inside another one, as a linked worktree's git folder is inside the main repository's, also
-	// silences the outer one. Starting them again brings them back.
+	// silences the outer one. Starting them again brings them back, but only once all of them
+	// have stopped, or stopping a later one would silence one already started.
+	var restart []*Repo
 	for _, r := range m.repos {
 		if r.watcher != nil && watchesOverlap(closed, r) {
 			r.watcher.Close()
-			r.watcher = m.watchLocked(r)
+			restart = append(restart, r)
 		}
+	}
+	for _, r := range restart {
+		r.watcher = m.watchLocked(r)
 	}
 	return m.settings.Update(func(s *settings.Settings) {
 		s.OpenTabs = m.pathsLocked()
@@ -350,8 +360,8 @@ func watchesOverlap(a, b *Repo) bool {
 		rel, err := filepath.Rel(base, dir)
 		return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 	}
-	for _, x := range []string{a.Path, a.GitDir} {
-		for _, y := range []string{b.Path, b.GitDir} {
+	for _, x := range []string{a.Path, a.GitDir, a.CommonDir} {
+		for _, y := range []string{b.Path, b.GitDir, b.CommonDir} {
 			if inside(x, y) || inside(y, x) {
 				return true
 			}
@@ -459,8 +469,9 @@ func (m *Manager) watchLocked(r *Repo) *watch.Watcher {
 	}
 	r.changes.mu.Unlock()
 	w, err := m.startWatch(watch.Options{
-		Root:   r.Path,
-		GitDir: r.GitDir,
+		Root:      r.Path,
+		GitDir:    r.GitDir,
+		CommonDir: r.CommonDir,
 		FilterWorkTree: func(paths []string) []string {
 			kept, err := r.Git.NotIgnored(context.Background(), paths)
 			if err != nil {

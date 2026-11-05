@@ -3,6 +3,7 @@ package watch
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"syscall"
 	"testing"
@@ -31,6 +32,16 @@ func (r recorder) waitFor(t *testing.T, want Kind) {
 		case <-timeout:
 			t.Fatalf("timed out waiting for %v; saw %v", want.Names(), seen.Names())
 		}
+	}
+}
+
+// expectNothing fails if anything is reported for a while.
+func (r recorder) expectNothing(t *testing.T) {
+	t.Helper()
+	select {
+	case k := <-r.ch:
+		t.Errorf("reported %v", k.Names())
+	case <-time.After(500 * time.Millisecond):
 	}
 }
 
@@ -156,6 +167,63 @@ func TestClassifyGitPath(t *testing.T) {
 			t.Errorf("classifyGitPath(%q) = %v, want %v", path, got.Names(), want.Names())
 		}
 	}
+}
+
+func TestClassifyCommonPath(t *testing.T) {
+	tests := map[string]Kind{
+		"HEAD":                  Refs,
+		"refs/heads/x":          Refs,
+		"packed-refs":           Refs,
+		"FETCH_HEAD":            Refs,
+		"config":                Config,
+		"worktrees/other/HEAD":  Refs,
+		"index":                 0,
+		"ORIG_HEAD":             0,
+		"MERGE_HEAD":            0,
+		"rebase-merge/done":     0,
+		"objects/ab/cdef":       0,
+		"refs/heads/x.lock":     0,
+		"worktrees/other/index": 0,
+	}
+	for path, want := range tests {
+		if got := classifyCommonPath(path); got != want {
+			t.Errorf("classifyCommonPath(%q) = %v, want %v", path, got.Names(), want.Names())
+		}
+	}
+}
+
+// A linked worktree's refs live in the git directory it shares with the main worktree.
+func TestLinkedWorktreeReportsSharedRefs(t *testing.T) {
+	fx := gittest.New(t)
+	fx.Linear(1)
+	dir := filepath.Join(t.TempDir(), "wt")
+	fx.Git("worktree", "add", "-b", "feature", dir)
+	rec := recorder{ch: make(chan Kind, 64)}
+	w, err := New(Options{
+		Root:      dir,
+		GitDir:    fx.Path(".git/worktrees/wt"),
+		CommonDir: fx.Path(".git"),
+		Debounce:  50 * time.Millisecond,
+		OnChange:  rec.onChange,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(w.Close)
+
+	fx.Git("branch", "made-elsewhere")
+	rec.waitFor(t, Refs)
+	rec.drain()
+
+	// Its own HEAD still reports as a head change, not as a shared one.
+	fx.Git("-C", dir, "checkout", "-q", "-b", "other")
+	rec.waitFor(t, Head)
+	rec.drain()
+
+	// The main worktree's index is its own business.
+	fx.WriteFile("main-only.txt", "x")
+	fx.Git("add", "main-only.txt")
+	rec.expectNothing(t)
 }
 
 func TestKindNames(t *testing.T) {

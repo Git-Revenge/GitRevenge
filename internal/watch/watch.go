@@ -9,6 +9,7 @@ package watch
 import (
 	"errors"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -65,6 +66,9 @@ type Options struct {
 	// GitDir is the repository's git directory; usually Root/.git, but it can live
 	// elsewhere for linked worktrees and submodules.
 	GitDir string
+	// CommonDir is the git directory a linked worktree shares with the main one, which holds
+	// the refs. Empty, or the same as GitDir, when there's nothing else to watch.
+	CommonDir string
 	// Debounce is how long the tree must be quiet before changes are reported. Default 150ms.
 	Debounce time.Duration
 	// MaxWait bounds how long a constant stream of changes can delay a report. Default 1s.
@@ -100,6 +104,12 @@ func New(opts Options) (*Watcher, error) {
 	if g, err := filepath.EvalSymlinks(opts.GitDir); err == nil {
 		opts.GitDir = g
 	}
+	if opts.CommonDir != "" {
+		opts.CommonDir = filepath.Clean(opts.CommonDir)
+		if c, err := filepath.EvalSymlinks(opts.CommonDir); err == nil {
+			opts.CommonDir = c
+		}
+	}
 
 	w := &Watcher{
 		opts: opts,
@@ -111,11 +121,18 @@ func New(opts Options) (*Watcher, error) {
 	if err := notify.Watch(filepath.Join(opts.Root, "..."), w.events, notify.All); err != nil {
 		return nil, err
 	}
-	if !within(opts.GitDir, opts.Root) {
-		if err := notify.Watch(filepath.Join(opts.GitDir, "..."), w.events, notify.All); err != nil {
+	// A linked worktree's own git directory is inside the common one, so the common one covers
+	// both, and a repository's usual .git is inside the root.
+	watched := []string{opts.Root}
+	for _, dir := range []string{opts.CommonDir, opts.GitDir} {
+		if dir == "" || slices.ContainsFunc(watched, func(base string) bool { return within(dir, base) }) {
+			continue
+		}
+		if err := notify.Watch(filepath.Join(dir, "..."), w.events, notify.All); err != nil {
 			notify.Stop(w.events)
 			return nil, err
 		}
+		watched = append(watched, dir)
 	}
 	w.wg.Add(1)
 	go w.loop()
@@ -204,6 +221,11 @@ func (w *Watcher) classify(path string) (Kind, string) {
 	if rel, ok := relTo(path, w.opts.GitDir); ok {
 		return classifyGitPath(rel), ""
 	}
+	if w.opts.CommonDir != "" {
+		if rel, ok := relTo(path, w.opts.CommonDir); ok {
+			return classifyCommonPath(rel), ""
+		}
+	}
 	rel, ok := relTo(path, w.opts.Root)
 	if !ok || rel == "." {
 		return 0, ""
@@ -237,6 +259,20 @@ func classifyGitPath(rel string) Kind {
 	case "MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "BISECT_LOG", "BISECT_START",
 		"rebase-merge", "rebase-apply", "sequencer":
 		return State
+	}
+	return 0
+}
+
+// classifyCommonPath maps a path inside a linked worktree's common git directory to a Kind.
+// Only what's shared matters: the index and any merge in progress there belong to the main
+// worktree. Its HEAD counts as a change to refs, because that says which branch it has out.
+func classifyCommonPath(rel string) Kind {
+	if rel == "HEAD" {
+		return Refs
+	}
+	switch k := classifyGitPath(rel); k {
+	case Refs, Config:
+		return k
 	}
 	return 0
 }
