@@ -39,6 +39,11 @@ type SessionState struct {
 	InsightsTab string `json:"insightsTab"`
 	// InsightsTabID is Active's value for the Insights tab.
 	InsightsTabID string `json:"insightsTabId"`
+	// IgnoreTab is the repository the Ignore rules tab showed last time, or "" if it was
+	// closed.
+	IgnoreTab string `json:"ignoreTab"`
+	// IgnoreTabID is Active's value for the Ignore rules tab.
+	IgnoreTabID string `json:"ignoreTabId"`
 }
 
 // FailedRepo is a saved tab that could not be reopened.
@@ -140,6 +145,8 @@ func (a *App) RestoreSession() (SessionState, error) {
 		ConfigTabID:   settings.ConfigTabID,
 		InsightsTab:   m.Settings().Get().InsightsTab,
 		InsightsTabID: settings.InsightsTabID,
+		IgnoreTab:     m.Settings().Get().IgnoreTab,
+		IgnoreTabID:   settings.IgnoreTabID,
 	}
 	for _, r := range m.List() {
 		st.Tabs = append(st.Tabs, tabFor(ctx, r))

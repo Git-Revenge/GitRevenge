@@ -408,6 +408,8 @@ func (m *Manager) Restore(ctx context.Context) (active string, failed map[string
 		active = settings.ConfigTabID
 	case saved.ActiveTab == settings.InsightsTabID && saved.InsightsTab != "":
 		active = settings.InsightsTabID
+	case saved.ActiveTab == settings.IgnoreTabID && saved.IgnoreTab != "":
+		active = settings.IgnoreTabID
 	case r != nil:
 		active = r.Path
 	case len(m.repos) > 0:

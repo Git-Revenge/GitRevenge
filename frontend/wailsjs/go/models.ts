@@ -796,6 +796,8 @@ export namespace app {
 	    configTabId: string;
 	    insightsTab: string;
 	    insightsTabId: string;
+	    ignoreTab: string;
+	    ignoreTabId: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SessionState(source);
@@ -810,6 +812,8 @@ export namespace app {
 	        this.configTabId = source["configTabId"];
 	        this.insightsTab = source["insightsTab"];
 	        this.insightsTabId = source["insightsTabId"];
+	        this.ignoreTab = source["ignoreTab"];
+	        this.ignoreTabId = source["ignoreTabId"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1411,6 +1415,43 @@ export namespace git {
 	        this.created = source["created"];
 	    }
 	}
+	export class IgnoreCheck {
+	    matched: boolean;
+	    ignored: boolean;
+	    rule: IgnoreLine;
+	    tracked: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new IgnoreCheck(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.matched = source["matched"];
+	        this.ignored = source["ignored"];
+	        this.rule = this.convertValues(source["rule"], IgnoreLine);
+	        this.tracked = source["tracked"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class IgnorePreview {
 	    hidden: string[];
 	    tracked: string[];
@@ -1424,6 +1465,82 @@ export namespace git {
 	        this.hidden = source["hidden"];
 	        this.tracked = source["tracked"];
 	    }
+	}
+	export class IgnoreRuleStats {
+	    source: string;
+	    line: number;
+	    ignores: number;
+	    restores: number;
+	    tracked: number;
+	    paths: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new IgnoreRuleStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.source = source["source"];
+	        this.line = source["line"];
+	        this.ignores = source["ignores"];
+	        this.restores = source["restores"];
+	        this.tracked = source["tracked"];
+	        this.paths = source["paths"];
+	    }
+	}
+	export class IgnoreSource {
+	    source: string;
+	    path: string;
+	    scope: string;
+	    dir?: string;
+	    exists: boolean;
+	    rules: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new IgnoreSource(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.source = source["source"];
+	        this.path = source["path"];
+	        this.scope = source["scope"];
+	        this.dir = source["dir"];
+	        this.exists = source["exists"];
+	        this.rules = source["rules"];
+	    }
+	}
+	export class IgnoreStats {
+	    rules: IgnoreRuleStats[];
+	    truncated: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new IgnoreStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.rules = this.convertValues(source["rules"], IgnoreRuleStats);
+	        this.truncated = source["truncated"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class IgnoreTarget {
 	    scope: string;

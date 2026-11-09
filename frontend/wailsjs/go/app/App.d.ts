@@ -27,6 +27,8 @@ export function CancelNetwork(arg1:string):Promise<void>;
 
 export function CheckForUpdate(arg1:boolean):Promise<app.UpdateInfo>;
 
+export function CheckIgnorePath(arg1:string,arg2:string):Promise<git.IgnoreCheck>;
+
 export function ChooseAndOpenRepo():Promise<app.RepoTab>;
 
 export function ChooseFile(arg1:string):Promise<string>;
@@ -109,6 +111,10 @@ export function HideBranch(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function IgnoreFileNames(arg1:string):Promise<app.IgnoreFiles>;
 
+export function IgnoreSources(arg1:string):Promise<Array<git.IgnoreSource>>;
+
+export function IgnoreStats(arg1:string):Promise<git.IgnoreStats>;
+
 export function IgnoredFiles(arg1:string):Promise<app.Ignored>;
 
 export function Init(arg1:string,arg2:string):Promise<string>;
@@ -169,6 +175,8 @@ export function PushStack(arg1:string,arg2:Array<string>):Promise<void>;
 
 export function PushedUndo(arg1:string,arg2:boolean):Promise<app.SharedCommits>;
 
+export function ReadIgnoreFile(arg1:string,arg2:string):Promise<string>;
+
 export function RebasePlan(arg1:string,arg2:string):Promise<Array<git.RebaseItem>>;
 
 export function RebaseStack(arg1:string,arg2:Array<string>,arg3:string):Promise<void>;
@@ -225,6 +233,8 @@ export function SaveFile(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function SaveGitConfig(arg1:string,arg2:boolean):Promise<app.ConfigSaveResult>;
 
+export function SaveIgnoreFile(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
 export function SearchGraph(arg1:string,arg2:string):Promise<graph.SearchResult>;
 
 export function SetActiveRepo(arg1:string):Promise<void>;
@@ -240,6 +250,8 @@ export function SetGitConfigText(arg1:string,arg2:string):Promise<app.ConfigDoc>
 export function SetGraphDensity(arg1:string):Promise<void>;
 
 export function SetGraphFocus(arg1:string,arg2:string,arg3:boolean):Promise<void>;
+
+export function SetIgnoreTab(arg1:string):Promise<void>;
 
 export function SetInsightsTab(arg1:string):Promise<void>;
 

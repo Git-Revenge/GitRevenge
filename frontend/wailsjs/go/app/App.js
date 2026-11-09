@@ -42,6 +42,10 @@ export function CheckForUpdate(arg1) {
   return window['go']['app']['App']['CheckForUpdate'](arg1);
 }
 
+export function CheckIgnorePath(arg1, arg2) {
+  return window['go']['app']['App']['CheckIgnorePath'](arg1, arg2);
+}
+
 export function ChooseAndOpenRepo() {
   return window['go']['app']['App']['ChooseAndOpenRepo']();
 }
@@ -206,6 +210,14 @@ export function IgnoreFileNames(arg1) {
   return window['go']['app']['App']['IgnoreFileNames'](arg1);
 }
 
+export function IgnoreSources(arg1) {
+  return window['go']['app']['App']['IgnoreSources'](arg1);
+}
+
+export function IgnoreStats(arg1) {
+  return window['go']['app']['App']['IgnoreStats'](arg1);
+}
+
 export function IgnoredFiles(arg1) {
   return window['go']['app']['App']['IgnoredFiles'](arg1);
 }
@@ -326,6 +338,10 @@ export function PushedUndo(arg1, arg2) {
   return window['go']['app']['App']['PushedUndo'](arg1, arg2);
 }
 
+export function ReadIgnoreFile(arg1, arg2) {
+  return window['go']['app']['App']['ReadIgnoreFile'](arg1, arg2);
+}
+
 export function RebasePlan(arg1, arg2) {
   return window['go']['app']['App']['RebasePlan'](arg1, arg2);
 }
@@ -438,6 +454,10 @@ export function SaveGitConfig(arg1, arg2) {
   return window['go']['app']['App']['SaveGitConfig'](arg1, arg2);
 }
 
+export function SaveIgnoreFile(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['SaveIgnoreFile'](arg1, arg2, arg3, arg4);
+}
+
 export function SearchGraph(arg1, arg2) {
   return window['go']['app']['App']['SearchGraph'](arg1, arg2);
 }
@@ -468,6 +488,10 @@ export function SetGraphDensity(arg1) {
 
 export function SetGraphFocus(arg1, arg2, arg3) {
   return window['go']['app']['App']['SetGraphFocus'](arg1, arg2, arg3);
+}
+
+export function SetIgnoreTab(arg1) {
+  return window['go']['app']['App']['SetIgnoreTab'](arg1);
 }
 
 export function SetInsightsTab(arg1) {
