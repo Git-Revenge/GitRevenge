@@ -429,7 +429,7 @@
   .seg {
     display: inline-flex;
     border: 1px solid var(--paper-edge);
-    border-radius: 7px;
+    border-radius: var(--r-md);
     overflow: hidden;
   }
 
@@ -454,7 +454,7 @@
     gap: 10px;
     margin: 12px 20px 0;
     padding: 10px 12px;
-    border-radius: 8px;
+    border-radius: var(--r-md);
     background: var(--danger-wash);
     font-size: 13px;
   }
@@ -513,7 +513,7 @@
 
   input.pat {
     border: 1px solid var(--accent);
-    border-radius: 5px;
+    border-radius: var(--r-sm);
     background: var(--paper);
   }
 
@@ -586,7 +586,7 @@
     font-size: 13px;
     line-height: 1.6;
     padding: 10px 12px;
-    border-radius: 8px;
+    border-radius: var(--r-md);
   }
 
   .foot {
@@ -621,7 +621,7 @@
     flex-direction: column;
     gap: 4px;
     padding: 12px;
-    border-radius: 8px;
+    border-radius: var(--r-md);
     background: var(--paper-warm);
     font-size: 13px;
     line-height: 1.45;

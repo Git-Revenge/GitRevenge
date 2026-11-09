@@ -126,7 +126,7 @@
     padding: 1px 6px;
     border: 1px solid var(--paper-edge);
     border-bottom-width: 2px;
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     background: var(--paper-warm);
     font-family: var(--font-mono);
     font-size: 12px;

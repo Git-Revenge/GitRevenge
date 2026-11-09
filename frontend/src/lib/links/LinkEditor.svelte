@@ -311,7 +311,7 @@
     flex-direction: column;
     gap: 10px;
     padding: 12px;
-    border-radius: 8px;
+    border-radius: var(--r-md);
     background: var(--paper-warm);
   }
 
@@ -334,7 +334,7 @@
   .config {
     margin: 4px 0 0;
     padding: 10px 12px;
-    border-radius: 6px;
+    border-radius: var(--r-md);
     font-family: var(--font-mono);
     font-size: 12px;
     line-height: 1.55;
@@ -347,7 +347,7 @@
     flex-direction: column;
     gap: 6px;
     padding: 12px;
-    border-radius: 8px;
+    border-radius: var(--r-md);
     background: var(--paper-warm);
   }
 

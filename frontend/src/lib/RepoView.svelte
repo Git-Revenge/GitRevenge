@@ -428,7 +428,7 @@
     flex: none;
     margin-left: auto;
     padding: 3px 10px;
-    border-radius: 5px;
+    border-radius: var(--r-sm);
     background: color-mix(in srgb, var(--link) 12%, transparent);
     font-size: 14px;
     color: var(--link);

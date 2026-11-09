@@ -78,7 +78,7 @@
     padding: 0;
     background: none;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--r-md);
     color: var(--ink-mute);
     transition:
       background-color var(--dur-quick),
@@ -106,7 +106,7 @@
     min-width: 15px;
     padding: 0 3px;
     box-sizing: border-box;
-    border-radius: 8px;
+    border-radius: 999px;
     background: var(--paper-deep);
     color: var(--ink-soft);
     font-family: var(--font-mono);

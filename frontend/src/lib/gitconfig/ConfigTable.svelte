@@ -382,7 +382,7 @@
     align-items: end;
     padding: 18px 20px;
     background: var(--paper-warm);
-    border-radius: 10px;
+    border-radius: var(--r-md);
   }
 
   .add-actions {

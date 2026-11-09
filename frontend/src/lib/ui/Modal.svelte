@@ -126,7 +126,7 @@
     padding: 22px 24px 20px;
     background: var(--paper);
     border: 1px solid var(--paper-edge);
-    border-radius: 10px;
+    border-radius: var(--r-lg);
     box-shadow: var(--shadow);
     outline: none;
   }

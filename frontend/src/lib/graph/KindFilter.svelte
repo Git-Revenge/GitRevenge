@@ -75,7 +75,7 @@
     padding: 4px;
     background: var(--paper);
     border: 1px solid var(--paper-edge);
-    border-radius: 8px;
+    border-radius: var(--r-md);
     box-shadow: var(--shadow);
     animation: drop-in var(--dur-base) var(--ease-ink);
   }
@@ -85,7 +85,7 @@
     align-items: center;
     gap: 8px;
     padding: 5px 8px;
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     font-size: 13px;
     white-space: nowrap;
     cursor: pointer;

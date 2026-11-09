@@ -181,7 +181,7 @@
     color: var(--ink-mute);
     white-space: nowrap;
     font-size: 14px;
-    border-radius: 6px 6px 0 0;
+    border-radius: var(--r-md) var(--r-md) 0 0;
     transition:
       color var(--dur-base),
       background-color var(--dur-base);
@@ -274,7 +274,7 @@
     margin-right: 6px;
     padding: 0 6px 0 10px;
     border: 1px solid var(--paper-edge);
-    border-radius: 6px;
+    border-radius: var(--r-md);
     background: var(--paper);
     color: var(--ink-mute);
     font-size: 13px;
@@ -288,7 +288,7 @@
 
   .palette kbd {
     padding: 0 5px;
-    border-radius: 3px;
+    border-radius: var(--r-sm);
     background: var(--wash-hover);
     font-family: var(--font-mono);
     font-size: 12px;

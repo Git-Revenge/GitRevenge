@@ -213,7 +213,7 @@
     padding: 8px 12px;
     background: none;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--r-md);
     color: var(--ink-soft);
     font-size: 15px;
     text-align: left;
@@ -357,7 +357,7 @@
     gap: 10px 14px;
     margin: 0;
     padding: 10px 16px;
-    border-radius: 8px;
+    border-radius: var(--r-md);
   }
 
   .note {
@@ -403,7 +403,7 @@
     padding: 12px 14px;
     background: var(--code-bg);
     color: var(--code-text);
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     white-space: pre;
   }
 </style>

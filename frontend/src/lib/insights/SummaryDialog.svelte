@@ -85,7 +85,7 @@
     overflow: auto;
     margin: 0;
     padding: 16px 18px;
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     background: var(--code-bg);
     color: var(--code-text);
     font-family: var(--font-mono);
@@ -97,7 +97,7 @@
   .pending {
     margin: 14px 0 0;
     padding: 10px 14px;
-    border-radius: 8px;
+    border-radius: var(--r-md);
     background: color-mix(in srgb, var(--ink-ochre) 20%, transparent);
     font-size: 14px;
   }

@@ -65,7 +65,7 @@
   pre {
     padding: 10px 12px;
     background: var(--paper-warm);
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     font-family: var(--font-mono);
     font-size: 12.5px;
     overflow-x: auto;

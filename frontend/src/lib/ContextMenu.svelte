@@ -241,7 +241,7 @@
     padding: 4px;
     background: var(--paper);
     border: 1px solid var(--paper-edge);
-    border-radius: 8px;
+    border-radius: var(--r-md);
     box-shadow: var(--shadow);
     outline: none;
     animation: drop-in var(--dur-base) var(--ease-ink);
@@ -256,7 +256,7 @@
     padding: 4px 12px;
     background: none;
     border: none;
-    border-radius: 5px;
+    border-radius: var(--r-sm);
     font-size: 14px;
     text-align: left;
     white-space: nowrap;

@@ -202,7 +202,7 @@
     padding: 0;
     background: var(--paper-warm);
     border: none;
-    border-radius: 7px;
+    border-radius: var(--r-md);
     color: var(--ink-soft);
     opacity: 0;
     transition: opacity var(--dur-quick);

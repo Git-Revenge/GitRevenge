@@ -905,7 +905,7 @@
   .notice {
     margin: 2px 16px 8px 20px;
     padding: 10px 12px;
-    border-radius: 6px;
+    border-radius: var(--r-md);
     background: color-mix(in srgb, var(--warning) 14%, transparent);
     font-size: 14px;
     line-height: 1.4;
@@ -1087,7 +1087,7 @@
     gap: 8px;
     margin: 4px 16px 4px 20px;
     padding: 12px;
-    border-radius: 6px;
+    border-radius: var(--r-md);
     background: var(--paper-warm);
   }
 
@@ -1134,7 +1134,7 @@
     display: flex;
     align-items: center;
     padding-right: 6px;
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     transition: background-color var(--dur-quick);
   }
 
@@ -1252,7 +1252,7 @@
   textarea {
     flex: 1;
     padding: 7px 10px;
-    border-radius: 5px;
+    border-radius: var(--r-sm);
     font-size: 14px;
     resize: vertical;
   }

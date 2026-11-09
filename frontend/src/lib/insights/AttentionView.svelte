@@ -121,7 +121,7 @@
   .thresholds {
     padding: 14px 18px;
     background: var(--paper-warm);
-    border-radius: 10px;
+    border-radius: var(--r-md);
   }
 
   .thresholds summary {
@@ -155,7 +155,7 @@
     width: 84px;
     min-height: 34px;
     padding: 6px 8px;
-    border-radius: 6px;
+    border-radius: var(--r-sm);
     font-family: var(--font-mono);
     font-size: 13px;
   }
@@ -226,7 +226,7 @@
 
   .val {
     padding: 1px 7px;
-    border-radius: 5px;
+    border-radius: var(--r-sm);
     font-family: var(--font-mono);
     font-size: 13px;
     color: var(--ink-mute);
