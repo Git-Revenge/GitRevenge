@@ -12,9 +12,49 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  WAILS_VERSION: v2.17.0
+
 jobs:
+  # What a change can affect. Pull requests skip jobs for the side they don't touch; pushes to
+  # main and changes to the workflows run everything.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.filter.outputs.go }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: filter
+        shell: bash
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(git diff --name-only "$BASE"...HEAD)
+          echo "$files"
+          all=false
+          if echo "$files" | grep -qE '^\.github/'; then all=true; fi
+          go=$all
+          frontend=$all
+          # Go code, its modules, the Wails project and packaging; the generated bindings
+          # live under frontend/ and count for both.
+          if echo "$files" | grep -qE '\.go$|^go\.(mod|sum)$|^wails\.json$|^build/|^\.golangci|^frontend/wailsjs/'; then go=true; fi
+          if echo "$files" | grep -qE '^frontend/'; then frontend=true; fi
+          echo "go=$go" >> "$GITHUB_OUTPUT"
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+
   frontend:
-    name: Frontend (check, lint, test)
+    name: Frontend (check, lint, test, build)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -30,14 +70,49 @@ jobs:
       - run: npm run check
       - run: npm run lint
       - run: npm test
-      - run: npx playwright install --with-deps chromium webkit
-      - run: npm run test:browser
-      - run: npm run test:browser:webkit
       - run: npm run build
       - run: npm run bundle-budget
 
+  browser:
+    name: Browser (${{ matrix.browser }})
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    runs-on: ubuntu-latest
+    # Playwright's own image has the browsers and the system packages they need, so nothing is
+    # downloaded or installed with apt. Its version must match @playwright/test.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --ipc=host
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Playwright matches the image
+        run: |
+          v=$(node -p "require('@playwright/test/package.json').version")
+          if [ "$v" != "1.64.1" ]; then
+            echo "::error::@playwright/test is $v but the browser job's image is v1.64.1. Update the image tag in ci.yml."
+            exit 1
+          fi
+      - run: npx playwright test --project=${{ matrix.browser }}
+        env:
+          HOME: /root
+
   go:
     name: Go (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -69,17 +144,30 @@ jobs:
         # runners have no gcc.
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then go test ./...; else go test -race ./...; fi
-      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+      # Lint findings are the same on every OS, so one run is enough.
+      - if: runner.os == 'Linux'
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.15.0
+      - uses: actions/cache@v6
+        id: wails
+        with:
+          path: ~/go/bin/wails*
+          key: wails-${{ runner.os }}-${{ runner.arch }}-${{ env.WAILS_VERSION }}
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
+        if: steps.wails.outputs.cache-hit != 'true'
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
       - name: Wails build (Windows)
         if: runner.os == 'Windows'
         run: wails build -s
+      # The universal app is what ships; on pull requests the runner's own architecture is
+      # enough to prove it builds, at half the time.
       - name: Wails build (macOS universal)
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && github.event_name != 'pull_request'
         run: wails build -s -platform darwin/universal
+      - name: Wails build (macOS)
+        if: runner.os == 'macOS' && github.event_name == 'pull_request'
+        run: wails build -s
       - name: Wails build (Linux)
         if: runner.os == 'Linux'
         run: wails build -s -platform linux/amd64 -tags webkit2_41
@@ -88,6 +176,8 @@ jobs:
     # AlmaLinux stands in for RHEL. Each version gets its own package, because RHEL 9 only has
     # WebKitGTK 4.0, a separate code path in Wails, and RHEL 10 only has 4.1, from EPEL.
     name: Build (${{ matrix.name }})
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -109,6 +199,9 @@ jobs:
     steps:
       - name: Install build dependencies
         run: |
+          # Mirrors vary a lot in speed: take the fastest, download in parallel, and leave out
+          # optional packages.
+          printf 'fastestmirror=True\nmax_parallel_downloads=10\ninstall_weak_deps=False\n' >> /etc/dnf/dnf.conf
           dnf install -y dnf-plugins-core
           dnf config-manager --set-enabled crb
           if [ "${{ matrix.name }}" = "EL10" ]; then dnf install -y epel-release; fi
@@ -126,6 +219,19 @@ jobs:
         working-directory: frontend
         run: npm ci && npm run build
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
       - name: Wails build
         run: wails build -s -platform linux/amd64 -tags "${{ matrix.tags }}"
+
+  # One check that says whether the run passed: every job passed or was skipped as
+  # unaffected.
+  result:
+    name: CI
+    if: always()
+    needs: [changes, frontend, browser, go, rhel]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job passed or was skipped
+        run: |
+          echo '${{ toJSON(needs) }}'
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then exit 1; fi
