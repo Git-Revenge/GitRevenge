@@ -19,6 +19,7 @@ Git tools: everyday git chores without leaving the app.
 
 - Insights › Shipped groups by the references your smart links find, when any link counts for Shipped, and shows them as links. The rules in use are listed in every export. Without such a link, `PROJ-123` and `#123` still group as before. (#525, #528)
 - A bare `#123` in a trailer no longer links to the remote's issues on its own. Add a **Numbered (#123)** link in Settings to say where numbers go. (#525, #528)
+- The graph's commit count, Kinds, density and search share one bar with Undo, Redo, Fetch, Pull and Push, so the graph starts a bar higher. They take a line of their own in a narrow window, and step aside while a file or the rebase editor is open. (#559)
 - The working tree is the graph's first row, above the newest commit, with its mark on the first lane and its words where the messages start, instead of a strip above the graph. It still says clean, how many files changed, and offers **Review**. The button that hides the right panel moved to the end of the toolbar. (#556)
 - Text actions that throw something away (**Discard all…**, **Delete**, **Remove**, **Discard mine and reload**) are drawn in the danger colour, so they no longer look like the safe action beside them. (#543)
 ||||||| parent of f8d0616 (feat: show the graph density as a two-icon segmented control)

@@ -23,8 +23,12 @@
     onDrop,
     onSelectedRefs,
     lead,
+    toolsHost,
   }: {
     path: string
+    /** Somewhere else to put the header's tools (count, Kinds, density, search), such as the
+     * caller's own toolbar, so the two share one bar. Without one they sit above the graph. */
+    toolsHost?: HTMLElement | null
     /** A row of the caller's own above the first commit, such as the working tree. It scrolls
      * with the history, and is told where the first lane and the messages are so it can line
      * up with them. */
@@ -100,6 +104,21 @@
   let span = $derived(loading && estimate > total ? estimate : total)
 
   let viewH = $state(0)
+  /** Moves the header into the caller's host while there is one, and back out with the graph.
+   * Svelte keeps updating the node wherever it lives; it only needs taking away by hand, since
+   * it's no longer under this component's root when the component goes. */
+  function hosted(node: HTMLElement, host: HTMLElement | null | undefined) {
+    const home = node.parentNode
+    const before = node.nextSibling
+    const place = (to: HTMLElement | null | undefined) => {
+      if (to) to.appendChild(node)
+      else if (home && node.parentNode !== home) home.insertBefore(node, before)
+      node.classList.toggle('hosted', !!to)
+    }
+    place(host)
+    return { update: place, destroy: () => node.remove() }
+  }
+
   /** Rows above the first commit: the caller's lead row, if it gave one. */
   let leadRows = $derived(lead ? 1 : 0)
   let map = $derived(scrollMap((span + leadRows) * rowH, viewH))
@@ -765,7 +784,7 @@
 </script>
 
 <div class="graph">
-  <div class="status">
+  <div class="status" use:hosted={toolsHost}>
     {#if error || rowError}
       <span class="error">Couldn't read history: {error || rowError}</span>
     {:else if loading && paused}
@@ -984,6 +1003,15 @@
     box-sizing: border-box;
     padding: 6px 12px 6px 16px;
     border-bottom: 1px solid var(--paper-edge);
+  }
+
+  /* In the caller's bar: no rule or room of its own, since the bar has both. */
+  .status:global(.hosted) {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    padding: 4px 4px 4px 12px;
+    border-bottom: none;
   }
 
   /* The search box is what gives up width: the count and the buttons keep theirs. */
