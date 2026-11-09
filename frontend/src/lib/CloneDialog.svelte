@@ -5,6 +5,7 @@
   import { errorText } from './errors'
   import { prefs } from './prefs.svelte'
   import { session } from './session.svelte'
+  import Busy from './ui/Busy.svelte'
   import Icon from './ui/Icon.svelte'
   import InkButton from './ui/InkButton.svelte'
   import Modal from './ui/Modal.svelte'
@@ -83,7 +84,7 @@
       <input bind:value={name} oninput={() => (nameEdited = true)} disabled={running} />
     </label>
     {#if running}
-      <p class="status" role="status"><span class="spinner" aria-hidden="true"></span> {progress || 'Connecting…'}</p>
+      <p class="status" role="status"><Busy /> {progress || 'Connecting…'}</p>
     {/if}
     {#if error}<p class="form-error" role="alert">{error}</p>{/if}
     <div class="form-actions">
@@ -121,19 +122,4 @@
     overflow-wrap: anywhere;
   }
 
-  .spinner {
-    flex: none;
-    width: 11px;
-    height: 11px;
-    border: 2px solid var(--accent);
-    border-top-color: transparent;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
 </style>
