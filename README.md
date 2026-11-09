@@ -72,6 +72,7 @@ Performance checks run against a large repository of your choice; see [Performan
 - [The documentation site](https://gitrevenge.com), with the user guide. Its source is `docs/`, and `docs-site/` builds it: `cd docs-site && npm ci && npm start`.
 - [Plan](docs/PLAN.md): scope, architecture, performance targets, milestones and workflow.
 - [Architecture decision records](docs/adr/).
+- [Changelog](CHANGELOG.md): what changed in each release.
 - [Releasing](docs/RELEASING.md).
 - [Accessibility](ACCESSIBILITY.md), [contributing](CONTRIBUTING.md), [code of conduct](CODE_OF_CONDUCT.md) and [security policy](SECURITY.md).
 - Work is tracked in [issues](https://github.com/Git-Revenge/GitRevenge/issues), grouped by [milestone](https://github.com/Git-Revenge/GitRevenge/milestones).
