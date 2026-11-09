@@ -8,18 +8,23 @@
   import MathView from './markdown/MathView.svelte'
   import MermaidDiagram from './markdown/MermaidDiagram.svelte'
   import { mathMarked, type MathToken } from './markdown/math'
-  import { valueParts } from './trailers'
+  import { linkTitle, webOnly, type LinkPart, type Linker } from './links/links'
 
   let {
     text,
-    issueURL = '',
+    linker = webOnly,
+    onLinkMenu,
     document = false,
     onLink,
     resolveImage,
     math = false,
   }: {
     text: string
-    issueURL?: string
+    /** Turns text into links: web addresses, and in a commit message the repository's smart
+     * links. */
+    linker?: Linker
+    /** Opens a menu for a smart link, such as Copy link. */
+    onLinkMenu?: (e: MouseEvent, part: LinkPart) => void
     /** A whole document: keeps heading levels and sets a reading size. */
     document?: boolean
     /** Handles a relative link, such as another file in the repository. */
@@ -46,10 +51,12 @@
   const headingTag = (depth: number) => (document ? `h${Math.min(6, depth + 1)}` : 'h3')
 </script>
 
-{#snippet links(value: string)}{#each valueParts(value, issueURL) as part, k (k)}{#if part.href}<a
+{#snippet links(value: string)}{#each linker.parts(value, 'message') as part, k (k)}{#if part.href}<a
         href={part.href}
-        title={part.href}
-        onclick={(e) => open(e, part.href!)}>{part.text}</a
+        title={linkTitle(part)}
+        class:smart={!!part.rule}
+        onclick={(e) => open(e, part.href!)}
+        oncontextmenu={(e) => onLinkMenu?.(e, part)}>{part.text}</a
       >{:else}{part.text}{/if}{/each}{/snippet}
 
 <!-- inLink: already inside an <a>, so nothing here may become another one. -->

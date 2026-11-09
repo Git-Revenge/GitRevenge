@@ -6,6 +6,8 @@ import type { Ref, Row } from './graph/rowCache'
 import { errorText } from './errors'
 import { session } from './session.svelte'
 import { toasts } from './toasts.svelte'
+import { BrowserOpenURL } from '../../wailsjs/runtime/runtime.js'
+import { linkStore } from './links/links.svelte'
 
 /** What the menus need from the view that opens them. */
 export interface MenuContext {
@@ -241,12 +243,22 @@ export function upstreamDialog(path: string, ref: Ref, refs: Ref[]): DialogSpec 
   }
 }
 
+/** "Open ABC-1234 in Jira" for each smart link a branch name matches, first in its menu. */
+export function linkItems(path: string, name: string): MenuItem[] {
+  return linkStore
+    .linker(path)
+    .find(name, 'branches')
+    .filter((m) => m.rule)
+    .map((m) => ({ label: `Open ${m.text} in ${m.rule}`, icon: 'external' as const, run: () => BrowserOpenURL(m.href) }))
+}
+
 /** Menu items for one ref (branch, remote branch, tag or stash). */
 export function refItems(ref: Ref, ctx: MenuContext): MenuItem[] {
   const { path, openDialog } = ctx
   switch (ref.kind) {
     case 'local':
       return groups(
+        linkItems(path, ref.short),
         [
           // The checked-out branch keeps these items, disabled, so the menu's shape doesn't shift.
           // Git won't check out a branch that's in another worktree, so that one goes there instead.
@@ -313,6 +325,7 @@ export function refItems(ref: Ref, ctx: MenuContext): MenuItem[] {
       {
         const [remote, ...rest] = ref.short.split('/')
         return groups(
+          linkItems(path, rest.join('/')),
           [{ label: `Checkout ${ref.short}`, icon: 'branch', run: () => session.run(() => branch(path, 'checkout', ref.short)) }, ...integrateItems(ctx, ref.short, ref.short)],
           [...focusItems(ctx, ref, rest.join('/')), hideItem(ctx, ref, rest.join('/'))],
           [markItem(ctx, ref, rest.join('/'))],

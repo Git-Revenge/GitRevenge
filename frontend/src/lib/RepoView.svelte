@@ -20,6 +20,7 @@
   import type { Ref, Row } from './graph/rowCache'
   import { session } from './session.svelte'
   import Sidebar from './Sidebar.svelte'
+  import { linkStore } from './links/links.svelte'
   import WorkingTreePanel from './WorkingTreePanel.svelte'
 
   let { path }: { path: string } = $props()
@@ -27,6 +28,12 @@
   const storage = (): Pick<Storage, 'getItem' | 'setItem'> => localStorage
   let right = $state(loadRightPanel(untrack(() => path), storage()))
   $effect(() => saveRightPanel(path, $state.snapshot(right), storage()))
+
+  // Smart links come from git config: read again whenever the repository's config changes.
+  $effect(() => {
+    void session.revision[path]
+    void linkStore.load(path)
+  })
   let windowWidth = $state(0)
   /** The panel's width now. Before the first measure there's nothing to fit it to. */
   let rightWidth = $derived(windowWidth ? fitWidth(right.width, windowWidth) : right.width)
@@ -270,7 +277,7 @@
   {#if view === 'wip'}
     <WorkingTreePanel {path} current={diff} openFile={(t) => (diff = t)} onNewBranch={() => (dialog = newBranchDialog(ctx))} onMenu={openMenu} />
   {:else if selected}
-    <CommitPanel {path} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} onReveal={revealCommit} onActions={(x, y) => selected && openMenu(commitMenuItems(selected, graph.refsOf(selected.id), ctx), x, y)} />
+    <CommitPanel {path} onMenu={openMenu} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} onReveal={revealCommit} onActions={(x, y) => selected && openMenu(commitMenuItems(selected, graph.refsOf(selected.id), ctx), x, y)} />
   {/if}
     </div>
   {/if}

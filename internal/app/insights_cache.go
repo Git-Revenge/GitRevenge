@@ -91,7 +91,12 @@ func cachedInsight[T any](ctx context.Context, a *App, g *git.Repo, root, view s
 	if err != nil {
 		return zero, err
 	}
-	key := view + "\x00" + root + "\x00" + string(inputs) + "\x00" + string(kinds) + "\x00" + refs
+	// So do the smart links that find ticket references.
+	links, err := json.Marshal(a.linkConfig(ctx, g).Patterns())
+	if err != nil {
+		return zero, err
+	}
+	key := view + "\x00" + root + "\x00" + string(inputs) + "\x00" + string(kinds) + "\x00" + string(links) + "\x00" + refs
 	if v, ok := a.insights.get(key); ok {
 		if t, ok := v.(T); ok {
 			return t, nil

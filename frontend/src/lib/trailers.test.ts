@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { makeLinker } from './links/links'
 import { appendTrailer, groupTrailers, trailerKeyChoices, asPerson, valueParts } from './trailers'
 
 describe('appendTrailer', () => {
@@ -92,29 +93,29 @@ describe('asPerson', () => {
 })
 
 describe('valueParts', () => {
-  const issues = 'https://github.com/o/r/issues/{n}'
+  const numbered = makeLinker({ web: true, rules: [{ name: 'Num', pattern: '#(\\d+)\\b', url: 'https://github.com/o/r/issues/{1}', in: ['trailers'], shipped: false, enabled: true, scope: 'local' }] })
 
-  it('links issue references when the pattern is known', () => {
-    expect(valueParts('#1, #22', issues)).toEqual([
-      { text: '#1', href: 'https://github.com/o/r/issues/1' },
+  it('links issue references when a rule says where they go', () => {
+    expect(valueParts('#1, #22', numbered)).toEqual([
+      { text: '#1', href: 'https://github.com/o/r/issues/1', rule: 'Num' },
       { text: ', ' },
-      { text: '#22', href: 'https://github.com/o/r/issues/22' },
+      { text: '#22', href: 'https://github.com/o/r/issues/22', rule: 'Num' },
     ])
   })
 
-  it('leaves issue references as text without one', () => {
-    expect(valueParts('#7', '')).toEqual([{ text: '#7' }])
+  it('leaves issue references as text without a rule', () => {
+    expect(valueParts('#7')).toEqual([{ text: '#7' }])
   })
 
   it('links URLs, leaving trailing punctuation out', () => {
-    expect(valueParts('see https://example.com/a?b=1.', '')).toEqual([
+    expect(valueParts('see https://example.com/a?b=1.')).toEqual([
       { text: 'see ' },
-      { text: 'https://example.com/a?b=1', href: 'https://example.com/a?b=1' },
+      { text: 'https://example.com/a?b=1', href: 'https://example.com/a?b=1', rule: '' },
       { text: '.' },
     ])
   })
 
   it('returns plain text as one part', () => {
-    expect(valueParts('no links here', issues)).toEqual([{ text: 'no links here' }])
+    expect(valueParts('no links here', numbered)).toEqual([{ text: 'no links here' }])
   })
 })

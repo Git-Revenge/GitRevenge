@@ -112,6 +112,9 @@ type ShippedQuery struct {
 	Target       string
 	Since, Until int64
 	Range        string
+	// Match finds ticket references in a subject (place "message") or a reference trailer's
+	// value (place "trailers"). Nil uses the built-in PROJ-123 and #123.
+	Match func(text, place string) []string
 }
 
 // ShippedItem is one first-parent commit on the target branch.
@@ -212,7 +215,7 @@ func parseShipped(head, numstat string, q ShippedQuery) (item *ShippedItem, pare
 	title, _, _ := strings.Cut(body, "\n")
 	it := &ShippedItem{
 		SHA: f[0], Title: title, Author: f[2], Email: f[3], Committed: at,
-		Merge: len(parents) > 1, Refs: References(body),
+		Merge: len(parents) > 1, Refs: ReferencesWith(body, q.Match),
 		Revert: strings.HasPrefix(title, "Revert \""),
 		Fixup:  strings.HasPrefix(title, "fixup! ") || strings.HasPrefix(title, "squash! ") || strings.HasPrefix(title, "amend! "),
 	}
@@ -263,18 +266,26 @@ var referenceRE = regexp.MustCompile(`\b[A-Z][A-Z0-9_]*-[0-9]+\b|#[0-9]+\b`)
 
 // References finds ticket references (PROJ-123 or #123) in a message's subject and in its
 // reference trailers, in order of first appearance.
-func References(message string) []string {
+func References(message string) []string { return ReferencesWith(message, nil) }
+
+// ReferencesWith is References with the matching given: match finds references in a subject
+// ("message") or a reference trailer's value ("trailers"). Nil means the built-in matching.
+func ReferencesWith(message string, match func(text, place string) []string) []string {
+	if match == nil {
+		match = func(text, _ string) []string { return referenceRE.FindAllString(text, -1) }
+	}
 	subject, body, _ := strings.Cut(strings.TrimSpace(message), "\n")
-	texts := []string{subject}
+	type text struct{ s, place string }
+	texts := []text{{subject, "message"}}
 	_, trailers := SplitTrailers(body)
 	for _, t := range trailers {
 		if slices.Contains(referenceTrailers, strings.ToLower(t.Key)) {
-			texts = append(texts, t.Value)
+			texts = append(texts, text{t.Value, "trailers"})
 		}
 	}
 	refs := []string{}
 	for _, s := range texts {
-		for _, m := range referenceRE.FindAllString(s, -1) {
+		for _, m := range match(s.s, s.place) {
 			if !slices.Contains(refs, m) {
 				refs = append(refs, m)
 			}

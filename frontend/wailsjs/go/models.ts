@@ -63,6 +63,7 @@ export namespace app {
 	    range: string;
 	    points?: string;
 	    kinds: Record<string, Array<string>>;
+	    references: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new InsightsWindow(source);
@@ -78,6 +79,7 @@ export namespace app {
 	        this.range = source["range"];
 	        this.points = source["points"];
 	        this.kinds = source["kinds"];
+	        this.references = source["references"];
 	    }
 	}
 	export class AttentionResult {
@@ -619,6 +621,42 @@ export namespace app {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.available = source["available"];
 	        this.status = this.convertValues(source["status"], git.LFSStatus);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class LinkTry {
+	    scanned: number;
+	    commits: number;
+	    matches: links.Match[];
+	    problem?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LinkTry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.scanned = source["scanned"];
+	        this.commits = source["commits"];
+	        this.matches = this.convertValues(source["matches"], links.Match);
+	        this.problem = source["problem"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2106,6 +2144,87 @@ export namespace graph {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.rows = source["rows"];
 	        this.total = source["total"];
+	    }
+	}
+
+}
+
+export namespace links {
+	
+	export class Rule {
+	    name: string;
+	    pattern: string;
+	    url: string;
+	    in: string[];
+	    shipped: boolean;
+	    enabled: boolean;
+	    scope: string;
+	    shadowed?: boolean;
+	    problem?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Rule(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.pattern = source["pattern"];
+	        this.url = source["url"];
+	        this.in = source["in"];
+	        this.shipped = source["shipped"];
+	        this.enabled = source["enabled"];
+	        this.scope = source["scope"];
+	        this.shadowed = source["shadowed"];
+	        this.problem = source["problem"];
+	    }
+	}
+	export class Config {
+	    rules: Rule[];
+	    web: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Config(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.rules = this.convertValues(source["rules"], Rule);
+	        this.web = source["web"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Match {
+	    text: string;
+	    href: string;
+	    rule: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Match(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.text = source["text"];
+	        this.href = source["href"];
+	        this.rule = source["rule"];
 	    }
 	}
 

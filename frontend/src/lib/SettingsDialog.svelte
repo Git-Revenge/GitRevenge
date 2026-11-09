@@ -14,6 +14,7 @@
   import Modal from './ui/Modal.svelte'
   import { update } from './update.svelte'
   import Loading from './ui/Loading.svelte'
+  import LinksSettings from './links/LinksSettings.svelte'
 
   let { onClose }: { onClose: () => void } = $props()
 
@@ -110,7 +111,7 @@
   }
 </script>
 
-<Modal title="Settings" eyebrow="make it yours" width={560} {onClose}>
+<Modal title="Settings" eyebrow="make it yours" width={640} {onClose}>
   {#if !p}
     {#if error}<p class="muted">{error}</p>{:else}<Loading />{/if}
   {:else}
@@ -164,6 +165,15 @@
           >
         </span>
       </fieldset>
+
+      <LinksSettings
+        repo={repoPath}
+        {repoName}
+        onShowConfig={() => {
+          onClose()
+          void gitConfig.show(repoPath)
+        }}
+      />
 
       <fieldset>
         <legend class="meta">Repositories</legend>

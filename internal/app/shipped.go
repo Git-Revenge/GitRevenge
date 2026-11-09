@@ -50,6 +50,9 @@ type InsightsWindow struct {
 	// Kinds are the branch kind patterns in use, an input since they decide which branches
 	// are Docs (left out) and which items are Bot (grouped) (ADR 0009).
 	Kinds map[string][]string `json:"kinds"`
+	// References are the smart link rules that find ticket references, "name pattern" each,
+	// or empty for the built-in PROJ-123 and #123. They decide how Shipped groups.
+	References []string `json:"references"`
 }
 
 // query is the commit selection the window stands for.
@@ -183,7 +186,11 @@ func (a *App) InsightsShipped(path string, in InsightsInputs) (ShippedResult, er
 		if err != nil {
 			return ShippedResult{}, err
 		}
-		items, err := g.Shipped(ctx, w.query())
+		q := w.query()
+		lc := a.linkConfig(ctx, g)
+		q.Match = lc.References()
+		w.References = lc.Patterns()
+		items, err := g.Shipped(ctx, q)
 		if err != nil {
 			return ShippedResult{}, err
 		}

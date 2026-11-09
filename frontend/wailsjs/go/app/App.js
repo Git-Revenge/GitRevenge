@@ -222,6 +222,10 @@ export function IgnoredFiles(arg1) {
   return window['go']['app']['App']['IgnoredFiles'](arg1);
 }
 
+export function ImportLinkRules(arg1, arg2, arg3) {
+  return window['go']['app']['App']['ImportLinkRules'](arg1, arg2, arg3);
+}
+
 export function Init(arg1, arg2) {
   return window['go']['app']['App']['Init'](arg1, arg2);
 }
@@ -284,6 +288,10 @@ export function LFSLocks(arg1) {
 
 export function LastCommitMessage(arg1) {
   return window['go']['app']['App']['LastCommitMessage'](arg1);
+}
+
+export function LinkRules(arg1) {
+  return window['go']['app']['App']['LinkRules'](arg1);
 }
 
 export function MarkBranchKind(arg1, arg2, arg3) {
@@ -386,6 +394,10 @@ export function RemoveIgnoreRule(arg1, arg2) {
   return window['go']['app']['App']['RemoveIgnoreRule'](arg1, arg2);
 }
 
+export function RemoveLinkRule(arg1, arg2, arg3) {
+  return window['go']['app']['App']['RemoveLinkRule'](arg1, arg2, arg3);
+}
+
 export function RemoveRecentRepo(arg1) {
   return window['go']['app']['App']['RemoveRecentRepo'](arg1);
 }
@@ -400,6 +412,10 @@ export function RenameGitConfigKey(arg1, arg2, arg3) {
 
 export function RenameGitConfigSection(arg1, arg2, arg3) {
   return window['go']['app']['App']['RenameGitConfigSection'](arg1, arg2, arg3);
+}
+
+export function ReorderLinkRules(arg1, arg2, arg3) {
+  return window['go']['app']['App']['ReorderLinkRules'](arg1, arg2, arg3);
 }
 
 export function ReplaceGitConfigValue(arg1, arg2, arg3, arg4) {
@@ -456,6 +472,10 @@ export function SaveGitConfig(arg1, arg2) {
 
 export function SaveIgnoreFile(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['SaveIgnoreFile'](arg1, arg2, arg3, arg4);
+}
+
+export function SaveLinkRule(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SaveLinkRule'](arg1, arg2, arg3);
 }
 
 export function SearchGraph(arg1, arg2) {
@@ -538,6 +558,10 @@ export function SetUpdateChecks(arg1) {
   return window['go']['app']['App']['SetUpdateChecks'](arg1);
 }
 
+export function SetWebLinks(arg1, arg2) {
+  return window['go']['app']['App']['SetWebLinks'](arg1, arg2);
+}
+
 export function SetWorkTreeContent(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['SetWorkTreeContent'](arg1, arg2, arg3, arg4);
 }
@@ -584,6 +608,10 @@ export function Theme() {
 
 export function TrailerHints(arg1) {
   return window['go']['app']['App']['TrailerHints'](arg1);
+}
+
+export function TryLinkRule(arg1, arg2) {
+  return window['go']['app']['App']['TryLinkRule'](arg1, arg2);
 }
 
 export function Undo(arg1) {

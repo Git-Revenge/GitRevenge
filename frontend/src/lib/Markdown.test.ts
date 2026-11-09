@@ -7,6 +7,11 @@ vi.mock('../../wailsjs/runtime/runtime.js', () => ({ BrowserOpenURL: vi.fn() }))
 vi.mock('./theme.svelte', () => ({ theme: { resolved: 'light' } }))
 
 const { default: Markdown } = await import('./Markdown.svelte')
+const { makeLinker } = await import('./links/links')
+
+/** A linker with one rule sending #123 to an issue address with {n} for the number. */
+const numbered = (issues: string) =>
+  makeLinker({ web: true, rules: issues ? [{ name: 'Issues', pattern: '#(\\d+)\\b', url: issues.replace('{n}', '{1}'), in: ['message'], shipped: false, enabled: true, scope: 'local' }] : [] })
 
 /** Drops Svelte's hydration comments, which may span lines, until none are left. */
 function withoutComments(out: string): string {
@@ -19,8 +24,8 @@ function withoutComments(out: string): string {
 }
 
 /** Rendered HTML without hydration comments or scoped class names. */
-const html = (text: string, issueURL = '', extra: Record<string, unknown> = {}) =>
-  withoutComments(render(Markdown, { props: { text, issueURL, ...extra } }).body).replace(/ class="[^"]*"/g, '')
+const html = (text: string, issues = '', extra: Record<string, unknown> = {}) =>
+  withoutComments(render(Markdown, { props: { text, linker: numbered(issues), ...extra } }).body).replace(/ class="[^"]*"/g, '')
 
 describe('Markdown', () => {
   describe('links inside links', () => {

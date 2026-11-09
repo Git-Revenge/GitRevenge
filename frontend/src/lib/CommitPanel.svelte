@@ -1,6 +1,10 @@
 <script lang="ts">
   import { errorText } from './errors'
-  import { CommitDetail, CommitNotes, CommitSignatures, IssueURL, SetCommitNote } from '../../wailsjs/go/app/App.js'
+  import { CommitDetail, CommitNotes, CommitSignatures, SetCommitNote } from '../../wailsjs/go/app/App.js'
+  import type { MenuItem } from './ContextMenu.svelte'
+  import { commands } from './commands.svelte'
+  import { linkTitle, type LinkPart } from './links/links'
+  import { linkStore } from './links/links.svelte'
   import type { app, git } from '../../wailsjs/go/models'
   import { BrowserOpenURL, ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
   import { provideCommands } from './commands.svelte'
@@ -26,7 +30,10 @@
     onReveal,
     current,
     onSearch,
+    onMenu,
   }: {
+    /** Opens a menu at this position, such as a smart link's. */
+    onMenu?: (items: MenuItem[], x: number, y: number) => void
     path: string
     commitId: string
     /** Labels for the branches and tags on the commit. */
@@ -206,19 +213,27 @@
     expired: 'Expired signature or key',
     revoked: 'Revoked key',
   }
-  /** Where "#123" in a trailer links to, from the repository's remote; "" for nowhere. */
-  let issueURL = $state('')
+  /** Turns web addresses and the repository's smart links into links. */
+  let linker = $derived(linkStore.linker(path))
 
-  $effect(() => {
-    const p = path
-    issueURL = ''
-    void IssueURL(p)
-      .then((u) => {
-        if (p === path) issueURL = u
-      })
-      // Without it, issue references just aren't links.
-      .catch(() => {})
-  })
+  /** A smart link's menu: open it, copy it, or find other commits that mention it. */
+  function linkMenu(e: MouseEvent, part: LinkPart) {
+    if (!onMenu || !part.href) return
+    e.preventDefault()
+    const href = part.href
+    const copy = (text: string) => void ClipboardSetText(text).catch(() => false)
+    onMenu(
+      [
+        { label: part.rule ? `Open ${part.text} in ${part.rule}` : 'Open in your browser', icon: 'external', run: () => BrowserOpenURL(href) },
+        { label: 'Copy link', icon: 'copy', separator: true, run: () => copy(href) },
+        ...(part.rule ? [{ label: `Copy ${part.text}`, run: () => copy(part.text) }] : []),
+        ...(part.rule && onSearch ? [{ label: `Find commits mentioning ${part.text}`, icon: 'search' as const, run: () => onSearch?.(part.text) }] : []),
+        ...(part.rule ? [{ label: 'Edit links in Settings…', icon: 'gear' as const, separator: true, run: () => void (commands.settingsOpen = true) }] : []),
+      ],
+      e.clientX,
+      e.clientY,
+    )
+  }
 
   // Messages render as markdown; the raw text is a toggle away, remembered across sessions.
   const RAW_KEY = 'gitrevenge.rawMessages'
@@ -272,7 +287,7 @@
   {#if who}
     {who.name}<span class="email" title={who.email}>{who.email}</span>
   {:else}
-    {#each valueParts(value, issueURL) as part, k (k)}{#if part.href}<a href={part.href} title={part.href} onclick={(e) => openLink(e, part.href!)}>{part.text}</a>{:else}{part.text}{/if}{/each}
+    {#each valueParts(value, linker) as part, k (k)}{#if part.href}<a href={part.href} title={linkTitle(part)} class:smart={!!part.rule} onclick={(e) => openLink(e, part.href!)} oncontextmenu={(e) => linkMenu(e, part)}>{part.text}</a>{:else}{part.text}{/if}{/each}
   {/if}
   {#if onSearch && key !== 'stable'}
     <button class="find" title="Find commits with this trailer" aria-label="Find commits with {trailerQuery(key, value)}" onclick={() => onSearch(trailerQuery(key, value))}><Icon name="search" size={13} /></button>
@@ -348,7 +363,7 @@
   {:else}
     {@const c = info.commit}
     <header>
-      <h2>{c.subject}</h2>
+      <h2>{#each linker.parts(c.subject, 'message') as part, k (k)}{#if part.href}<a href={part.href} title={linkTitle(part)} class:smart={!!part.rule} onclick={(e) => openLink(e, part.href!)} oncontextmenu={(e) => linkMenu(e, part)}>{part.text}</a>{:else}{part.text}{/if}{/each}</h2>
       <div class="who">
         <button class="author" onclick={() => onSearch?.(c.author.name)} title="Find commits by {c.author.name}">{c.author.name}</button>
         <span class="when">{formatTime(c.author.time)}</span>
@@ -389,7 +404,7 @@
               <button class="btn sm quiet raw-toggle" aria-pressed={raw} onclick={toggleRaw} title={raw ? 'Show the message rendered as markdown' : 'Show the message as plain text'}>{raw ? 'Raw' : 'Markdown'}</button>
             </div>
             <div class="message">
-              {#if raw}<p class="body">{reflow(c.body)}</p>{:else}<Markdown text={c.body} {issueURL} />{/if}
+              {#if raw}<p class="body">{reflow(c.body)}</p>{:else}<Markdown text={c.body} {linker} onLinkMenu={linkMenu} />{/if}
             </div>
           {:else}
             <p class="muted">No description.</p>
