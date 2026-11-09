@@ -7,7 +7,7 @@ The graph's first row, above the newest commit, is your working tree. When you h
 Your changes are one list, by filename under their folders, with line counts. A tick means the file goes in the commit.
 
 - Tick a file to stage it, and untick it to unstage it. A dash and **partly staged** mean only some of its changes are going in, and ticking it stages the rest.
-- The tick at the top of the list does every file at once. **Discard all** throws away everything unstaged, after asking.
+- The tick at the top of the list does every file at once. **Discard all…** throws away everything unstaged, after asking; like every action that throws something away, it's drawn in the danger colour.
 - The line under the heading and the commit button both say what's next: tick a file, describe the commit, then **Commit 3 files to main**. While there are conflicts, the button says how many are left.
 - On a filesystem that ignores letter case, such as Windows, files whose names differ only by case show as changed when nobody edited them. The panel says so and marks them **case clash**, and the tick at the top leaves them out.
 - If you aren't on a branch, the panel says so and offers **Create a branch here**, since a commit made there is easy to lose.

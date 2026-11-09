@@ -19,9 +19,13 @@ When there's room, branches and tags have their own column to the left of the gr
 
 Labels are ranked so the ones you'd most want to see come first: the checked-out branch, Trunk, Release, tags, Environment, Feature, then the rest. Whatever doesn't fit becomes **+N**. Hover over a commit's labels to expand them and see every branch and tag on it, in full, with each branch's row saying where it lives, such as `local · origin`. The same list is in the commit's details on the right.
 
-Column headers name what's in each column. In compact rows with enough width, the filter button beside **Author** searches for the selected commit's author.
+Column headers name what's in each column. In compact rows with enough width, the filter button beside **Author** searches for the selected commit's author, an author carrying on from the row above shows as a ditto mark, and the **When** column holds how long ago each commit was made.
+
+The selected commit has a bar in its line's colour at the left edge of its row. In the timeline, the checked-out commit's row carries a handwritten "you're here" after its label when there's room.
 
 ## Moving around
+
+Jumping to a commit, from a branch in the sidebar, a parent link or a search match, glides there when it's close and cuts when it's far, and the commit lands under a wash that fades so you can find it. If your system asks for reduced motion, everything moves at once instead.
 
 - Scroll, or use the arrow keys to move the selection one commit at a time.
 - <kbd>Page Up</kbd> and <kbd>Page Down</kbd> move a page at a time.
@@ -50,7 +54,7 @@ The sidebar has an icon rail and one panel at a time: **Branches**, **Remotes**,
 
 Names with a `/` form folders, so `release/v0.8` and `release/v0.7` sit in a `release` folder. A folder holding one branch is shown as that branch, with its full name. **Name** or **Recent**, at the top of the panel, sorts by name or by most recently updated. The checked-out branch always comes first, marked with a rose dot and in bold, and other branches are muted. A branch shows one status at a time (**parent merged**, **gone**, or how far ahead or behind it is); hover over it for the rest. Hovering or tabbing to a row also shows a **…** button with the same menu as right-click.
 
-Type in **Filter all panels** to narrow the lists. The filter stays on as you switch panels, and the rail shows how many matches each panel has.
+Type in **Filter all panels** to narrow the lists. The filter stays on as you switch panels, and the rail shows how many matches each panel has. Without a filter, the rail shows a number for how many stashes you have, and a rose dot on a panel that has something needing attention, such as a branch that needs care.
 
 ![The sidebar filtered to "v0", with a count on each panel that has a match](../img/sidebar-filter-light.webp#gh-light-mode-only)
 ![The sidebar filtered to "v0", with a count on each panel that has a match](../img/sidebar-filter-dark.webp#gh-dark-mode-only)
@@ -66,7 +70,7 @@ A [kind](branch-care.md#branch-kinds)'s icon marks a folder, or a branch on its 
 
 ## Filtering by kind
 
-When a repository has branches of any [kind](branch-care.md#branch-kinds), the graph's header has a **Kinds** dropdown with a checkbox for each one. Clear a box to hide every branch of that kind, and the button says how many kinds are hidden. Docs lines are drawn faded either way. Other branches can be hidden too; see [hiding branches](branch-care.md#hiding-branches).
+When a repository has branches of any [kind](branch-care.md#branch-kinds), the bar above the graph has a **Kinds** dropdown with a checkbox for each one. Clear a box to hide every branch of that kind, and the button says how many kinds are hidden. Docs lines are drawn faded either way. Other branches can be hidden too; see [hiding branches](branch-care.md#hiding-branches).
 
 ## Focusing on a branch
 
@@ -74,15 +78,19 @@ Focus is the opposite of [hiding a branch](branch-care.md#hiding-branches): it s
 
 The graph then shows the branch, its remote-tracking copies, and the history they're built on. Other branches' labels stay on commits that are still showing, so you can see where the branch left them. Stashes and the checked-out branch's other commits leave the view, and the commit panel and working tree still work as usual.
 
-Only one focus exists at a time, and choosing another replaces it. The graph's header says what's focused. To go back to everything, click the **×** there, or right-click the branch and choose **Stop focusing**. A focus lasts until you close the tab, or until its branch is deleted.
+Only one focus exists at a time, and choosing another replaces it. The bar above the graph says what's focused. To go back to everything, click the **×** there, or right-click the branch and choose **Stop focusing**. A focus lasts until you close the tab, or until its branch is deleted.
 
 ## Two layouts
 
-The default **timeline** layout gives each commit two lines: the subject, then who made it and when. The first commit of each day names the day (**Today**, **Yesterday**, then the date) under a dashed line; the commits below it in the same day show only the author and time; and when the same author's previous commit on that line is just above, the line is just the time, faded, and the commit's circle shrinks from the author's initials to a dot. **Compact rows** fits one commit per line, so you see more history at once. Switch between them with the button in the graph's header, or in [Settings](settings.md).
+The default **timeline** layout gives each commit two lines: the subject, then who made it and when. The first commit of each day names the day (**Today**, **Yesterday**, then the date) under a dashed line; the commits below it in the same day show only the author and time; and when the same author's previous commit on that line is just above, the line is just the time, faded, and the commit's circle shrinks from the author's initials to a dot. **Compact rows** fits one commit per line, so you see more history at once. Switch between them with the pair of icons in the bar above the graph, where the one in use is raised, or in [Settings](settings.md).
+
+The graph's commit count, **Kinds**, the layout switch and the search share that bar with Undo, Redo, Fetch, Pull and Push. In a narrow window they take a line of their own, and while a file is open they step aside for the file's own header.
 
 ## Right-click menus
 
 Right-click a commit, branch or tag for what you can do with it: check it out, create a branch or tag there, merge, rebase, cherry-pick, revert, reset, or see its reflog. [Branches, merges and rebases](branches.md) covers these.
+
+You don't have to right-click. Rest the pointer on a commit, or select one from the keyboard, and two small buttons appear at the right of its row: one copies its SHA, the other opens the same menu. <kbd>Tab</kbd> reaches them after the graph.
 
 A commit's menu starts with what you can do with the commit itself. Below that, each branch and tag on it has its own submenu, so what you do to `main` stays apart from what you do to `origin/main`. Hover over one to open it, or use the arrow keys.
 

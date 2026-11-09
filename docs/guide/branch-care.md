@@ -40,7 +40,7 @@ Hidden branches leave the sidebar and the graph. Commits that only they reach di
 
 - **One branch:** right-click it and choose **Hide**. Hiding `wip/x` hides `origin/wip/x` too.
 - **Patterns:** under **This repository** in Settings, list them in **Hidden branches**, such as `wip/*, archive/*`.
-- **A whole kind:** the **Kinds** dropdown in the graph's header has a checkbox for each kind the repository has. Clear one to hide every branch of that kind. They all start checked (showing).
+- **A whole kind:** the **Kinds** dropdown in the bar above the graph has a checkbox for each kind the repository has. Clear one to hide every branch of that kind. They all start checked (showing).
 
 When something is hidden, the sidebar says how many, under the branch lists. **Show them** brings them back for now, in italics; **Hide them again** undoes that. To unhide a branch for good, right-click it while it's showing and choose **Unhide**.
 
