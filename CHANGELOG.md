@@ -17,6 +17,7 @@ Git tools: everyday git chores without leaving the app.
 
 ### Changed
 
+- A repository's own settings (branch kinds, hidden branches, clean up on pull, notes syncing, stack parents set by hand and Insights thresholds) are kept in its git config, under `gitrevenge` keys, instead of the app's settings file. Set them in your global git config to make them your defaults for every repository; a repository's own setting wins, and its list replaces the global one. Existing settings move over the first time each repository opens. The app's own settings, such as theme and zoom, stay where they were. (#526)
 - Insights › Shipped groups by the references your smart links find, when any link counts for Shipped, and shows them as links. The rules in use are listed in every export. Without such a link, `PROJ-123` and `#123` still group as before. (#525, #528)
 - A bare `#123` in a trailer no longer links to the remote's issues on its own. Add a **Numbered (#123)** link in Settings to say where numbers go. (#525, #528)
 - The graph's commit count, Kinds, density and search share one bar with Undo, Redo, Fetch, Pull and Push, so the graph starts a bar higher. They take a line of their own in a narrow window, and step aside while a file or the rebase editor is open. (#559)

@@ -232,7 +232,7 @@
           <legend class="meta">This repository · {repoName}</legend>
           <p class="hint">
             Branch kinds change how branches look and behave. Patterns match the branch name without the remote, so <code>release/*</code> also
-            matches <code>origin/release/1.4</code>; <code>*</code> matches any run of characters. These stay on this computer.
+            matches <code>origin/release/1.4</code>; <code>*</code> matches any run of characters. They're kept in this repository's git config, which is never committed.
           </p>
           {#each repo.kinds as k (k.kind)}
             {@const custom = !sameList(splitPatterns(kindText[k.kind] ?? ''), k.defaults)}

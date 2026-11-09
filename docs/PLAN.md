@@ -34,6 +34,7 @@ This document records the decisions from the initial requirements session (2026-
 | Git config editing | Working copy edited through `git config --file`; validated saves with backups | [0007](adr/0007-git-config-editing.md) |
 | Insights | Computed only from repository state; a pure function of the repo and explicit inputs | [0008](adr/0008-insights-from-repository-state.md) |
 | Branch kinds | Six built-in kinds (Trunk, Release, Environment, Docs, Bot, Feature) matched by local per-repo patterns | [0009](adr/0009-branch-kinds.md) |
+| Where settings live | A repository's settings in git config, its own over the global one; the app's own settings and state in the app's file | [0011](adr/0011-repository-settings-in-git-config.md) |
 
 ### Backend
 

@@ -23,7 +23,7 @@ With a repository's tab active, a **This repository** section adds settings that
 | **Sync notes on fetch, pull and push** | Shares git notes with the remote. [More](branch-care.md#syncing-notes). |
 | **Hidden branches** | Patterns of branches to leave out of the sidebar and graph. [More](branch-care.md#hiding-branches). |
 
-Settings are saved to `settings.json`; see [where your data lives](install.md#where-your-data-lives). Git's own settings, such as your name, email and aliases, are edited in the [Git Config tab](git-config.md): choose **Edit git config…** under Git.
+The settings under **This repository** are kept in the repository's git config, under `gitrevenge` keys, where the [Git Config tab](git-config.md) shows them with the rest; set them in your global config to make them your defaults everywhere. The app's own settings are saved to `settings.json`; see [where your data lives](install.md#where-your-data-lives). Git's own settings, such as your name, email and aliases, are edited in the [Git Config tab](git-config.md): choose **Edit git config…** under Git.
 
 ## The command palette
 

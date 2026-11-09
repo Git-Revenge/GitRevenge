@@ -100,7 +100,12 @@ func (a *App) SetRepoPreferences(path string, p RepoPreferences) error {
 	if err != nil {
 		return err
 	}
-	if err := m.Settings().Update(func(s *settings.Settings) { s.SetRepo(rs) }); err != nil {
+	err = a.updateRepoSettings(m, path, func(cur *settings.RepoSettings) {
+		// Stack parents aren't part of these preferences: they stay as they are.
+		rs.StackParents = cur.StackParents
+		*cur = rs
+	})
+	if err != nil {
 		return err
 	}
 	if r := m.Get(path); r != nil {
@@ -123,8 +128,7 @@ func (a *App) HideBranch(path, name string, hide bool) error {
 		return err
 	}
 	var wider string
-	err = m.Settings().Update(func(s *settings.Settings) {
-		rs := s.Repo(path)
+	err = a.updateRepoSettings(m, path, func(rs *settings.RepoSettings) {
 		rs.Hide = slices.DeleteFunc(rs.Hide, func(p string) bool { return p == name })
 		if hide {
 			rs.Hide = append(rs.Hide, name)
@@ -135,7 +139,6 @@ func (a *App) HideBranch(path, name string, hide bool) error {
 				}
 			}
 		}
-		s.SetRepo(rs)
 	})
 	if err != nil {
 		return err
@@ -168,8 +171,7 @@ func (a *App) MarkBranchKind(path, name, kind string) error {
 		return err
 	}
 	var result branchkind.Kind
-	err = m.Settings().Update(func(s *settings.Settings) {
-		rs := s.Repo(path)
+	err = a.updateRepoSettings(m, path, func(rs *settings.RepoSettings) {
 		if rs.Kinds == nil {
 			rs.Kinds = map[string][]string{}
 		}
@@ -194,8 +196,7 @@ func (a *App) MarkBranchKind(path, name, kind string) error {
 		if len(rs.Kinds) == 0 {
 			rs.Kinds = nil
 		}
-		s.SetRepo(rs)
-		result = session.Rules(rs).Kind(name)
+		result = session.Rules(*rs).Kind(name)
 	})
 	if err != nil {
 		return err
@@ -220,13 +221,11 @@ func (a *App) SetKindVisible(path, kind string, visible bool) error {
 	if err != nil {
 		return err
 	}
-	err = m.Settings().Update(func(s *settings.Settings) {
-		rs := s.Repo(path)
+	err = a.updateRepoSettings(m, path, func(rs *settings.RepoSettings) {
 		rs.HideKinds = slices.DeleteFunc(rs.HideKinds, func(k string) bool { return k == kind })
 		if !visible {
 			rs.HideKinds = append(rs.HideKinds, kind)
 		}
-		s.SetRepo(rs)
 	})
 	if err != nil {
 		return err
@@ -262,8 +261,7 @@ func (a *App) updateStackParents(path string, change func(map[string]string)) er
 	if err != nil {
 		return err
 	}
-	err = m.Settings().Update(func(s *settings.Settings) {
-		rs := s.Repo(path)
+	err = a.updateRepoSettings(m, path, func(rs *settings.RepoSettings) {
 		if rs.StackParents == nil {
 			rs.StackParents = map[string]string{}
 		}
@@ -271,7 +269,6 @@ func (a *App) updateStackParents(path string, change func(map[string]string)) er
 		if len(rs.StackParents) == 0 {
 			rs.StackParents = nil
 		}
-		s.SetRepo(rs)
 	})
 	if err != nil {
 		return err

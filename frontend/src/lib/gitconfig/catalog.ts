@@ -68,6 +68,19 @@ export const CATALOG: KeyInfo[] = [
   k('remote.<name>.fetch', 'string', 'Which refs a fetch from this remote gets.', { multi: true }),
   k('remote.<name>.url', 'string', 'The remote’s address.'),
   k('remote.<name>.pushurl', 'string', 'Where pushes to this remote go, when different from its url.', { multi: true }),
+  // Git Revenge's own settings for a repository (#526). The repository's config wins over the
+  // global one, and its list replaces the global list.
+  k('gitrevenge.cleanupOnPull', 'bool', 'Git Revenge: after each pull, deletes local branches whose upstream is gone and that have nothing unpushed.'),
+  k('gitrevenge.syncNotes', 'bool', 'Git Revenge: fetches git notes on fetch and pull, and pushes changed notes on push.'),
+  k('gitrevenge.hide', 'string', 'Git Revenge: a pattern of branches to leave out of the sidebar and graph, such as wip/*. One empty value means none here.', { multi: true }),
+  k('gitrevenge.hideKind', 'enum', 'Git Revenge: a branch kind whose branches are hidden.', { multi: true, values: ['trunk', 'release', 'environment', 'docs', 'bot', 'feature'] }),
+  k('gitrevenge.webLinks', 'bool', 'Git Revenge: turns web addresses written out in full into links. On unless set to false.'),
+  k('gitrevenge-kind.<name>.pattern', 'string', 'Git Revenge: a pattern of branches of this kind, such as release/*. One empty value means the kind matches nothing.', { multi: true }),
+  k('gitrevenge-insights.stale', 'int', 'Git Revenge: days without a commit before Insights calls a branch stale.'),
+  k('gitrevenge-insights.longLived', 'int', 'Git Revenge: days since a branch left its target before Insights calls it long-lived.'),
+  k('gitrevenge-insights.behind', 'int', 'Git Revenge: commits behind its target before Insights flags a branch.'),
+  k('gitrevenge-insights.size', 'int', 'Git Revenge: lines changed before Insights calls a branch large.'),
+  k('branch.<name>.gitrevengeStackParent', 'string', 'Git Revenge: the branch this one is stacked on, set by hand. Empty means not stacked.'),
 ]
 
 /** The catalog entry for a full key, matching <name> placeholders and ignoring the case of

@@ -1,6 +1,6 @@
 # 0009 — Branch kinds are built in, matched by local patterns
 
-- Status: Accepted, amended 2026-11-01 (a sixth kind, Feature, and the sidebar's rail)
+- Status: Accepted, amended 2026-11-01 (a sixth kind, Feature, and the sidebar's rail) and 2026-11-09 (patterns move to git config, ADR 0011)
 - Date: 2026-10-31
 
 ## Context
@@ -12,7 +12,7 @@ Some branches aren't like the others. `main` is the line everything returns to; 
 - **Six built-in kinds:** Trunk, Release, Environment, Docs, Bot and Feature. Kinds carry behaviour, not just decoration, so they are a fixed set rather than labels people define. Custom labels can come later if a real need appears.
 - **Matched by glob against the branch name**, without the remote prefix, so `origin/release/1.4` is a Release branch. The first matching kind wins, in the order above.
 - **Built-in defaults** work with no setup: Trunk `main`, `master`, `develop`, `trunk`; Release `release/*`, `releases/*`, `hotfix/*`; Docs `gh-pages`, `gh-docs`, `docs-site`; Bot `dependabot/*`, `renovate/*`; Feature `feature/*`, `features/*`, `feat/*`; Environment none, since `staging` and `production` are too often ordinary branches.
-- **Patterns are local.** Overrides live in Git Revenge's settings, keyed by repository path, beside the per-repo hide patterns. Nothing is written into the repository, so the app stays local-only and one person's kinds don't change anyone else's view.
+- **Patterns are local.** Overrides live in git config (ADR 0011): the repository's own `.git/config`, which is never committed, or the user's global config as their defaults for every repository. Nothing is written into the repository's history, so the app stays local-only and one person's kinds don't change anyone else's view. (Until 2026-11-09 they lived in Git Revenge's own settings, keyed by repository path.)
 - **A commit's kind is its lane's kind.** A lane takes the kind of the branch tip that starts it and keeps it along that first-parent line. Commits in a merged-in side line with no branch of their own have no kind.
 - **What a kind changes:**
   - Look: a chip colour and icon in the graph, a mark in the sidebar's branch tree on the kind's folder (or on the branch, when a folder's branches don't share a kind), and in the timeline the kind's icon in place of author initials (all but Trunk and Feature). Every mark has the kind's name in its tooltip and accessible name.
@@ -26,7 +26,7 @@ Some branches aren't like the others. `main` is the line everything returns to; 
 
 - Most repositories get sensible kinds without configuration, and the Docs default fixes the common `gh-pages` case.
 - Two people with different patterns can see different Insights numbers for the same repository; the exported inputs show why.
-- Kinds don't travel with a clone. A team that wants shared kinds would need a committed file, which this decision defers.
+- Kinds don't travel with a clone. A team that wants shared kinds would need a committed file, which this decision defers. They do travel with a person's dotfiles, through the global config.
 - Pinned Trunk lanes change the incremental layout and have to stay within the kernel benchmark's targets.
 
 ## Amendment, 2026-11-01

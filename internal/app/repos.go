@@ -88,6 +88,10 @@ func (a *App) sessions() (*session.Manager, error) {
 		a.sess.OnGraph(a.emitGraphProgress)
 		a.sess.OnWatchFailed(func(path string, err error) { a.notice(path, watchFailedMessage(err)) })
 		a.sess.OnChange(func(path string, k watch.Kind) {
+			// The repository's own settings live in its config.
+			if k&watch.Config != 0 {
+				a.syncRepoConfigSoon(path)
+			}
 			a.emit("repo:changed", RepoChange{Path: path, Kinds: k.Names()})
 		})
 	})
@@ -150,6 +154,7 @@ func (a *App) RestoreSession() (SessionState, error) {
 	}
 	for _, r := range m.List() {
 		st.Tabs = append(st.Tabs, tabFor(ctx, r))
+		a.syncRepoConfigSoon(r.Path)
 	}
 	for p, err := range failed {
 		st.Failed = append(st.Failed, FailedRepo{Path: p, Error: err.Error()})
@@ -182,6 +187,7 @@ func (a *App) OpenRepo(path string) (RepoTab, error) {
 	if err != nil {
 		return RepoTab{}, friendly(err)
 	}
+	a.syncRepoConfigSoon(r.Path)
 	return tabFor(ctx, r), nil
 }
 

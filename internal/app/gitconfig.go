@@ -100,6 +100,12 @@ func (a *App) gitConfig() (*gitConfigs, error) {
 		c.docs = map[string]*gitconfig.Doc{}
 		c.backups = &gitconfig.Backups{Dir: dir, Keep: gitconfig.DefaultKeep}
 		c.watcher = gitconfig.NewWatcher(func(path string) {
+			// A change to the global config can change what every open repository inherits.
+			if a.sess != nil {
+				for _, r := range a.sess.List() {
+					a.syncRepoConfigSoon(r.Path)
+				}
+			}
 			a.emit("gitconfig:changed", ConfigChange{Path: path})
 		})
 		if global, alt, err := c.runner.GlobalConfigPath(context.Background()); err == nil {
