@@ -310,6 +310,7 @@
       fg: token('--ink'),
       soft: token('--ink-soft'),
       muted: token('--ink-mute'),
+      faint: token('--ink-faint'),
       deep: token('--paper-deep'),
       selected: token('--selected'),
       hover: token('--wash-hover'),

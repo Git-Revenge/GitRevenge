@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clearOf, clip, DATE_COLUMN, clippedName, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, rowWashed, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE } from './draw'
+import { clearOf, clip, DATE_COLUMN, clippedName, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, rowWashed, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine } from './draw'
 import type { Ref, Row } from './rowCache'
 
 describe('graph geometry', () => {
@@ -397,5 +397,60 @@ describe('hereNotePlace', () => {
     expect(hereNotePlace(40, 95, 150)).toBeNull()
     expect(hereNotePlace(0, 130, 150)).toBe(8)
     expect(HERE_NOTE).toMatch(/here/)
+  })
+})
+
+describe('dayLabel', () => {
+  const now = new Date(2026, 9, 29, 12).getTime() / 1000
+
+  it('names today and yesterday, then the weekday and date, with the year once it differs', () => {
+    expect(dayLabel(now - 3600, now)).toBe('Today')
+    expect(dayLabel(now - 86400, now)).toBe('Yesterday')
+    expect(dayLabel(new Date(2026, 9, 26, 9).getTime() / 1000, now)).toMatch(/26/)
+    expect(dayLabel(new Date(2026, 9, 26, 9).getTime() / 1000, now)).not.toMatch(/2026/)
+    expect(dayLabel(new Date(2024, 0, 15).getTime() / 1000, now)).toMatch(/2024/)
+  })
+
+  it('tells days apart by the local calendar', () => {
+    const late = new Date(2026, 9, 28, 23, 50).getTime() / 1000
+    const early = new Date(2026, 9, 29, 0, 10).getTime() / 1000
+    expect(sameDay(late, early)).toBe(false)
+    expect(sameDay(early, early + 3600)).toBe(true)
+    expect(timeLabel(early)).toMatch(/\d/)
+  })
+})
+
+describe('metaLine', () => {
+  const now = new Date(2026, 9, 29, 12).getTime() / 1000
+  const day = (d: number, h: number) => new Date(2026, 9, d, h).getTime() / 1000
+  const row = (author: string, authorTime: number, col = 0, parents = 1): Row => ({ index: 0, col, color: 0, up: [], down: [], width: 1, id: 'x', parents, author, authorTime, subject: 's' })
+
+  it('names the day, author and time on the first row of a day, without a divider when nothing is above', () => {
+    const m = metaLine(row('Ana', day(29, 9)), {}, now)
+    expect(m.text).toMatch(/^Today · Ana · /)
+    expect(m.divider).toBe(false)
+    expect(m.quiet).toBe(false)
+  })
+
+  it('draws the divider when the loaded row above is from another day', () => {
+    const m = metaLine(row('Ana', day(28, 18)), { prev: row('Ana', day(29, 9)) }, now)
+    expect(m.text).toMatch(/^Yesterday · Ana · /)
+    expect(m.divider).toBe(true)
+  })
+
+  it('drops the day inside it, and drops the author too inside a run', () => {
+    const prev = row('Ana', day(29, 10))
+    const other = metaLine(row('Ben', day(29, 9)), { prev }, now)
+    expect(other.text).toMatch(/^Ben · /)
+    expect(other.divider).toBe(false)
+    const same = metaLine(row('Ana', day(29, 9)), { prev }, now)
+    expect(same.text).not.toMatch(/Ana/)
+    expect(same.quiet).toBe(true)
+  })
+
+  it('a merge breaks the run, and a different lane does too', () => {
+    const prev = row('Ana', day(29, 10))
+    expect(metaLine(row('Ana', day(29, 9), 0, 2), { prev }, now).quiet).toBe(false)
+    expect(metaLine(row('Ana', day(29, 9), 1), { prev }, now).quiet).toBe(false)
   })
 })
