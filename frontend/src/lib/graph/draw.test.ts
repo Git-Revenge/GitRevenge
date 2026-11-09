@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clearOf, clip, DATE_COLUMN, clippedName, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, rowWashed, setLaneColors, sortRefs, selectionBar } from './draw'
+import { clearOf, clip, DATE_COLUMN, clippedName, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, rowWashed, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE } from './draw'
 import type { Ref, Row } from './rowCache'
 
 describe('graph geometry', () => {
@@ -388,5 +388,14 @@ describe('selectionBar', () => {
   it("is a 3px bar at the left edge, inset 4px from the row's top and bottom", () => {
     expect(selectionBar(100, 52)).toEqual({ x: 0, y: 104, w: 3, h: 44, r: 2 })
     expect(selectionBar(0, 30)).toEqual({ x: 0, y: 4, w: 3, h: 22, r: 2 })
+  })
+})
+
+describe('hereNotePlace', () => {
+  it('sits a gap after the labels when the column has room, and stays away otherwise', () => {
+    expect(hereNotePlace(40, 60, 150)).toBe(48)
+    expect(hereNotePlace(40, 95, 150)).toBeNull()
+    expect(hereNotePlace(0, 130, 150)).toBe(8)
+    expect(HERE_NOTE).toMatch(/here/)
   })
 })

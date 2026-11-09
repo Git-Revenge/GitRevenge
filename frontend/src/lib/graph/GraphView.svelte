@@ -227,6 +227,7 @@
       bad: token('--danger'),
       warn: token('--warning'),
       kinds: Object.fromEntries(Object.entries(KINDS).map(([k, info]) => [k, token(info.token)])),
+      link: token('--link'),
     }
   }
 
