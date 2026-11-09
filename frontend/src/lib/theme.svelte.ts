@@ -1,11 +1,33 @@
 import { GraphDensity, SetGraphDensity, SetTheme, Theme } from '../../wailsjs/go/app/App.js'
 import type { Density } from './graph/draw'
+import { reducedMotion } from './ui/motion'
 
 type Resolved = 'light' | 'dark'
 /** A saved choice, or '' to follow the operating system. */
 type Mode = '' | Resolved
 
 const media = window.matchMedia('(prefers-color-scheme: dark)')
+
+type Transitions = Document & { startViewTransition?: (update: () => Promise<void>) => unknown }
+
+/** Sets data-theme on the document root. A change of theme cross-fades the whole window through
+ * a view transition where the engine has one (WebView2 and WebKit do), over --dur-base from
+ * style.css; the first paint, and anyone asking for less motion, switch at once. The update
+ * waits two frames so the graph's canvas, which repaints on the next frame, is in the new
+ * picture rather than flipping after the fade. */
+function applyTheme(theme: Resolved) {
+  const root = document.documentElement
+  if (root.dataset.theme === theme) return
+  const doc = document as Transitions
+  if (!root.dataset.theme || !doc.startViewTransition || reducedMotion()) {
+    root.dataset.theme = theme
+    return
+  }
+  doc.startViewTransition(() => {
+    root.dataset.theme = theme
+    return new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())))
+  })
+}
 
 /** Appearance: the colour theme, applied as data-theme on the document root, and the
  * graph's row density. */
@@ -21,7 +43,7 @@ class ThemeState {
     media.addEventListener('change', (e) => (this.system = e.matches ? 'dark' : 'light'))
     $effect.root(() => {
       $effect(() => {
-        document.documentElement.dataset.theme = this.resolved
+        applyTheme(this.resolved)
       })
     })
   }
