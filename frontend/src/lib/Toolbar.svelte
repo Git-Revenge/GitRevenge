@@ -12,6 +12,7 @@
   import { formatShortcut, isMac, provideCommands, type Command } from './commands.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
   import { session } from './session.svelte'
+  import Busy from './ui/Busy.svelte'
   import Icon from './ui/Icon.svelte'
 
   let { path }: { path: string } = $props()
@@ -162,7 +163,7 @@
 
   {#if running}
     <span class="progress" role="status">
-      <span class="spinner" aria-hidden="true"></span>
+      <Busy />
       <span class="text">{labels[running]}{progress ? `: ${progress}` : '…'}</span>
       <button class="btn text cancel" onclick={() => CancelNetwork(path)}>Cancel</button>
     </span>
@@ -265,19 +266,4 @@
     flex-shrink: 0;
   }
 
-  .spinner {
-    flex: none;
-    width: 11px;
-    height: 11px;
-    border: 2px solid var(--accent);
-    border-top-color: transparent;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
 </style>
