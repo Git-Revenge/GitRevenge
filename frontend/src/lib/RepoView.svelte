@@ -19,8 +19,6 @@
   import { linkStore } from './links/links.svelte'
   import WorkingTreePanel from './WorkingTreePanel.svelte'
   import { bisect, marksOf } from './bisect.svelte'
-  import BisectDialog from './BisectDialog.svelte'
-  import BisectPanel from './BisectPanel.svelte'
   import { Integrate } from '../../wailsjs/go/app/App.js'
 
   let { path }: { path: string } = $props()
@@ -329,10 +327,12 @@
   {#if view === 'wip'}
     <WorkingTreePanel {path} current={diff} openFile={(t) => (diff = t)} onNewBranch={() => (dialog = newBranchDialog(ctx))} onMenu={openMenu} />
   {:else if running && !bisectAside && (!selected || selected.id === bisectSubject || running.candidates.length > 0)}
-    <BisectPanel
+    <!-- Loaded when a bisect first runs: most sessions never need it. -->
+    <Lazy
+      load={() => import('./BisectPanel.svelte')}
       {path}
       info={running}
-      onOpenCommit={(id) => {
+      onOpenCommit={(id: string) => {
         bisectAside = true
         void revealCommit(id)
       }}
@@ -353,7 +353,7 @@
   <Dialog spec={dialog} onClose={() => (dialog = null)} />
 {/if}
 {#if bisect.starting?.path === path}
-  <BisectDialog {path} bad={bisect.starting.bad} onClose={() => (bisect.starting = null)} />
+  <Lazy load={() => import('./BisectDialog.svelte')} {path} bad={bisect.starting.bad} onClose={() => (bisect.starting = null)} />
 {/if}
 {#if reflogRef}
   <Lazy
