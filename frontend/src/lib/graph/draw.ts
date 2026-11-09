@@ -90,6 +90,53 @@ export function relativeTime(unixSeconds: number, nowSeconds: number): string {
   return (d.getFullYear() === new Date(nowSeconds * 1000).getFullYear() ? shortDate : shortDateYear).format(d)
 }
 
+const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+const dayFmtYear = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+const timeFmt = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' })
+
+/** Whether two moments fall on the same local calendar day. */
+export function sameDay(a: number, b: number): boolean {
+  const da = new Date(a * 1000)
+  const db = new Date(b * 1000)
+  return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate()
+}
+
+/** The day a commit belongs to, as the timeline names it: "Today", "Yesterday", then "Mon, Oct 26"
+ * (with the year once it isn't this year's). */
+export function dayLabel(unixSeconds: number, nowSeconds: number): string {
+  if (sameDay(unixSeconds, nowSeconds)) return 'Today'
+  if (sameDay(unixSeconds, nowSeconds - 86400)) return 'Yesterday'
+  const d = new Date(unixSeconds * 1000)
+  return (d.getFullYear() === new Date(nowSeconds * 1000).getFullYear() ? dayFmt : dayFmtYear).format(d)
+}
+
+/** A commit's time of day, in the local short form. */
+export function timeLabel(unixSeconds: number): string {
+  return timeFmt.format(new Date(unixSeconds * 1000))
+}
+
+/** What the timeline's second line says for a row, given its neighbours. */
+export interface MetaLine {
+  text: string
+  /** The row starts a new day after a loaded row, so it draws the day's hairline. */
+  divider: boolean
+  /** The same author carrying on: the line is only the time, drawn faint. */
+  quiet: boolean
+}
+
+/** The second line of a timeline row. The first row of a day names the day, the author and the
+ * time; rows that follow in the same day drop the day; an author's run drops the author too and
+ * fades, since the node above already said who. A row whose previous row isn't loaded yet names
+ * its day, to be safe, but draws no divider. */
+export function metaLine(row: Pick<Row, 'author' | 'authorTime' | 'parents' | 'col'>, near: Near, nowSeconds: number): MetaLine {
+  const prev = near.prev
+  const newDay = !prev || !sameDay(prev.authorTime, row.authorTime)
+  const time = timeLabel(row.authorTime)
+  if (newDay) return { text: `${dayLabel(row.authorTime, nowSeconds)} · ${row.author} · ${time}`, divider: !!prev, quiet: false }
+  if (repeatsAuthor(row as Row, near)) return { text: time, divider: false, quiet: true }
+  return { text: `${row.author} · ${time}`, divider: false, quiet: false }
+}
+
 /** Up to two initials for an author's node: "Ris Adams" → "RA", "dependabot[bot]" → "D". */
 export function initials(name: string): string {
   const words = name.replace(/\[.*?\]|<.*?>/g, ' ').split(/[\s._-]+/).filter((w) => /\p{L}|\p{N}/u.test(w))
@@ -102,6 +149,8 @@ export interface Theme {
   fg: string
   soft: string
   muted: string
+  /** The smallest labels: a quiet row's time. */
+  faint: string
   deep: string
   selected: string
   hover: string
@@ -608,10 +657,23 @@ export function drawRow(
   ctx.fillText(clip(ctx, row.subject, subjectRight - left), left, line1)
 
   if (comfortable) {
+    const meta = metaLine(row, near, nowSeconds)
+    if (meta.divider) {
+      // The day changes here: a dashed hairline along the row's top edge, from the message on.
+      ctx.save()
+      ctx.globalAlpha *= 0.45
+      ctx.strokeStyle = theme.muted
+      ctx.lineWidth = 1
+      ctx.setLineDash([3, 3])
+      ctx.beginPath()
+      ctx.moveTo(lay.textX, y + 0.5)
+      ctx.lineTo(lay.width - 14, y + 0.5)
+      ctx.stroke()
+      ctx.restore()
+    }
     setFont(ctx, `12px ${MONO}`, '0.08em')
-    ctx.fillStyle = theme.muted
-    const meta = `${row.author} · ${relativeTime(row.authorTime, nowSeconds)}`.toUpperCase()
-    ctx.fillText(clip(ctx, meta, lay.width - 14 - lay.textX), lay.textX, y + 37)
+    ctx.fillStyle = meta.quiet ? theme.faint : theme.muted
+    ctx.fillText(clip(ctx, meta.text.toUpperCase(), lay.width - 14 - lay.textX), lay.textX, y + 37)
     ctx.letterSpacing = '0px'
   }
   ctx.restore()

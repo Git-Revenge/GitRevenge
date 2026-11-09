@@ -78,7 +78,7 @@ Only one focus exists at a time, and choosing another replaces it. The graph's h
 
 ## Two layouts
 
-The default **timeline** layout gives each commit two lines: the subject, and the author and date. A commit's circle shows the author's initials, and shrinks to a dot when the same author's previous commit on that line is just above it. **Compact rows** fits one commit per line, so you see more history at once. Switch between them with the button in the graph's header, or in [Settings](settings.md).
+The default **timeline** layout gives each commit two lines: the subject, then who made it and when. The first commit of each day names the day (**Today**, **Yesterday**, then the date) under a dashed line; the commits below it in the same day show only the author and time; and when the same author's previous commit on that line is just above, the line is just the time, faded, and the commit's circle shrinks from the author's initials to a dot. **Compact rows** fits one commit per line, so you see more history at once. Switch between them with the button in the graph's header, or in [Settings](settings.md).
 
 ## Right-click menus
 

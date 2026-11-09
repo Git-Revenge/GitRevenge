@@ -43,6 +43,8 @@ Git tools: everyday git chores without leaving the app.
 - Jumping to a commit (from a branch, a parent link or a search match) glides there when it's within three screens and cuts when it's further, and the commit lands under a wash that fades. Commits that arrive where you're already looking fade up, a few at a time. Reduced motion keeps everything instant. (#558)
 - Hovering a commit in the graph (or selecting one from the keyboard) shows three small actions at the row's right edge: copy its SHA, check it out, and a menu with everything right-click offers. (#555)
 - The selected commit is marked by a bar in its lane's colour at the row's left edge, over a lighter wash, and the selection, hover and search dimming ease into place instead of snapping. Reduced motion keeps the instant draw. (#553)
+||||||| parent of a753927 (feat: the timeline names each day once and goes quiet inside a run)
+- The timeline's second line stops repeating itself: the first commit of each day names the day (**Today**, **Yesterday**, then the date) under a dashed line, commits below it in the same day show the author and time, and a run of commits by the same author shows only the time, faded. (#554)
 
 ## [0.10.0] - 2026-11-06
 
