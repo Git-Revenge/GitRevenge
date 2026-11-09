@@ -162,7 +162,7 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13.5px;
+    font-size: 13px;
   }
 
   td {

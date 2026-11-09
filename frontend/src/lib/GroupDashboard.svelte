@@ -179,7 +179,7 @@
 
   .mono {
     font-family: var(--font-mono);
-    font-size: 12.5px;
+    font-size: 13px;
   }
 
   td.action {

@@ -1171,7 +1171,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-family: var(--font-mono);
-    font-size: 12.5px;
+    font-size: 13px;
   }
 
   /* Row actions appear on hover or focus, so the list reads calmly. */
@@ -1224,7 +1224,7 @@
     display: flex;
     gap: 2px;
     align-items: center;
-    font-size: 12.5px;
+    font-size: 13px;
     font-style: italic;
     color: var(--danger);
   }

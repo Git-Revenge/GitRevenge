@@ -47,7 +47,7 @@
 
 <style>
   .split {
-    font-size: 12.5px;
+    font-size: 13px;
     tab-size: 4;
   }
 

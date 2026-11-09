@@ -67,7 +67,7 @@
     background: var(--paper-warm);
     border-radius: var(--r-sm);
     font-family: var(--font-mono);
-    font-size: 12.5px;
+    font-size: 13px;
     overflow-x: auto;
   }
 

@@ -110,7 +110,7 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13.5px;
+    font-size: 13px;
   }
 
   th {
@@ -135,7 +135,7 @@
 
   .mono {
     font-family: var(--font-mono);
-    font-size: 12.5px;
+    font-size: 12px;
     white-space: nowrap;
   }
 

@@ -891,7 +891,7 @@
     margin: 0 0 12px;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-    font-size: 14.5px;
+    font-size: 15px;
     line-height: 1.6;
     color: var(--ink-soft);
   }
@@ -952,7 +952,7 @@
   .notes textarea {
     width: 100%;
     font: inherit;
-    font-size: 13.5px;
+    font-size: 14px;
   }
 
   .note-actions {
@@ -1157,7 +1157,7 @@
 
   .file {
     font-family: var(--font-mono);
-    font-size: 12.5px;
+    font-size: 13px;
     overflow-wrap: anywhere;
   }
 
