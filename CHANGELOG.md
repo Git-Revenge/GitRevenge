@@ -31,7 +31,7 @@ Git tools: everyday git chores without leaving the app.
 - Compact rows: the Author column shows a ditto mark for an author carrying on from the row above, and the date column is headed **When**, since it holds relative times. (#557)
 - In the timeline, the checked-out commit's row carries a small handwritten "you’re here" after its label when the branch column has room. (#562)
 - Jumping to a commit (from a branch, a parent link or a search match) glides there when it's within three screens and cuts when it's further, and the commit lands under a wash that fades. Commits that arrive where you're already looking fade up, a few at a time. Reduced motion keeps everything instant. (#558)
-- Hovering a commit in the graph (or selecting one from the keyboard) shows three small actions at the row's right edge: copy its SHA, check it out, and a menu with everything right-click offers. (#555)
+- Resting the pointer on a commit in the graph (or selecting one from the keyboard) shows two small actions at the row's right edge: copy its SHA, and a menu with everything right-click offers. (#555)
 - The selected commit is marked by a bar in its lane's colour at the row's left edge, over a lighter wash, and the selection, hover and search dimming ease into place instead of snapping. Reduced motion keeps the instant draw. (#553)
 - The timeline's second line stops repeating itself: the first commit of each day names the day (**Today**, **Yesterday**, then the date) under a dashed line, commits below it in the same day show the author and time, and a run of commits by the same author shows only the time, faded. (#554)
 
