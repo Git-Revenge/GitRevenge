@@ -244,7 +244,6 @@ func TestDeleteBranchAndWorktreeRefusesTheOneOpenHere(t *testing.T) {
 }
 
 func TestAWorktreeAddedOrRemovedInTheAppUpdatesTheBranch(t *testing.T) {
-	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "1", "base")
@@ -266,7 +265,6 @@ func TestAWorktreeAddedOrRemovedInTheAppUpdatesTheBranch(t *testing.T) {
 }
 
 func TestAWorktreeChangedOutsideTheAppUpdatesTheBranch(t *testing.T) {
-	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "1", "base")
@@ -294,7 +292,6 @@ func waitForBranch(t *testing.T, a *App, path, name string) {
 }
 
 func TestClosingAWorktreesTabKeepsTheMainTabWatching(t *testing.T) {
-	t.Parallel()
 	a, fx, path, dir := worktreeFixture(t)
 	other, err := a.OpenRepo(dir)
 	if err != nil {
@@ -309,7 +306,6 @@ func TestClosingAWorktreesTabKeepsTheMainTabWatching(t *testing.T) {
 }
 
 func TestClosingTheMainTabKeepsAWorktreesTabWatching(t *testing.T) {
-	t.Parallel()
 	a, fx, path, dir := worktreeFixture(t)
 	other, err := a.OpenRepo(dir)
 	if err != nil {
@@ -350,7 +346,6 @@ func waitForSubject(t *testing.T, a *App, path, subject string) {
 
 // #512: refs live in the git folder a linked worktree shares with the main one.
 func TestAWorktreesTabNoticesABranchMadeElsewhere(t *testing.T) {
-	t.Parallel()
 	a, fx, _, dir := worktreeFixture(t)
 	path := openWorktreeTab(t, a, dir)
 	fx.Git("branch", "made-outside")
@@ -358,7 +353,6 @@ func TestAWorktreesTabNoticesABranchMadeElsewhere(t *testing.T) {
 }
 
 func TestAWorktreesTabNoticesACommitInTheMainWorktree(t *testing.T) {
-	t.Parallel()
 	a, fx, _, dir := worktreeFixture(t)
 	path := openWorktreeTab(t, a, dir)
 	fx.CommitFile("elsewhere.txt", "1", "committed in main")
@@ -366,7 +360,6 @@ func TestAWorktreesTabNoticesACommitInTheMainWorktree(t *testing.T) {
 }
 
 func TestAWorktreesTabNoticesACommitMadeInItOutsideTheApp(t *testing.T) {
-	t.Parallel()
 	a, fx, _, dir := worktreeFixture(t)
 	path := openWorktreeTab(t, a, dir)
 	fx.Git("-C", dir, "commit", "--allow-empty", "-m", "committed in a terminal")
@@ -374,7 +367,6 @@ func TestAWorktreesTabNoticesACommitMadeInItOutsideTheApp(t *testing.T) {
 }
 
 func TestAWorktreesTabNoticesTheMainWorktreeSwitchingBranch(t *testing.T) {
-	t.Parallel()
 	a, fx, _, dir := worktreeFixture(t)
 	path := openWorktreeTab(t, a, dir)
 	fx.Git("branch", "next")
@@ -384,7 +376,6 @@ func TestAWorktreesTabNoticesTheMainWorktreeSwitchingBranch(t *testing.T) {
 }
 
 func TestTheMainTabStillNoticesThingsWithAWorktreeTabOpen(t *testing.T) {
-	t.Parallel()
 	a, fx, path, dir := worktreeFixture(t)
 	openWorktreeTab(t, a, dir)
 	fx.Git("branch", "made-outside")
@@ -392,7 +383,6 @@ func TestTheMainTabStillNoticesThingsWithAWorktreeTabOpen(t *testing.T) {
 }
 
 func TestClosingOneWorktreesTabKeepsAnothersWatching(t *testing.T) {
-	t.Parallel()
 	a, fx, _, dir := worktreeFixture(t)
 	second := filepath.Join(t.TempDir(), "second-wt")
 	fx.Git("worktree", "add", "-b", "second", second)
@@ -407,7 +397,6 @@ func TestClosingOneWorktreesTabKeepsAnothersWatching(t *testing.T) {
 
 // A session can restore tabs in any order, so the inner watch can start first.
 func TestTheMainTabOpenedAfterAWorktreesTabBothWatch(t *testing.T) {
-	t.Parallel()
 	a, fx, path, dir := worktreeFixture(t)
 	other := openWorktreeTab(t, a, dir)
 	if err := a.CloseRepo(path); err != nil {
@@ -420,7 +409,6 @@ func TestTheMainTabOpenedAfterAWorktreesTabBothWatch(t *testing.T) {
 }
 
 func TestClosingOneOfThreeTabsKeepsTheOtherTwoWatching(t *testing.T) {
-	t.Parallel()
 	a, fx, path, dir := worktreeFixture(t)
 	second := filepath.Join(t.TempDir(), "second-wt")
 	fx.Git("worktree", "add", "-b", "second", second)
@@ -435,7 +423,6 @@ func TestClosingOneOfThreeTabsKeepsTheOtherTwoWatching(t *testing.T) {
 }
 
 func TestReopeningAWorktreesTabKeepsEveryTabWatching(t *testing.T) {
-	t.Parallel()
 	a, fx, path, dir := worktreeFixture(t)
 	other := openWorktreeTab(t, a, dir)
 	if err := a.CloseRepo(other); err != nil {
