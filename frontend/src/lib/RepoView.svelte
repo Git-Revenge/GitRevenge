@@ -56,6 +56,8 @@
   }
 
   let graph: GraphView
+  /** Where the graph puts its header tools: in the bar, beside the repository's actions. */
+  let toolsHost = $state<HTMLElement>()
   let selected = $state<Row | undefined>()
   /** Which panel is on the right: uncommitted changes, or the selected commit. */
   let view = $state<'wip' | 'commit'>('commit')
@@ -189,12 +191,15 @@
   <div class="main">
     <div class="bar">
       <Toolbar {path} />
+      <!-- The graph's own tools join the bar while the graph is showing; a file or the rebase
+           editor has its own header, so they step aside for it. -->
+      <div class="graph-tools" class:hidden={diff || rebaseBase} bind:this={toolsHost}></div>
       <button class="btn sm quiet icon panel-toggle" aria-pressed={!right.hidden} aria-label={right.hidden ? 'Show the right panel' : 'Hide the right panel'} title={right.hidden ? 'Show the right panel' : 'Hide the right panel'} onclick={() => (right.hidden = !right.hidden)}><Icon name="sidebar" size={14} /></button>
     </div>
     <!-- The graph stays mounted while a diff is open, so scroll position and selection
          survive returning to it. -->
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {onSelect} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} {onSelect} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           openMenu(commitMenuItems(row, refs, ctx), x, y)}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
@@ -380,13 +385,26 @@
   .bar {
     flex: none;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     border-bottom: 1px solid var(--paper-edge);
   }
 
+  /* Takes the room the actions leave, and a line of its own once that's too little. */
+  .graph-tools {
+    flex: 1 1 380px;
+    min-width: 0;
+    display: flex;
+    border-left: 1px solid var(--paper-edge);
+  }
+
+  .graph-tools.hidden {
+    display: none;
+  }
+
   .panel-toggle {
     flex: none;
-    margin: 0 8px;
+    margin: 0 8px 0 auto;
     transform: scaleX(-1);
   }
 

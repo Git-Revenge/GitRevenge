@@ -220,8 +220,8 @@
     padding: 0 12px;
     white-space: nowrap;
     overflow: hidden;
-    /* The bar that holds it draws the rule underneath. */
-    flex: 1;
+    /* The bar that holds it draws the rule underneath, and shares the row with the graph's tools. */
+    flex: 0 1 auto;
     min-width: 0;
   }
 

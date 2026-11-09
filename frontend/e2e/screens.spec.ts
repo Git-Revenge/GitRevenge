@@ -1246,6 +1246,28 @@ test.describe('before the first load has answered', () => {
       expect(color).not.toBe(selected)
     })
 
+    // #559: the graph's tools share the toolbar's bar, and step aside when a file takes over.
+    test("the graph's tools sit in the toolbar's bar, and leave it with the graph", async ({ page }) => {
+      await page.setViewportSize({ width: 1800, height: 800 })
+      await open(page, 'repoView', dirty([one]))
+      const fetch = page.getByRole('button', { name: 'Fetch' })
+      const search = page.getByRole('searchbox', { name: 'Search commits' })
+      await expect(search).toBeVisible()
+      const a = (await fetch.boundingBox())!
+      const b = (await search.boundingBox())!
+      // One row: the two overlap vertically.
+      expect(b.y).toBeLessThan(a.y + a.height)
+      expect(a.y).toBeLessThan(b.y + b.height)
+      // Nothing of the header is left above the graph.
+      expect(await page.locator('.graph .status').count()).toBe(0)
+
+      await bar(page).click()
+      await page.getByRole('button', { name: /a\.txt/ }).first().click()
+      await expect(page.locator('.scroller')).toBeHidden()
+      await expect(search).toBeHidden()
+      await expect(fetch).toBeVisible()
+    })
+
     // #556: it's the graph's first row, so its words start where the messages do and its mark
     // sits on the first lane. (#514 pinned it at 44px while it sat above the graph, where the
     // columns could leave it stranded; inside the graph it leaves with the graph instead.)
