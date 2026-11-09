@@ -496,6 +496,38 @@ textarea {
   opacity: 0.4;
 }
 
+/* Text that destroys something: the same italic link in the danger colour, with the bar to
+   match, so Discard all never looks like Stage all. Outranks .btn.danger's filled body. */
+.btn.text.danger {
+  color: var(--danger);
+  background: none;
+}
+
+.btn.text.danger::before {
+  content: none;
+}
+
+.btn.text.danger::after {
+  inset: auto 2px calc(50% - 0.75em) 2px;
+  height: 0.4em;
+  border-radius: 3px 6px 4px 5px;
+  background: var(--danger);
+  opacity: 0.18;
+  filter: none;
+  mix-blend-mode: normal;
+  transform: none;
+}
+
+.btn.text.danger:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+.btn.text.danger:hover:not(:disabled)::after,
+.btn.text.danger:focus-visible::after {
+  opacity: 0.4;
+  transform: none;
+}
+
 /* The Caveat arrow on an lg primary that leads somewhere. */
 .btn .arrow {
   font-family: var(--font-hand);

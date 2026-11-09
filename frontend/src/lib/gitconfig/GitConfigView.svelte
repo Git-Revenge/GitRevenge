@@ -161,7 +161,7 @@
     </p>
     <pre class="disk" aria-label="The file on disk now">{gitConfig.conflict.disk}</pre>
     <div class="form-actions">
-      <button class="btn text" onclick={() => gitConfig.reload()}>Discard mine and reload</button>
+      <button class="btn text danger" onclick={() => gitConfig.reload()}>Discard mine and reload</button>
       <InkButton onclick={() => gitConfig.save(true)}>Save mine</InkButton>
     </div>
   </Modal>

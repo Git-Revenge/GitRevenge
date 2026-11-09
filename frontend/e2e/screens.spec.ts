@@ -1790,7 +1790,7 @@ test.describe('confirm buttons are legible', () => {
   for (const theme of ['light', 'dark'] as const) {
     test(`Discard all, ${theme}`, async ({ page }) => {
       await open(page, 'workingTree', { theme, responses })
-      await page.getByRole('button', { name: 'Discard all' }).click()
+      await page.getByRole('button', { name: 'Discard all…' }).click()
       const yes = page.getByRole('button', { name: 'Yes', exact: true })
       expect(await contrast(yes)).toBeGreaterThanOrEqual(4.5)
       await yes.hover()

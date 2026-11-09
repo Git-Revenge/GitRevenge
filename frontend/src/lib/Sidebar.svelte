@@ -366,7 +366,7 @@
         {#if careOn && !filter.trim() && deletable.length > 0}
           <div class="care-bar">
             <span>{deletable.length.toLocaleString()} safe to delete</span>
-            <button class="btn sm" disabled={deleting} onclick={deleteAll}>{deleting ? 'Deleting…' : 'Delete all'}</button>
+            <button class="btn sm danger" disabled={deleting} onclick={deleteAll}>{deleting ? 'Deleting…' : 'Delete all'}</button>
           </div>
         {/if}
       {/if}
