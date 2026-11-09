@@ -18,6 +18,10 @@ export function AnswerPrompt(arg1, arg2, arg3) {
   return window['go']['app']['App']['AnswerPrompt'](arg1, arg2, arg3);
 }
 
+export function Bisect(arg1) {
+  return window['go']['app']['App']['Bisect'](arg1);
+}
+
 export function Blame(arg1, arg2, arg3) {
   return window['go']['app']['App']['Blame'](arg1, arg2, arg3);
 }
@@ -294,6 +298,10 @@ export function LinkRules(arg1) {
   return window['go']['app']['App']['LinkRules'](arg1);
 }
 
+export function MarkBisect(arg1, arg2) {
+  return window['go']['app']['App']['MarkBisect'](arg1, arg2);
+}
+
 export function MarkBranchKind(arg1, arg2, arg3) {
   return window['go']['app']['App']['MarkBranchKind'](arg1, arg2, arg3);
 }
@@ -308,6 +316,10 @@ export function OpenGitConfig(arg1) {
 
 export function OpenRepo(arg1) {
   return window['go']['app']['App']['OpenRepo'](arg1);
+}
+
+export function PlanBisect(arg1, arg2, arg3) {
+  return window['go']['app']['App']['PlanBisect'](arg1, arg2, arg3);
 }
 
 export function Preferences() {
@@ -582,6 +594,10 @@ export function StageFiles(arg1, arg2) {
   return window['go']['app']['App']['StageFiles'](arg1, arg2);
 }
 
+export function StartBisect(arg1, arg2, arg3) {
+  return window['go']['app']['App']['StartBisect'](arg1, arg2, arg3);
+}
+
 export function StashAction(arg1, arg2, arg3) {
   return window['go']['app']['App']['StashAction'](arg1, arg2, arg3);
 }
@@ -616,6 +632,10 @@ export function TryLinkRule(arg1, arg2) {
 
 export function Undo(arg1) {
   return window['go']['app']['App']['Undo'](arg1);
+}
+
+export function UndoBisect(arg1) {
+  return window['go']['app']['App']['UndoBisect'](arg1);
 }
 
 export function UndoIgnore(arg1, arg2) {

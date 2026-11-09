@@ -134,6 +134,105 @@ export namespace app {
 	        this.skipped = source["skipped"];
 	    }
 	}
+	export class BisectMark {
+	    commit: string;
+	    subject: string;
+	    term: string;
+	    step: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new BisectMark(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.commit = source["commit"];
+	        this.subject = source["subject"];
+	        this.term = source["term"];
+	        this.step = source["step"];
+	    }
+	}
+	export class BisectInfo {
+	    running: boolean;
+	    current: string;
+	    marks: BisectMark[];
+	    steps: number;
+	    remaining: number;
+	    stepsLeft: number;
+	    firstBad: string;
+	    candidates: string[];
+	    origin: string;
+	    inQuestion: string[];
+	    rangeCapped: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new BisectInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.running = source["running"];
+	        this.current = source["current"];
+	        this.marks = this.convertValues(source["marks"], BisectMark);
+	        this.steps = source["steps"];
+	        this.remaining = source["remaining"];
+	        this.stepsLeft = source["stepsLeft"];
+	        this.firstBad = source["firstBad"];
+	        this.candidates = source["candidates"];
+	        this.origin = source["origin"];
+	        this.inQuestion = source["inQuestion"];
+	        this.rangeCapped = source["rangeCapped"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class BisectPlan {
+	    bad: string;
+	    good: string;
+	    badSubject: string;
+	    goodSubject: string;
+	    suggested: string;
+	    commits: number;
+	    steps: number;
+	    first: string;
+	    firstSubject: string;
+	    problem: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BisectPlan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bad = source["bad"];
+	        this.good = source["good"];
+	        this.badSubject = source["badSubject"];
+	        this.goodSubject = source["goodSubject"];
+	        this.suggested = source["suggested"];
+	        this.commits = source["commits"];
+	        this.steps = source["steps"];
+	        this.first = source["first"];
+	        this.firstSubject = source["firstSubject"];
+	        this.problem = source["problem"];
+	    }
+	}
 	export class BranchLoss {
 	    branch: string;
 	    upstream: string;
