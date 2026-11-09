@@ -321,8 +321,15 @@ class InsightsTab {
     })
     // A repository's refs moved (a commit, merge or fetch): compute it again. The backend
     // cache makes repositories that didn't change free.
+    // The global config may hold smart links, which decide Shipped's references.
+    EventsOn('gitconfig:changed', () => {
+      if (!this.open) return
+      clearTimeout(this.timer)
+      this.timer = setTimeout(() => void this.load(), 500)
+    })
     EventsOn('repo:changed', (c: { path: string; kinds: string[] }) => {
-      if (!this.open || !(c.kinds.includes('refs') || c.kinds.includes('head'))) return
+      // Config holds the smart links that decide Shipped's references.
+      if (!this.open || !(c.kinds.includes('refs') || c.kinds.includes('head') || c.kinds.includes('config'))) return
       const repo = this.repos.find((r) => samePath(r, c.path))
       if (!repo) return
       clearTimeout(this.timer)

@@ -5,6 +5,7 @@ import {git} from '../models';
 import {gitconfig} from '../models';
 import {session} from '../models';
 import {settings} from '../models';
+import {links} from '../models';
 import {graph} from '../models';
 
 export function AddGitConfigValue(arg1:string,arg2:string,arg3:string):Promise<app.ConfigDoc>;
@@ -117,6 +118,8 @@ export function IgnoreStats(arg1:string):Promise<git.IgnoreStats>;
 
 export function IgnoredFiles(arg1:string):Promise<app.Ignored>;
 
+export function ImportLinkRules(arg1:string,arg2:string,arg3:string):Promise<number>;
+
 export function Init(arg1:string,arg2:string):Promise<string>;
 
 export function InsightsBranches(arg1:string,arg2:app.InsightsInputs):Promise<app.AttentionResult>;
@@ -148,6 +151,8 @@ export function LFSAction(arg1:string,arg2:string,arg3:Array<string>):Promise<vo
 export function LFSLocks(arg1:string):Promise<Array<git.LFSLock>>;
 
 export function LastCommitMessage(arg1:string):Promise<string>;
+
+export function LinkRules(arg1:string):Promise<links.Config>;
 
 export function MarkBranchKind(arg1:string,arg2:string,arg3:string):Promise<void>;
 
@@ -199,6 +204,8 @@ export function RemoveGitConfigSection(arg1:string,arg2:string):Promise<app.Conf
 
 export function RemoveIgnoreRule(arg1:string,arg2:git.IgnoreLine):Promise<void>;
 
+export function RemoveLinkRule(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function RemoveRecentRepo(arg1:string):Promise<void>;
 
 export function RemoveWorktree(arg1:string,arg2:string,arg3:boolean):Promise<string>;
@@ -206,6 +213,8 @@ export function RemoveWorktree(arg1:string,arg2:string,arg3:boolean):Promise<str
 export function RenameGitConfigKey(arg1:string,arg2:string,arg3:string):Promise<app.ConfigDoc>;
 
 export function RenameGitConfigSection(arg1:string,arg2:string,arg3:string):Promise<app.ConfigDoc>;
+
+export function ReorderLinkRules(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
 export function ReplaceGitConfigValue(arg1:string,arg2:string,arg3:string,arg4:string):Promise<app.ConfigDoc>;
 
@@ -234,6 +243,8 @@ export function SaveFile(arg1:string,arg2:string,arg3:string):Promise<string>;
 export function SaveGitConfig(arg1:string,arg2:boolean):Promise<app.ConfigSaveResult>;
 
 export function SaveIgnoreFile(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
+export function SaveLinkRule(arg1:string,arg2:links.Rule,arg3:string):Promise<void>;
 
 export function SearchGraph(arg1:string,arg2:string):Promise<graph.SearchResult>;
 
@@ -275,6 +286,8 @@ export function SetTheme(arg1:string):Promise<void>;
 
 export function SetUpdateChecks(arg1:boolean):Promise<void>;
 
+export function SetWebLinks(arg1:string,arg2:boolean):Promise<void>;
+
 export function SetWorkTreeContent(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function ShowingHidden(arg1:string):Promise<boolean>;
@@ -298,6 +311,8 @@ export function TakeConflictSide(arg1:string,arg2:string,arg3:string):Promise<vo
 export function Theme():Promise<string>;
 
 export function TrailerHints(arg1:string):Promise<git.TrailerHints>;
+
+export function TryLinkRule(arg1:string,arg2:links.Rule):Promise<app.LinkTry>;
 
 export function Undo(arg1:string):Promise<void>;
 

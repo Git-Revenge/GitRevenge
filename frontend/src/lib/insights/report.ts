@@ -18,6 +18,9 @@ export interface RepoWindow {
   points?: string
   /** The branch kind patterns in use (ADR 0009), keyed by kind. */
   kinds?: Record<string, string[]>
+  /** The smart links that find ticket references, "name pattern" each; empty for the
+   * built-in PROJ-123 and #123. */
+  references?: string[]
 }
 
 /** A thresholds set (app.Thresholds). */
@@ -83,6 +86,7 @@ export function inputLines(inp: ReportInputs): [string, string][] {
   }
   const kinds = first ? kindsLine(first.kinds) : ''
   if (kinds) lines.push(['Branch kinds', kinds])
+  if (first) lines.push(['References', first.references?.length ? first.references.join('; ') : 'built in: PROJ-123 and #123'])
   const t = inp.thresholds
   lines.push(['Thresholds', `stale ${t.stale}d, long-lived ${t.longLived}d, behind ${t.behind}, size ${t.size} lines`])
   return lines

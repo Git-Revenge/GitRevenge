@@ -394,3 +394,14 @@ describe('commitMenuItems', () => {
     expect(labels(items)).toContain('Apply stash')
   })
 })
+
+describe('smart links in branch menus', () => {
+  it('puts Open KEY first for a branch name a rule matches, local or remote', async () => {
+    const { linkStore } = await import('./links/links.svelte')
+    linkStore.configs['/r'] = { web: true, rules: [{ name: 'Jira', pattern: 'ABC-[0-9]+', url: 'https://acme.example/browse/{0}', in: ['branches'], shipped: false, enabled: true, scope: 'global' }] } as never
+    expect(labels(refItems(ref('feature/ABC-12-retry', 'local'), ctx('main')))[0]).toBe('Open ABC-12 in Jira')
+    expect(labels(refItems(ref('origin/feature/ABC-12-retry', 'remote'), ctx('main')))[0]).toBe('Open ABC-12 in Jira')
+    expect(labels(refItems(ref('wip-docs', 'local'), ctx('main')))[0]).not.toMatch(/^Open /)
+    delete linkStore.configs['/r']
+  })
+})

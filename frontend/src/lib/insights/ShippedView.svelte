@@ -2,6 +2,9 @@
   // The Shipped view of the Insights tab (#250): what landed on the target branch in the
   // window, grouped by ticket reference or by day.
   import type { git } from '../../../wailsjs/go/models'
+  import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
+  import { linkTitle } from '../links/links'
+  import { linkStore } from '../links/links.svelte'
   import { session } from '../session.svelte'
   import { insights } from './insights.svelte'
   import { byDay, byReference, duration, utcDay, type Tagged } from './model'
@@ -15,6 +18,19 @@
   let refGroups = $derived(byReference(work))
   let dayGroups = $derived(byDay(work))
   let refCount = $derived(refGroups.filter((g) => g.ref).length)
+
+  // References link through each repository's smart links.
+  $effect(() => {
+    for (const r of insights.repos) void linkStore.load(r)
+  })
+  /** A reference as a link, through the first of its items' repositories that links it. */
+  function refLink(ref: string, repos: string[]) {
+    for (const r of repos) {
+      const m = linkStore.linker(r).find(ref, 'message')[0]
+      if (m && m.text === ref && m.rule) return m
+    }
+    return null
+  }
 
   const repoName = (path: string) => session.tabs.find((t) => t.path === path)?.name ?? path.split(/[\\/]/).pop() ?? path
   const target = $derived(w?.target.replace(/^origin\//, '') ?? 'the target')
@@ -67,7 +83,13 @@
     {#each refGroups as g (g.ref)}
       <section class="group" aria-label={g.ref || 'No reference'}>
         <h2>
-          {#if g.ref}<code class="ref">{g.ref}</code>{:else}<span class="noref">No reference</span>{/if}
+          {#if g.ref}
+            {@const link = refLink(g.ref, g.items.map((i) => i.repo))}
+            {#if link}
+              <a class="ref" href={link.href} title={linkTitle(link)} onclick={(e) => (e.preventDefault(), BrowserOpenURL(link.href))}>{g.ref}</a>
+              <span class="src">{link.rule}</span>
+            {:else}<code class="ref">{g.ref}</code>{/if}
+          {:else}<span class="noref">No reference</span>{/if}
           <span class="meta">{g.items.length} {g.items.length === 1 ? 'item' : 'items'}</span>
           <span class="spacer"></span>
           {#if g.cycle}<span class="meta" title="Median cycle time of the merges in this group">cycle {duration(g.cycle)}</span>{/if}
@@ -93,10 +115,37 @@
     </details>
   {/if}
 
-  <p class="foot">References come from subjects and trailers (<code>TIDE-88</code>, <code>#41</code>, <code>Refs:</code>, <code>Closes:</code>) and are shown as text, never links. An item with several goes under its first.</p>
+  <p class="foot">
+    {#if w?.references?.length}
+      References are what your smart links match in subjects and reference trailers (<code>Refs:</code>, <code>Closes:</code>), from the links that count for Shipped. They open in your browser.
+    {:else}
+      References are <code>TIDE-88</code> and <code>#41</code> in subjects and reference trailers (<code>Refs:</code>, <code>Closes:</code>), shown as text. Add a smart link in Settings that counts for Shipped to choose your own and make them links.
+    {/if}
+    An item with several goes under its first.
+  </p>
 </div>
 
 <style>
+  a.ref {
+    font-family: var(--font-mono);
+    text-decoration: none;
+    color: var(--link);
+    background: linear-gradient(transparent 62%, color-mix(in srgb, var(--link) 30%, transparent) 62%);
+  }
+
+  a.ref:hover {
+    color: var(--link-hover);
+  }
+
+  .src {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--paper-deep);
+    color: var(--ink-soft);
+  }
+
   .deps summary {
     cursor: pointer;
     list-style: none;

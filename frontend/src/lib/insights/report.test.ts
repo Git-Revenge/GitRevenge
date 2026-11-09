@@ -34,6 +34,7 @@ describe('inputs', () => {
       ['Repository harbour-api', 'main @ bbb222'],
       ['Window', '2026-07-09T00:00:00Z to 2026-07-22T09:00:00Z'],
       ['As of', '2026-07-22T09:00:00Z'],
+      ['References', 'built in: PROJ-123 and #123'],
       ['Thresholds', 'stale 7d, long-lived 14d, behind 50, size 500 lines'],
     ])
   })
@@ -51,6 +52,7 @@ describe('summary', () => {
         'Repository harbour-api: main @ bbb222  ',
         'Window: 2026-07-09T00:00:00Z to 2026-07-22T09:00:00Z  ',
         'As of: 2026-07-22T09:00:00Z  ',
+        'References: built in: PROJ-123 and #123  ',
         'Thresholds: stale 7d, long-lived 14d, behind 50, size 500 lines  ',
         '',
         '## Shipped (2)',
@@ -90,10 +92,10 @@ describe('CSV', () => {
     const csv = shippedCSV(inputs, items, name)
     const lines = csv.split('\r\n')
     expect(lines[0]).toBe('Scope,Harbour team')
-    expect(lines[6]).toBe('')
-    expect(lines[7]).toBe('repository,commit,committed_utc,title,author,email,references,files,added,removed,merge,cycle_hours,revert,fixup,bot')
-    expect(lines[8]).toBe('api,s2,2026-07-22T08:59:10Z,"Ignore logs, ""really""",Maya Okafor,maya@x,,2,10,3,no,,no,no,no')
-    expect(lines[9]).toContain('TIDE-88,2,10,3,yes,2.0,no,no')
+    expect(lines[7]).toBe('')
+    expect(lines[8]).toBe('repository,commit,committed_utc,title,author,email,references,files,added,removed,merge,cycle_hours,revert,fixup,bot')
+    expect(lines[9]).toBe('api,s2,2026-07-22T08:59:10Z,"Ignore logs, ""really""",Maya Okafor,maya@x,,2,10,3,no,,no,no,no')
+    expect(lines[10]).toContain('TIDE-88,2,10,3,yes,2.0,no,no')
   })
 
   it('marks pending conflict checks and lists hot files', () => {
