@@ -30,6 +30,8 @@ Git tools: everyday git chores without leaving the app.
 - Every empty list says so the same way: a handwritten note and one plain sentence, from the sidebar and the working tree to the command palette, LFS, remotes and the reflog. Lists still being read show the loading mark instead. (#549)
 ||||||| parent of 7f12c5d (feat: segmented controls for the theme and graph settings)
 - Settings › Appearance picks the theme (System, Light, Dark) and the commit graph (Timeline, Compact) with segmented controls, the same shape as the diff's Unified / Split, instead of drop-downs. (#561)
+||||||| parent of 1a3cfc9 (feat: cross-fade the window when the theme changes)
+- Switching between the light and dark themes cross-fades the window instead of flipping it. Reduced motion keeps the flip. (#560)
 
 ## [0.10.0] - 2026-11-06
 

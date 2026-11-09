@@ -949,6 +949,15 @@ textarea {
   animation-delay: 200ms;
 }
 
+/* Switching themes cross-fades the window (theme.svelte.ts starts the view transition); the
+   old and new pictures just fade, with no slide, over --dur-base. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur-base);
+  animation-timing-function: var(--ease-ink);
+  mix-blend-mode: normal;
+}
+
 /* Reduced motion: every token goes to zero, so nothing moves, blurs or lingers. Loops
    (spinners, busy dots) switch themselves off where they're defined. */
 @media (prefers-reduced-motion: reduce) {
