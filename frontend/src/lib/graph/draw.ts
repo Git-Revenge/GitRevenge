@@ -113,6 +113,8 @@ export interface Theme {
   warn: string
   /** Branch kind colours, keyed by kind (trunk, release, environment, docs, bot). */
   kinds?: Record<string, string>
+  /** The rose for the one handwritten note on the canvas. */
+  link: string
 }
 
 // Icons drawn on the canvas, built once each from the same paths as the Icon component.
@@ -274,6 +276,37 @@ export function layoutColumns(width: number, graphW: number, density: Density, f
 
 const SERIF = '"Fraunces Variable", Georgia, serif'
 const MONO = '"JetBrains Mono Variable", ui-monospace, Consolas, monospace'
+const HAND = '"Caveat Variable", "Segoe Script", cursive'
+
+/** The graph's one handwritten note, beside the checked-out commit's label. */
+export const HERE_NOTE = 'you’re here'
+const HERE_GAP = 8
+const HERE_TILT = (-3 * Math.PI) / 180
+
+/** Where the note starts, given where the labels ended, how wide the note is and how wide the
+ * column is; null when it wouldn't fit with the column's right-hand margin. */
+export function hereNotePlace(labelsEnd: number, noteWidth: number, columnWidth: number): number | null {
+  const x = labelsEnd + HERE_GAP
+  return x + noteWidth <= columnWidth - 12 ? x : null
+}
+
+/** Draws the note after the labels, tilted like every hand note in the app, and returns where
+ * it ends; or returns labelsEnd when there wasn't room. */
+function drawHereNote(ctx: CanvasRenderingContext2D, labelsEnd: number, mid: number, columnWidth: number, theme: Theme): number {
+  setFont(ctx, `18px ${HAND}`)
+  const w = ctx.measureText(HERE_NOTE).width
+  const x = hereNotePlace(labelsEnd, w, columnWidth)
+  if (x === null) return labelsEnd
+  ctx.save()
+  ctx.translate(x, mid + 1)
+  ctx.rotate(HERE_TILT)
+  ctx.fillStyle = theme.link
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(HERE_NOTE, 0, 0)
+  ctx.restore()
+  return x + w
+}
 
 function setFont(ctx: CanvasRenderingContext2D, font: string, spacing = '0px') {
   ctx.font = font
@@ -408,8 +441,10 @@ export function drawRow(
 
   // Labels in their own column, each tied to its node by a thin line.
   if (lay.refW && refs.length) {
-    const end = drawLabels(ctx, refs, 8, mid, lay.refW - 16, color, theme, comfortable, lay.remote) - LABEL_TRAIL
+    let end = drawLabels(ctx, refs, 8, mid, lay.refW - 16, color, theme, comfortable, lay.remote) - LABEL_TRAIL
     labelSpan = [8, end]
+    // The checked-out commit gets the graph's one handwritten word, when the column has room.
+    if (comfortable && refs.some((r) => r.head)) end = drawHereNote(ctx, end, mid, lay.refW, theme)
     const to = Math.min(x, graphRight)
     if (end < to && x >= graphLeft) {
       ctx.globalAlpha = before * 0.45

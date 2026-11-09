@@ -35,6 +35,9 @@ Git tools: everyday git chores without leaving the app.
 ||||||| parent of 60945ef (feat: ease the graph's selection, hover and dimming; mark the selection with a bar)
 ||||||| parent of 83819db (feat: compact rows say "same author" with a ditto, and head the dates When)
 - Compact rows: the Author column shows a ditto mark for an author carrying on from the row above, and the date column is headed **When**, since it holds relative times. (#557)
+||||||| parent of b35e300 (feat: a handwritten "you're here" beside the checked-out commit)
+||||||| parent of fee6780 (feat: a handwritten "you're here" beside the checked-out commit)
+- In the timeline, the checked-out commit's row carries a small handwritten "you’re here" after its label when the branch column has room. (#562)
 - The selected commit is marked by a bar in its lane's colour at the row's left edge, over a lighter wash, and the selection, hover and search dimming ease into place instead of snapping. Reduced motion keeps the instant draw. (#553)
 
 ## [0.10.0] - 2026-11-06
