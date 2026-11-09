@@ -159,6 +159,9 @@ export function selectionBar(y: number, h: number): { x: number; y: number; w: n
 /** How far a row that doesn't match the search fades: to 0.3 of its ink. */
 const DIM = 0.7
 
+/** What the compact Author column says for an author carrying on from the row above. */
+export const DITTO = '〃'
+
 /** Width a kind icon takes in a ref label, gap included. */
 const KIND_ICON_W = 15
 
@@ -549,9 +552,14 @@ export function drawRow(
     ctx.fillText(relativeTime(row.authorTime, nowSeconds), lay.dateX, line1)
   }
   if (lay.authorW) {
+    // Inside an author's run the column says "same again" with a ditto, so one name isn't
+    // shouted down the column; the node's dot already said so.
+    const ditto = !isHead && repeatsAuthor(row, near)
     setFont(ctx, `13px ${SERIF}`)
     ctx.fillStyle = theme.muted
-    ctx.fillText(clip(ctx, row.author, lay.authorW - 16), lay.authorX, line1)
+    if (ditto) ctx.globalAlpha *= 0.6
+    ctx.fillText(ditto ? DITTO : clip(ctx, row.author, lay.authorW - 16), lay.authorX, line1)
+    if (ditto) ctx.globalAlpha /= 0.6
   }
 
   let left = lay.textX

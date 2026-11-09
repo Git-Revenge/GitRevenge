@@ -652,7 +652,7 @@
           <button class="btn sm quiet icon" onclick={searchAuthor} disabled={selected < 0} aria-label="Search for the selected commit's author" title="Search for the selected commit's author"><Icon name="filter" size={13} /></button>
         </span>
       {/if}
-      {#if columns.dateW}<span style:left="{columns.dateX}px">Date</span>{/if}
+      {#if columns.dateW}<span style:left="{columns.dateX}px">When</span>{/if}
       <span style:left="{columns.shaX}px">SHA</span>
     </div>
   {/if}
