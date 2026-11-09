@@ -239,6 +239,16 @@ button:disabled {
   cursor: default;
 }
 
+/* Links, wherever they turn up: rose, never the browser's blue. A commit's subject, a trailer
+   and a message body all read the same; components only add to this. */
+a {
+  color: var(--link);
+}
+
+a:hover {
+  color: var(--link-hover);
+}
+
 input,
 select,
 textarea {
