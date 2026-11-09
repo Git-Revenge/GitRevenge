@@ -7,8 +7,8 @@ Open **Settings** with <kbd>Ctrl</kbd>+<kbd>,</kbd> or from the command palette.
 
 | Setting | What it does |
 |---|---|
-| **Theme** | Light, dark, or follow the system. |
-| **Commit graph** | Timeline (two lines per commit) or compact rows. |
+| **Theme** | System, Light or Dark. |
+| **Commit graph** | Timeline (two lines per commit) or Compact (one). |
 | **Zoom** | Scales the whole app, from 80% to 150%. |
 | **Git executable** | Which `git` to use. Leave it empty to find it on your `PATH`. A change takes effect after a restart. |
 | **Clone into** | Where new clones go. Empty means the folder of the last repository you opened. |

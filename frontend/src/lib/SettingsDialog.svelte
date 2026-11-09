@@ -19,6 +19,29 @@
   let { onClose }: { onClose: () => void } = $props()
 
   let p = $state<app.Preferences | null>(null)
+
+  /** The few-option choices, as segmented controls: the same shape as the diff's Unified / Split. */
+  const THEMES = [
+    { value: '', label: 'System', title: 'Follow the operating system' },
+    { value: 'light', label: 'Light', title: 'Ink Paper' },
+    { value: 'dark', label: 'Dark', title: 'Ink Parchment' },
+  ]
+  const DENSITIES = [
+    { value: '', label: 'Timeline', title: 'Two lines per commit, with authors' },
+    { value: 'compact', label: 'Compact', title: 'One line per commit' },
+  ]
+
+  /** Arrow keys move along a segmented control and choose as they go, as a radio group does. */
+  function pick<T extends { value: string }>(e: KeyboardEvent, options: T[], current: string, choose: (v: string) => void) {
+    const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0
+    if (!step) return
+    e.preventDefault()
+    const i = Math.max(0, options.findIndex((o) => o.value === current))
+    const next = options[(i + step + options.length) % options.length]
+    choose(next.value)
+    const buttons = (e.currentTarget as HTMLElement).closest('.segmented')?.querySelectorAll('button')
+    buttons?.[(i + step + options.length) % options.length]?.focus()
+  }
   let initialGit = ''
   let error = $state('')
   let saving = $state(false)
@@ -123,21 +146,26 @@
     >
       <fieldset>
         <legend class="meta">Appearance</legend>
-        <label class="form-field">
-          <span>Theme</span>
-          <select bind:value={p.theme}>
-            <option value="">Follow the system</option>
-            <option value="light">Light (Ink Paper)</option>
-            <option value="dark">Dark (Ink Parchment)</option>
-          </select>
-        </label>
-        <label class="form-field">
-          <span>Commit graph</span>
-          <select bind:value={p.graphDensity}>
-            <option value="">Timeline (two lines per commit)</option>
-            <option value="compact">Compact rows</option>
-          </select>
-        </label>
+        <div class="form-field">
+          <span id="theme-label">Theme</span>
+          <div class="segmented" role="group" aria-labelledby="theme-label">
+            {#each THEMES as t (t.value)}
+              <button type="button" aria-pressed={p.theme === t.value} tabindex={p.theme === t.value ? 0 : -1} title={t.title} onclick={() => p && (p.theme = t.value)} onkeydown={(e) => pick(e, THEMES, p?.theme ?? '', (v) => p && (p.theme = v))}
+                >{t.label}</button
+              >
+            {/each}
+          </div>
+        </div>
+        <div class="form-field">
+          <span id="density-label">Commit graph</span>
+          <div class="segmented" role="group" aria-labelledby="density-label">
+            {#each DENSITIES as d (d.value)}
+              <button type="button" aria-pressed={p.graphDensity === d.value} tabindex={p.graphDensity === d.value ? 0 : -1} title={d.title} onclick={() => p && (p.graphDensity = d.value)} onkeydown={(e) => pick(e, DENSITIES, p?.graphDensity ?? '', (v) => p && (p.graphDensity = v))}
+                >{d.label}</button
+              >
+            {/each}
+          </div>
+        </div>
         <label class="form-field">
           <span>Zoom: {p.zoom}%</span>
           <input type="range" min="80" max="150" step="5" bind:value={p.zoom} aria-valuetext="{p.zoom} percent" />
