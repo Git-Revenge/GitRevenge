@@ -41,7 +41,8 @@ jobs:
           files=$(git diff --name-only "$BASE"...HEAD)
           echo "$files"
           all=false
-          if echo "$files" | grep -qE '^\.github/'; then all=true; fi
+          # Only workflow changes run everything; templates and issue forms run nothing.
+          if echo "$files" | grep -qE '^\.github/workflows/'; then all=true; fi
           go=$all
           frontend=$all
           # Go code, its modules, the Wails project and packaging; the generated bindings
