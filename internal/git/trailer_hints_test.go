@@ -9,6 +9,7 @@ import (
 )
 
 func TestTrailerHints(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	fx := gittest.New(t)
 	commit := func(msg string) {
@@ -35,6 +36,7 @@ func TestTrailerHints(t *testing.T) {
 }
 
 func TestTrailerHintsIgnoresKeysWithoutPeople(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Git("commit", "-q", "--allow-empty", "-m", "one\n\nCloses: Ana <ana@example.com>")
 	got := OpenRepo(newTestRunner(t), fx.Dir).TrailerHints(context.Background())

@@ -78,6 +78,7 @@ func focusedNames(t *testing.T, a *App, path string) map[string]bool {
 }
 
 func TestFocusShowsOneBranchUntilItIsCleared(t *testing.T) {
+	t.Parallel()
 	a, _, path := focusFixture(t)
 	if err := a.SetGraphFocus(path, "one", false); err != nil {
 		t.Fatal(err)
@@ -103,6 +104,7 @@ func TestFocusShowsOneBranchUntilItIsCleared(t *testing.T) {
 }
 
 func TestOnlyOneFocusAtATime(t *testing.T) {
+	t.Parallel()
 	a, _, path := focusFixture(t)
 	for _, b := range []string{"one", "two"} {
 		if err := a.SetGraphFocus(path, b, false); err != nil {
@@ -116,6 +118,7 @@ func TestOnlyOneFocusAtATime(t *testing.T) {
 }
 
 func TestFocusKeepsLabelsOnTheCommitsShown(t *testing.T) {
+	t.Parallel()
 	a, fx, path := focusFixture(t)
 	base := fx.Git("rev-list", "--max-parents=0", "HEAD")
 	fx.Git("branch", "at-base", base[:40])
@@ -138,6 +141,7 @@ func TestFocusKeepsLabelsOnTheCommitsShown(t *testing.T) {
 }
 
 func TestFocusIncludesTheRemoteCopy(t *testing.T) {
+	t.Parallel()
 	a, fx, path := focusFixture(t)
 	fx.Git("update-ref", "refs/remotes/origin/one", fx.Git("rev-parse", "two")[:40])
 	fx.Git("remote", "add", "origin", fx.Dir)
@@ -151,6 +155,7 @@ func TestFocusIncludesTheRemoteCopy(t *testing.T) {
 }
 
 func TestFocusOnlyMatchesTheWholeName(t *testing.T) {
+	t.Parallel()
 	a, fx, path := focusFixture(t)
 	fx.Git("branch", "one-more", "two")
 	if err := a.SetGraphFocus(path, "one", false); err != nil {
@@ -160,6 +165,7 @@ func TestFocusOnlyMatchesTheWholeName(t *testing.T) {
 }
 
 func TestFocusCanShowAHiddenBranch(t *testing.T) {
+	t.Parallel()
 	a, _, path := focusFixture(t)
 	if err := a.HideBranch(path, "one", true); err != nil {
 		t.Fatal(err)
@@ -180,6 +186,7 @@ func TestFocusCanShowAHiddenBranch(t *testing.T) {
 }
 
 func TestFocusLeavesOutStashes(t *testing.T) {
+	t.Parallel()
 	a, fx, path := focusFixture(t)
 	fx.WriteFile("a.txt", "changed")
 	fx.Stash("kept")
@@ -190,6 +197,7 @@ func TestFocusLeavesOutStashes(t *testing.T) {
 }
 
 func TestFocusOnAStackCoversEveryBranchInIt(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "1", "base")
@@ -227,6 +235,7 @@ func TestFocusOnAStackCoversEveryBranchInIt(t *testing.T) {
 }
 
 func TestFocusOnABranchWithNoStackIsJustTheBranch(t *testing.T) {
+	t.Parallel()
 	a, _, path := focusFixture(t)
 	if err := a.SetGraphFocus(path, "one", true); err != nil {
 		t.Fatal(err)
@@ -235,6 +244,7 @@ func TestFocusOnABranchWithNoStackIsJustTheBranch(t *testing.T) {
 }
 
 func TestFocusEndsWhenTheBranchGoes(t *testing.T) {
+	t.Parallel()
 	a, _, path := focusFixture(t)
 	if err := a.SetGraphFocus(path, "one", false); err != nil {
 		t.Fatal(err)
@@ -251,6 +261,7 @@ func TestFocusEndsWhenTheBranchGoes(t *testing.T) {
 }
 
 func TestFocusOnAMissingBranchIsRefused(t *testing.T) {
+	t.Parallel()
 	a, _, path := focusFixture(t)
 	if err := a.SetGraphFocus(path, "no-such-branch", false); err == nil {
 		t.Fatal("focused on a branch that doesn't exist")
@@ -261,6 +272,7 @@ func TestFocusOnAMissingBranchIsRefused(t *testing.T) {
 }
 
 func TestFocusDoesNotMarkOtherRefs(t *testing.T) {
+	t.Parallel()
 	a, _, path := focusFixture(t)
 	if err := a.SetGraphFocus(path, "one", false); err != nil {
 		t.Fatal(err)

@@ -8,6 +8,7 @@ import (
 )
 
 func TestRepoStateAndAbort(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.WithConflict(t)
 	tab, err := a.OpenRepo(fx.Dir)

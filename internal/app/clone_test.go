@@ -69,6 +69,7 @@ func TestCloneRefusesNonEmptyFolder(t *testing.T) {
 }
 
 func TestCloneValidatesInput(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	parent := t.TempDir()
 	for _, c := range []struct{ url, parent, name string }{
@@ -146,6 +147,7 @@ func TestCancelCloneCleansUp(t *testing.T) {
 }
 
 func TestRemoveCloneKeepsExistingFolder(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, ".git", "objects"), 0o755); err != nil {
 		t.Fatal(err)
@@ -179,6 +181,7 @@ func TestInitCreatesRepo(t *testing.T) {
 }
 
 func TestInitRefusesExistingRepo(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 

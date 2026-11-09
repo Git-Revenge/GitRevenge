@@ -7,6 +7,7 @@ import (
 )
 
 func TestConflictBindings(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.WithConflict(t)
 	tab, _ := a.OpenRepo(fx.Dir)

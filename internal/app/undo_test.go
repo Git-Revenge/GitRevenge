@@ -18,6 +18,7 @@ func undoLabel(t *testing.T, a *App, path string) UndoInfo {
 }
 
 func TestUndoRedoCommit(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	base := fx.CommitFile("a.txt", "one\n", "base")
@@ -58,6 +59,7 @@ func TestUndoRedoCommit(t *testing.T) {
 }
 
 func TestUndoRefusesWhenHistoryMovedElsewhere(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "one\n", "base")
@@ -80,6 +82,7 @@ func TestUndoRefusesWhenHistoryMovedElsewhere(t *testing.T) {
 }
 
 func TestUndoMergeCheckoutAndReset(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "a\n", "base")
@@ -126,6 +129,7 @@ func TestUndoMergeCheckoutAndReset(t *testing.T) {
 }
 
 func TestUndoBranchCreateAndDelete(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.Linear(1)
@@ -153,6 +157,7 @@ func TestUndoBranchCreateAndDelete(t *testing.T) {
 }
 
 func TestNewOperationClearsRedo(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.Linear(1)
@@ -169,6 +174,7 @@ func TestNewOperationClearsRedo(t *testing.T) {
 }
 
 func TestClosingRepoDropsUndoHistory(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.Linear(1)
@@ -195,6 +201,7 @@ func TestClosingRepoDropsUndoHistory(t *testing.T) {
 }
 
 func TestUndoHistoryChangesAreAnnounced(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	var mu sync.Mutex
 	var got []string

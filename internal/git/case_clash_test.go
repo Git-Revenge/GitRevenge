@@ -31,6 +31,7 @@ func trimNL(s string) string {
 }
 
 func TestMarkCaseClashes(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	status := func(files ...FileStatus) *Status { return &Status{Files: files} }
 

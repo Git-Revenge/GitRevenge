@@ -12,6 +12,7 @@ import (
 )
 
 func TestReferences(t *testing.T) {
+	t.Parallel()
 	for msg, want := range map[string][]string{
 		"Cache readings offline (TIDE-88)":                        {"TIDE-88"},
 		"Paginate readings (#41)\n\nBody mentions OTHER-1.":       {"#41"},
@@ -48,6 +49,7 @@ func shippedFixture(t *testing.T) (*gittest.Repo, map[string]string) {
 }
 
 func TestShipped(t *testing.T) {
+	t.Parallel()
 	fx, c := shippedFixture(t)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
 	ctx := context.Background()
@@ -164,6 +166,7 @@ func TestShippedIgnoresPersonalConfig(t *testing.T) {
 }
 
 func TestInsightsTargetPrefersOriginHead(t *testing.T) {
+	t.Parallel()
 	origin := gittest.New(t)
 	origin.Linear(1)
 	fx := gittest.Clone(t, origin)

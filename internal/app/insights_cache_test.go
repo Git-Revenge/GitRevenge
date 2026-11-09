@@ -11,6 +11,7 @@ import (
 )
 
 func TestCachedInsightFollowsRefs(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(2)
 	a := newTestApp(t)
@@ -51,6 +52,7 @@ func TestCachedInsightFollowsRefs(t *testing.T) {
 }
 
 func TestInsightsReuseConflictChecks(t *testing.T) {
+	t.Parallel()
 	origin := gittest.New(t)
 	origin.CommitFile("a.txt", "base\n", "Start")
 	origin.Branch("side")
@@ -106,6 +108,7 @@ func TestInsightsReuseConflictChecks(t *testing.T) {
 }
 
 func TestInsightsFetchedAt(t *testing.T) {
+	t.Parallel()
 	origin := gittest.New(t)
 	origin.Linear(1)
 	fx := gittest.Clone(t, origin)

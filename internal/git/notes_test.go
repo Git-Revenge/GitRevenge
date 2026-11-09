@@ -9,6 +9,7 @@ import (
 )
 
 func TestNotes(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	shas := fx.Linear(2)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)

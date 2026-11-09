@@ -9,6 +9,7 @@ import (
 )
 
 func TestSplitTrailers(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name     string
 		body     string
@@ -78,6 +79,7 @@ func TestSplitTrailers(t *testing.T) {
 }
 
 func TestParseTrailerQuery(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		in   string
 		want TrailerQuery
@@ -100,6 +102,7 @@ func TestParseTrailerQuery(t *testing.T) {
 }
 
 func TestTrailerQueryMatchesIssueRefsWhole(t *testing.T) {
+	t.Parallel()
 	q := TrailerQuery{"closes", "#12"}
 	for value, want := range map[string]bool{"#12": true, "#11, #12": true, "#123": false, "#112": false} {
 		if got := q.Matches(Trailer{"Closes", value}); got != want {
@@ -109,6 +112,7 @@ func TestTrailerQueryMatchesIssueRefsWhole(t *testing.T) {
 }
 
 func TestCommitsWithTrailer(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(1)
 	ada := fx.CommitFile("a.txt", "a", "Pair work\n\nCo-authored-by: Ada Lovelace <ada@example.com>")

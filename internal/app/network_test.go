@@ -144,6 +144,7 @@ func TestFetchAsksForCredentials(t *testing.T) {
 }
 
 func TestNetErrHTTPStatus(t *testing.T) {
+	t.Parallel()
 	err := netErr(&git.Error{Stderr: "fatal: unable to access 'http://x/repo.git/': The requested URL returned error: 403"})
 	if err == nil || !strings.Contains(err.Error(), "HTTP 403") {
 		t.Fatalf("err = %v", err)

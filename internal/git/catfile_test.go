@@ -19,6 +19,7 @@ func newTestObjectReader(t *testing.T) (*ObjectReader, *gittest.Repo) {
 }
 
 func TestObjectReaderContents(t *testing.T) {
+	t.Parallel()
 	o, fx := newTestObjectReader(t)
 	fx.CommitFile("hello.txt", "hello\nworld\n", "add hello")
 
@@ -41,6 +42,7 @@ func TestObjectReaderContents(t *testing.T) {
 }
 
 func TestObjectReaderInfo(t *testing.T) {
+	t.Parallel()
 	o, fx := newTestObjectReader(t)
 	fx.CommitFile("a.txt", "abc", "add a")
 
@@ -54,6 +56,7 @@ func TestObjectReaderInfo(t *testing.T) {
 }
 
 func TestObjectReaderMissing(t *testing.T) {
+	t.Parallel()
 	o, fx := newTestObjectReader(t)
 	fx.Linear(1)
 
@@ -67,6 +70,7 @@ func TestObjectReaderMissing(t *testing.T) {
 }
 
 func TestObjectReaderRestartsAfterProcessDies(t *testing.T) {
+	t.Parallel()
 	o, fx := newTestObjectReader(t)
 	fx.Linear(1)
 	if _, err := o.Info("HEAD"); err != nil {
@@ -84,6 +88,7 @@ func TestObjectReaderRestartsAfterProcessDies(t *testing.T) {
 }
 
 func TestObjectReaderConcurrent(t *testing.T) {
+	t.Parallel()
 	o, fx := newTestObjectReader(t)
 	shas := fx.Linear(10)
 
@@ -110,6 +115,7 @@ func TestObjectReaderConcurrent(t *testing.T) {
 }
 
 func TestObjectReaderRejectsNewlines(t *testing.T) {
+	t.Parallel()
 	o, _ := newTestObjectReader(t)
 	if _, err := o.Info("HEAD\ncontents HEAD"); err == nil {
 		t.Fatal("revision containing a newline must be rejected")

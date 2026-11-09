@@ -9,6 +9,7 @@ import (
 )
 
 func TestWorkingTreeFlow(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "one\n", "base")
@@ -52,6 +53,7 @@ func TestWorkingTreeFlow(t *testing.T) {
 }
 
 func TestStageAndUnstageAll(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.Linear(1)

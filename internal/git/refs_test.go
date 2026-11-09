@@ -25,6 +25,7 @@ func refsByName(t *testing.T, fx *gittest.Repo) map[string]Ref {
 }
 
 func TestRefsKindsAndHead(t *testing.T) {
+	t.Parallel()
 	fx := gittest.WithMergeHistory(t)
 	fx.Git("tag", "light")
 	refs := refsByName(t, fx)
@@ -47,6 +48,7 @@ func TestRefsKindsAndHead(t *testing.T) {
 }
 
 func TestRefsUpdated(t *testing.T) {
+	t.Parallel()
 	fx := gittest.WithMergeHistory(t)
 	fx.Git("tag", "light")
 	refs := refsByName(t, fx)
@@ -72,6 +74,7 @@ func TestRefsUpdated(t *testing.T) {
 
 // The upstream fields come from a second query, for only the branches that have one (#346).
 func TestRefsUpstreamsOnlyWhereConfigured(t *testing.T) {
+	t.Parallel()
 	local, _ := gittest.WithRemote(t, 2)
 	local.Git("branch", "plain")
 	local.Git("branch", "dir/tracking", "--track", "origin/main")
@@ -95,6 +98,7 @@ func TestRefsUpstreamsOnlyWhereConfigured(t *testing.T) {
 }
 
 func TestRefsNoUpstreamsAtAll(t *testing.T) {
+	t.Parallel()
 	fx := gittest.WithMergeHistory(t)
 	refs := refsByName(t, fx)
 	if len(refs) == 0 {
@@ -108,6 +112,7 @@ func TestRefsNoUpstreamsAtAll(t *testing.T) {
 }
 
 func TestRefsConfigForDeletedBranch(t *testing.T) {
+	t.Parallel()
 	local, _ := gittest.WithRemote(t, 1)
 	local.Git("config", "branch.deleted.remote", "origin")
 	local.Git("config", "branch.deleted.merge", "refs/heads/deleted")
@@ -121,6 +126,7 @@ func TestRefsConfigForDeletedBranch(t *testing.T) {
 }
 
 func TestRefsOnlyDeletedBranchesConfigured(t *testing.T) {
+	t.Parallel()
 	fx := gittest.WithMergeHistory(t)
 	fx.Git("config", "branch.deleted.remote", "origin")
 	fx.Git("config", "branch.deleted.merge", "refs/heads/deleted")
@@ -167,6 +173,7 @@ func BenchmarkRefsManyBranches(b *testing.B) {
 }
 
 func TestRefsRemoteTracking(t *testing.T) {
+	t.Parallel()
 	local, remote := gittest.WithRemote(t, 2)
 	local.CommitFile("ahead.txt", "x", "local work")
 	seed := gittest.Clone(t, remote)
@@ -188,6 +195,7 @@ func TestRefsRemoteTracking(t *testing.T) {
 }
 
 func TestRefsUpstreamGone(t *testing.T) {
+	t.Parallel()
 	local, remote := gittest.WithRemote(t, 1)
 	local.Branch("feature")
 	local.Git("push", "-q", "-u", "origin", "feature")
@@ -199,6 +207,7 @@ func TestRefsUpstreamGone(t *testing.T) {
 }
 
 func TestRefsStashes(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(1)
 	fx.WriteFile("a.txt", "1")
@@ -217,6 +226,7 @@ func TestRefsStashes(t *testing.T) {
 }
 
 func TestRefsEmptyRepo(t *testing.T) {
+	t.Parallel()
 	refs, err := OpenRepo(newTestRunner(t), gittest.New(t).Dir).Refs(context.Background())
 	if err != nil || len(refs) != 0 {
 		t.Fatalf("refs = %v, err = %v", refs, err)

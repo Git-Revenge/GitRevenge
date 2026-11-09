@@ -10,6 +10,7 @@ import (
 )
 
 func TestResetModes(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	for _, tc := range []struct {
 		mode             ResetMode
@@ -47,6 +48,7 @@ func TestResetModes(t *testing.T) {
 }
 
 func TestRevert(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "one\n", "base")
 	bad := fx.CommitFile("b.txt", "oops\n", "add b")
@@ -65,6 +67,7 @@ func TestRevert(t *testing.T) {
 }
 
 func TestRevertMergeNeedsMainline(t *testing.T) {
+	t.Parallel()
 	fx := gittest.WithMergeHistory(t)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
 	ctx := context.Background()
@@ -83,6 +86,7 @@ func TestRevertMergeNeedsMainline(t *testing.T) {
 }
 
 func TestRevertConflict(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("c.txt", "one\n", "base")
 	target := fx.CommitFile("c.txt", "two\n", "change")

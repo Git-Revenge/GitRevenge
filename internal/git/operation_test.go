@@ -34,6 +34,7 @@ func conflictingBranches(t *testing.T, commitsOnOther int) *gittest.Repo {
 }
 
 func TestIdle(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(1)
 	if st := stateOf(t, fx); st.Op != None || len(st.Conflicts) != 0 {
@@ -42,6 +43,7 @@ func TestIdle(t *testing.T) {
 }
 
 func TestMergeConflictThenAbort(t *testing.T) {
+	t.Parallel()
 	fx := gittest.WithConflict(t)
 	st := stateOf(t, fx)
 	if st.Op != Merge || !slices.Equal(st.Conflicts, []string{"conflict.txt"}) {
@@ -58,6 +60,7 @@ func TestMergeConflictThenAbort(t *testing.T) {
 }
 
 func TestMergeContinueAfterResolving(t *testing.T) {
+	t.Parallel()
 	fx := gittest.WithConflict(t)
 	fx.WriteFile("conflict.txt", "resolved\n")
 	fx.Git("add", "conflict.txt")
@@ -75,6 +78,7 @@ func TestMergeContinueAfterResolving(t *testing.T) {
 }
 
 func TestRebaseProgressAndSkip(t *testing.T) {
+	t.Parallel()
 	fx := conflictingBranches(t, 1)
 	fx.Checkout("other")
 	fx.CommitFile("g.txt", "more\n", "second")
@@ -96,6 +100,7 @@ func TestRebaseProgressAndSkip(t *testing.T) {
 }
 
 func TestCherryPickAndRevertDetected(t *testing.T) {
+	t.Parallel()
 	fx := conflictingBranches(t, 1)
 	if _, err := fx.TryGit("cherry-pick", "other"); err == nil {
 		t.Fatal("expected cherry-pick conflict")
@@ -115,6 +120,7 @@ func TestCherryPickAndRevertDetected(t *testing.T) {
 }
 
 func TestBisectDetectedAndReset(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	shas := fx.Linear(4)
 	fx.Git("bisect", "start", shas[3], shas[0])
@@ -134,6 +140,7 @@ func TestBisectDetectedAndReset(t *testing.T) {
 }
 
 func TestActionWithNothingInProgress(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(1)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)

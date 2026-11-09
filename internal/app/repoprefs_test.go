@@ -17,6 +17,7 @@ func kindOf(p RepoPreferences, k branchkind.Kind) KindPatterns {
 }
 
 func TestRepoPreferencesDefaults(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	p, err := a.RepoPreferences(t.TempDir())
 	if err != nil {
@@ -35,6 +36,7 @@ func TestRepoPreferencesDefaults(t *testing.T) {
 }
 
 func TestRepoPreferencesRoundTrip(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	repo, other := t.TempDir(), t.TempDir()
 	p, _ := a.RepoPreferences(repo)
@@ -93,6 +95,7 @@ func TestRepoPreferencesRoundTrip(t *testing.T) {
 }
 
 func TestRepoPreferencesValidation(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	repo := t.TempDir()
 	if err := a.SetRepoPreferences(repo, RepoPreferences{Kinds: []KindPatterns{{Kind: "nightly", Custom: true}}}); err == nil {
@@ -107,6 +110,7 @@ func TestRepoPreferencesValidation(t *testing.T) {
 }
 
 func TestMarkBranchKind(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	repo := t.TempDir()
 	if err := a.MarkBranchKind(repo, "production", "environment"); err != nil {

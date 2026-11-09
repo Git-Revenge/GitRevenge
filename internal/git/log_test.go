@@ -25,6 +25,7 @@ func readLog(t *testing.T, fx *gittest.Repo, opts LogOptions) []LogCommit {
 }
 
 func TestLogLinear(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	shas := fx.Linear(3)
 
@@ -47,6 +48,7 @@ func TestLogLinear(t *testing.T) {
 }
 
 func TestLogIncludesAllBranchesAndMerges(t *testing.T) {
+	t.Parallel()
 	fx := gittest.WithMergeHistory(t)
 	got := readLog(t, fx, LogOptions{})
 	if len(got) != 6 {
@@ -70,6 +72,7 @@ func TestLogIncludesAllBranchesAndMerges(t *testing.T) {
 }
 
 func TestLogSubjectWithSpecialCharacters(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	subject := "fix: handle ünïcødé, tabs\tand | pipes"
 	fx.CommitFile("a.txt", "a", subject+"\n\nbody line\nmore body")
@@ -80,12 +83,14 @@ func TestLogSubjectWithSpecialCharacters(t *testing.T) {
 }
 
 func TestLogEmptyRepo(t *testing.T) {
+	t.Parallel()
 	if got := readLog(t, gittest.New(t), LogOptions{}); len(got) != 0 {
 		t.Fatalf("empty repo returned %d commits", len(got))
 	}
 }
 
 func TestLogDetachedHeadIncluded(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(2)
 	fx.Git("checkout", "-q", "--detach")
@@ -97,6 +102,7 @@ func TestLogDetachedHeadIncluded(t *testing.T) {
 }
 
 func TestLogMaxCountAndStop(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(10)
 	if got := readLog(t, fx, LogOptions{MaxCount: 4}); len(got) != 4 {
@@ -119,12 +125,14 @@ func TestLogMaxCountAndStop(t *testing.T) {
 }
 
 func TestParseLogRecordRejectsGarbage(t *testing.T) {
+	t.Parallel()
 	if _, err := parseLogRecord([]byte("not a record")); err == nil || !strings.Contains(err.Error(), "unexpected") {
 		t.Fatalf("err = %v", err)
 	}
 }
 
 func TestLogOrphanBranchKeepsOtherHistory(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(2)
 	fx.Git("checkout", "-q", "--orphan", "fresh")
@@ -136,6 +144,7 @@ func TestLogOrphanBranchKeepsOtherHistory(t *testing.T) {
 // An orphan branch committed to alongside main, like gh-pages, interleaves with main by
 // date instead of being listed as one block after it (#275).
 func TestLogInterleavesParallelHistoriesByDate(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	m1 := fx.CommitFile("a.txt", "1", "main 1")
 	fx.Git("checkout", "-q", "--orphan", "gh-pages")
@@ -161,6 +170,7 @@ func TestLogInterleavesParallelHistoriesByDate(t *testing.T) {
 }
 
 func TestLogVeryLongSubject(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(1)
 	long := strings.Repeat("x", 200*1024) // larger than the 64KB read buffer
@@ -178,6 +188,7 @@ func TestLogVeryLongSubject(t *testing.T) {
 }
 
 func TestCountCommitsMatchesLog(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
 	if n, err := repo.CountCommits(context.Background(), LogOptions{}); err != nil || n != 0 {
@@ -198,6 +209,7 @@ func TestCountCommitsMatchesLog(t *testing.T) {
 }
 
 func TestLogIncludesTagsOutsideBranches(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(2)
 	fx.Tag("v1", "")
@@ -224,6 +236,7 @@ func TestLogIncludesTagsOutsideBranches(t *testing.T) {
 // Excluded branches leave the default starting points, local and remote-tracking, while
 // HEAD stays even when it matches.
 func TestLogExcludesHiddenBranches(t *testing.T) {
+	t.Parallel()
 	origin := gittest.New(t)
 	origin.CommitFile("a.txt", "1", "base")
 	origin.Branch("wip/try")

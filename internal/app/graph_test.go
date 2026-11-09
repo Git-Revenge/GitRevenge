@@ -10,6 +10,7 @@ import (
 )
 
 func TestGraphRows(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.WithMergeHistory(t)
 	tab, err := a.OpenRepo(fx.Dir)
@@ -39,6 +40,7 @@ func TestGraphRows(t *testing.T) {
 }
 
 func TestGraphRefsAndCommitRow(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.WithMergeHistory(t)
 	tab, err := a.OpenRepo(fx.Dir)
@@ -69,6 +71,7 @@ func TestGraphRefsAndCommitRow(t *testing.T) {
 }
 
 func TestSearchGraph(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.WithMergeHistory(t)
 	tab, err := a.OpenRepo(fx.Dir)
@@ -90,6 +93,7 @@ func TestSearchGraph(t *testing.T) {
 }
 
 func TestSearchGraphByTrailer(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.Linear(2)
@@ -114,6 +118,7 @@ func TestSearchGraphByTrailer(t *testing.T) {
 }
 
 func TestSearchesCancelThePreviousOne(t *testing.T) {
+	t.Parallel()
 	var s searches
 	first, doneFirst := s.start("/r")
 	second, doneSecond := s.start("/r")
@@ -133,6 +138,7 @@ func TestSearchesCancelThePreviousOne(t *testing.T) {
 }
 
 func TestCommitSignaturesCachesUnsigned(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	shas := fx.Linear(2)
@@ -152,6 +158,7 @@ func TestCommitSignaturesCachesUnsigned(t *testing.T) {
 }
 
 func TestWorktreeBindings(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.Linear(1)

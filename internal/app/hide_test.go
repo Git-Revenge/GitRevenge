@@ -25,6 +25,7 @@ func loadedPage(t *testing.T, a *App, path string) GraphPage {
 }
 
 func TestHideBranch(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "1", "base")
@@ -98,6 +99,7 @@ func TestHideBranch(t *testing.T) {
 }
 
 func TestRefKinds(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "1", "base")
@@ -120,6 +122,7 @@ func TestRefKinds(t *testing.T) {
 }
 
 func TestTrunkPinnedInGraph(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "1", "base")
@@ -141,6 +144,7 @@ func TestTrunkPinnedInGraph(t *testing.T) {
 }
 
 func TestKindToggleAndLaneKinds(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "1", "code")

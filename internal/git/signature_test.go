@@ -11,6 +11,7 @@ import (
 )
 
 func TestStatusOf(t *testing.T) {
+	t.Parallel()
 	for code, want := range map[string]string{"G": "good", "B": "bad", "U": "unknown", "E": "unknown", "X": "expired", "Y": "expired", "R": "revoked", "N": "none", "": "none"} {
 		if got := statusOf(code); got != want {
 			t.Errorf("statusOf(%q) = %q, want %q", code, got, want)
@@ -19,6 +20,7 @@ func TestStatusOf(t *testing.T) {
 }
 
 func TestVerifySignaturesUnsigned(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	shas := fx.Linear(2)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
@@ -37,6 +39,7 @@ func TestVerifySignaturesUnsigned(t *testing.T) {
 }
 
 func TestVerifySignaturesSSH(t *testing.T) {
+	t.Parallel()
 	keygen, err := exec.LookPath("ssh-keygen")
 	if err != nil {
 		t.Skip("ssh-keygen not installed")

@@ -7,6 +7,7 @@ import (
 )
 
 func TestLFSAndSubmoduleBindings(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.SetupLFS("*.bin")

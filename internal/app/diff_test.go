@@ -11,6 +11,7 @@ import (
 )
 
 func TestFileContentsModes(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "v1\n", "first")
@@ -43,6 +44,7 @@ func TestFileContentsModes(t *testing.T) {
 }
 
 func TestPartialStagingGuards(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "one\ntwo\n", "base")
@@ -76,6 +78,7 @@ func TestPartialStagingGuards(t *testing.T) {
 }
 
 func TestFileImage(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	// A 1x1 PNG.
@@ -100,6 +103,7 @@ func TestFileImage(t *testing.T) {
 }
 
 func TestFileData(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	pdf := "%PDF-1.4\n\x00\x01\x02 binary bytes\n%%EOF\n"

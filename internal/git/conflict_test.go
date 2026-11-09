@@ -11,6 +11,7 @@ import (
 )
 
 func TestConflictStages(t *testing.T) {
+	t.Parallel()
 	fx := gittest.WithConflict(t) // conflict.txt: base / ours / theirs
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
 
@@ -27,6 +28,7 @@ func TestConflictStages(t *testing.T) {
 }
 
 func TestResolveWithStagesResult(t *testing.T) {
+	t.Parallel()
 	fx := gittest.WithConflict(t)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
 	ctx := context.Background()
@@ -44,6 +46,7 @@ func TestResolveWithStagesResult(t *testing.T) {
 }
 
 func TestTakeSide(t *testing.T) {
+	t.Parallel()
 	for _, side := range []ConflictSide{Ours, Theirs} {
 		t.Run(string(side), func(t *testing.T) {
 			fx := gittest.WithConflict(t)
@@ -63,6 +66,7 @@ func TestTakeSide(t *testing.T) {
 }
 
 func TestTakeSideWhereThatSideDeleted(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("d.txt", "base\n", "base")
 	fx.Branch("theirs")
@@ -91,6 +95,7 @@ func TestTakeSideWhereThatSideDeleted(t *testing.T) {
 }
 
 func TestTakeSideRequiresConflict(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "a", "base")
 	err := OpenRepo(newTestRunner(t), fx.Dir).TakeSide(context.Background(), "a.txt", Ours)

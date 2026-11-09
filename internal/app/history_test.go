@@ -7,6 +7,7 @@ import (
 )
 
 func TestHistoryAndBlameBindings(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "one\n", "first")

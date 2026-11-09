@@ -8,6 +8,7 @@ import (
 )
 
 func TestIntegrate(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile("c.txt", "base\n", "base")
@@ -37,6 +38,7 @@ func TestIntegrate(t *testing.T) {
 }
 
 func TestResetAndRevertActions(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	base := fx.CommitFile("a.txt", "one\n", "base")

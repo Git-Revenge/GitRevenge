@@ -9,6 +9,7 @@ import (
 )
 
 func TestGroupCRUD(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile("src/a.txt", "a", "base")

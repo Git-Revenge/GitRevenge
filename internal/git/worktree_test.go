@@ -9,6 +9,7 @@ import (
 )
 
 func TestParseWorktrees(t *testing.T) {
+	t.Parallel()
 	out := "worktree /src/app\nHEAD aaa\nbranch refs/heads/main\n\nworktree /src/app-fix\nHEAD bbb\ndetached\nlocked reason\n\nworktree /tmp/gone\nHEAD ccc\nbranch refs/heads/old\nprunable gitdir file points to non-existent location\n"
 	got := parseWorktrees(out, "/src/app-fix")
 	if len(got) != 3 {
@@ -26,6 +27,7 @@ func TestParseWorktrees(t *testing.T) {
 }
 
 func TestAddAndRemoveWorktree(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(1)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)

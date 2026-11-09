@@ -26,6 +26,7 @@ func changedPaths(t *testing.T, a *App, path string) []string {
 }
 
 func TestIgnoreAndUndo(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.WriteFile("cache/kept.txt", "tracked\n")
@@ -66,6 +67,7 @@ func TestIgnoreAndUndo(t *testing.T) {
 }
 
 func TestStopIgnoring(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile(".gitignore", "*.log\n", "base")
@@ -97,6 +99,7 @@ func TestStopIgnoring(t *testing.T) {
 }
 
 func TestSaveIgnoreFileRefusesAStaleBase(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile(".gitignore", "*.log\n", "base")

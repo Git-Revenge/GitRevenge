@@ -9,12 +9,14 @@ import (
 )
 
 func TestVersion(t *testing.T) {
+	t.Parallel()
 	if got := New().Version(); got != version.Version {
 		t.Fatalf("Version() = %q, want %q", got, version.Version)
 	}
 }
 
 func TestStartupDiscoversGit(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}

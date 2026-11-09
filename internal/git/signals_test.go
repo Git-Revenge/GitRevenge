@@ -9,6 +9,7 @@ import (
 )
 
 func TestRenamedTo(t *testing.T) {
+	t.Parallel()
 	for in, want := range map[string]string{
 		"a.txt":                 "a.txt",
 		"old.txt => new.txt":    "new.txt",
@@ -54,6 +55,7 @@ func branchesFixture(t *testing.T) *gittest.Repo {
 }
 
 func TestOpenBranches(t *testing.T) {
+	t.Parallel()
 	fx := branchesFixture(t)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
 	ctx := context.Background()
@@ -103,6 +105,7 @@ func TestOpenBranches(t *testing.T) {
 }
 
 func TestWouldConflict(t *testing.T) {
+	t.Parallel()
 	fx := branchesFixture(t)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
 	ctx := context.Background()
@@ -123,6 +126,7 @@ func TestWouldConflict(t *testing.T) {
 }
 
 func TestHotFiles(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "1\n", "Start")
 	since := fx.Commit("Mark")

@@ -21,6 +21,7 @@ func newTestApp(t *testing.T) *App {
 }
 
 func TestOpenRepoTabAndRecents(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.Linear(1)
@@ -49,6 +50,7 @@ func TestOpenRepoTabAndRecents(t *testing.T) {
 }
 
 func TestOpenRepoHeadStates(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	empty := gittest.New(t)
@@ -73,6 +75,7 @@ func TestOpenRepoHeadStates(t *testing.T) {
 }
 
 func TestOpenRepoFriendlyError(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	_, err := a.OpenRepo(t.TempDir())
 	if err == nil || err.Error() != "That folder isn't a git repository." {
@@ -81,6 +84,7 @@ func TestOpenRepoFriendlyError(t *testing.T) {
 }
 
 func TestRestoreSession(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	tab, err := a.OpenRepo(fx.Dir)

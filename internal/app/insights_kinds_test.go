@@ -38,6 +38,7 @@ func kindsFixture(t *testing.T) *gittest.Repo {
 }
 
 func TestInsightsShippedMarksBots(t *testing.T) {
+	t.Parallel()
 	fx := kindsFixture(t)
 	a := newTestApp(t)
 	res, err := a.InsightsShipped(fx.Dir, InsightsInputs{Window: "14d"})
@@ -63,6 +64,7 @@ func TestInsightsShippedMarksBots(t *testing.T) {
 }
 
 func TestInsightsBranchesLeaveOutEndStates(t *testing.T) {
+	t.Parallel()
 	fx := kindsFixture(t)
 	a := newTestApp(t)
 	res, err := a.InsightsBranches(fx.Dir, InsightsInputs{Window: "14d"})
@@ -89,6 +91,7 @@ func TestInsightsBranchesLeaveOutEndStates(t *testing.T) {
 }
 
 func TestInsightsReleaseBranchWindow(t *testing.T) {
+	t.Parallel()
 	fx := kindsFixture(t)
 	a := newTestApp(t)
 	rbs, err := a.InsightsReleaseBranches(fx.Dir, "")
@@ -125,6 +128,7 @@ func TestInsightsReleaseBranchWindow(t *testing.T) {
 // Settings saved through a path inside the repository apply to the repository: Insights and
 // the graph look them up by the work tree root.
 func TestRepoSettingsFollowTheRoot(t *testing.T) {
+	t.Parallel()
 	fx := kindsFixture(t)
 	a := newTestApp(t)
 	sub := filepath.Join(fx.Dir, "sub")

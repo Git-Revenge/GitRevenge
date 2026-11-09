@@ -8,6 +8,7 @@ import (
 )
 
 func TestParseVersion(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		in   string
 		want Version
@@ -33,6 +34,7 @@ func TestParseVersion(t *testing.T) {
 }
 
 func TestVersionLess(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		a, b Version
 		want bool
@@ -51,6 +53,7 @@ func TestVersionLess(t *testing.T) {
 }
 
 func TestDiscover(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}

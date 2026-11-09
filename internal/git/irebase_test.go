@@ -30,6 +30,7 @@ func subjects(fx *gittest.Repo, n int) string {
 }
 
 func TestRebasePlan(t *testing.T) {
+	t.Parallel()
 	_, _, _, plan := fourCommits(t)
 	if len(plan) != 3 || plan[0].Subject != "add a" || plan[2].Subject != "add c" {
 		t.Fatalf("plan = %+v", plan)
@@ -40,6 +41,7 @@ func TestRebasePlan(t *testing.T) {
 }
 
 func TestRebaseReorderDropReword(t *testing.T) {
+	t.Parallel()
 	fx, repo, base, plan := fourCommits(t)
 	plan[0], plan[2] = plan[2], plan[0] // c, b, a
 	plan[1].Action = "drop"             // drop b
@@ -61,6 +63,7 @@ func TestRebaseReorderDropReword(t *testing.T) {
 }
 
 func TestRebaseSquashAndFixup(t *testing.T) {
+	t.Parallel()
 	fx, repo, base, plan := fourCommits(t)
 	plan[1].Action = "squash"
 	plan[1].Message = "add a and b"
@@ -80,6 +83,7 @@ func TestRebaseSquashAndFixup(t *testing.T) {
 }
 
 func TestRebaseValidation(t *testing.T) {
+	t.Parallel()
 	_, repo, base, plan := fourCommits(t)
 	ctx := context.Background()
 	bad := append([]RebaseItem(nil), plan...)
@@ -104,6 +108,7 @@ func TestRebaseValidation(t *testing.T) {
 }
 
 func TestRebasePlanRefusesMerges(t *testing.T) {
+	t.Parallel()
 	fx := gittest.WithMergeHistory(t)
 	root := fx.Git("rev-list", "--max-parents=0", "HEAD")
 	_, err := OpenRepo(newTestRunner(t), fx.Dir).RebasePlan(context.Background(), root)
@@ -113,6 +118,7 @@ func TestRebasePlanRefusesMerges(t *testing.T) {
 }
 
 func TestRebaseConflictStopsInProgress(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	base := fx.CommitFile("f.txt", "1\n", "base")
 	fx.CommitFile("f.txt", "2\n", "two")

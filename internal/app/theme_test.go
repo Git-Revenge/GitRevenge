@@ -3,6 +3,7 @@ package app
 import "testing"
 
 func TestThemeRoundTrip(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	if got, err := a.Theme(); err != nil || got != "" {
@@ -23,6 +24,7 @@ func TestThemeRoundTrip(t *testing.T) {
 }
 
 func TestGraphDensityRoundTrip(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	if got, err := a.GraphDensity(); err != nil || got != "" {

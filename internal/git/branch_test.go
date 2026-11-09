@@ -16,6 +16,7 @@ func currentBranch(t *testing.T, fx *gittest.Repo) string {
 }
 
 func TestCreateRenameDeleteBranch(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	shas := fx.Linear(2)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
@@ -54,6 +55,7 @@ func TestCreateRenameDeleteBranch(t *testing.T) {
 }
 
 func TestDeleteUnmergedNeedsForce(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(1)
 	fx.Branch("topic")
@@ -71,6 +73,7 @@ func TestDeleteUnmergedNeedsForce(t *testing.T) {
 }
 
 func TestCheckoutKinds(t *testing.T) {
+	t.Parallel()
 	local, remote := gittest.WithRemote(t, 2)
 	seed := gittest.Clone(t, remote)
 	seed.Branch("feature")
@@ -103,6 +106,7 @@ func TestCheckoutKinds(t *testing.T) {
 }
 
 func TestCheckoutRefusesToLoseLocalChanges(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "main\n", "base")
 	fx.Branch("other")
@@ -121,6 +125,7 @@ func TestCheckoutRefusesToLoseLocalChanges(t *testing.T) {
 }
 
 func TestSetAndUnsetUpstream(t *testing.T) {
+	t.Parallel()
 	local, _ := gittest.WithRemote(t, 1)
 	local.Branch("topic")
 	repo := OpenRepo(newTestRunner(t), local.Dir)
@@ -140,6 +145,7 @@ func TestSetAndUnsetUpstream(t *testing.T) {
 }
 
 func TestTags(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	shas := fx.Linear(2)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
