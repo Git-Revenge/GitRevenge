@@ -745,7 +745,7 @@
               {:else}
                 {@const item = r.file.item}
                 <li style:--depth={r.depth}>
-                  <button class="name ig" data-file-row title="{item.path}: ignored by {item.rule.pattern} ({where(item.rule.source)} line {item.rule.line})" onclick={(e) => ignoredMenu(e, item)} oncontextmenu={(e) => ignoredMenu(e, item)}>
+                  <button class="name ig" data-file-row title="{item.path}: ignored by {item.rule.pattern} ({where(item.rule.source)} line {item.rule.line})" oncontextmenu={(e) => ignoredMenu(e, item)}>
                     <span class="path">{fileName(r.file.path)}{item.path.endsWith('/') ? '/' : ''}</span>
                     <code class="why">{item.rule.pattern}</code>
                   </button>

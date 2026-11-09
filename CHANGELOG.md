@@ -22,35 +22,23 @@ Git tools: everyday git chores without leaving the app.
 - The graph's commit count, Kinds, density and search share one bar with Undo, Redo, Fetch, Pull and Push, so the graph starts a bar higher. They take a line of their own in a narrow window, and step aside while a file or the rebase editor is open. (#559)
 - The working tree is the graph's first row, above the newest commit, with its mark on the first lane and its words where the messages start, instead of a strip above the graph. It still says clean, how many files changed, and offers **Review**. The button that hides the right panel moved to the end of the toolbar. (#556)
 - Text actions that throw something away (**Discard all…**, **Delete**, **Remove**, **Discard mine and reload**) are drawn in the danger colour, so they no longer look like the safe action beside them. (#543)
-||||||| parent of f8d0616 (feat: show the graph density as a two-icon segmented control)
 - The graph's density switch is a pair of icons, timeline and compact, that shows which is on, instead of a button whose label changed with the state. (#544)
-||||||| parent of 1a64be6 (feat: open a repository by clicking its dashboard row)
 - A group dashboard's rows open the repository on click, as rows do everywhere else; the **Open** link stays for the keyboard. (#552)
-||||||| parent of a09c0e5 (feat: a rose dot on the rail for what needs attention)
 - The sidebar rail marks branches that need care, and submodules that need updating, with a rose dot instead of a number, so it no longer looks like the stash count beside it. (#550)
-||||||| parent of 7b0f64f (feat: one shape for every empty list)
 - Every empty list says so the same way: a handwritten note and one plain sentence, from the sidebar and the working tree to the command palette, LFS, remotes and the reflog. Lists still being read show the loading mark instead. (#549)
-||||||| parent of 7f12c5d (feat: segmented controls for the theme and graph settings)
 - Settings › Appearance picks the theme (System, Light, Dark) and the commit graph (Timeline, Compact) with segmented controls, the same shape as the diff's Unified / Split, instead of drop-downs. (#561)
-||||||| parent of 1a3cfc9 (feat: cross-fade the window when the theme changes)
 - Switching between the light and dark themes cross-fades the window instead of flipping it. Reduced motion keeps the flip. (#560)
-||||||| parent of 60945ef (feat: ease the graph's selection, hover and dimming; mark the selection with a bar)
-||||||| parent of 83819db (feat: compact rows say "same author" with a ditto, and head the dates When)
 - Compact rows: the Author column shows a ditto mark for an author carrying on from the row above, and the date column is headed **When**, since it holds relative times. (#557)
-||||||| parent of b35e300 (feat: a handwritten "you're here" beside the checked-out commit)
-||||||| parent of fee6780 (feat: a handwritten "you're here" beside the checked-out commit)
 - In the timeline, the checked-out commit's row carries a small handwritten "you’re here" after its label when the branch column has room. (#562)
-||||||| parent of 1f653ed (feat: show a commit's actions when its row is hovered or selected)
-||||||| parent of e7ac134 (feat: glide to a commit and land it; fade in rows that arrive in view)
 - Jumping to a commit (from a branch, a parent link or a search match) glides there when it's within three screens and cuts when it's further, and the commit lands under a wash that fades. Commits that arrive where you're already looking fade up, a few at a time. Reduced motion keeps everything instant. (#558)
 - Hovering a commit in the graph (or selecting one from the keyboard) shows three small actions at the row's right edge: copy its SHA, check it out, and a menu with everything right-click offers. (#555)
 - The selected commit is marked by a bar in its lane's colour at the row's left edge, over a lighter wash, and the selection, hover and search dimming ease into place instead of snapping. Reduced motion keeps the instant draw. (#553)
-||||||| parent of a753927 (feat: the timeline names each day once and goes quiet inside a run)
 - The timeline's second line stops repeating itself: the first commit of each day names the day (**Today**, **Yesterday**, then the date) under a dashed line, commits below it in the same day show the author and time, and a run of commits by the same author shows only the time, faded. (#554)
 
 ### Fixed
 
 - A link in a commit's subject is rose like the links in its message and trailers, not the browser's blue. (#582)
+- An ignored file's menu opens on right-click (or the Menu key) only; a plain click no longer opens it. (#583)
 
 ## [0.10.0] - 2026-11-06
 

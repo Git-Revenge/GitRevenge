@@ -1288,6 +1288,26 @@ test.describe('before the first load has answered', () => {
       await expect(fetch).toBeVisible()
     })
 
+    // #583: a plain click on an ignored file opened its menu, as if it were a right-click.
+    test('an ignored file opens its menu on right-click only', async ({ page }) => {
+      const s = dirty([one])
+      const ignored = { files: [{ path: 'out.log', rule: { source: '.gitignore', line: 1, pattern: '*.log' }, canExcept: true }], truncated: false }
+      await open(page, 'repoView', { ...s, responses: { ...s.responses, IgnoredFiles: ignored } })
+      await page.getByRole('button', { name: 'Ignored' }).click()
+      const row = page.locator('button.name.ig')
+      await expect(row).toBeVisible()
+      await row.click()
+      await expect(page.getByRole('menu')).toHaveCount(0)
+      await row.click({ button: 'right' })
+      await expect(page.getByRole('menu')).toBeVisible()
+      // The keyboard's way in still works: the Menu key raises the same event on the focused row.
+      await page.keyboard.press('Escape')
+      await expect(page.getByRole('menu')).toHaveCount(0)
+      await row.focus()
+      await row.dispatchEvent('contextmenu')
+      await expect(page.getByRole('menu')).toBeVisible()
+    })
+
     // #556: it's the graph's first row, so its words start where the messages do and its mark
     // sits on the first lane. (#514 pinned it at 44px while it sat above the graph, where the
     // columns could leave it stranded; inside the graph it leaves with the graph instead.)
