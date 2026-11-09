@@ -26,6 +26,8 @@ Git tools: everyday git chores without leaving the app.
 - A group dashboard's rows open the repository on click, as rows do everywhere else; the **Open** link stays for the keyboard. (#552)
 ||||||| parent of a09c0e5 (feat: a rose dot on the rail for what needs attention)
 - The sidebar rail marks branches that need care, and submodules that need updating, with a rose dot instead of a number, so it no longer looks like the stash count beside it. (#550)
+||||||| parent of 7b0f64f (feat: one shape for every empty list)
+- Every empty list says so the same way: a handwritten note and one plain sentence, from the sidebar and the working tree to the command palette, LFS, remotes and the reflog. Lists still being read show the loading mark instead. (#549)
 
 ## [0.10.0] - 2026-11-06
 

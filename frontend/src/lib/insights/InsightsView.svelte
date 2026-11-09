@@ -57,6 +57,7 @@
     insights.window === 'releases' ? 'between two releases' : insights.window === 'month' ? 'this month so far' : insights.window === '7d' ? 'the last week' : 'the last two weeks',
   )
   const flagLabel: Record<string, string> = { stale: 'stale', 'long-lived': 'long-lived', drifting: 'drifting', 'big-batch': 'big batch' }
+  import Empty from '../ui/Empty.svelte'
 </script>
 
 <div class="insights">
@@ -169,7 +170,7 @@
       <p class="banner" role="alert"><Icon name="warning" size={16} />{repoName(repo)}: {insights.data[repo].error}</p>
     {/each}
     {#if !scope}
-      <p class="empty"><span class="hand">nothing to measure</span> Open a repository or make a project group to see its insights.</p>
+      <Empty note="nothing to measure">Open a repository or make a project group to see its insights.</Empty>
     {/if}
 
     {#if w && insights.view === 'shipped'}
@@ -664,8 +665,7 @@
     white-space: nowrap;
   }
 
-  .same,
-  .empty {
+  .same {
     display: flex;
     align-items: baseline;
     gap: 12px;
@@ -674,8 +674,7 @@
     color: var(--ink-mute);
   }
 
-  .same .hand,
-  .empty .hand {
+  .same .hand {
     font-size: 20px;
     color: var(--accent-c);
     white-space: nowrap;

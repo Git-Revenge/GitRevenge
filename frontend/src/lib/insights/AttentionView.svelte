@@ -24,6 +24,7 @@
   const repoName = (path: string) => session.tabs.find((t) => t.path === path)?.name ?? path.split(/[\\/]/).pop() ?? path
   const days = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`
   const target = $derived(w?.target.replace(/^origin\//, '') ?? 'the target')
+  import Empty from '../ui/Empty.svelte'
 </script>
 
 <div class="attention">
@@ -49,10 +50,7 @@
   </details>
 
   {#if flagged.length === 0}
-    <p class="empty">
-      <span class="hand">all moving</span>
-      {insights.pending ? 'Nothing flagged yet; conflict checks are still running.' : 'No open branch is past a threshold or conflicting.'}
-    </p>
+    <Empty note="all moving">{insights.pending ? 'Nothing flagged yet; conflict checks are still running.' : 'No open branch is past a threshold or conflicting.'}</Empty>
   {:else}
     <div class="scroll">
       <table>
@@ -239,7 +237,6 @@
     color: var(--warning);
   }
 
-  .empty,
   .foot {
     display: flex;
     gap: 12px;

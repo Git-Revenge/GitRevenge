@@ -61,6 +61,7 @@
   async function lockAction(file: string, action: 'lock' | 'unlock', force = false) {
     if (await run(() => LFSAction(path, action, [file, force ? 'true' : '']))) await checkLocks()
   }
+  import Empty from './ui/Empty.svelte'
 </script>
 
 <Modal title="LFS" eyebrow="large files" width={640} {onClose}>
@@ -77,7 +78,7 @@
           <button class="btn sm quiet icon" disabled={busy} onclick={() => run(() => LFSAction(path, 'untrack', [p.pattern]))} aria-label="Stop tracking {p.pattern}" title="Stop tracking"><Icon name="close" /></button>
         </li>
       {:else}
-        <li class="muted">No patterns tracked.</li>
+        <li><Empty note="none yet">No patterns tracked.</Empty></li>
       {/each}
     </ul>
     <form
@@ -116,7 +117,7 @@
           {/if}
         </li>
       {:else}
-        <li class="muted">No files in LFS.</li>
+        <li><Empty note="nothing large">No files in LFS.</Empty></li>
       {/each}
     </ul>
   {/if}

@@ -63,10 +63,11 @@
   }
 
   onMount(load)
+  import Empty from './ui/Empty.svelte'
 </script>
 
 <Modal title="Remotes" eyebrow="ports of call" width={580} {onClose}>
-  {#if remotes.length === 0 && editing === null}<p class="form-note">No remotes yet. Add one to fetch from and push to.</p>{/if}
+  {#if remotes.length === 0 && editing === null}<Empty note="none yet">No remotes yet. Add one to fetch from and push to.</Empty>{/if}
   {#if remotes.length}
     <ul>
       {#each remotes as r (r.name)}

@@ -13,6 +13,7 @@
 
   const repoName = (path: string) => session.tabs.find((t) => t.path === path)?.name ?? path.split(/[\\/]/).pop() ?? path
   const kind = (title: string) => (title.startsWith('Revert "') ? 'revert' : title.split('!')[0])
+  import Empty from '../ui/Empty.svelte'
 </script>
 
 <div class="hotspots">
@@ -34,7 +35,7 @@
           <span class="lines">{f.value.lines}</span>
         </div>
       {:else}
-        <p class="sub quiet">No files changed in this window.</p>
+        <Empty note="nothing moved">No files changed in this window.</Empty>
       {/each}
       {#if files.some((f) => f.value.openBranches)}
         <p class="note">

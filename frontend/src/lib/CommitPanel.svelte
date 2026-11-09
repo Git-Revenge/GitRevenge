@@ -280,6 +280,7 @@
   function showFile(f: git.FileChange) {
     openFile({ mode: 'commit', commit: commitId, file: f.path, oldPath: f.oldPath })
   }
+  import Empty from './ui/Empty.svelte'
 </script>
 
 {#snippet trailerValue(key: string, value: string)}
@@ -352,7 +353,7 @@
         {/if}
       {/each}
     </ul>
-    {#if fileQuery.trim() && !rows.length}<p class="muted">No files match that.</p>{/if}
+    {#if fileQuery.trim() && !rows.length}<Empty note="no match" compact>No files match that.</Empty>{/if}
   </div>
 {/snippet}
 

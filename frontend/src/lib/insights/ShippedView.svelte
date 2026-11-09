@@ -34,6 +34,7 @@
 
   const repoName = (path: string) => session.tabs.find((t) => t.path === path)?.name ?? path.split(/[\\/]/).pop() ?? path
   const target = $derived(w?.target.replace(/^origin\//, '') ?? 'the target')
+  import Empty from '../ui/Empty.svelte'
 </script>
 
 {#snippet item(i: Tagged<git.ShippedItem>)}
@@ -78,7 +79,7 @@
   </div>
 
   {#if insights.items.length === 0}
-    <p class="empty"><span class="hand">quiet stretch</span> Nothing landed on {target} in this window.</p>
+    <Empty note="quiet stretch">Nothing landed on {target} in this window.</Empty>
   {:else if grouping === 'reference'}
     {#each refGroups as g (g.ref)}
       <section class="group" aria-label={g.ref || 'No reference'}>
@@ -279,21 +280,10 @@
     color: var(--ink-faint);
   }
 
-  .empty,
   .foot {
     margin: 0;
     font-size: 13px;
     color: var(--ink-mute);
   }
 
-  .empty {
-    display: flex;
-    gap: 12px;
-    align-items: baseline;
-  }
-
-  .empty .hand {
-    font-size: 20px;
-    color: var(--accent-c);
-  }
 </style>

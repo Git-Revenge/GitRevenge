@@ -154,6 +154,7 @@
   const secret = (r: Row) => [...r.values.map((v) => v.value), ...r.inherited.map((i) => i.value)].some((v) => hasSecret(r.key, v)) || hasSecret(r.key, '')
   const name = (key: string) => splitKey(key)[2]
   const last = (r: Row) => r.inherited[r.inherited.length - 1]
+  import Empty from '../ui/Empty.svelte'
 </script>
 
 <div class="table" bind:this={tableEl}>
@@ -299,9 +300,7 @@
       {/if}
     </section>
   {:else}
-    <p class="empty">
-      {#if filter}Nothing matches “{filter}”.{:else}<span class="hand">a blank page</span> This file has no settings yet. Add one above.{/if}
-    </p>
+    {#if filter}<Empty note="no match">Nothing matches “{filter}”.</Empty>{:else}<Empty note="a blank page">This file has no settings yet. Add one above.</Empty>{/if}
   {/each}
 </div>
 
@@ -608,10 +607,6 @@
     margin: 0;
     padding: 24px 0;
     color: var(--ink-mute);
-  }
-
-  .empty .hand {
-    color: var(--accent-c);
   }
 
   @media (prefers-reduced-motion: reduce) {
