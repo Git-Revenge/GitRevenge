@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clearOf, clip, DATE_COLUMN, clippedName, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, rowWashed, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine } from './draw'
+import { clearOf, clip, DATE_COLUMN, clippedName, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, rowWashed, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine, bisectRow } from './draw'
 import type { Ref, Row } from './rowCache'
 
 describe('graph geometry', () => {
@@ -452,5 +452,36 @@ describe('metaLine', () => {
     const prev = row('Ana', day(29, 10))
     expect(metaLine(row('Ana', day(29, 9), 0, 2), { prev }, now).quiet).toBe(false)
     expect(metaLine(row('Ana', day(29, 9), 1), { prev }, now).quiet).toBe(false)
+  })
+})
+
+describe('bisectRow', () => {
+  const colors = { bad: '#800' }
+  const b = { terms: { z: 'bad', a: 'good', k: 'skip' }, inQuestion: new Set(['z', 'c', 'm']), current: 'c', found: '' }
+
+  it('marks the commit under test, with its note and the band', () => {
+    expect(bisectRow('c', b, colors)).toEqual({ extra: { mark: 'testing', band: true, note: 'testing this one' }, faded: false })
+  })
+
+  it('gives each answered commit its mark, and never fades it', () => {
+    expect(bisectRow('z', b, colors)).toEqual({ extra: { mark: 'bad' }, faded: false })
+    expect(bisectRow('a', b, colors)).toEqual({ extra: { mark: 'good' }, faded: false })
+    expect(bisectRow('k', b, colors)).toEqual({ extra: { mark: 'skip' }, faded: false })
+  })
+
+  it('bands what is still in question and fades the rest', () => {
+    expect(bisectRow('m', b, colors)).toEqual({ extra: { band: true }, faded: false })
+    expect(bisectRow('old', b, colors)).toEqual({ extra: {}, faded: true })
+  })
+
+  it('fades nothing when the range is not known', () => {
+    expect(bisectRow('old', { ...b, inQuestion: null }, colors)).toEqual({ extra: {}, faded: false })
+  })
+
+  it('marks the answer once found, and fades everything unanswered', () => {
+    const done = { ...b, inQuestion: null, current: '', found: 'm' }
+    expect(bisectRow('m', done, colors)).toEqual({ extra: { mark: 'found', note: 'it broke here', noteColor: '#800' }, faded: false })
+    expect(bisectRow('old', done, colors)).toEqual({ extra: {}, faded: true })
+    expect(bisectRow('a', done, colors).faded).toBe(false)
   })
 })

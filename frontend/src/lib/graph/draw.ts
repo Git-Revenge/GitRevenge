@@ -164,6 +164,8 @@ export interface Theme {
   kinds?: Record<string, string>
   /** The rose for the one handwritten note on the canvas. */
   link: string
+  /** The teal of a bisect's range and the commit under test. */
+  teal: string
 }
 
 // Icons drawn on the canvas, built once each from the same paths as the Icon component.
@@ -341,18 +343,18 @@ export function hereNotePlace(labelsEnd: number, noteWidth: number, columnWidth:
 
 /** Draws the note after the labels, tilted like every hand note in the app, and returns where
  * it ends; or returns labelsEnd when there wasn't room. */
-function drawHereNote(ctx: CanvasRenderingContext2D, labelsEnd: number, mid: number, columnWidth: number, theme: Theme): number {
+function drawNote(ctx: CanvasRenderingContext2D, text: string, color: string, labelsEnd: number, mid: number, columnWidth: number): number {
   setFont(ctx, `18px ${HAND}`)
-  const w = ctx.measureText(HERE_NOTE).width
+  const w = ctx.measureText(text).width
   const x = hereNotePlace(labelsEnd, w, columnWidth)
   if (x === null) return labelsEnd
   ctx.save()
   ctx.translate(x, mid + 1)
   ctx.rotate(HERE_TILT)
-  ctx.fillStyle = theme.link
+  ctx.fillStyle = color
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
-  ctx.fillText(HERE_NOTE, 0, 0)
+  ctx.fillText(text, 0, 0)
   ctx.restore()
   return x + w
 }
@@ -410,6 +412,91 @@ export function rowWashed(row: Pick<Row, 'kind'>): boolean {
 /** Where a row's labels were drawn, from their left edge to their right. */
 export type LabelSpan = [start: number, end: number]
 
+/** What a bisect says about a commit: an answer already given, the commit under test, or the
+ * first bad commit once it's found. */
+export type RowMark = 'good' | 'bad' | 'skip' | 'testing' | 'found'
+
+/** Things a row wears on top of what the commit itself is, such as its place in a bisect. */
+export interface RowExtra {
+  /** Replaces the commit's node. */
+  mark?: RowMark
+  /** A teal wash across the row: still in question. */
+  band?: boolean
+  /** A handwritten note in the label column, in place of "you're here". */
+  note?: string
+  noteColor?: string
+}
+
+/** How strong the wash is on a row still in question during a bisect. */
+const BAND = 0.12
+
+/** A bisect's mark in place of a commit's node. Each is a shape as well as a colour: a tick, a
+ * cross, a dash for a skip, a question mark for the commit under test. */
+function drawMark(ctx: CanvasRenderingContext2D, x: number, y: number, mark: RowMark, theme: Theme, cut: (r: number) => void, comfortable: boolean) {
+  const r = comfortable ? 11 : 7
+  ctx.save()
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  if (mark === 'found') {
+    ctx.globalAlpha *= 0.2
+    disc(ctx, x, y, r + 7, theme.bad)
+    ctx.globalAlpha /= 0.2
+  }
+  cut(r + 2)
+  const s = r / 11
+  if (mark === 'testing') {
+    disc(ctx, x, y, r, theme.teal)
+    cut(r - 2.5)
+    setFont(ctx, `600 12px ${MONO}`)
+    ctx.fillStyle = theme.teal
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('?', x, y + 0.5)
+  } else if (mark === 'skip') {
+    disc(ctx, x, y, r, theme.muted)
+    cut(r - 1.5)
+    ctx.strokeStyle = theme.muted
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(x - 4 * s, y)
+    ctx.lineTo(x + 4 * s, y)
+    ctx.stroke()
+  } else {
+    disc(ctx, x, y, r, mark === 'good' ? theme.good : theme.bad)
+    ctx.strokeStyle = theme.bg
+    ctx.lineWidth = 2.4 * Math.max(s, 0.8)
+    ctx.beginPath()
+    if (mark === 'good') {
+      ctx.moveTo(x - 5 * s, y + 0.5 * s)
+      ctx.lineTo(x - 1.5 * s, y + 4 * s)
+      ctx.lineTo(x + 5 * s, y - 3.5 * s)
+    } else {
+      ctx.moveTo(x - 4 * s, y - 4 * s)
+      ctx.lineTo(x + 4 * s, y + 4 * s)
+      ctx.moveTo(x + 4 * s, y - 4 * s)
+      ctx.lineTo(x - 4 * s, y + 4 * s)
+    }
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
+/** What a commit wears during a bisect, and whether it's out of the running (faded). `terms`
+ * holds the answers by commit; `inQuestion` the commits that could still be the first bad one,
+ * or null when that isn't known. */
+export function bisectRow(
+  id: string,
+  b: { terms: Record<string, string>; inQuestion: ReadonlySet<string> | null; current: string; found: string },
+  colors: { bad: string },
+): { extra: RowExtra; faded: boolean } {
+  if (b.found === id) return { extra: { mark: 'found', note: 'it broke here', noteColor: colors.bad }, faded: false }
+  if (b.current === id) return { extra: { mark: 'testing', band: true, note: 'testing this one' }, faded: false }
+  const term = b.terms[id]
+  if (term === 'good' || term === 'bad' || term === 'skip') return { extra: { mark: term }, faded: false }
+  const open = !!b.inQuestion?.has(id)
+  return { extra: open ? { band: true } : {}, faded: !open && (b.inQuestion !== null || !!b.found) }
+}
+
 /** Draws one row whose top edge is at y. `selected`, `hovered` and `dimmed` are strengths from 0
  * to 1, so the caller can ease them between frames; 1 is the plain state. nowSeconds dates the
  * relative times. Returns where its labels went, if it has any. */
@@ -426,6 +513,7 @@ export function drawRow(
   nowSeconds: number,
   seal?: Seal,
   near: Near = {},
+  extra: RowExtra = {},
 ): LabelSpan | null {
   let labelSpan: LabelSpan | null = null
   const { m } = lay
@@ -448,6 +536,13 @@ export function drawRow(
     ctx.globalAlpha = a * washAlpha
     paint()
     ctx.globalAlpha = a
+  }
+  if (extra.band) {
+    // Still in question during a bisect: a teal wash under whatever else the row wears.
+    ctx.globalAlpha = base * BAND
+    ctx.fillStyle = theme.teal
+    ctx.fillRect(0, y, lay.width, h)
+    ctx.globalAlpha = base
   }
   washOver(() => {
     ctx.fillStyle = wash
@@ -493,7 +588,8 @@ export function drawRow(
     let end = drawLabels(ctx, refs, 8, mid, lay.refW - 16, color, theme, comfortable, lay.remote) - LABEL_TRAIL
     labelSpan = [8, end]
     // The checked-out commit gets the graph's one handwritten word, when the column has room.
-    if (comfortable && refs.some((r) => r.head)) end = drawHereNote(ctx, end, mid, lay.refW, theme)
+    if (comfortable && !extra.note && refs.some((r) => r.head)) end = drawNote(ctx, HERE_NOTE, theme.link, end, mid, lay.refW)
+    if (extra.note) end = drawNote(ctx, extra.note, extra.noteColor ?? theme.teal, end, mid, lay.refW)
     const to = Math.min(x, graphRight)
     if (end < to && x >= graphLeft) {
       ctx.globalAlpha = before * 0.45
@@ -506,6 +602,9 @@ export function drawRow(
       ctx.globalAlpha = before
     }
   }
+
+  // A row with no labels still gets its note, from the column's edge.
+  if (lay.refW && !refs.length && extra.note) drawNote(ctx, extra.note, extra.noteColor ?? theme.teal, 0, mid, lay.refW)
 
   // Lanes, clipped to the graph column so wide graphs don't run under the text.
   ctx.save()
@@ -567,7 +666,9 @@ export function drawRow(
     disc(ctx, x, mid, comfortable ? 16 : 8.5, color)
     ctx.globalAlpha /= 0.3
   }
-  if (isStash) {
+  if (extra.mark) {
+    drawMark(ctx, x, mid, extra.mark, theme, cut, comfortable)
+  } else if (isStash) {
     // Stashes aren't real history: a dashed ring, like the working tree's.
     const r = comfortable ? 9 : 5
     cut(r + 2)

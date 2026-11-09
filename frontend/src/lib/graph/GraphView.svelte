@@ -11,10 +11,11 @@
   import { DUR, easeInk, fadeUp, labelsFold, labelsUnfold, menuOut, reducedMotion, stagger } from '../ui/motion'
   import KindFilter from './KindFilter.svelte'
   import RefChip from './RefChip.svelte'
-  import { drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
+  import { bisectRow, drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
   import { scrollMap, topAfterScroll, toScroll, type ScrollMap } from './scrollMap'
   import { Washes, landWash } from './tween'
+  import type { BisectMarks } from '../bisect.svelte'
 
   let {
     path,
@@ -24,8 +25,12 @@
     onSelectedRefs,
     lead,
     toolsHost,
+    bisect = null,
   }: {
     path: string
+    /** A bisect in progress, to mark in the graph: answers given, the commits still in
+     * question, the commit under test and the answer. */
+    bisect?: BisectMarks | null
     /** Somewhere else to put the header's tools (count, Kinds, density, search), such as the
      * caller's own toolbar, so the two share one bar. Without one they sit above the graph. */
     toolsHost?: HTMLElement | null
@@ -295,6 +300,12 @@
   }
   /** Each row's selection, hover and search-dimming strength, eased between frames. */
   const washes = new Washes()
+  /** The bisect as the paint loop wants it: the range as a set. Repaints when it changes. */
+  let bisectView: { terms: Record<string, string>; inQuestion: Set<string> | null; current: string; found: string } | null = null
+  $effect(() => {
+    bisectView = bisect ? { terms: bisect.terms, inQuestion: bisect.inQuestion ? new Set(bisect.inQuestion) : null, current: bisect.current, found: bisect.found } : null
+    schedule()
+  })
   /** A glide to a commit someone asked for, so the eye can follow it; null between glides. */
   let glide: { from: number; to: number; start: number } | null = null
   /** The row just jumped to, and when: it lands under a wash that then fades. */
@@ -353,6 +364,7 @@
       warn: token('--warning'),
       kinds: Object.fromEntries(Object.entries(KINDS).map(([k, info]) => [k, token(info.token)])),
       link: token('--link'),
+      teal: token('--accent-a'),
     }
   }
 
@@ -479,8 +491,10 @@
       // toward where it should be, so a selection arrives rather than appears.
       const sel = washes.value(`s${i}`, i === selected || i === dropTarget ? 1 : 0, frameAt)
       const hov = washes.value(`h${i}`, i === hovered ? 1 : 0, frameAt)
-      const dim = washes.value(`d${i}`, matchSet && !matchSet.has(i) ? 1 : 0, frameAt)
-      const span = drawRow(ctx, row, cache.refsFor(row.id), y, lay, th, sel, hov, dim, now, sealOf(sigs.get(row.id)), { prev: cache.get(i - 1), prev2: cache.get(i - 2), next: cache.get(i + 1) })
+      // During a bisect a commit wears its answer, and fades once it's out of the running.
+      const place = bisectView ? bisectRow(row.id, bisectView, { bad: th.bad }) : null
+      const dim = washes.value(`d${i}`, (matchSet && !matchSet.has(i)) || place?.faded ? 1 : 0, frameAt)
+      const span = drawRow(ctx, row, cache.refsFor(row.id), y, lay, th, sel, hov, dim, now, sealOf(sigs.get(row.id)), { prev: cache.get(i - 1), prev2: cache.get(i - 2), next: cache.get(i + 1) }, place?.extra)
       if (arriving) ctx.restore()
       if (span) labelSpans.set(i, span)
     }

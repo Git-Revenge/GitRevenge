@@ -50,6 +50,26 @@ The reflog is git's record of where HEAD and each branch have been. It's how you
 
 [Undo a mistake](../walkthroughs/undo-a-mistake.md) walks through recovering a commit with it.
 
+## Finding the commit that broke something
+
+When something worked once and doesn't now, a bisect finds the commit that changed it. You name one commit where it's broken and one where it worked, and Git Revenge checks out commits in between for you to try, halving the range with each answer.
+
+Right-click the broken commit and choose **Find what broke it, up to here…**, or choose **Find the commit that broke it…** in the command palette to start from the commit you're on. The dialog takes the two ends. It suggests the last tag as the good one, and says how many commits lie between them and about how many steps that is. Your working tree has to be clean enough for git to check out other commits.
+
+While a bisect runs, a strip under the tabs asks about the commit that's checked out. Build it, try the thing that's broken, then answer:
+
+- **Good** (<kbd>G</kbd>) if it works there.
+- **Bad** (<kbd>B</kbd>) if it's broken there.
+- **Can't tell** (<kbd>S</kbd>) if that commit won't build or can't be tested. Git picks another nearby.
+
+**Undo last** takes back your last answer and checks that commit out again. **Stop…** ends the bisect and returns you to where you started.
+
+The graph shows where things stand. Commits you've answered for carry a tick or a cross, the commit under test has a ring and the note "testing this one", the commits still in question have a teal band, and everything that's been ruled out fades. The panel on the right has the same three answers in words, what the commit changed, and your answers so far.
+
+When the answer is known, the strip says how many steps it took and the graph marks the commit "it broke here". The panel shows what that commit changed and offers to open its changes, start a branch for the fix, or revert it. **Copy the log** copies your answers as text for an issue. **Done** returns you to your branch. If the commits you skipped hide the answer, you're told which commits it could be instead.
+
+A bisect lives in the repository, not the app: one started with `git bisect` in a terminal shows up here, and one started here carries on in a terminal.
+
 ## Notes
 
 Git notes attach extra text to a commit without changing it. The details panel shows a selected commit's notes, and lets you add, edit or remove one.

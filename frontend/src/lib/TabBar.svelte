@@ -4,6 +4,7 @@
   import { gitConfig } from './gitconfig/config.svelte'
   import { insights } from './insights/insights.svelte'
   import { ignoreRules } from './ignorerules/ignoreRules.svelte'
+  import { bisect } from './bisect.svelte'
   import { session } from './session.svelte'
   import { theme } from './theme.svelte'
   import Icon from './ui/Icon.svelte'
@@ -70,7 +71,7 @@
       <div class="tab" class:active={session.active === tab.path} title={tab.path} oncontextmenu={(e) => tabMenu(e, tab.path)}>
         <button class="label" onclick={() => session.select(tab.path)} onauxclick={(e) => onAuxClick(e, tab.path)}>
           {tab.name}
-          {#if tab.head}<span class="head">{tab.head}</span>{/if}
+          {#if bisect.of(tab.path)}<span class="head">bisecting{bisect.of(tab.path)?.current ? ` · ${bisect.of(tab.path)?.current.slice(0, 7)}` : ''}</span>{:else if tab.head}<span class="head">{tab.head}</span>{/if}
         </button>
         <button class="close" aria-label="Close {tab.name}" title="Close (middle-click)" onclick={() => session.close(tab.path)}>
           <Icon name="close" size={12} />

@@ -18,6 +18,8 @@
   import Sidebar from './Sidebar.svelte'
   import { linkStore } from './links/links.svelte'
   import WorkingTreePanel from './WorkingTreePanel.svelte'
+  import { bisect, marksOf } from './bisect.svelte'
+  import { Integrate } from '../../wailsjs/go/app/App.js'
 
   let { path }: { path: string } = $props()
 
@@ -78,6 +80,10 @@
       return head.startsWith('detached') ? '' : head
     },
     openDialog: (spec) => (dialog = spec),
+    // One bisect at a time: the entry goes while one is running.
+    get openBisect() {
+      return running ? undefined : (bad: string) => (bisect.starting = { path, bad })
+    },
     openRebase: (base) => {
       diff = null
       rebaseBase = base
@@ -100,6 +106,7 @@
       shortcut: 'Mod+Alt+B',
       run: () => (right.hidden = !right.hidden),
     },
+    ...(running ? [] : [{ id: 'repo.bisect', group: 'Repository', title: 'Find the commit that broke it…', keywords: 'bisect regression bad good', run: () => (bisect.starting = { path, bad: 'HEAD' }) }]),
     {
       id: 'view.changes',
       group: 'View',
@@ -139,6 +146,41 @@
 
   /** Labels for the branches and tags on the selected commit. */
   let selectedRefs = $state<RefLabel[]>([])
+
+  // A bisect in progress (issue #592). The banner keeps the store up to date; here it picks
+  // what the graph marks and what the right panel shows.
+  let running = $derived(bisect.of(path))
+  let bisectMarks = $derived(marksOf(running))
+  /** The commit a bisect is about right now: the one under test, or the answer. */
+  let bisectSubject = $derived(running ? running.firstBad || running.current : '')
+  /** Set when someone asks for the commit's own details instead of the bisect's panel. */
+  let bisectAside = $state(false)
+
+  // Each step checks out another commit: bring it into view and select it.
+  let lastSubject = ''
+  $effect(() => {
+    const id = bisectSubject
+    if (id === lastSubject) return
+    lastSubject = id
+    bisectAside = false
+    if (id) {
+      view = 'commit'
+      right.hidden = false
+      void revealCommit(id)
+    }
+  })
+
+  /** Stops the bisect, then starts a branch for the fix from where it began. */
+  async function fixBranch() {
+    await bisect.stop(path)
+    dialog = newBranchDialog(ctx)
+  }
+
+  /** Stops the bisect, then reverts the commit it found on the branch it began from. */
+  async function revertFound(id: string) {
+    await bisect.stop(path)
+    await session.run(() => Integrate(path, 'revert', [id, '']))
+  }
 
   function onSelect(row: Row | undefined, auto: boolean) {
     selected = row
@@ -195,7 +237,7 @@
     <!-- The graph stays mounted while a diff is open, so scroll position and selection
          survive returning to it. -->
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} {onSelect} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} bisect={bisectMarks} {onSelect} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           openMenu(commitMenuItems(row, refs, ctx), x, y)}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
@@ -263,7 +305,7 @@
       </div>
     {/if}
   </div>
-  {#if (view === 'wip' || selected) && !right.hidden}
+  {#if (view === 'wip' || selected || running) && !right.hidden}
     <div class="right" style:width="{rightWidth}px">
       <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
       <div
@@ -284,6 +326,19 @@
       ></div>
   {#if view === 'wip'}
     <WorkingTreePanel {path} current={diff} openFile={(t) => (diff = t)} onNewBranch={() => (dialog = newBranchDialog(ctx))} onMenu={openMenu} />
+  {:else if running && !bisectAside && (!selected || selected.id === bisectSubject || running.candidates.length > 0)}
+    <!-- Loaded when a bisect first runs: most sessions never need it. -->
+    <Lazy
+      load={() => import('./BisectPanel.svelte')}
+      {path}
+      info={running}
+      onOpenCommit={(id: string) => {
+        bisectAside = true
+        void revealCommit(id)
+      }}
+      onFixBranch={fixBranch}
+      onRevert={revertFound}
+    />
   {:else if selected}
     <CommitPanel {path} onMenu={openMenu} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} onReveal={revealCommit} onActions={(x, y) => selected && openMenu(commitMenuItems(selected, graph.refsOf(selected.id), ctx), x, y)} />
   {/if}
@@ -296,6 +351,9 @@
 {/if}
 {#if dialog}
   <Dialog spec={dialog} onClose={() => (dialog = null)} />
+{/if}
+{#if bisect.starting?.path === path}
+  <Lazy load={() => import('./BisectDialog.svelte')} {path} bad={bisect.starting.bad} onClose={() => (bisect.starting = null)} />
 {/if}
 {#if reflogRef}
   <Lazy

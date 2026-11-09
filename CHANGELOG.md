@@ -14,6 +14,7 @@ Git tools: everyday git chores without leaving the app.
 - An **Ignored** toggle lists ignored files with the rule behind each, and right-clicking one makes an exception or removes the rule. (#521, #524)
 - An **Ignore rules** tab to read and edit every ignore file that applies: each `.gitignore`, `.git/info/exclude` and your global excludes file. Each rule says what it ignores now, and a checker says which rule decides any path. Open it from the sidebar's Repository panel or the command palette. (#522, #527, #540)
 - Smart links: patterns you set in **Settings › Links** turn ticket keys such as `ABC-1234` in commit messages, trailers and branch names into links that open in your browser. Presets cover Jira, numbered issues, GitHub, GitLab, Linear and Azure Boards. Rules live in git config, in this repository's `.git/config` or your global config. A branch's right-click menu opens its ticket first. Git Revenge only makes the link and never contacts the site. (#525, #528)
+- Bisect: find the commit that broke something. Name a commit where it's broken and one where it worked, then answer **Good**, **Bad** or **Can't tell** as Git Revenge checks out the commits in between. The graph marks your answers, the commit under test and the range still in question, and when the first bad commit is found you can open its changes, start a fix branch or revert it. Start it from a commit's menu or the command palette; a bisect started in a terminal shows up too. (#591, #592)
 
 ### Changed
 
