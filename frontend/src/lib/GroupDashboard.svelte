@@ -74,7 +74,15 @@
       <tbody>
         {#each rows as r (r.path)}
           {@const res = results[r.path]}
-          <tr class:missing={!r.exists}>
+          <!-- The row opens the repository, as rows do elsewhere; the Open button at its end is the
+               same action for the keyboard. -->
+          <tr
+            class:missing={!r.exists}
+            class:openable={r.exists}
+            onclick={(e) => {
+              if (r.exists && !(e.target as HTMLElement).closest('button')) session.open(r.path)
+            }}
+          >
             <td class="repo" title={r.path}>{r.name}</td>
             <td class="mono">{r.branch || '—'}</td>
             <td>
@@ -170,6 +178,10 @@
 
   tbody tr:hover {
     background: var(--wash-hover);
+  }
+
+  tbody tr.openable {
+    cursor: pointer;
   }
 
   .repo {

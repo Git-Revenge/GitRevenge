@@ -22,6 +22,8 @@ Git tools: everyday git chores without leaving the app.
 - Text actions that throw something away (**Discard all…**, **Delete**, **Remove**, **Discard mine and reload**) are drawn in the danger colour, so they no longer look like the safe action beside them. (#543)
 ||||||| parent of f8d0616 (feat: show the graph density as a two-icon segmented control)
 - The graph's density switch is a pair of icons, timeline and compact, that shows which is on, instead of a button whose label changed with the state. (#544)
+||||||| parent of 1a64be6 (feat: open a repository by clicking its dashboard row)
+- A group dashboard's rows open the repository on click, as rows do everywhere else; the **Open** link stays for the keyboard. (#552)
 
 ## [0.10.0] - 2026-11-06
 
