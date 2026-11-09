@@ -187,28 +187,9 @@
     openDialog={ctx.openDialog}
   />
   <div class="main">
-    <Toolbar {path} />
-    <div class="wip-row">
-    <button
-      class="wip"
-      class:active={view === 'wip'}
-      aria-pressed={view === 'wip'}
-      onclick={() => {
-        view = 'wip'
-        right.hidden = false
-        if (diff?.mode === 'commit') diff = null
-      }}
-    >
-      <span class="dot" class:dirty={!!changes}>{#if changes && changes > 0}<span class="ring"></span>{:else if changes !== null}<Icon name="check" />{/if}</span>
-      <span class="wip-title">{changes ? `${changes} ${changes === 1 ? 'file' : 'files'} changed` : 'Working tree'}</span>
-      {#if changes && session.activeTab?.head}
-        <span class="where">{session.activeTab.head.startsWith('detached') ? session.activeTab.head : `on ${session.activeTab.head}`}</span>
-      {:else if changes === 0}
-        <span class="meta">clean</span>
-      {/if}
-      {#if changes}<span class="review">Review</span>{/if}
-    </button>
-    <button class="btn sm quiet icon panel-toggle" aria-pressed={!right.hidden} aria-label={right.hidden ? 'Show the right panel' : 'Hide the right panel'} title={right.hidden ? 'Show the right panel' : 'Hide the right panel'} onclick={() => (right.hidden = !right.hidden)}><Icon name="sidebar" size={14} /></button>
+    <div class="bar">
+      <Toolbar {path} />
+      <button class="btn sm quiet icon panel-toggle" aria-pressed={!right.hidden} aria-label={right.hidden ? 'Show the right panel' : 'Hide the right panel'} title={right.hidden ? 'Show the right panel' : 'Hide the right panel'} onclick={() => (right.hidden = !right.hidden)}><Icon name="sidebar" size={14} /></button>
     </div>
     <!-- The graph stays mounted while a diff is open, so scroll position and selection
          survive returning to it. -->
@@ -221,7 +202,33 @@
           else
             session.error =
               'Drop onto the checked-out branch to merge, rebase or cherry-pick into it, or drag the checked-out branch onto another commit.'
-        }} />
+        }}
+      >
+        <!-- The working tree is the graph's first row: what isn't a commit yet, above the newest
+             one, with its mark on the first lane and its words where the messages start. -->
+        {#snippet lead(at: { nodeX: number; textX: number })}
+          <button
+            class="wip"
+            class:active={view === 'wip'}
+            aria-pressed={view === 'wip'}
+            style:padding-left="{at.textX}px"
+            onclick={() => {
+              view = 'wip'
+              right.hidden = false
+              if (diff?.mode === 'commit') diff = null
+            }}
+          >
+            <span class="dot" class:dirty={!!changes} style:left="{at.nodeX - 8}px">{#if changes && changes > 0}<span class="ring"></span>{:else if changes !== null}<Icon name="check" />{/if}</span>
+            <span class="wip-title">{changes ? `${changes} ${changes === 1 ? 'file' : 'files'} changed` : 'Working tree'}</span>
+            {#if changes && session.activeTab?.head}
+              <span class="where">{session.activeTab.head.startsWith('detached') ? session.activeTab.head : `on ${session.activeTab.head}`}</span>
+            {:else if changes === 0}
+              <span class="meta">clean</span>
+            {/if}
+            {#if changes}<span class="review">Review</span>{/if}
+          </button>
+        {/snippet}
+      </GraphView>
     </div>
     {#if rebaseBase}
       <div class="graph">
@@ -369,13 +376,12 @@
     display: none;
   }
 
-  /* A quiet row at the left of the panel. It keeps its place whatever the graph below is doing,
-     including when a file has replaced it. */
-  .wip-row {
+  /* The repository's actions, with the right panel's toggle at the end. */
+  .bar {
     flex: none;
     display: flex;
     align-items: center;
-    border-bottom: 1px dotted var(--paper-edge);
+    border-bottom: 1px solid var(--paper-edge);
   }
 
   .panel-toggle {
@@ -391,10 +397,12 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    min-height: 38px;
+    height: 100%;
+    /* The left padding comes from the graph: where its messages start. */
     padding: 0 14px 0 44px;
     background: none;
     border: none;
+    border-bottom: 1px dotted var(--paper-edge);
     border-radius: 0;
     text-align: left;
     transition: background-color var(--dur-base);
