@@ -39,6 +39,8 @@ Git tools: everyday git chores without leaving the app.
 ||||||| parent of fee6780 (feat: a handwritten "you're here" beside the checked-out commit)
 - In the timeline, the checked-out commit's row carries a small handwritten "you’re here" after its label when the branch column has room. (#562)
 ||||||| parent of 1f653ed (feat: show a commit's actions when its row is hovered or selected)
+||||||| parent of e7ac134 (feat: glide to a commit and land it; fade in rows that arrive in view)
+- Jumping to a commit (from a branch, a parent link or a search match) glides there when it's within three screens and cuts when it's further, and the commit lands under a wash that fades. Commits that arrive where you're already looking fade up, a few at a time. Reduced motion keeps everything instant. (#558)
 - Hovering a commit in the graph (or selecting one from the keyboard) shows three small actions at the row's right edge: copy its SHA, check it out, and a menu with everything right-click offers. (#555)
 - The selected commit is marked by a bar in its lane's colour at the row's left edge, over a lighter wash, and the selection, hover and search dimming ease into place instead of snapping. Reduced motion keeps the instant draw. (#553)
 
