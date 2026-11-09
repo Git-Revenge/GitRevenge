@@ -14,6 +14,14 @@ export function at(t: Tween, now: number, duration: number): number {
   return t.from + (t.to - t.from) * easeInk(p)
 }
 
+/** The wash over a row that was just jumped to, at `t` from 0 to 1 of the landing: solid for
+ * the first 40%, then fading, so the eye finds the row and is then left alone. */
+export function landWash(t: number): number {
+  if (t <= 0.4) return 1
+  if (t >= 1) return 0
+  return 1 - easeInk((t - 0.4) / 0.6)
+}
+
 /** Whether a tween has arrived. */
 export function settled(t: Tween, now: number, duration: number): boolean {
   return t.from === t.to || now - t.start >= duration

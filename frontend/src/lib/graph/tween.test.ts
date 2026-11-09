@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Washes, at, settled } from './tween'
+import { Washes, at, landWash, settled } from './tween'
 
 describe('at', () => {
   it('starts where it set off and lands on its target', () => {
@@ -19,6 +19,20 @@ describe('at', () => {
     for (let now = 0; now <= 200; now += 10) {
       const v = at(t, now, 200)
       expect(v).toBeGreaterThanOrEqual(last)
+      last = v
+    }
+  })
+})
+
+describe('landWash', () => {
+  it('holds, then fades to nothing, never brightening', () => {
+    expect(landWash(0)).toBe(1)
+    expect(landWash(0.4)).toBe(1)
+    expect(landWash(1)).toBe(0)
+    let last = 1
+    for (let t = 0.4; t <= 1; t += 0.05) {
+      const v = landWash(t)
+      expect(v).toBeLessThanOrEqual(last)
       last = v
     }
   })
