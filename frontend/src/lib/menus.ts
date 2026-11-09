@@ -19,6 +19,9 @@ export interface MenuContext {
   openRebase: (base: string) => void
   /** Opens the reflog browser on a ref ("HEAD" or refs/heads/…). */
   openReflog: (ref: string) => void
+  /** Opens the dialog that starts a bisect with this commit as the bad one; absent while one
+   * is already running. */
+  openBisect?: (bad: string) => void
 }
 
 /** Joins groups of items, drawing a rule between non-empty groups. */
@@ -410,6 +413,7 @@ export function commitItems(row: Row, refs: Ref[], ctx: MenuContext): MenuItem[]
     ...(ctx.current() && !refs.some((r) => r.head)
       ? [{ label: `Interactive rebase ${ctx.current()} from here…`, icon: 'rebase' as const, run: () => ctx.openRebase(row.id) }]
       : []),
+    ...(ctx.openBisect ? [{ label: 'Find what broke it, up to here…', icon: 'search' as const, run: () => ctx.openBisect?.(row.id) }] : []),
     {
       label: `Reset ${ctx.current() || 'HEAD'} to ${short}…`,
       icon: 'reset',

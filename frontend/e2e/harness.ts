@@ -197,6 +197,20 @@ const mounts = {
     const { default: RepoView } = await import('../src/lib/RepoView.svelte')
     mount(RepoView, { target: host, props: { path: '/r' } })
   },
+  // The repository view under the operation strip, as the app shell stacks them.
+  async bisect() {
+    host.style.cssText = 'display:flex;flex-direction:column;height:100vh'
+    const { default: OperationBanner } = await import('../src/lib/OperationBanner.svelte')
+    const { default: RepoView } = await import('../src/lib/RepoView.svelte')
+    mount(OperationBanner, { target: host, props: { path: '/r' } })
+    const rest = document.createElement('div')
+    rest.style.cssText = 'flex:1;min-height:0'
+    host.append(rest)
+    mount(RepoView, { target: rest, props: { path: '/r' } })
+    // The shell also turns key presses into commands.
+    const { commands } = await import('../src/lib/commands.svelte')
+    window.addEventListener('keydown', (e) => void commands.dispatch(e))
+  },
   async worktreesDialog() {
     const { default: WorktreesDialog } = await import('../src/lib/WorktreesDialog.svelte')
     mount(WorktreesDialog, { target: host, props: { path: '/r', onClose: () => {} } })
@@ -264,6 +278,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'repoView':
     await mounts.repoView()
+    break
+  case 'bisect':
+    await mounts.bisect()
     break
   case 'worktreesDialog':
     await mounts.worktreesDialog()
