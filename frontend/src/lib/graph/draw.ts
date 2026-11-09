@@ -146,6 +146,19 @@ const LANE_WASH_INSET = 2
 /** How far past a label's right edge drawLabels' returned position is. */
 const LABEL_TRAIL = 8
 
+/** The selected row's mark: a bar in the lane's colour at the row's left edge, the same mark as
+ * the active view in Insights and Git Config and the ink line under the active tab. */
+const SEL_BAR_WIDTH = 3
+const SEL_BAR_INSET = 4
+
+/** Where the selection bar goes for a row whose top edge is at y and height is h. */
+export function selectionBar(y: number, h: number): { x: number; y: number; w: number; h: number; r: number } {
+  return { x: 0, y: y + SEL_BAR_INSET, w: SEL_BAR_WIDTH, h: h - SEL_BAR_INSET * 2, r: 2 }
+}
+
+/** How far a row that doesn't match the search fades: to 0.3 of its ink. */
+const DIM = 0.7
+
 /** Width a kind icon takes in a ref label, gap included. */
 const KIND_ICON_W = 15
 
@@ -312,8 +325,9 @@ export function rowWashed(row: Pick<Row, 'kind'>): boolean {
 /** Where a row's labels were drawn, from their left edge to their right. */
 export type LabelSpan = [start: number, end: number]
 
-/** Draws one row whose top edge is at y. nowSeconds dates the relative times. Returns where its
- * labels went, if it has any. */
+/** Draws one row whose top edge is at y. `selected`, `hovered` and `dimmed` are strengths from 0
+ * to 1, so the caller can ease them between frames; 1 is the plain state. nowSeconds dates the
+ * relative times. Returns where its labels went, if it has any. */
 export function drawRow(
   ctx: CanvasRenderingContext2D,
   row: Row,
@@ -321,9 +335,9 @@ export function drawRow(
   y: number,
   lay: Layout,
   theme: Theme,
-  selected: boolean,
-  hovered: boolean,
-  dimmed: boolean,
+  selected: number,
+  hovered: number,
+  dimmed: number,
   nowSeconds: number,
   seal?: Seal,
   near: Near = {},
@@ -332,13 +346,36 @@ export function drawRow(
   const { m } = lay
   const h = m.rowH
   const comfortable = lay.density === 'comfortable'
-  const wash = selected ? theme.selected : hovered ? theme.hover : ''
+  const unit = (v: number) => Math.min(1, Math.max(0, v))
+  const sel = unit(selected)
+  // Hovering the selected row shows the selection alone.
+  const hov = unit(hovered) * (1 - sel)
+  const wash = sel > 0 ? theme.selected : hov > 0 ? theme.hover : ''
+  const washAlpha = sel > 0 ? sel : hov
   ctx.save()
   // Rows that don't match an active search fade back.
-  if (dimmed && !selected) ctx.globalAlpha = 0.3
-  if (wash) {
+  ctx.globalAlpha = 1 - DIM * unit(dimmed) * (1 - sel)
+  const base = ctx.globalAlpha
+  /** Paints in the row's wash colour at the wash's current strength. */
+  const washOver = (paint: () => void) => {
+    if (!wash) return
+    const a = ctx.globalAlpha
+    ctx.globalAlpha = a * washAlpha
+    paint()
+    ctx.globalAlpha = a
+  }
+  washOver(() => {
     ctx.fillStyle = wash
     ctx.fillRect(0, y, lay.width, h)
+  })
+  if (sel > 0) {
+    const bar = selectionBar(y, h)
+    ctx.globalAlpha = base * sel
+    ctx.fillStyle = laneColor(row.color)
+    ctx.beginPath()
+    ctx.roundRect(bar.x, bar.y, bar.w, bar.h, bar.r)
+    ctx.fill()
+    ctx.globalAlpha = base
   }
 
   const mid = y + h / 2
@@ -419,7 +456,7 @@ export function drawRow(
     const e = elbow(lx(s.from), y1, lx(s.to), y2, leaving)
     ctx.globalAlpha = strength(s)
     stroke(e, HALO_WIDTH, theme.bg)
-    if (wash) stroke(e, HALO_WIDTH, wash)
+    washOver(() => stroke(e, HALO_WIDTH, wash))
     stroke(e, LINE_WIDTH, laneColor(s.color))
   }
   for (const s of row.up) if (s.from === s.to) straight(s, y, mid)
@@ -435,7 +472,7 @@ export function drawRow(
   /** Fills a disc in the row's own background, so a node cuts the lines behind it. */
   const cut = (r: number) => {
     disc(ctx, x, mid, r, theme.bg)
-    if (wash) disc(ctx, x, mid, r, wash)
+    washOver(() => disc(ctx, x, mid, r, wash))
   }
   if (isHead) {
     // A soft halo marks the checked-out commit.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clearOf, clip, DATE_COLUMN, clippedName, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, rowWashed, setLaneColors, sortRefs } from './draw'
+import { clearOf, clip, DATE_COLUMN, clippedName, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, rowWashed, setLaneColors, sortRefs, selectionBar } from './draw'
 import type { Ref, Row } from './rowCache'
 
 describe('graph geometry', () => {
@@ -381,5 +381,12 @@ describe('laneWindow', () => {
   it('centres the selected node when the nodes in view are wider than the column', () => {
     expect(laneWindow(0, 900, 300, 10)).toBe(295)
     expect(laneWindow(100, 900, null, 10)).toBe(95)
+  })
+})
+
+describe('selectionBar', () => {
+  it("is a 3px bar at the left edge, inset 4px from the row's top and bottom", () => {
+    expect(selectionBar(100, 52)).toEqual({ x: 0, y: 104, w: 3, h: 44, r: 2 })
+    expect(selectionBar(0, 30)).toEqual({ x: 0, y: 4, w: 3, h: 22, r: 2 })
   })
 })
