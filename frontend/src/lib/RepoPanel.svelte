@@ -1,11 +1,13 @@
 <script lang="ts">
-  // The sidebar's Repository panel: worktrees, submodules and the way into LFS. It stays mounted
+  // The sidebar's Repository panel: worktrees, submodules and the ways into LFS and the
+  // Ignore rules tab. It stays mounted
   // while other panels show, so the rail's badge and filter counts are always right.
   import { LFS, RemoveWorktree, Submodules, UpdateSubmodules, Worktrees } from '../../wailsjs/go/app/App.js'
   import type { app, git } from '../../wailsjs/go/models'
   import type { MenuItem } from './ContextMenu.svelte'
   import type { DialogSpec } from './Dialog.svelte'
   import { errorText } from './errors'
+  import { ignoreRules } from './ignorerules/ignoreRules.svelte'
   import LFSDialog from './LFSDialog.svelte'
   import { canOpenWorktree, canRemoveWorktree, folderName, lfsNames, matchesFilter, submoduleStatus, worktreeNames, worktreeStatus, worktreeTooltip } from './repoPanel'
   import { session } from './session.svelte'
@@ -73,8 +75,9 @@
   let shownSubs = $derived(subs.filter((s) => matchesFilter(filter, s.path)))
   let lfsFiles = $derived(lfs?.status.files.length ?? 0)
   let showLfs = $derived(!!lfs?.available && matchesFilter(filter, ...lfsNames(lfs.status.patterns, lfs.status.files)))
+  let showIgnore = $derived(matchesFilter(filter, 'Ignore rules', '.gitignore', 'exclude'))
   let filtering = $derived(filter.trim().length > 0)
-  let matches = $derived(shownTrees.length + shownSubs.length + (showLfs ? 1 : 0))
+  let matches = $derived(shownTrees.length + shownSubs.length + (showLfs ? 1 : 0) + (showIgnore ? 1 : 0))
 
   $effect(() => {
     onStatus?.({ attention: subs.filter((s) => s.state !== 'ok').length, matches })
@@ -169,6 +172,19 @@
           <span class="icon"><Icon name="lfs" size={14} /></span>
           <span class="name">LFS</span>
           <span class="status muted">{lfsFiles.toLocaleString()} {lfsFiles === 1 ? 'file' : 'files'}</span>
+        </button>
+      </li>
+    </ul>
+  </section>
+{/if}
+
+{#if showIgnore}
+  <section>
+    <ul>
+      <li>
+        <button class="row lfs" onclick={() => ignoreRules.show(path)} title="Read and edit this repository's .gitignore files, its exclude file and your global excludes">
+          <span class="icon"><Icon name="eye" size={14} /></span>
+          <span class="name">Ignore rules</span>
         </button>
       </li>
     </ul>
