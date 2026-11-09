@@ -25,6 +25,7 @@ func isolatedConfigRunner(t *testing.T, content string) (*Runner, string) {
 }
 
 func TestParseConfigList(t *testing.T) {
+	t.Parallel()
 	out := "global\x00file:C:/Users/me/.gitconfig\x00user.name\nMe\x00local\x00file:.git/config\x00core.bare\x00command\x00\x00a.b\nx\ny\x00"
 	got := parseConfigList([]byte(out), true)
 	want := []ConfigEntry{
@@ -41,6 +42,7 @@ func TestParseConfigList(t *testing.T) {
 }
 
 func TestSameConfigKey(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		a, b string
 		want bool
@@ -109,6 +111,7 @@ func sameFile(a, b string) bool {
 }
 
 func TestFileConfigAndEdit(t *testing.T) {
+	t.Parallel()
 	r := newTestRunner(t)
 	ctx := context.Background()
 	file := filepath.Join(t.TempDir(), "config")
@@ -192,6 +195,7 @@ func TestGlobalConfigPath(t *testing.T) {
 }
 
 func TestLocalConfigPathWorktree(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(1)
 	wt := filepath.Join(t.TempDir(), "wt")
@@ -206,6 +210,7 @@ func TestLocalConfigPathWorktree(t *testing.T) {
 }
 
 func TestConfigKeysAndCommands(t *testing.T) {
+	t.Parallel()
 	r := newTestRunner(t)
 	keys, err := r.ConfigKeys(context.Background())
 	if err != nil {

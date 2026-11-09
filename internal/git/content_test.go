@@ -10,6 +10,7 @@ import (
 )
 
 func TestContentsVersions(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "head\n", "base")
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
@@ -33,6 +34,7 @@ func TestContentsVersions(t *testing.T) {
 }
 
 func TestContentsBinaryLargeImage(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(1)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
@@ -60,6 +62,7 @@ func TestContentsBinaryLargeImage(t *testing.T) {
 }
 
 func TestSetIndexContentStagesPartialChange(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "one\ntwo\nthree\n", "base")
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
@@ -84,6 +87,7 @@ func TestSetIndexContentStagesPartialChange(t *testing.T) {
 }
 
 func TestSetIndexContentNewFileAndMode(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(1)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
@@ -102,6 +106,7 @@ func TestSetIndexContentNewFileAndMode(t *testing.T) {
 // With autocrlf the work tree has CRLF but the index stores LF. Reading with filters and
 // writing with --path must round-trip so only real edits show as changes.
 func TestSetIndexContentRespectsLineEndingFilters(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Git("config", "core.autocrlf", "true")
 	fx.WriteFile("a.txt", "one\r\ntwo\r\n")
@@ -126,6 +131,7 @@ func TestSetIndexContentRespectsLineEndingFilters(t *testing.T) {
 }
 
 func TestSetWorkTreeContent(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "a\n", "base")
 	repo := OpenRepo(newTestRunner(t), fx.Dir)

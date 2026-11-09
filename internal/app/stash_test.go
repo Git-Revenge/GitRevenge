@@ -8,6 +8,7 @@ import (
 )
 
 func TestStashBindings(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "base\n", "base")

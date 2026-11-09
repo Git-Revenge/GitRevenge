@@ -8,6 +8,7 @@ import (
 )
 
 func TestBranchActions(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.Linear(2)
@@ -45,6 +46,7 @@ func TestBranchActions(t *testing.T) {
 }
 
 func TestGitMessageStripsPrefixes(t *testing.T) {
+	t.Parallel()
 	got := gitMessage("error: Your local changes would be overwritten:\n\tmain.go\nfatal: Aborting\n").Error()
 	if got != "Your local changes would be overwritten:\n\tmain.go\nAborting" {
 		t.Fatalf("got %q", got)

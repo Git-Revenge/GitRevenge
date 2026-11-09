@@ -25,6 +25,7 @@ func branched(t *testing.T, files ...string) (*gittest.Repo, *Repo) {
 }
 
 func TestMergedBranches(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	fx, g := branched(t, "a1.txt", "a2.txt")
 	fx.Git("branch", "bottom", "topic")
@@ -58,6 +59,7 @@ func TestMergedBranches(t *testing.T) {
 }
 
 func TestBranchStates(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	fx, g := branched(t, "a.txt", "b.txt")
 	fx.Git("branch", "level", "main")
@@ -71,6 +73,7 @@ func TestBranchStates(t *testing.T) {
 }
 
 func TestMergedBranchesStopsWhenOutOfTime(t *testing.T) {
+	t.Parallel()
 	_, g := branched(t, "a.txt")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -80,6 +83,7 @@ func TestMergedBranchesStopsWhenOutOfTime(t *testing.T) {
 }
 
 func TestBranchMergeState(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	state := func(g *Repo) BranchMerge { return g.BranchMergeState(ctx, "topic", []string{"main"}) }
 
@@ -334,6 +338,7 @@ func TestBranchMergeState(t *testing.T) {
 }
 
 func TestBranchesTogether(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	fx, g := branched(t, "a.txt")
 	commit := fx.Git("rev-parse", "main")[:40]

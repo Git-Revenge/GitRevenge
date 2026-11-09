@@ -10,6 +10,7 @@ import (
 )
 
 func TestMergeModes(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "a", "base")
 	fx.Branch("feature")
@@ -35,6 +36,7 @@ func TestMergeModes(t *testing.T) {
 }
 
 func TestMergeFastForward(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "a", "base")
 	fx.Branch("feature")
@@ -49,6 +51,7 @@ func TestMergeFastForward(t *testing.T) {
 }
 
 func TestMergeConflictLeavesOperation(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("c.txt", "base\n", "base")
 	fx.Branch("theirs")
@@ -66,6 +69,7 @@ func TestMergeConflictLeavesOperation(t *testing.T) {
 }
 
 func TestCherryPickAndRebase(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "a", "base")
 	fx.Branch("feature")
@@ -95,6 +99,7 @@ func TestCherryPickAndRebase(t *testing.T) {
 }
 
 func TestCherryPickConflict(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("c.txt", "base\n", "base")
 	fx.Branch("other")

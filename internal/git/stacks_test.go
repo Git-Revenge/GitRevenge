@@ -9,6 +9,7 @@ import (
 )
 
 func TestStackParents(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "1", "base")
 	fx.Branch("one")

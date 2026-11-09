@@ -10,6 +10,7 @@ import (
 )
 
 func TestClone(t *testing.T) {
+	t.Parallel()
 	_, remote := gittest.WithRemote(t, 2)
 	r := newTestRunner(t)
 	dir := filepath.Join(t.TempDir(), "copy")
@@ -24,6 +25,7 @@ func TestClone(t *testing.T) {
 }
 
 func TestCloneFailureLeavesNoFolder(t *testing.T) {
+	t.Parallel()
 	r := newTestRunner(t)
 	dir := filepath.Join(t.TempDir(), "copy")
 
@@ -36,6 +38,7 @@ func TestCloneFailureLeavesNoFolder(t *testing.T) {
 }
 
 func TestInit(t *testing.T) {
+	t.Parallel()
 	r := newTestRunner(t)
 	dir := filepath.Join(t.TempDir(), "new", "repo")
 
@@ -49,6 +52,7 @@ func TestInit(t *testing.T) {
 }
 
 func TestCloneName(t *testing.T) {
+	t.Parallel()
 	for url, want := range map[string]string{
 		"https://github.com/owner/repo.git": "repo",
 		"https://github.com/owner/repo":     "repo",

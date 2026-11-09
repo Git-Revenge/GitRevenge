@@ -8,6 +8,7 @@ import (
 )
 
 func TestCountLines(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	fx := gittest.New(t)
 	fx.WriteFile("a.txt", "one\ntwo\n")
@@ -42,6 +43,7 @@ func TestCountLines(t *testing.T) {
 }
 
 func TestCountLinesWithoutCommitsLeavesZeros(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	fx := gittest.New(t)
 	fx.WriteFile("a.txt", "one\n")

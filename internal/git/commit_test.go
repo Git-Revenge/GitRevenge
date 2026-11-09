@@ -10,6 +10,7 @@ import (
 )
 
 func TestReadCommitParsesHeaderAndMessage(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	parent := fx.Linear(1)[0]
 	fx.CommitFile("a.txt", "a", "Add a\n\nLonger explanation\nover two lines.")
@@ -35,6 +36,7 @@ func TestReadCommitParsesHeaderAndMessage(t *testing.T) {
 }
 
 func TestReadCommitRejectsNonCommit(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "a", "add")
 	o := NewObjectReader(newTestRunner(t), fx.Dir)
@@ -45,6 +47,7 @@ func TestReadCommitRejectsNonCommit(t *testing.T) {
 }
 
 func TestParseSignatureOddNames(t *testing.T) {
+	t.Parallel()
 	s := parseSignature("Jane <Doe> Smith <jane@example.com> 1700000000 -0500")
 	if s.Name != "Jane <Doe> Smith" || s.Email != "jane@example.com" || s.Time != 1700000000 || s.TZ != "-0500" {
 		t.Fatalf("%+v", s)
@@ -68,6 +71,7 @@ func changed(t *testing.T, fx *gittest.Repo, rev string) []FileChange {
 }
 
 func TestChangedFiles(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.WriteFile("keep.txt", "keep")
 	fx.WriteFile("old name.txt", strings.Repeat("rename me\n", 20))

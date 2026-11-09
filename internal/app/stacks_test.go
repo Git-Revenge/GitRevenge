@@ -33,6 +33,7 @@ func stackOf(refs []git.Ref, name string) git.Ref {
 }
 
 func TestStacksInRefs(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "1", "base")

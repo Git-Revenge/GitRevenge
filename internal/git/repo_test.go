@@ -20,6 +20,7 @@ func openTestRepo(t *testing.T) (*Repo, *gittest.Repo) {
 }
 
 func TestWriteRetriesUntilLockReleased(t *testing.T) {
+	t.Parallel()
 	repo, fx := openTestRepo(t)
 	fx.WriteFile("a.txt", "a\n")
 	lock := fx.Path(".git/index.lock")
@@ -37,6 +38,7 @@ func TestWriteRetriesUntilLockReleased(t *testing.T) {
 }
 
 func TestWriteReportsPersistentLock(t *testing.T) {
+	t.Parallel()
 	repo, fx := openTestRepo(t)
 	fx.WriteFile("a.txt", "a\n")
 	if err := os.WriteFile(fx.Path(".git/index.lock"), nil, 0o644); err != nil {
@@ -54,6 +56,7 @@ func TestWriteReportsPersistentLock(t *testing.T) {
 }
 
 func TestWritesAreSerialized(t *testing.T) {
+	t.Parallel()
 	repo, fx := openTestRepo(t)
 	const n = 8
 	var wg sync.WaitGroup
@@ -87,6 +90,7 @@ func TestWritesAreSerialized(t *testing.T) {
 }
 
 func TestWriteWaitRespectsContext(t *testing.T) {
+	t.Parallel()
 	repo, _ := openTestRepo(t)
 	repo.writes <- struct{}{} // simulate a long-running write holding the slot
 	defer func() { <-repo.writes }()
@@ -99,6 +103,7 @@ func TestWriteWaitRespectsContext(t *testing.T) {
 }
 
 func TestNotIgnored(t *testing.T) {
+	t.Parallel()
 	repo, fx := openTestRepo(t)
 	fx.CommitFile(".gitignore", "build/\n*.log\n", "ignore")
 

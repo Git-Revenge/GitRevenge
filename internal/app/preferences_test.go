@@ -7,6 +7,7 @@ import (
 )
 
 func TestPreferencesRoundTrip(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	p, err := a.Preferences()
 	if err != nil {
@@ -35,6 +36,7 @@ func TestPreferencesRoundTrip(t *testing.T) {
 }
 
 func TestPreferencesValidation(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	base := Preferences{UpdateChecks: true, Zoom: 100}
 	bad := map[string]Preferences{
@@ -57,6 +59,7 @@ func TestPreferencesValidation(t *testing.T) {
 }
 
 func TestKeybindings(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	if got, err := a.Keybindings(); err != nil || len(got) != 0 {
 		t.Fatalf("defaults = %v, %v", got, err)

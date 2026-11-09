@@ -11,6 +11,7 @@ import (
 )
 
 func TestSignalFlags(t *testing.T) {
+	t.Parallel()
 	asOf := 100 * day
 	b := git.OpenBranch{Name: "x", LastCommit: asOf - 9*day - 1, FirstCommit: asOf - 20*day, Behind: 60, Added: 400, Removed: 101}
 	s := signal(b, asOf, Thresholds{}.withDefaults())
@@ -32,6 +33,7 @@ func TestSignalFlags(t *testing.T) {
 }
 
 func TestInsightsBranchesAndConflicts(t *testing.T) {
+	t.Parallel()
 	origin := gittest.New(t)
 	origin.CommitFile("a.txt", "base\n", "Start")
 	origin.Branch("conflicting")
@@ -84,6 +86,7 @@ func TestInsightsBranchesAndConflicts(t *testing.T) {
 }
 
 func TestInsightsHotspots(t *testing.T) {
+	t.Parallel()
 	origin := gittest.New(t)
 	origin.CommitFile("a.txt", "1\n", "Start")
 	origin.Branch("touches-a")
@@ -113,6 +116,7 @@ func TestInsightsHotspots(t *testing.T) {
 }
 
 func TestInsightsThresholdsSavedPerScope(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	if got, err := a.InsightsThresholds("repo:x"); err != nil || got != (Thresholds{Stale: 7, LongLived: 14, Behind: 50, Size: 500}) {
 		t.Fatalf("defaults = %+v, %v", got, err)

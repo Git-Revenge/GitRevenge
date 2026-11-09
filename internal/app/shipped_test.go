@@ -9,6 +9,7 @@ import (
 )
 
 func TestResolveWindow(t *testing.T) {
+	t.Parallel()
 	// Thursday 2026-10-29 17:42:00 UTC.
 	asOf := time.Date(2026, 10, 29, 17, 42, 0, 0, time.UTC).Unix()
 	utc := func(y int, m time.Month, d int) int64 { return time.Date(y, m, d, 0, 0, 0, 0, time.UTC).Unix() }
@@ -37,6 +38,7 @@ func TestResolveWindow(t *testing.T) {
 }
 
 func TestInsightsShippedIsReproducible(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "1\n", "Start")
 	fx.CommitFile("a.txt", "2\n", "Second (TIDE-1)")

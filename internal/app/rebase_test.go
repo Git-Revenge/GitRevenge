@@ -8,6 +8,7 @@ import (
 )
 
 func TestInteractiveRebaseAndUndo(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
 	base := fx.CommitFile("base.txt", "b\n", "base")

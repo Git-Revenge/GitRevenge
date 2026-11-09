@@ -9,6 +9,7 @@ import (
 )
 
 func TestFileHistoryFollowsRenames(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("old.txt", strings.Repeat("content\n", 10), "create")
 	fx.CommitFile("other.txt", "x", "unrelated")
@@ -40,6 +41,7 @@ func TestFileHistoryFollowsRenames(t *testing.T) {
 }
 
 func TestBlame(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	first := fx.CommitFile("f.go", "package main\n\nfunc a() {}\n", "add a")
 	second := fx.CommitFile("f.go", "package main\n\nfunc a() {}\nfunc b() {}\n", "add b")

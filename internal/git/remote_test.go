@@ -11,6 +11,7 @@ import (
 )
 
 func TestRemotesManage(t *testing.T) {
+	t.Parallel()
 	local, remote := gittest.WithRemote(t, 1)
 	repo := OpenRepo(newTestRunner(t), local.Dir)
 	ctx := context.Background()
@@ -49,6 +50,7 @@ func TestRemotesManage(t *testing.T) {
 }
 
 func TestParseProgress(t *testing.T) {
+	t.Parallel()
 	p := ParseProgress("Receiving objects:  45% (450/1000), 1.2 MiB | 2 MiB/s")
 	if p.Phase != "Receiving objects" || p.Percent != 45 {
 		t.Fatalf("%+v", p)
@@ -62,6 +64,7 @@ func TestParseProgress(t *testing.T) {
 }
 
 func TestFetchPullPush(t *testing.T) {
+	t.Parallel()
 	local, remote := gittest.WithRemote(t, 1)
 	other := gittest.Clone(t, remote)
 	other.CommitFile("theirs.txt", "t", "their work")
@@ -106,6 +109,7 @@ func TestFetchPullPush(t *testing.T) {
 }
 
 func TestPushNewBranchSetsUpstreamAndTags(t *testing.T) {
+	t.Parallel()
 	local, remote := gittest.WithRemote(t, 1)
 	repo := OpenRepo(newTestRunner(t), local.Dir)
 	ctx := context.Background()
@@ -135,6 +139,7 @@ func TestPushNewBranchSetsUpstreamAndTags(t *testing.T) {
 }
 
 func TestPushRejectedAndForceWithLease(t *testing.T) {
+	t.Parallel()
 	local, remote := gittest.WithRemote(t, 1)
 	other := gittest.Clone(t, remote)
 	other.CommitFile("o.txt", "o", "other pushes first")
@@ -162,6 +167,7 @@ func TestPushRejectedAndForceWithLease(t *testing.T) {
 }
 
 func TestIssueURL(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"https://github.com/Git-Revenge/GitRevenge.git":  "https://github.com/Git-Revenge/GitRevenge/issues/{n}",
 		"git@github.com:Git-Revenge/GitRevenge.git":      "https://github.com/Git-Revenge/GitRevenge/issues/{n}",

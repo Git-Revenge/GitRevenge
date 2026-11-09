@@ -11,6 +11,7 @@ import (
 )
 
 func TestMergeTargets(t *testing.T) {
+	t.Parallel()
 	local := func(s string, head bool) git.Ref { return git.Ref{Short: s, Kind: git.LocalBranch, Head: head} }
 	remote := func(s string) git.Ref { return git.Ref{Short: s, Kind: git.RemoteBranch} }
 	rules := branchkind.New(nil, nil)

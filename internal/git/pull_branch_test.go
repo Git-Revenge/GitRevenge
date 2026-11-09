@@ -23,6 +23,7 @@ func pullBranchFixture(t *testing.T) (*Repo, *gittest.Repo, *gittest.Repo) {
 }
 
 func TestPullBranchFastForwardsWithoutTouchingTheWorkingTree(t *testing.T) {
+	t.Parallel()
 	repo, local, other := pullBranchFixture(t)
 	tip := other.CommitFile("feat2.txt", "2", "feat 2")
 	other.Git("push", "-q")
@@ -53,6 +54,7 @@ func TestPullBranchFastForwardsWithoutTouchingTheWorkingTree(t *testing.T) {
 }
 
 func TestPullBranchFollowsTheUpstreamName(t *testing.T) {
+	t.Parallel()
 	repo, local, other := pullBranchFixture(t)
 	other.Git("checkout", "-q", "-b", "team/other-name")
 	tip := other.CommitFile("o.txt", "o", "other name")
@@ -66,6 +68,7 @@ func TestPullBranchFollowsTheUpstreamName(t *testing.T) {
 }
 
 func TestPullBranchLeavesABranchWithNothingToPull(t *testing.T) {
+	t.Parallel()
 	repo, local, _ := pullBranchFixture(t)
 	ctx := context.Background()
 	if from, to, err := repo.PullBranch(ctx, "feat", NetOptions{}); err != nil || from != to {
@@ -81,6 +84,7 @@ func TestPullBranchLeavesABranchWithNothingToPull(t *testing.T) {
 }
 
 func TestPullBranchRefuses(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	t.Run("diverged", func(t *testing.T) {
@@ -142,6 +146,7 @@ func TestPullBranchRefuses(t *testing.T) {
 }
 
 func TestMoveBranch(t *testing.T) {
+	t.Parallel()
 	repo, local, _ := pullBranchFixture(t)
 	ctx := context.Background()
 	tip := local.Git("rev-parse", "feat")

@@ -8,6 +8,7 @@ import (
 )
 
 func TestChangedFilesCountsLines(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.WriteFile("kept.txt", "one\ntwo\nthree\n")
 	fx.WriteFile("moved.txt", "a\nb\nc\nd\ne\nf\ng\nh\n")

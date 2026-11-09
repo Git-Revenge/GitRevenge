@@ -26,6 +26,7 @@ func status(t *testing.T, repo *Repo) map[string]FileStatus {
 }
 
 func TestStatusKinds(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.WriteFile("mod.txt", "a\n")
 	fx.WriteFile("del.txt", "d\n")
@@ -69,6 +70,7 @@ func TestStatusKinds(t *testing.T) {
 }
 
 func TestStatusBranchInfo(t *testing.T) {
+	t.Parallel()
 	local, _ := gittest.WithRemote(t, 1)
 	local.CommitFile("x.txt", "x", "ahead")
 	st, err := OpenRepo(newTestRunner(t), local.Dir).Status(context.Background())
@@ -81,6 +83,7 @@ func TestStatusBranchInfo(t *testing.T) {
 }
 
 func TestStatusConflictAndEmptyRepo(t *testing.T) {
+	t.Parallel()
 	fx := gittest.WithConflict(t)
 	if f := status(t, OpenRepo(newTestRunner(t), fx.Dir))["conflict.txt"]; !f.Conflicted || f.Staged() || !f.Unstaged() {
 		t.Fatalf("conflicted = %+v", f)
@@ -95,6 +98,7 @@ func TestStatusConflictAndEmptyRepo(t *testing.T) {
 }
 
 func TestStageUnstageRoundTrip(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(1)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
@@ -133,6 +137,7 @@ func TestStageUnstageRoundTrip(t *testing.T) {
 }
 
 func TestUnstageBeforeFirstCommit(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
 	ctx := context.Background()
@@ -157,6 +162,7 @@ func TestUnstageBeforeFirstCommit(t *testing.T) {
 }
 
 func TestDiscard(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("keep.txt", "original\n", "base")
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
@@ -189,6 +195,7 @@ func TestDiscard(t *testing.T) {
 }
 
 func TestCommitAndAmend(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(1)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
@@ -221,6 +228,7 @@ func TestCommitAndAmend(t *testing.T) {
 }
 
 func TestCommitHookFailureIsReported(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("no sh for hooks")
 	}
@@ -240,6 +248,7 @@ func TestCommitHookFailureIsReported(t *testing.T) {
 }
 
 func TestCommitSignedWithSSH(t *testing.T) {
+	t.Parallel()
 	keygen, err := exec.LookPath("ssh-keygen")
 	if err != nil {
 		t.Skip("ssh-keygen not installed")
@@ -270,6 +279,7 @@ func TestCommitSignedWithSSH(t *testing.T) {
 }
 
 func TestCommitIdentity(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
 	if got := repo.CommitIdentity(context.Background()); got != (Identity{Name: "Test User", Email: "test@example.com"}) {
@@ -278,6 +288,7 @@ func TestCommitIdentity(t *testing.T) {
 }
 
 func TestCommitNothingStaged(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(1)
 	fx.WriteFile("unstaged.txt", "x")

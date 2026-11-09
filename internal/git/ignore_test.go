@@ -12,6 +12,7 @@ import (
 )
 
 func TestEscapeIgnorePath(t *testing.T) {
+	t.Parallel()
 	for in, want := range map[string]string{
 		"debug.log":         "/debug.log",
 		"a/b c.txt":         "/a/b c.txt",
@@ -29,6 +30,7 @@ func TestEscapeIgnorePath(t *testing.T) {
 }
 
 func TestRootPattern(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct{ dir, in, want string }{
 		{"", "*.log", "*.log"},
 		{"build", "*.bin", "/build/**/*.bin"},
@@ -73,6 +75,7 @@ func untrackedPaths(t *testing.T, repo *Repo) []string {
 }
 
 func TestAddIgnoreRuleHidesFiles(t *testing.T) {
+	t.Parallel()
 	fx, repo := ignoreFixture(t)
 	ctx := context.Background()
 	got, err := repo.AddIgnoreRule(ctx, IgnoreTarget{Scope: IgnoreRoot}, "*.log")
@@ -107,6 +110,7 @@ func TestAddIgnoreRuleHidesFiles(t *testing.T) {
 }
 
 func TestAddIgnoreRuleKeepsCRLFAndMissingNewline(t *testing.T) {
+	t.Parallel()
 	fx, repo := ignoreFixture(t)
 	fx.WriteFile(".gitignore", "a\r\nb")
 	if _, err := repo.AddIgnoreRule(context.Background(), IgnoreTarget{Scope: IgnoreRoot}, "*.log"); err != nil {
@@ -119,6 +123,7 @@ func TestAddIgnoreRuleKeepsCRLFAndMissingNewline(t *testing.T) {
 }
 
 func TestAddIgnoreRuleTargets(t *testing.T) {
+	t.Parallel()
 	fx, repo := ignoreFixture(t)
 	ctx := context.Background()
 	dir, err := repo.AddIgnoreRule(ctx, IgnoreTarget{Scope: IgnoreDir, Dir: "build"}, "*.bin")
@@ -147,6 +152,7 @@ func TestAddIgnoreRuleTargets(t *testing.T) {
 }
 
 func TestRemoveIgnoreRuleChecksTheLine(t *testing.T) {
+	t.Parallel()
 	fx, repo := ignoreFixture(t)
 	ctx := context.Background()
 	fx.WriteFile(".gitignore", "# top\n*.log\n*.tmp\n")
@@ -169,6 +175,7 @@ func TestRemoveIgnoreRuleChecksTheLine(t *testing.T) {
 }
 
 func TestPreviewIgnore(t *testing.T) {
+	t.Parallel()
 	fx, repo := ignoreFixture(t)
 	ctx := context.Background()
 	pv, err := repo.PreviewIgnore(ctx, IgnoreTarget{Scope: IgnoreRoot}, "/build/cache/")
@@ -202,6 +209,7 @@ func TestPreviewIgnore(t *testing.T) {
 }
 
 func TestIgnoredFilesAndExceptions(t *testing.T) {
+	t.Parallel()
 	fx, repo := ignoreFixture(t)
 	ctx := context.Background()
 	fx.WriteFile(".gitignore", "*.log\n/build/cache/\n")
@@ -254,6 +262,7 @@ func TestIgnoredFilesAndExceptions(t *testing.T) {
 }
 
 func TestExceptGlobalRuleStaysInThisClone(t *testing.T) {
+	t.Parallel()
 	fx, repo := ignoreFixture(t)
 	ctx := context.Background()
 	rule, err := repo.AddIgnoreRule(ctx, IgnoreTarget{Scope: IgnoreGlobal}, "*.log")
@@ -288,6 +297,7 @@ func TestExceptGlobalRuleStaysInThisClone(t *testing.T) {
 }
 
 func TestStopTracking(t *testing.T) {
+	t.Parallel()
 	fx, repo := ignoreFixture(t)
 	if err := repo.StopTracking(context.Background(), []string{"build/cache/README.md"}); err != nil {
 		t.Fatal(err)
@@ -305,6 +315,7 @@ func TestStopTracking(t *testing.T) {
 }
 
 func TestRestoreIgnoreRule(t *testing.T) {
+	t.Parallel()
 	fx, repo := ignoreFixture(t)
 	ctx := context.Background()
 	fx.WriteFile(".gitignore", "a\n*.log\nb\n")

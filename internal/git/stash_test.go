@@ -11,6 +11,7 @@ import (
 )
 
 func TestStashSaveAndPop(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "base\n", "base")
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
@@ -46,6 +47,7 @@ func TestStashSaveAndPop(t *testing.T) {
 }
 
 func TestStashIncludeUntrackedApplyDrop(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.Linear(1)
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
@@ -80,6 +82,7 @@ func TestStashIncludeUntrackedApplyDrop(t *testing.T) {
 }
 
 func TestStashActionsFollowRenumbering(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "0\n", "base")
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
@@ -103,6 +106,7 @@ func TestStashActionsFollowRenumbering(t *testing.T) {
 }
 
 func TestStashPopConflictKeepsStash(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.CommitFile("a.txt", "base\n", "base")
 	repo := OpenRepo(newTestRunner(t), fx.Dir)

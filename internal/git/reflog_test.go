@@ -9,6 +9,7 @@ import (
 )
 
 func TestReflog(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	shas := fx.Linear(3)
 	fx.Git("reset", "--hard", shas[0])

@@ -24,6 +24,7 @@ func newTestRunner(t *testing.T) *Runner {
 }
 
 func TestRunOutput(t *testing.T) {
+	t.Parallel()
 	r := newTestRunner(t)
 	repo := gittest.New(t)
 	sha := repo.Linear(1)[0]
@@ -38,6 +39,7 @@ func TestRunOutput(t *testing.T) {
 }
 
 func TestRunErrorCarriesStderrAndExitCode(t *testing.T) {
+	t.Parallel()
 	r := newTestRunner(t)
 	repo := gittest.New(t)
 
@@ -52,6 +54,7 @@ func TestRunErrorCarriesStderrAndExitCode(t *testing.T) {
 }
 
 func TestStreamReadsLines(t *testing.T) {
+	t.Parallel()
 	r := newTestRunner(t)
 	repo := gittest.New(t)
 	repo.Linear(50)
@@ -74,6 +77,7 @@ func TestStreamReadsLines(t *testing.T) {
 }
 
 func TestStreamStopsOnConsumerError(t *testing.T) {
+	t.Parallel()
 	r := newTestRunner(t)
 	repo := gittest.New(t)
 	repo.Linear(20)
@@ -87,6 +91,7 @@ func TestStreamStopsOnConsumerError(t *testing.T) {
 }
 
 func TestRunCanceled(t *testing.T) {
+	t.Parallel()
 	r := newTestRunner(t)
 	repo := gittest.New(t)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -99,6 +104,7 @@ func TestRunCanceled(t *testing.T) {
 }
 
 func TestBaseEnv(t *testing.T) {
+	t.Parallel()
 	env := baseEnv([]string{"PATH=/bin", "GIT_DIR=/elsewhere", "git_work_tree=/x", "LC_ALL=fr_FR", "HOME=/home/u"})
 	for _, banned := range []string{"GIT_DIR=/elsewhere", "git_work_tree=/x", "LC_ALL=fr_FR"} {
 		if slices.Contains(env, banned) {
@@ -113,6 +119,7 @@ func TestBaseEnv(t *testing.T) {
 }
 
 func TestWithPath(t *testing.T) {
+	t.Parallel()
 	sep := string(os.PathListSeparator)
 	cases := []struct {
 		name string
@@ -135,6 +142,7 @@ func TestWithPath(t *testing.T) {
 }
 
 func TestMissingLFSError(t *testing.T) {
+	t.Parallel()
 	for _, stderr := range []string{
 		"This repository is configured for Git LFS but 'git-lfs' was not found on your path. If you no longer wish to use Git LFS, remove this hook by deleting the 'post-checkout' file in the hooks directory (set by 'core.hookspath'; usually '.git/hooks').",
 		"git-lfs filter-process: git-lfs: command not found\nfatal: the remote end hung up unexpectedly",

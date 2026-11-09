@@ -9,6 +9,7 @@ import (
 )
 
 func TestIgnoreSources(t *testing.T) {
+	t.Parallel()
 	fx, repo := ignoreFixture(t)
 	ctx := context.Background()
 	fx.WriteFile("build/.gitignore", "*.bin\n")
@@ -53,6 +54,7 @@ func equalStrings(a, b []string) bool {
 }
 
 func TestReadWriteIgnoreFile(t *testing.T) {
+	t.Parallel()
 	fx, repo := ignoreFixture(t)
 	ctx := context.Background()
 	fx.WriteFile(".gitignore", "a\r\nb\r\n")
@@ -85,6 +87,7 @@ func TestReadWriteIgnoreFile(t *testing.T) {
 }
 
 func TestIgnoreStats(t *testing.T) {
+	t.Parallel()
 	fx, repo := ignoreFixture(t)
 	ctx := context.Background()
 	fx.WriteFile(".gitignore", "*.log\n!keep.log\n/build/cache/\n*.tmp\n")
@@ -114,6 +117,7 @@ func TestIgnoreStats(t *testing.T) {
 }
 
 func TestCheckIgnorePath(t *testing.T) {
+	t.Parallel()
 	fx, repo := ignoreFixture(t)
 	ctx := context.Background()
 	fx.WriteFile(".gitignore", "*.log\n!keep.log\n/build/cache/\n")

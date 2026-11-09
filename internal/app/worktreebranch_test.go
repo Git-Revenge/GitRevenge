@@ -50,6 +50,7 @@ func branchExists(fx *gittest.Repo, name string) bool {
 }
 
 func TestRefsSayWhichWorktreeHasABranch(t *testing.T) {
+	t.Parallel()
 	a, _, path, dir := worktreeFixture(t)
 	r := localRef(t, a, path, "feature")
 	if r == nil || r.Worktree == "" {
@@ -65,6 +66,7 @@ func TestRefsSayWhichWorktreeHasABranch(t *testing.T) {
 }
 
 func TestPlainDeleteOfABranchInAWorktreeNamesWhy(t *testing.T) {
+	t.Parallel()
 	a, _, path, _ := worktreeFixture(t)
 	err := a.BranchAction(path, "delete", []string{"feature", "true"})
 	if err == nil || !strings.Contains(err.Error(), "another worktree") {
@@ -73,6 +75,7 @@ func TestPlainDeleteOfABranchInAWorktreeNamesWhy(t *testing.T) {
 }
 
 func TestDeleteBranchAndWorktree(t *testing.T) {
+	t.Parallel()
 	a, fx, path, dir := worktreeFixture(t)
 	if _, err := a.DeleteBranchAndWorktree(path, "feature", false, true); err != nil {
 		t.Fatal(err)
@@ -86,6 +89,7 @@ func TestDeleteBranchAndWorktree(t *testing.T) {
 }
 
 func TestDeleteBranchAndWorktreeTouchesNothingIfCommitsWouldBeLost(t *testing.T) {
+	t.Parallel()
 	a, fx, path, dir := worktreeFixture(t)
 	_, err := a.DeleteBranchAndWorktree(path, "feature", false, false)
 	if err == nil || !strings.Contains(err.Error(), "aren't merged") {
@@ -100,6 +104,7 @@ func TestDeleteBranchAndWorktreeTouchesNothingIfCommitsWouldBeLost(t *testing.T)
 }
 
 func TestDeleteBranchAndWorktreeNeedsATickForUncommittedChanges(t *testing.T) {
+	t.Parallel()
 	a, fx, path, dir := worktreeFixture(t)
 	if err := os.WriteFile(filepath.Join(dir, "new.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
@@ -123,6 +128,7 @@ func TestDeleteBranchAndWorktreeNeedsATickForUncommittedChanges(t *testing.T) {
 }
 
 func TestDeleteBranchAndWorktreeWhenTheFolderIsAlreadyGone(t *testing.T) {
+	t.Parallel()
 	a, fx, path, dir := worktreeFixture(t)
 	if err := os.RemoveAll(dir); err != nil {
 		t.Fatal(err)
@@ -136,6 +142,7 @@ func TestDeleteBranchAndWorktreeWhenTheFolderIsAlreadyGone(t *testing.T) {
 }
 
 func TestDeleteBranchAndWorktreeWithTheWorktreeOpenInATab(t *testing.T) {
+	t.Parallel()
 	a, _, path, dir := worktreeFixture(t)
 	other, err := a.OpenRepo(dir)
 	if err != nil {
@@ -158,6 +165,7 @@ func TestDeleteBranchAndWorktreeWithTheWorktreeOpenInATab(t *testing.T) {
 }
 
 func TestARefusedRemovalLeavesTheWorktreesTabOpen(t *testing.T) {
+	t.Parallel()
 	a, _, path, dir := worktreeFixture(t)
 	other, err := a.OpenRepo(dir)
 	if err != nil {
@@ -177,6 +185,7 @@ func TestARefusedRemovalLeavesTheWorktreesTabOpen(t *testing.T) {
 // A process with its current folder in the worktree stops Windows deleting the folder, as a
 // terminal or editor does. Git drops the worktree anyway, so the branch can still go.
 func TestDeleteBranchAndWorktreeWithSomethingElseHoldingTheFolder(t *testing.T) {
+	t.Parallel()
 	if runtime.GOOS != "windows" {
 		t.Skip("only Windows stops a folder in use being deleted")
 	}
@@ -203,6 +212,7 @@ func TestDeleteBranchAndWorktreeWithSomethingElseHoldingTheFolder(t *testing.T) 
 }
 
 func TestDeleteBranchAndWorktreeRefusesTheMainWorktree(t *testing.T) {
+	t.Parallel()
 	a, fx, _, dir := worktreeFixture(t)
 	tab, err := a.OpenRepo(dir)
 	if err != nil {
@@ -218,6 +228,7 @@ func TestDeleteBranchAndWorktreeRefusesTheMainWorktree(t *testing.T) {
 }
 
 func TestDeleteBranchAndWorktreeRefusesTheOneOpenHere(t *testing.T) {
+	t.Parallel()
 	a, _, _, dir := worktreeFixture(t)
 	tab, err := a.OpenRepo(dir)
 	if err != nil {

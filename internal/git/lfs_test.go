@@ -8,6 +8,7 @@ import (
 )
 
 func TestLFSStatusTrackUntrack(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.SetupLFS("*.bin") // skips when git-lfs is missing
 	fx.WriteFile("big.bin", "\x00binary")
@@ -48,6 +49,7 @@ func TestLFSStatusTrackUntrack(t *testing.T) {
 }
 
 func TestLFSEmptyRepo(t *testing.T) {
+	t.Parallel()
 	fx := gittest.New(t)
 	fx.SetupLFS("*.bin")
 	st, err := OpenRepo(newTestRunner(t), fx.Dir).LFS(context.Background())
@@ -58,6 +60,7 @@ func TestLFSEmptyRepo(t *testing.T) {
 
 // Locks need an LFS server, so the server's JSON is tested directly.
 func TestParseLocks(t *testing.T) {
+	t.Parallel()
 	out := []byte(`{"ours":[{"id":"1","path":"art/a.psd","owner":{"name":"me"},"locked_at":"2026-10-28T10:00:00Z"}],
 		"theirs":[{"id":"2","path":"art/b.psd","owner":{"name":"sam"},"locked_at":"2026-10-28T11:00:00Z"}]}`)
 	locks, err := parseLocks(out)
@@ -73,6 +76,7 @@ func TestParseLocks(t *testing.T) {
 }
 
 func TestParseSubmoduleLine(t *testing.T) {
+	t.Parallel()
 	sha := "0123456789abcdef0123456789abcdef01234567"
 	cases := map[string]Submodule{
 		" " + sha + " libs/a (heads/main)":           {Path: "libs/a", Commit: sha, State: "ok", Describe: "heads/main"},
@@ -92,6 +96,7 @@ func TestParseSubmoduleLine(t *testing.T) {
 }
 
 func TestSubmodulesStatusAndUpdate(t *testing.T) {
+	t.Parallel()
 	sub := gittest.New(t)
 	subHead := sub.Linear(1)[0]
 	fx := gittest.New(t)

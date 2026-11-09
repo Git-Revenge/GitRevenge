@@ -134,6 +134,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+      # Tests run in parallel, and each repository they open gets a file watcher. Ubuntu's
+      # default of 128 inotify instances per user runs out, and a watcher that can't start
+      # misses the changes a test waits for.
+      - name: Raise the inotify limits
+        if: runner.os == 'Linux'
+        run: |
+          sudo sysctl -w fs.inotify.max_user_instances=1024
+          sudo sysctl -w fs.inotify.max_user_watches=524288
       # main.go embeds frontend/dist, so the frontend must be built before any Go tooling.
       - name: Build frontend
         working-directory: frontend

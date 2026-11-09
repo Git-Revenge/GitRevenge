@@ -10,6 +10,7 @@ import (
 )
 
 func TestNotesSync(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	alice, remote := gittest.WithRemote(t, 2)
 	bob := gittest.Clone(t, remote)
@@ -70,6 +71,7 @@ func TestNotesSync(t *testing.T) {
 }
 
 func TestNotesSyncWithoutNotes(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	local, _ := gittest.WithRemote(t, 1)
 	r := OpenRepo(newTestRunner(t), local.Dir)
