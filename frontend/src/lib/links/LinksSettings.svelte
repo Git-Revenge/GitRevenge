@@ -1,15 +1,23 @@
 <script lang="ts">
-  // Settings › Links: the smart links that apply to the open repository, its own and the
-  // global ones. Changes are written to git config straight away, not on the dialog's Save.
+  // Settings › Links: the smart links that apply to a repository, its own and the global
+  // ones. Changes are written to git config straight away, not on the dialog's Save. The
+  // repository is the active tab's, or, when Settings opens from another tab, one picked
+  // from the repositories open, so a link can always go in a repository's own config.
   import { ChooseFile, ImportLinkRules, LinkRules, RemoveLinkRule, ReorderLinkRules, SaveFile, SaveLinkRule, SetWebLinks } from '../../../wailsjs/go/app/App.js'
   import { links } from '../../../wailsjs/go/models'
   import { errorText } from '../errors'
+  import { session } from '../session.svelte'
   import { toasts } from '../toasts.svelte'
   import Icon from '../ui/Icon.svelte'
   import LinkEditor from './LinkEditor.svelte'
   import { linkStore } from './links.svelte'
 
-  let { repo, repoName, onShowConfig }: { repo: string; repoName: string; onShowConfig: () => void } = $props()
+  let { active, onShowConfig }: { active: string; onShowConfig: (repo: string) => void } = $props()
+
+  // svelte-ignore state_referenced_locally
+  let picked = $state(active || session.tabs[0]?.path || '')
+  let repo = $derived(session.tabs.some((t) => t.path === picked) ? picked : (session.tabs[0]?.path ?? ''))
+  let repoName = $derived(session.tabs.find((t) => t.path === repo)?.name ?? '')
 
   let cfg = $state<links.Config | null>(null)
   let error = $state('')
@@ -98,6 +106,14 @@
       ? `${repoName}'s .git/config, or`
       : ''} your global config.
   </p>
+  {#if session.tabs.length > 1 || (!active && repo)}
+    <label class="form-field pick">
+      <span>Repository</span>
+      <select bind:value={picked}>
+        {#each session.tabs as t (t.path)}<option value={t.path}>{t.name}</option>{/each}
+      </select>
+    </label>
+  {/if}
   {#if error}<p class="form-error" role="alert">{error}</p>{/if}
   {#if cfg}
     <div class="rule">
@@ -116,7 +132,7 @@
           {#if r.problem}<span class="warn">{r.problem}</span>{/if}
           {#if r.shadowed}<span class="d">Replaced here by {repoName}'s own {r.name}.</span>{/if}
         </span>
-        <span class="pill" class:repo={r.scope === 'local'}>{r.scope === 'local' ? 'this repo' : 'global config'}</span>
+        <span class="pill" class:repo={r.scope === 'local'}>{r.scope === 'local' ? repoName || 'this repo' : 'global config'}</span>
         <span class="acts">
           <button type="button" class="btn sm quiet icon" aria-label="Move {r.name} up" title="Move up" disabled={at <= 0} onclick={() => move(r, -1)}><span class="up"><Icon name="chevron" size={14} /></span></button>
           <button type="button" class="btn sm quiet icon" aria-label="Move {r.name} down" title="Move down" disabled={at < 0 || at === siblings.length - 1} onclick={() => move(r, 1)}><Icon name="chevron" size={14} /></button>
@@ -135,13 +151,13 @@
     <div class="row">
       <button type="button" class="btn" onclick={() => (editing = null)}><Icon name="plus" size={14} />Add a link…</button>
       <span class="spacer"></span>
-      {#if repo}<button type="button" class="btn quiet" onclick={onShowConfig} title="Show these links in the Git Config tab">Git Config</button>{/if}
+      {#if repo}<button type="button" class="btn quiet" onclick={() => onShowConfig(repo)} title="Show these links in the Git Config tab">Git Config</button>{/if}
       <button type="button" class="btn quiet" onclick={exportRules} disabled={!cfg.rules.length}>Export</button>
       <button type="button" class="btn quiet" onclick={importRules}>Import…</button>
       {#if repo}
         <select bind:value={importScope} aria-label="Import into">
           <option value="global">to global</option>
-          <option value="local">to this repo</option>
+          <option value="local">to {repoName}</option>
         </select>
       {/if}
     </div>
@@ -165,6 +181,10 @@
 
   legend {
     margin-bottom: 6px;
+  }
+
+  .pick {
+    margin-bottom: 8px;
   }
 
   .hint {
