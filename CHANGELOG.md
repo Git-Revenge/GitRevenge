@@ -19,6 +19,7 @@ Git tools: everyday git chores without leaving the app.
 
 - Insights › Shipped groups by the references your smart links find, when any link counts for Shipped, and shows them as links. The rules in use are listed in every export. Without such a link, `PROJ-123` and `#123` still group as before. (#525, #528)
 - A bare `#123` in a trailer no longer links to the remote's issues on its own. Add a **Numbered (#123)** link in Settings to say where numbers go. (#525, #528)
+- Jumping to a commit (from a branch, a parent link or a search match) glides there when it's within three screens and cuts when it's further, and the commit lands under a wash that fades. Commits that arrive where you're already looking fade up, a few at a time. Reduced motion keeps everything instant. (#558)
 - Hovering a commit in the graph (or selecting one from the keyboard) shows three small actions at the row's right edge: copy its SHA, check it out, and a menu with everything right-click offers. (#555)
 - The selected commit is marked by a bar in its lane's colour at the row's left edge, over a lighter wash, and the selection, hover and search dimming ease into place instead of snapping. Reduced motion keeps the instant draw. (#553)
 

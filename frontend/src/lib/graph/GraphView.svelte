@@ -8,13 +8,13 @@
   import { theme as colorTheme } from '../theme.svelte'
   import { provideCommands } from '../commands.svelte'
   import Icon from '../ui/Icon.svelte'
-  import { fadeUp, labelsFold, labelsUnfold, menuOut } from '../ui/motion'
+  import { DUR, easeInk, fadeUp, labelsFold, labelsUnfold, menuOut, reducedMotion, stagger } from '../ui/motion'
   import KindFilter from './KindFilter.svelte'
   import RefChip from './RefChip.svelte'
   import { drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneVar, laneWindow, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
   import { scrollMap, topAfterScroll, toScroll, type ScrollMap } from './scrollMap'
-  import { Washes } from './tween'
+  import { Washes, landWash } from './tween'
 
   let {
     path,
@@ -113,12 +113,15 @@
   }
 
   function scrollTo(t: number) {
+    glide = null
     top = Math.max(0, Math.min(map.maxTop, t))
     placeScroller(map)
     schedule()
   }
 
   function onScroll() {
+    // A scroll that isn't ours is the person's: it ends any glide.
+    if (setScroll === null) glide = null
     top = topAfterScroll(scroller.scrollTop, setScroll, top, map)
     setScroll = null
     schedule()
@@ -234,6 +237,19 @@
   }
   /** Each row's selection, hover and search-dimming strength, eased between frames. */
   const washes = new Washes()
+  /** A glide to a commit someone asked for, so the eye can follow it; null between glides. */
+  let glide: { from: number; to: number; start: number } | null = null
+  /** The row just jumped to, and when: it lands under a wash that then fades. */
+  let landing: { index: number; start: number } | null = null
+  /** When each commit was first painted, and last painted, so rows that arrive where someone is
+   * already looking fade up. Keyed by id: a reload paints the same commits again without the
+   * fade. Entries not painted for a minute are forgotten. */
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const painted = new Map<string, { start: number; last: number }>()
+  let paintedPruned = 0
+  const PAINTED_KEEP_MS = 60_000
+  /** How far a row that is arriving rises, in pixels, as it fades in. */
+  const ARRIVE_RISE = 4
   /** Drag state: the row pressed and where; the row under the pointer while dragging. */
   let drag: { from: number; x: number; y: number; active: boolean } | null = null
   let dropTarget = -1
@@ -314,6 +330,15 @@
   function draw() {
     frame = 0
     if (!canvas || !scroller) return
+    const frameAt = performance.now()
+    if (glide) {
+      // On the way to a commit: ease top toward it, and keep painting until it's there.
+      const p = Math.min(1, (frameAt - glide.start) / DUR.enter)
+      top = glide.from + (glide.to - glide.from) * easeInk(p)
+      placeScroller(map)
+      if (p >= 1) glide = null
+      else schedule()
+    }
     const dpr = window.devicePixelRatio || 1
     const w = scroller.clientWidth
     const h = scroller.clientHeight
@@ -360,20 +385,57 @@
     }
     const th = theme()
     const now = Date.now() / 1000
-    const frameAt = performance.now()
     labelSpans.clear()
+    const still = reducedMotion()
+    let arrivals = 0
     for (let i = first; i < last; i++) {
       const row = cache.get(i)
       const y = i * rowH - top
       if (!row) continue
       wantSignature(row.id)
+      // A commit painted for the first time fades up over --dur-move, the first six of a frame
+      // 40ms apart, the way every list in the app arrives.
+      let seen = painted.get(row.id)
+      if (!seen) {
+        seen = { start: frameAt + stagger(arrivals++), last: frameAt }
+        painted.set(row.id, seen)
+      }
+      seen.last = frameAt
+      const arrive = still ? 1 : Math.min(1, Math.max(0, (frameAt - seen.start) / DUR.move))
+      const arriving = arrive < 1
+      if (arriving) {
+        schedule()
+        const e = easeInk(arrive)
+        ctx.save()
+        ctx.globalAlpha = e
+        ctx.translate(0, (1 - e) * ARRIVE_RISE)
+      }
       // The drop target is highlighted like a selection while dragging. Each strength eases
       // toward where it should be, so a selection arrives rather than appears.
       const sel = washes.value(`s${i}`, i === selected || i === dropTarget ? 1 : 0, frameAt)
       const hov = washes.value(`h${i}`, i === hovered ? 1 : 0, frameAt)
       const dim = washes.value(`d${i}`, matchSet && !matchSet.has(i) ? 1 : 0, frameAt)
       const span = drawRow(ctx, row, cache.refsFor(row.id), y, lay, th, sel, hov, dim, now, sealOf(sigs.get(row.id)), { prev: cache.get(i - 1), prev2: cache.get(i - 2), next: cache.get(i + 1) })
+      if (arriving) ctx.restore()
       if (span) labelSpans.set(i, span)
+    }
+    if (landing) {
+      // The row just jumped to: a second wash over its selection, held then fading, so the eye
+      // finds it and is then left alone.
+      const t = (frameAt - landing.start) / (DUR.enter * 2)
+      if (t >= 1) landing = null
+      else {
+        ctx.save()
+        ctx.globalAlpha = landWash(t)
+        ctx.fillStyle = th.selected
+        ctx.fillRect(0, landing.index * rowH - top, w, rowH)
+        ctx.restore()
+        schedule()
+      }
+    }
+    if (frameAt - paintedPruned > PAINTED_KEEP_MS) {
+      paintedPruned = frameAt
+      for (const [id, p] of painted) if (frameAt - p.last > PAINTED_KEEP_MS) painted.delete(id)
     }
     washes.prune((key) => {
       const i = Number(key.slice(1))
@@ -414,8 +476,18 @@
   /** Scrolls to and selects row i (e.g. when a branch is picked in the sidebar). */
   export function reveal(i: number) {
     if (i < 0) return
-    // Center it rather than pinning it to an edge.
-    scrollTo(i * rowH - viewH / 2)
+    // Center it rather than pinning it to an edge. Within three screens the view glides there,
+    // so the eye can follow; further, it cuts. Either way the row lands under a wash that fades.
+    const target = Math.max(0, Math.min(map.maxTop, i * rowH - viewH / 2))
+    const at = performance.now()
+    const still = reducedMotion()
+    if (!still && Math.abs(target - top) > 1 && Math.abs(target - top) <= viewH * 3) {
+      glide = { from: top, to: target, start: at }
+      schedule()
+    } else {
+      scrollTo(target)
+    }
+    landing = still ? null : { index: i, start: at }
     select(i)
     scroller.focus()
   }
@@ -470,11 +542,13 @@
   function select(i: number, auto = false) {
     if (!auto) autoSelect = 'done'
     selected = Math.max(0, Math.min(span - 1, i))
-    // Keep the selection in view.
+    // Keep the selection in view, unless a glide is already on its way there.
     const y = selected * rowH
     // The first selection can land before the first draw has measured the view.
     const height = viewH || scroller.clientHeight
-    if (y < top) scrollTo(y)
+    if (glide) {
+      // Nothing: the glide centres it.
+    } else if (y < top) scrollTo(y)
     else if (y + rowH > top + height) scrollTo(y + rowH - height)
     selectedId = cache.get(selected)?.id ?? ''
     onSelect?.(cache.get(selected), auto)
