@@ -36,7 +36,7 @@ Hover over a group or one of its repositories and drag its grip to change the or
 ![A group's dashboard](../img/group-dashboard-light.webp#gh-light-mode-only)
 ![A group's dashboard](../img/group-dashboard-dark.webp#gh-dark-mode-only)
 
-A group's **Dashboard** shows each repository's branch, how many uncommitted changes it has, and when it was last fetched. From there you can fetch or pull them all at once. Pulls here are fast-forward only: a repository whose branch has diverged is reported, never merged. **Open all as tabs** opens every repository in the group. The walkthrough [Look after several repositories](../walkthroughs/several-repositories.md) goes through it step by step.
+A group's **Dashboard** shows each repository's branch, how many uncommitted changes it has, and when it was last fetched. From there you can fetch or pull them all at once. Pulls here are fast-forward only: a repository whose branch has diverged is reported, never merged. Click a repository's row to open it as a tab; **Open all as tabs** opens every repository in the group. The walkthrough [Look after several repositories](../walkthroughs/several-repositories.md) goes through it step by step.
 
 ## Worktrees
 
