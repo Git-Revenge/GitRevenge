@@ -172,6 +172,10 @@ export function Preferences():Promise<app.Preferences>;
 
 export function PreviewIgnore(arg1:string,arg2:git.IgnoreTarget,arg3:string):Promise<git.IgnorePreview>;
 
+export function PreviewMerge(arg1:string,arg2:string):Promise<app.MergePreview>;
+
+export function PreviewRebase(arg1:string,arg2:string):Promise<app.RebasePreview>;
+
 export function Pull(arg1:string,arg2:string):Promise<void>;
 
 export function PullBranch(arg1:string,arg2:string):Promise<void>;
