@@ -9,6 +9,8 @@ import {graph} from '../models';
 
 export function AddGitConfigValue(arg1:string,arg2:string,arg3:string):Promise<app.ConfigDoc>;
 
+export function AddIgnore(arg1:string,arg2:git.IgnoreTarget,arg3:string,arg4:Array<string>):Promise<app.IgnoreAdded>;
+
 export function AddWorktree(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function AnswerPrompt(arg1:string,arg2:string,arg3:boolean):Promise<void>;
@@ -105,6 +107,10 @@ export function Groups():Promise<Array<settings.Group>>;
 
 export function HideBranch(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
+export function IgnoreFileNames(arg1:string):Promise<app.IgnoreFiles>;
+
+export function IgnoredFiles(arg1:string):Promise<app.Ignored>;
+
 export function Init(arg1:string,arg2:string):Promise<string>;
 
 export function InsightsBranches(arg1:string,arg2:app.InsightsInputs):Promise<app.AttentionResult>;
@@ -147,6 +153,8 @@ export function OpenRepo(arg1:string):Promise<app.RepoTab>;
 
 export function Preferences():Promise<app.Preferences>;
 
+export function PreviewIgnore(arg1:string,arg2:git.IgnoreTarget,arg3:string):Promise<git.IgnorePreview>;
+
 export function Pull(arg1:string,arg2:string):Promise<void>;
 
 export function PullBranch(arg1:string,arg2:string):Promise<void>;
@@ -181,6 +189,8 @@ export function Remotes(arg1:string):Promise<Array<git.Remote>>;
 
 export function RemoveGitConfigSection(arg1:string,arg2:string):Promise<app.ConfigDoc>;
 
+export function RemoveIgnoreRule(arg1:string,arg2:git.IgnoreLine):Promise<void>;
+
 export function RemoveRecentRepo(arg1:string):Promise<void>;
 
 export function RemoveWorktree(arg1:string,arg2:string,arg3:boolean):Promise<string>;
@@ -202,6 +212,8 @@ export function ResolveConflict(arg1:string,arg2:string,arg3:string):Promise<voi
 export function Restack(arg1:string,arg2:string):Promise<void>;
 
 export function RestoreGitConfig(arg1:string,arg2:string):Promise<app.ConfigDoc>;
+
+export function RestoreIgnoreRule(arg1:string,arg2:git.IgnoreLine):Promise<void>;
 
 export function RestoreSession():Promise<app.SessionState>;
 
@@ -265,6 +277,8 @@ export function StashAction(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function StashSave(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
+export function StopIgnoring(arg1:string,arg2:string,arg3:git.IgnoreLine,arg4:boolean):Promise<git.IgnoreLine>;
+
 export function Submodules(arg1:string):Promise<Array<git.Submodule>>;
 
 export function TakeConflictSide(arg1:string,arg2:string,arg3:string):Promise<void>;
@@ -274,6 +288,8 @@ export function Theme():Promise<string>;
 export function TrailerHints(arg1:string):Promise<git.TrailerHints>;
 
 export function Undo(arg1:string):Promise<void>;
+
+export function UndoIgnore(arg1:string,arg2:app.IgnoreAdded):Promise<void>;
 
 export function UndoState(arg1:string):Promise<app.UndoInfo>;
 

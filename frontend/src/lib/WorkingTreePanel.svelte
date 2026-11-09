@@ -10,12 +10,20 @@
 
 <script lang="ts">
   import {
+    AddIgnore,
     PushedUndo,
     CommitChanges,
     DiscardFiles,
+    IgnoredFiles,
+    IgnoreFileNames,
     LastCommitMessage,
+    PreviewIgnore,
+    RemoveIgnoreRule,
+    RestoreIgnoreRule,
     StashSave,
     StageFiles,
+    StopIgnoring,
+    UndoIgnore,
     UnstageFiles,
     TakeConflictSide,
     TrailerHints,
@@ -23,17 +31,21 @@
     UndoState,
     WorkingTree,
   } from '../../wailsjs/go/app/App.js'
+  import { ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
   import type { app, git } from '../../wailsjs/go/models'
   import type { DiffTarget } from './diff/DiffView.svelte'
   import { provideCommands } from './commands.svelte'
   import { adjacentFile, FILTER_FROM, fileName, fileRows, moveThroughRows, readTreeChoice } from './fileList'
   import FileListTools from './FileListTools.svelte'
+  import IgnoreDialog, { type IgnoreSubject } from './IgnoreDialog.svelte'
+  import { anchored, escapeName, extension, plural as count, sourceName, type IgnoreScope, type IgnoreTarget } from './ignore'
   import PushedUndoDialog from './PushedUndoDialog.svelte'
   import type { MenuItem } from './ContextMenu.svelte'
   import { gitConfig } from './gitconfig/config.svelte'
   import { tick } from 'svelte'
   import { appendTrailer, asPerson, trailerKeyChoices } from './trailers'
   import { session } from './session.svelte'
+  import { toasts } from './toasts.svelte'
   import Icon, { type IconName } from './ui/Icon.svelte'
   import InkButton from './ui/InkButton.svelte'
 
@@ -130,6 +142,7 @@
   })
 
   async function refresh() {
+    if (showIgnored) void loadIgnored()
     const res = await session.run(() => WorkingTree(path))
     const waiting = commitWaiting
     commitWaiting = false
@@ -252,6 +265,182 @@
     confirmDiscard = null
     if (current && paths.includes(current.file)) openFile(null)
     await act(() => DiscardFiles(path, paths))
+  }
+
+  // Ignoring files. Quick picks write a rule straight away; anything that needs a choice,
+  // such as tracked files the rule would match, goes through the Ignore dialog.
+  let ignoring = $state<{ subject: IgnoreSubject; initial?: { pattern: string; scope: IgnoreScope } } | null>(null)
+  let globalFile = ''
+  // svelte-ignore state_referenced_locally
+  void IgnoreFileNames(path)
+    .then((n) => (globalFile = n.global))
+    .catch(() => {})
+  const where = (source: string) => sourceName(source, globalFile)
+
+  function announceIgnore(added: app.IgnoreAdded) {
+    const bits = [`${added.rule.pattern} added to ${where(added.rule.source)}.`]
+    if (added.hidden) bits.push(`${count(added.hidden, 'file')} hidden.`)
+    if (added.untracked.length) bits.push(`${count(added.untracked.length, 'file')} no longer tracked.`)
+    toasts.show(bits.join(' '), {
+      label: 'Undo',
+      run: async () => {
+        await session.run(() => UndoIgnore(path, added))
+        await refresh()
+      },
+    })
+    if (current && added.untracked.includes(current.file)) openFile(null)
+  }
+
+  async function quickIgnore(subject: IgnoreSubject, scope: IgnoreScope, pattern: string, untrack: string[]) {
+    const target: IgnoreTarget = { scope }
+    busy = true
+    const pv = await session.run(() => PreviewIgnore(path, target, pattern))
+    busy = false
+    if (!pv) return
+    // Other tracked files match: whether to stop tracking them is the person's call.
+    if (pv.tracked.some((p) => !untrack.includes(p))) {
+      ignoring = { subject, initial: { pattern, scope } }
+      return
+    }
+    busy = true
+    const added = await session.run(() => AddIgnore(path, target, pattern, untrack))
+    busy = false
+    if (added) announceIgnore(added)
+    await refresh()
+  }
+
+  function ignoreItems(f: git.FileStatus): MenuItem[] {
+    const name = fileName(f.path)
+    const subject: IgnoreSubject = { kind: 'file', path: f.path }
+    const more: MenuItem = { label: 'Ignore…', separator: true, run: () => void (ignoring = { subject }) }
+    if (!f.untracked) return [{ label: `Ignore ${name} and stop tracking it`, run: () => quickIgnore(subject, 'root', anchored(f.path), [f.path]) }, more]
+    const ext = extension(f.path)
+    return [
+      { label: `Ignore ${name}`, run: () => quickIgnore(subject, 'root', anchored(f.path), []) },
+      ...(ext ? [{ label: `Ignore every .${ext} file`, run: () => quickIgnore(subject, 'root', `*.${escapeName(ext)}`, []) }] : []),
+      { label: `Ignore ${name} only on this machine`, separator: true, run: () => quickIgnore(subject, 'exclude', anchored(f.path), []) },
+      more,
+    ]
+  }
+
+  async function copyPath(p: string) {
+    if (!(await ClipboardSetText(p).catch(() => false))) toasts.show("Couldn't copy to the clipboard.")
+  }
+
+  function fileMenu(e: MouseEvent, f: git.FileStatus) {
+    if (!onMenu) return
+    e.preventDefault()
+    const name = fileName(f.path)
+    const items: MenuItem[] = [
+      ...(isUnstaged(f) ? [{ label: `Stage ${name}`, icon: 'plus' as const, run: () => stage([f.path]) }] : []),
+      ...(isStaged(f) ? [{ label: `Unstage ${name}`, icon: 'minus' as const, run: () => unstage([f.path]) }] : []),
+      { label: 'Copy path', icon: 'copy', run: () => copyPath(f.path) },
+      { label: 'Ignore', icon: 'eye', separator: true, items: ignoreItems(f) },
+      ...(isUnstaged(f) ? [{ label: f.untracked ? `Delete ${name}…` : `Discard changes to ${name}…`, icon: 'undo' as const, separator: true, run: () => void (confirmDiscard = [f.path]) }] : []),
+    ]
+    onMenu(items, e.clientX, e.clientY)
+  }
+
+  function folderMenu(e: MouseEvent, dir: string) {
+    if (!onMenu || !dir) return
+    e.preventDefault()
+    const name = `${fileName(dir)}/`
+    const subject: IgnoreSubject = { kind: 'folder', path: dir }
+    const pattern = `${anchored(dir)}/`
+    onMenu(
+      [
+        { label: `Ignore the folder ${name}`, icon: 'eye', run: () => quickIgnore(subject, 'root', pattern, []) },
+        { label: `Ignore ${name} only on this machine`, run: () => quickIgnore(subject, 'exclude', pattern, []) },
+        { label: 'Ignore…', separator: true, run: () => void (ignoring = { subject }) },
+        { label: 'Copy path', icon: 'copy', separator: true, run: () => copyPath(dir) },
+      ],
+      e.clientX,
+      e.clientY,
+    )
+  }
+
+  // Ignored files, listed on request. The choice is remembered per repository.
+  // svelte-ignore state_referenced_locally
+  const SHOW_IGNORED_KEY = `gitrevenge.showIgnored:${path}`
+  let showIgnored = $state(readShowIgnored())
+  let ignoredList = $state<app.Ignored | null>(null)
+
+  function readShowIgnored(): boolean {
+    try {
+      return localStorage.getItem(SHOW_IGNORED_KEY) === 'on'
+    } catch {
+      return false
+    }
+  }
+
+  function toggleIgnored() {
+    showIgnored = !showIgnored
+    try {
+      if (showIgnored) localStorage.setItem(SHOW_IGNORED_KEY, 'on')
+      else localStorage.removeItem(SHOW_IGNORED_KEY)
+    } catch {
+      // Only a convenience; the list still opens.
+    }
+    if (showIgnored) void loadIgnored()
+  }
+
+  let ignoredAsked = 0
+  async function loadIgnored() {
+    const n = ++ignoredAsked
+    const res = await IgnoredFiles(path).catch(() => null)
+    if (n === ignoredAsked) ignoredList = res
+  }
+
+  /** Ignored paths as list rows: a whole folder keeps its trailing slash in its name. */
+  let ignoredRows = $derived(
+    fileRows(
+      (ignoredList?.files ?? []).map((item) => ({ path: item.path.replace(/\/$/, ''), item })),
+      { query: fileQuery, tree: fileTree, closed: closedFolders },
+    ),
+  )
+  const sameRule = (a: git.IgnoreLine, b: git.IgnoreLine) => a.source === b.source && a.line === b.line
+
+  async function stopIgnoring(item: git.IgnoredFile, except: boolean) {
+    busy = true
+    const rule = await session.run(() => StopIgnoring(path, item.path, item.rule, except))
+    busy = false
+    if (!rule) return
+    const src = where(rule.source)
+    toasts.show(except ? `${rule.pattern} added to ${src}.` : `${rule.pattern} removed from ${src}.`, {
+      label: 'Undo',
+      run: async () => {
+        await session.run(() => (except ? RemoveIgnoreRule(path, rule) : RestoreIgnoreRule(path, rule)))
+        await refresh()
+      },
+    })
+    await refresh()
+  }
+
+  function ignoredMenu(e: MouseEvent, item: git.IgnoredFile) {
+    if (!onMenu) return
+    e.preventDefault()
+    const name = item.path.endsWith('/') ? `${fileName(item.path.slice(0, -1))}/` : fileName(item.path)
+    const others = (ignoredList?.files ?? []).filter((o) => o !== item && sameRule(o.rule, item.rule)).length
+    const global = where(item.rule.source) === 'your global excludes file'
+    const back = others ? `, which also brings back ${count(others, 'more path')}${ignoredList?.truncated ? ' or more' : ''}` : ''
+    onMenu(
+      [
+        {
+          label: 'Stop ignoring',
+          icon: 'eye',
+          items: [
+            { label: `Ignored by ${item.rule.pattern}, line ${item.rule.line} of ${where(item.rule.source)}`, icon: 'info', disabled: true },
+            ...(item.canExcept
+              ? [{ label: `Make an exception for ${name}`, separator: true, run: () => stopIgnoring(item, true) }]
+              : [{ label: `No exception can reach inside an ignored folder`, separator: true, disabled: true }]),
+            { label: `Remove the rule ${item.rule.pattern}${global ? ' from every repository' : ''}${back}`, danger: global, run: () => stopIgnoring(item, false) },
+          ],
+        },
+        { label: 'Copy path', icon: 'copy', separator: true, run: () => copyPath(item.path) },
+      ],
+      e.clientX,
+      e.clientY,
+    )
   }
 
   async function toggleAmend() {
@@ -387,7 +576,7 @@
   {@const tick = tickOf(f)}
   <li class:active={isOpen(f)} class:going={tick !== 'none'} class:landed={landed?.has(f.path)} style:--depth={depth}>
     <input type="checkbox" class="tick" aria-label="Include {f.path} in the commit" checked={tick === 'all'} indeterminate={tick === 'part'} disabled={busy} onchange={(e) => tickChanged(e, f)} />
-    <button class="name" data-file-row onkeydown={rowKey} onclick={() => show(f)} title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}>
+    <button class="name" data-file-row onkeydown={rowKey} onclick={() => show(f)} oncontextmenu={(e) => fileMenu(e, f)} title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}>
       <span class="code s-{st.kind}" title={st.label}><Icon name={st.icon} size={14} /><span class="visually-hidden">{st.label}</span></span>
       <span class="path">{fileName(f.path)}</span>
       {#if f.origPath}<span class="from">from {f.origPath}</span>{/if}
@@ -420,6 +609,7 @@
       <h2>{wt && files.length ? `${plural(files.length, 'file')} changed` : 'Uncommitted changes'}</h2>
       {#if wt && files.length}<p class="next">{nextStep}</p>{/if}
     </div>
+    <button class="btn quiet" aria-pressed={showIgnored} class:pressed={showIgnored} onclick={toggleIgnored} title={showIgnored ? 'Hide ignored files' : 'Show ignored files'}><Icon name="eye" />Ignored</button>
     {#if !stashing}
       <button class="btn quiet" disabled={busy || files.length === 0} onclick={() => (stashing = true)} title="Set these changes aside in a stash"
         ><Icon name="stash" />Stash…</button
@@ -509,9 +699,10 @@
             {#if r.type === 'folder'}
               <li class="folder-row" style:--depth={r.depth}>
                 {#if r.collapsible}
-                  <button class="folder" aria-expanded={r.open} title={r.path} onclick={() => toggleFolder(r.path)}><Icon name="chevron" size={12} />{r.name}/</button>
+                  <button class="folder" aria-expanded={r.open} title={r.path} onclick={() => toggleFolder(r.path)} oncontextmenu={(e) => folderMenu(e, r.path)}><Icon name="chevron" size={12} />{r.name}/</button>
                 {:else}
-                  <div class="folder" title={r.path}>{r.name}</div>
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                  <div class="folder" title={r.path} oncontextmenu={(e) => folderMenu(e, r.path)}>{r.name}</div>
                 {/if}
               </li>
             {:else}
@@ -520,6 +711,43 @@
           {/each}
         </ul>
         {#if fileQuery.trim() && !rows.length}<p class="clean">No files match that.</p>{/if}
+      </section>
+    {/if}
+    {#if showIgnored}
+      <section class="ignored" aria-label="Ignored files">
+        <header>
+          <span class="meta">Ignored{ignoredList ? ` · ${ignoredList.files.length.toLocaleString()}${ignoredList.truncated ? '+' : ''}` : ''}</span>
+          <span class="note">not part of any commit</span>
+        </header>
+        {#if !ignoredList}
+          <p class="clean">Reading…</p>
+        {:else if !ignoredList.files.length}
+          <p class="clean">Nothing here is ignored.</p>
+        {:else}
+          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+          <ul onkeydown={(e) => moveThroughRows(e, e.currentTarget)}>
+            {#each ignoredRows as r (r.key)}
+              {#if r.type === 'folder'}
+                <li class="folder-row" style:--depth={r.depth}>
+                  {#if r.collapsible}
+                    <button class="folder" aria-expanded={r.open} title={r.path} onclick={() => toggleFolder(r.path)}><Icon name="chevron" size={12} />{r.name}/</button>
+                  {:else}
+                    <div class="folder" title={r.path}>{r.name}</div>
+                  {/if}
+                </li>
+              {:else}
+                {@const item = r.file.item}
+                <li style:--depth={r.depth}>
+                  <button class="name ig" data-file-row title="{item.path}: ignored by {item.rule.pattern} ({where(item.rule.source)} line {item.rule.line})" onclick={(e) => ignoredMenu(e, item)} oncontextmenu={(e) => ignoredMenu(e, item)}>
+                    <span class="path">{fileName(r.file.path)}{item.path.endsWith('/') ? '/' : ''}</span>
+                    <code class="why">{item.rule.pattern}</code>
+                  </button>
+                </li>
+              {/if}
+            {/each}
+          </ul>
+          {#if ignoredList.truncated}<p class="clean">Showing the first {ignoredList.files.length.toLocaleString()}.</p>{/if}
+        {/if}
       </section>
     {/if}
   </div>
@@ -585,7 +813,50 @@
   <PushedUndoDialog {path} verb="Undo" label={p.done.undo} shared={p.shared} onConfirm={() => takeBack(p.done)} onClose={() => (pushedUndo = null)} />
 {/if}
 
+{#if ignoring}
+  <IgnoreDialog
+    {path}
+    subject={ignoring.subject}
+    initial={ignoring.initial}
+    onClose={() => (ignoring = null)}
+    onDone={(added) => {
+      announceIgnore(added)
+      void refresh()
+    }}
+  />
+{/if}
+
 <style>
+  .btn.pressed {
+    background: var(--selected);
+  }
+
+  .ignored header {
+    gap: 8px;
+  }
+
+  .ignored .note {
+    font-size: 12px;
+    color: var(--ink-mute);
+  }
+
+  .name.ig {
+    color: var(--ink-mute);
+    font-style: italic;
+  }
+
+  .name.ig .why {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-style: normal;
+    color: var(--ink-faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 45%;
+  }
+
   .panel {
     display: flex;
     flex-direction: column;
