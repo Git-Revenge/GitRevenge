@@ -6,6 +6,10 @@ export function AddGitConfigValue(arg1, arg2, arg3) {
   return window['go']['app']['App']['AddGitConfigValue'](arg1, arg2, arg3);
 }
 
+export function AddIgnore(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['AddIgnore'](arg1, arg2, arg3, arg4);
+}
+
 export function AddWorktree(arg1, arg2, arg3) {
   return window['go']['app']['App']['AddWorktree'](arg1, arg2, arg3);
 }
@@ -198,6 +202,14 @@ export function HideBranch(arg1, arg2, arg3) {
   return window['go']['app']['App']['HideBranch'](arg1, arg2, arg3);
 }
 
+export function IgnoreFileNames(arg1) {
+  return window['go']['app']['App']['IgnoreFileNames'](arg1);
+}
+
+export function IgnoredFiles(arg1) {
+  return window['go']['app']['App']['IgnoredFiles'](arg1);
+}
+
 export function Init(arg1, arg2) {
   return window['go']['app']['App']['Init'](arg1, arg2);
 }
@@ -282,6 +294,10 @@ export function Preferences() {
   return window['go']['app']['App']['Preferences']();
 }
 
+export function PreviewIgnore(arg1, arg2, arg3) {
+  return window['go']['app']['App']['PreviewIgnore'](arg1, arg2, arg3);
+}
+
 export function Pull(arg1, arg2) {
   return window['go']['app']['App']['Pull'](arg1, arg2);
 }
@@ -350,6 +366,10 @@ export function RemoveGitConfigSection(arg1, arg2) {
   return window['go']['app']['App']['RemoveGitConfigSection'](arg1, arg2);
 }
 
+export function RemoveIgnoreRule(arg1, arg2) {
+  return window['go']['app']['App']['RemoveIgnoreRule'](arg1, arg2);
+}
+
 export function RemoveRecentRepo(arg1) {
   return window['go']['app']['App']['RemoveRecentRepo'](arg1);
 }
@@ -392,6 +412,10 @@ export function Restack(arg1, arg2) {
 
 export function RestoreGitConfig(arg1, arg2) {
   return window['go']['app']['App']['RestoreGitConfig'](arg1, arg2);
+}
+
+export function RestoreIgnoreRule(arg1, arg2) {
+  return window['go']['app']['App']['RestoreIgnoreRule'](arg1, arg2);
 }
 
 export function RestoreSession() {
@@ -518,6 +542,10 @@ export function StashSave(arg1, arg2, arg3) {
   return window['go']['app']['App']['StashSave'](arg1, arg2, arg3);
 }
 
+export function StopIgnoring(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['StopIgnoring'](arg1, arg2, arg3, arg4);
+}
+
 export function Submodules(arg1) {
   return window['go']['app']['App']['Submodules'](arg1);
 }
@@ -536,6 +564,10 @@ export function TrailerHints(arg1) {
 
 export function Undo(arg1) {
   return window['go']['app']['App']['Undo'](arg1);
+}
+
+export function UndoIgnore(arg1, arg2) {
+  return window['go']['app']['App']['UndoIgnore'](arg1, arg2);
 }
 
 export function UndoState(arg1) {
