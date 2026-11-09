@@ -49,6 +49,7 @@
       })
       .catch((e) => (error = errorText(e)))
   })
+  import Empty from './ui/Empty.svelte'
 </script>
 
 <Modal title="Reflog" eyebrow="where it's been" width={820} {onClose}>
@@ -68,7 +69,7 @@
   {:else if !entries}
     <Loading />
   {:else if entries.length === 0}
-    <p class="muted">No reflog for this ref. Git keeps reflogs for local refs it has moved, for 90 days by default.</p>
+    <Empty note="no trail">No reflog for this ref. Git keeps reflogs for local refs it has moved, for 90 days by default.</Empty>
   {:else}
     <div class="list">
       <table>
@@ -153,11 +154,6 @@
   .row-actions {
     white-space: nowrap;
     text-align: right;
-  }
-
-  .muted {
-    color: var(--ink-mute);
-    font-style: italic;
   }
 
   .error {

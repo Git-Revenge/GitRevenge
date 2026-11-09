@@ -87,6 +87,7 @@
     const t = targets.find((x) => x.path === path)
     return t ? gitConfig.label(t).replace(/^Local · /, '') : path
   }
+  import Empty from '../ui/Empty.svelte'
 </script>
 
 <div class="aliases">
@@ -168,7 +169,7 @@
       </div>
     {:else}
       {#if editing !== '+'}
-        <p class="empty"><span class="hand">none yet</span> No aliases here or in the files git reads with it.</p>
+        <Empty note="none yet">No aliases here or in the files git reads with it.</Empty>
       {/if}
     {/each}
   </div>
@@ -392,16 +393,6 @@
     flex: 1;
   }
 
-  .empty {
-    display: flex;
-    align-items: baseline;
-    gap: 14px;
-    margin: 0;
-    padding: 24px 0;
-    color: var(--ink-mute);
-  }
-
-  .empty .hand,
   .aside .hand {
     color: var(--accent-c);
   }

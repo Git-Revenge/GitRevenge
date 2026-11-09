@@ -66,13 +66,14 @@
     gitConfig.docs[path] = d
     await gitConfig.refreshEffective()
   }
+  import Empty from '../ui/Empty.svelte'
 </script>
 
 <div class="history">
   <p class="lede">Each save keeps the file as it was, in your app data folder. The last 20 are kept.</p>
 
   {#if loaded && backups.length === 0}
-    <p class="empty"><span class="hand">nothing yet</span> This file has no backups. Saving it keeps the version it replaces.</p>
+    <Empty note="nothing yet">This file has no backups. Saving it keeps the version it replaces.</Empty>
   {:else}
     <div class="layout">
       <div class="list" role="listbox" aria-label="Backups">
@@ -342,8 +343,7 @@
     color: var(--ink-mute);
   }
 
-  .same .hand,
-  .empty .hand {
+  .same .hand {
     color: var(--accent-c);
   }
 

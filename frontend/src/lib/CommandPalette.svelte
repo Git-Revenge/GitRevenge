@@ -112,6 +112,7 @@
     e.preventDefault()
     e.stopPropagation()
   }
+  import Empty from './ui/Empty.svelte'
 </script>
 
 {#if commands.paletteOpen}
@@ -157,7 +158,7 @@
             {#if row.cmd.shortcut}<kbd>{formatShortcut(row.cmd.shortcut)}</kbd>{/if}
           </li>
         {:else}
-          <li class="empty" role="presentation">No matching commands.</li>
+          <li class="empty" role="presentation"><Empty note="nothing by that name">No matching commands.</Empty></li>
         {/each}
       </ul>
     </div>

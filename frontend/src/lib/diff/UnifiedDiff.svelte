@@ -2,7 +2,6 @@
   import { SvelteSet } from 'svelte/reactivity'
   import { highlightLines, languageFor, type Token } from './highlight'
   import { applyChanges, diffLines, splitLines, toHunks, type Hunk } from './lineDiff'
-  import Icon from '../ui/Icon.svelte'
   import { wrap } from './wrap.svelte'
 
   /** What the hunk and line buttons do, and how the result is written. */
@@ -89,6 +88,7 @@
 
   const opIndexes = (h: Hunk) => Array.from({ length: h.end - h.start }, (_, k) => h.start + k)
   const header = (h: Hunk) => `@@ -${h.oldStart},${h.oldCount} +${h.newStart},${h.newCount} @@`
+  import Empty from '../ui/Empty.svelte'
 </script>
 
 {#snippet line(tokens: Token[] | undefined, fallback: string)}
@@ -100,7 +100,7 @@
 
 <div class="unified">
   {#if hunks.length === 0}
-    <p class="muted"><Icon name="diff" size={24} wash="teal" />No changes.</p>
+    <Empty note="nothing changed">No changes.</Empty>
   {/if}
   {#each hunks as h (h.start)}
     <section class="hunk">

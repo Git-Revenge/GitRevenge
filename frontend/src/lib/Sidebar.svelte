@@ -322,6 +322,7 @@
       if (p.path === path && (p.done || p.reset)) void load()
     })
   })
+  import Empty from './ui/Empty.svelte'
 </script>
 
 <aside class="sidebar">
@@ -403,18 +404,18 @@
         {/each}
       </ul>
       {#if rows.length === 0}
-        <p class="empty">
-          {#if elsewhere}
+        {#if elsewhere}
+          <Empty note="not here" compact>
             Nothing here.
             <button class="btn sm text" onclick={() => elsewhere && (ui.panel = elsewhere.panel)}>{TABS.find((t) => t.key === elsewhere?.panel)?.label} has {elsewhere.count.toLocaleString()}</button>
-          {:else if filtering}
-            Nothing matches that.
-          {:else if careOn}
-            Nothing needs care.
-          {:else}
-            {tab.empty}
-          {/if}
-        </p>
+          </Empty>
+        {:else if filtering}
+          <Empty note="no match" compact>Nothing matches that.</Empty>
+        {:else if careOn}
+          <Empty note="all tidy" compact>Nothing needs care.</Empty>
+        {:else}
+          <Empty note="none yet" compact>{tab.empty}</Empty>
+        {/if}
       {/if}
       {#if hiddenCount > 0 && (ui.panel === 'branches' || ui.panel === 'remotes')}
         <p class="hidden-note">
@@ -438,9 +439,10 @@
         }}
       />
       {#if filtering && repoMatches === 0 && repoElsewhere}
-        <p class="empty">
+        <Empty note="not here" compact>
+          Nothing here.
           <button class="btn sm text" onclick={() => repoElsewhere && (ui.panel = repoElsewhere.panel)}>{TABS.find((t) => t.key === repoElsewhere?.panel)?.label} has {repoElsewhere.count.toLocaleString()}</button>
-        </p>
+        </Empty>
       {/if}
     </div>
 
@@ -662,12 +664,6 @@
     outline: 2px solid var(--link);
     outline-offset: -2px;
     pointer-events: none;
-  }
-
-  .empty {
-    margin: 16px 12px;
-    color: var(--ink-mute);
-    font-style: italic;
   }
 
   .hidden-note {

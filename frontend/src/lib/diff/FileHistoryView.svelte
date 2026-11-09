@@ -27,6 +27,7 @@
       selected = commits[0] ?? null
     })
   })
+  import Empty from '../ui/Empty.svelte'
 </script>
 
 <div class="history">
@@ -53,7 +54,7 @@
           </button>
         </li>
       {:else}
-        <li class="muted pad">No commits touch this file.</li>
+        <li><Empty note="untouched">No commits touch this file.</Empty></li>
       {/each}
     {/if}
   </ul>
@@ -153,8 +154,4 @@
     color: var(--ink-mute);
   }
 
-  .pad {
-    padding: 10px 14px;
-    font-style: italic;
-  }
 </style>

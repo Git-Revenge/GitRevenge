@@ -135,6 +135,8 @@
     { id: 'ignore.save', group: 'Ignore rules', title: 'Save this ignore file', shortcut: 'Mod+S', whenTyping: true, run: () => void (isDirty && t.save()) },
     { id: 'ignore.view', group: 'Ignore rules', title: t.view === 'rules' ? 'Edit as text' : 'Edit as rules', run: () => void (t.view = t.view === 'rules' ? 'text' : 'rules') },
   ])
+  import Empty from '../ui/Empty.svelte'
+  import Loading from '../ui/Loading.svelte'
 </script>
 
 {#snippet sourceButton(s: git.IgnoreSource, label: string)}
@@ -181,7 +183,7 @@
 
   <main class="main">
     {#if !t.repo}
-      <p class="empty">Open a repository to see its ignore rules.</p>
+      <Empty note="nothing open">Open a repository to see its ignore rules.</Empty>
     {:else if t.source}
       <header class="head">
         <h1>{sourceLabel(t.source)}</h1>
@@ -199,13 +201,13 @@
         </div>
       {/if}
       {#if !t.doc}
-        <p class="empty">Reading…</p>
+        <Loading label="Reading…" />
       {:else if t.view === 'text'}
         <textarea class="text" spellcheck="false" aria-label="{sourceLabel(t.source)} as text" value={t.doc.text} oninput={(e) => t.edit(e.currentTarget.value)}></textarea>
       {:else}
         <div class="rules" bind:this={list}>
           {#if !lines.length}
-            <p class="empty">{t.source.exists ? 'This file is empty.' : "This file doesn't exist yet. Add a rule and save to create it."}</p>
+            {#if t.source.exists}<Empty note="a blank page">This file is empty.</Empty>{:else}<Empty note="not yet">This file doesn't exist yet. Add a rule and save to create it.</Empty>{/if}
           {/if}
           {#each lines as l (l.n)}
             {@const s = stats.get(l.n)}

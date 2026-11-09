@@ -6,6 +6,8 @@
   /** Repositories where the person set the case-clash notice aside, for this session. */
   // eslint-disable-next-line svelte/prefer-svelte-reactivity
   const caseNoticeSeen = new Set<string>()
+  import Empty from './ui/Empty.svelte'
+  import Loading from './ui/Loading.svelte'
 </script>
 
 <script lang="ts">
@@ -671,7 +673,7 @@
       </section>
     {/if}
     {#if wt && files.length === 0}
-      <p class="clean">Nothing to commit: your working tree matches the last commit.</p>
+      <Empty note="all committed" compact>Nothing to commit: your working tree matches the last commit.</Empty>
     {:else}
       <section>
         <header>
@@ -715,7 +717,7 @@
             {/if}
           {/each}
         </ul>
-        {#if fileQuery.trim() && !rows.length}<p class="clean">No files match that.</p>{/if}
+        {#if fileQuery.trim() && !rows.length}<Empty note="no match" compact>No files match that.</Empty>{/if}
       </section>
     {/if}
     {#if showIgnored}
@@ -725,9 +727,9 @@
           <span class="note">not part of any commit</span>
         </header>
         {#if !ignoredList}
-          <p class="clean">Reading…</p>
+          <Loading label="Reading…" />
         {:else if !ignoredList.files.length}
-          <p class="clean">Nothing here is ignored.</p>
+          <Empty note="nothing hidden" compact>Nothing here is ignored.</Empty>
         {:else}
           <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
           <ul onkeydown={(e) => moveThroughRows(e, e.currentTarget)}>

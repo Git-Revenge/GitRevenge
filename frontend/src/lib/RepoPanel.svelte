@@ -119,6 +119,7 @@
     ]
     onMenu?.(items, e.clientX, e.clientY)
   }
+  import Empty from './ui/Empty.svelte'
 </script>
 
 {#if shownTrees.length || !filtering}
@@ -192,7 +193,7 @@
 {/if}
 
 {#if filtering && matches === 0}
-  <p class="empty">Nothing matches that.</p>
+  <Empty note="no match" compact>Nothing matches that.</Empty>
 {/if}
 
 {#if lfsOpen}
