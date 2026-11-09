@@ -16,6 +16,8 @@ export function AddWorktree(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function AnswerPrompt(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
+export function Bisect(arg1:string):Promise<app.BisectInfo>;
+
 export function Blame(arg1:string,arg2:string,arg3:string):Promise<Array<git.BlameLine>>;
 
 export function BranchAction(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
@@ -154,6 +156,8 @@ export function LastCommitMessage(arg1:string):Promise<string>;
 
 export function LinkRules(arg1:string):Promise<links.Config>;
 
+export function MarkBisect(arg1:string,arg2:string):Promise<void>;
+
 export function MarkBranchKind(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function MergedBranches(arg1:string):Promise<Record<string, string>>;
@@ -161,6 +165,8 @@ export function MergedBranches(arg1:string):Promise<Record<string, string>>;
 export function OpenGitConfig(arg1:string):Promise<app.ConfigDoc>;
 
 export function OpenRepo(arg1:string):Promise<app.RepoTab>;
+
+export function PlanBisect(arg1:string,arg2:string,arg3:string):Promise<app.BisectPlan>;
 
 export function Preferences():Promise<app.Preferences>;
 
@@ -298,6 +304,8 @@ export function StackPushPlan(arg1:string,arg2:Array<string>):Promise<app.StackP
 
 export function StageFiles(arg1:string,arg2:Array<string>):Promise<void>;
 
+export function StartBisect(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function StashAction(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function StashSave(arg1:string,arg2:string,arg3:boolean):Promise<void>;
@@ -315,6 +323,8 @@ export function TrailerHints(arg1:string):Promise<git.TrailerHints>;
 export function TryLinkRule(arg1:string,arg2:links.Rule):Promise<app.LinkTry>;
 
 export function Undo(arg1:string):Promise<void>;
+
+export function UndoBisect(arg1:string):Promise<void>;
 
 export function UndoIgnore(arg1:string,arg2:app.IgnoreAdded):Promise<void>;
 
