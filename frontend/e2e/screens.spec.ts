@@ -258,11 +258,14 @@ test.describe('commit graph', () => {
     await page.mouse.move(box.x + 400, box.y - 40)
     await expect(actions).toHaveCount(0)
     await page.mouse.move(box.x + 400, box.y + 30)
-    await actions.getByRole('button', { name: /^Check out/ }).click()
-    await expect.poll(() => calls(page, 'BranchAction')).toContainEqual(['/repo', 'checkout', [expect.any(String)]])
+    await expect(actions).toBeVisible()
+    await actions.getByRole('button', { name: /^Copy/ }).click()
+    await expect(actions.getByRole('button', { name: /^Copied/ })).toBeVisible()
     await actions.getByRole('button', { name: /^Menu for/ }).click()
     await expect.poll(async () => (await events(page, 'context-row')).at(-1)?.[0]).toBe(0)
-    // Once its buttons have focus the card stays for the keyboard, pointer or not.
+    // Once its buttons have focus the card stays for the keyboard, pointer or not. (Focused
+    // explicitly: WebKit doesn't focus a button on click.)
+    await actions.getByRole('button', { name: /^Cop/ }).focus()
     await page.mouse.move(box.x + 400, box.y - 40)
     await expect(actions).toBeVisible()
   })

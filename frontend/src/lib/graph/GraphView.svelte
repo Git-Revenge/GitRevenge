@@ -2,7 +2,7 @@
   import { KINDS, kindFilterRows, type KindFilterRow } from '../branchKinds'
   import { errorText } from '../errors'
   import { onMount } from 'svelte'
-  import { BranchAction, CommitRow, CommitSignatures, GraphFocus, GraphRows, Refs, RepoPreferences, SearchGraph, SetGraphFocus, SetKindVisible } from '../../../wailsjs/go/app/App.js'
+  import { CommitRow, CommitSignatures, GraphFocus, GraphRows, Refs, RepoPreferences, SearchGraph, SetGraphFocus, SetKindVisible } from '../../../wailsjs/go/app/App.js'
   import { session } from '../session.svelte'
   import { ClipboardSetText, EventsOn } from '../../../wailsjs/runtime/runtime.js'
   import { theme as colorTheme } from '../theme.svelte'
@@ -189,15 +189,40 @@
   let actionsFocused = $state(false)
   /** The row actions' card, so leaving the grid for it doesn't count as leaving. */
   let actionsEl = $state<HTMLElement>()
-  /** Which row shows its actions, and where: the hovered row, else the selected row while the
-   * graph has focus, so the keyboard reaches them too. */
+  /** Which row shows its actions, and where: the hovered row once the pointer has rested on it
+   * a moment, else the selected row while the graph has focus, so the keyboard reaches them too. */
   let actions = $state<{ index: number; top: number } | null>(null)
   /** The row whose SHA was just copied, so its button can say so for a moment. */
   let copied = $state(-1)
   let copiedTimer: ReturnType<typeof setTimeout> | undefined
+  /** The card waits this long on a hovered row, so a pointer on its way to click a row doesn't
+   * find a button under it. */
+  const HOVER_DWELL = 200
+  let hoverReady = -1
+  let hoverPending = -1
+  let hoverTimer: ReturnType<typeof setTimeout> | undefined
 
   function updateActions() {
-    const index = drag?.active ? -1 : hovered >= 0 ? hovered : (gridFocused || actionsFocused) && selected >= 0 ? selected : -1
+    let index = -1
+    if (drag?.active) {
+      // Nothing while dragging.
+    } else if (hovered >= 0) {
+      if (hovered !== hoverPending) {
+        hoverPending = hovered
+        hoverReady = -1
+        clearTimeout(hoverTimer)
+        hoverTimer = setTimeout(() => {
+          hoverReady = hoverPending
+          updateActions()
+        }, HOVER_DWELL)
+      }
+      if (hovered === hoverReady) index = hovered
+    } else {
+      hoverPending = -1
+      hoverReady = -1
+      clearTimeout(hoverTimer)
+      if ((gridFocused || actionsFocused) && selected >= 0) index = selected
+    }
     const y = index * rowH - top
     if (index < 0 || !cache.get(index) || y + rowH <= 0 || y >= viewH) {
       if (actions) actions = null
@@ -212,16 +237,16 @@
   async function copySha(index: number) {
     const row = cache.get(index)
     if (!row) return
-    const ok = await ClipboardSetText(row.id).catch(() => false)
+    let ok: unknown
+    try {
+      ok = await ClipboardSetText(row.id)
+    } catch {
+      ok = false
+    }
     if (ok === false) return
     copied = index
     clearTimeout(copiedTimer)
     copiedTimer = setTimeout(() => (copied = -1), 1500)
-  }
-
-  function checkout(index: number) {
-    const row = cache.get(index)
-    if (row) void session.run(() => BranchAction(path, 'checkout', [row.id]))
   }
 
   /** Opens the row's menu under its "more" button: the same menu as right-click. */
@@ -638,6 +663,7 @@
       clearTimeout(searchTimer)
       clearTimeout(sigTimer)
       clearTimeout(copiedTimer)
+      clearTimeout(hoverTimer)
       cancelAnimationFrame(frame)
     }
   })
@@ -786,14 +812,13 @@
       <div class="spacer" style:height="{map.spacer}px"></div>
     </div>
     <!-- The hovered row's actions, or the selected row's while the graph has focus: copy the
-         SHA, check the commit out, and the same menu right-click opens. Tab reaches them after
-         the grid. -->
+         SHA, and the same menu right-click opens. Nothing here changes the repository on one
+         click, since the card sits where a click can land. Tab reaches them after the grid. -->
     {#if actions}
       {@const row = cache.get(actions.index)}
       {#if row}
         {@const short = row.id.slice(0, 7)}
         {@const i = actions.index}
-        {@const isHead = cache.refsFor(row.id).some((r) => r.head)}
         <div
           class="row-actions"
           role="group"
@@ -815,9 +840,6 @@
         >
           <button class="btn sm quiet icon" aria-label={copied === i ? `Copied ${short}` : `Copy ${short}`} title={copied === i ? 'Copied' : 'Copy the full SHA'} onclick={() => copySha(i)}>
             <Icon name={copied === i ? 'check' : 'copy'} size={14} />
-          </button>
-          <button class="btn sm quiet icon" aria-label="Check out {short}" title={isHead ? 'Already checked out' : `Check out ${short} (detached)`} disabled={isHead} onclick={() => checkout(i)}>
-            <Icon name="commit" size={14} />
           </button>
           <button class="btn sm quiet icon" aria-label="Menu for {short}" title="Everything you can do here, as on right-click" aria-haspopup="menu" onclick={(e) => more(i, e.currentTarget)}>
             <Icon name="more" size={14} />
