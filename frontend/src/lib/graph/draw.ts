@@ -523,7 +523,7 @@ export function drawRow(
     left = drawLabels(ctx, refs, left, line1, Math.min(subjectRight - left, (subjectRight - left) * 0.6), color, theme, comfortable, lay.remote)
     labelSpan = [lay.textX, left - LABEL_TRAIL]
   }
-  setFont(ctx, `${comfortable ? 14.5 : 13.5}px ${SERIF}`)
+  setFont(ctx, `${comfortable ? 14 : 13}px ${SERIF}`)
   ctx.fillStyle = docs ? theme.muted : theme.fg
   ctx.fillText(clip(ctx, row.subject, subjectRight - left), left, line1)
 

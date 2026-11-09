@@ -257,7 +257,7 @@
 
   .size {
     font-family: var(--font-mono);
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--ink-soft);
   }
 

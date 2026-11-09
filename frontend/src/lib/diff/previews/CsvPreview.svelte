@@ -83,7 +83,7 @@
   table {
     border-collapse: collapse;
     font-family: var(--font-mono);
-    font-size: 12.5px;
+    font-size: 13px;
   }
 
   th,

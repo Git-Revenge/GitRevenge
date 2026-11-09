@@ -335,13 +335,13 @@
 
   .resolved {
     font-family: var(--font-mono);
-    font-size: 12.5px;
+    font-size: 12px;
   }
 
   .as-of code,
   .who code {
     font-family: var(--font-mono);
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--accent-b);
   }
 

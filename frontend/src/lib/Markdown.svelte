@@ -136,7 +136,7 @@
 
 <style>
   .markdown {
-    font-size: 14.5px;
+    font-size: 15px;
     line-height: 1.6;
     color: var(--ink-soft);
     overflow-wrap: anywhere;
@@ -203,7 +203,7 @@
 
   code {
     font-family: var(--font-mono);
-    font-size: 12.5px;
+    font-size: 13px;
     color: var(--accent-b);
     background: var(--paper-warm);
     padding: 1px 4px;

@@ -161,7 +161,7 @@
 <style>
   .unified {
     font-family: var(--font-mono);
-    font-size: 12.5px;
+    font-size: 13px;
     line-height: 1.6;
     tab-size: 4;
   }

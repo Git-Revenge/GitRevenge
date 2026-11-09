@@ -94,7 +94,7 @@
     margin: 0;
     padding: 0;
     font-family: var(--font-mono);
-    font-size: 12.5px;
+    font-size: 13px;
     line-height: 1.7;
   }
 
