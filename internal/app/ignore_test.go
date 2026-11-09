@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
@@ -92,5 +93,24 @@ func TestStopIgnoring(t *testing.T) {
 	}
 	if got, want := changedPaths(t, a, tab.Path), []string{".gitignore", "a.log", "b.log"}; !slices.Equal(got, want) {
 		t.Fatalf("changes after removing the rule = %v, want %v", got, want)
+	}
+}
+
+func TestSaveIgnoreFileRefusesAStaleBase(t *testing.T) {
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.CommitFile(".gitignore", "*.log\n", "base")
+	tab, _ := a.OpenRepo(fx.Dir)
+
+	base, err := a.ReadIgnoreFile(tab.Path, ".gitignore")
+	if err != nil || base != "*.log\n" {
+		t.Fatalf("read = %q, %v", base, err)
+	}
+	fx.WriteFile(".gitignore", "*.log\n*.tmp\n")
+	if err := a.SaveIgnoreFile(tab.Path, ".gitignore", base, "*.bak\n"); err == nil || !strings.Contains(err.Error(), "changed on disk") {
+		t.Fatalf("err = %v", err)
+	}
+	if data, _ := os.ReadFile(fx.Path(".gitignore")); string(data) != "*.log\n*.tmp\n" {
+		t.Fatalf("file = %q", data)
 	}
 }

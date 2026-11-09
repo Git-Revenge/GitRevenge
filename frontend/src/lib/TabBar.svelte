@@ -3,6 +3,7 @@
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
   import { gitConfig } from './gitconfig/config.svelte'
   import { insights } from './insights/insights.svelte'
+  import { ignoreRules } from './ignorerules/ignoreRules.svelte'
   import { session } from './session.svelte'
   import { theme } from './theme.svelte'
   import Icon from './ui/Icon.svelte'
@@ -41,7 +42,7 @@
 
   $effect(() => {
     // Re-measure when the active tab, the set of tabs or their labels change.
-    void [session.active, session.tabs.map((t) => t.name + t.head), gitConfig.open, insights.open]
+    void [session.active, session.tabs.map((t) => t.name + t.head), gitConfig.open, insights.open, ignoreRules.open, ignoreRules.repoName]
     queueMicrotask(placeBar)
   })
 
@@ -99,6 +100,18 @@
           Insights
         </button>
         <button class="close" aria-label="Close Insights" title="Close (middle-click)" onclick={() => insights.close()}>
+          <Icon name="close" size={12} />
+        </button>
+      </div>
+    {/if}
+    {#if ignoreRules.open}
+      <div class="tab" class:active={session.active === session.ignoreTabId} title="Ignore rules">
+        <button class="label" onclick={() => session.select(session.ignoreTabId)} onauxclick={(e) => e.button === 1 && ignoreRules.requestClose()}>
+          <Icon name="eye" size={14} />
+          Ignore rules{#if ignoreRules.repoName}<span class="head">{ignoreRules.repoName}</span>{/if}
+          {#if ignoreRules.dirty.length > 0}<span class="dot" aria-label="unsaved changes" title="Unsaved changes">●</span>{/if}
+        </button>
+        <button class="close" aria-label="Close Ignore rules" title="Close (middle-click)" onclick={() => ignoreRules.requestClose()}>
           <Icon name="close" size={12} />
         </button>
       </div>

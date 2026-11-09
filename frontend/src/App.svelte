@@ -11,6 +11,7 @@
   import { commands, provideCommands, type Command } from './lib/commands.svelte'
   import { gitConfig } from './lib/gitconfig/config.svelte'
   import { insights } from './lib/insights/insights.svelte'
+  import { ignoreRules } from './lib/ignorerules/ignoreRules.svelte'
   import Lazy from './lib/ui/Lazy.svelte'
   import OperationBanner from './lib/OperationBanner.svelte'
   import PromptDialog from './lib/PromptDialog.svelte'
@@ -98,9 +99,15 @@
       list.push({ id: 'tabs.close', group: 'Tabs', title: 'Close Insights', keywords: 'tab', shortcut: 'Mod+W', whenTyping: true, run: () => insights.close() })
     if (session.active === session.configTabId)
       list.push({ id: 'tabs.close', group: 'Tabs', title: 'Close Git Config', keywords: 'tab', shortcut: 'Mod+W', whenTyping: true, run: () => gitConfig.requestClose() })
-    if (session.tabs.length > 0 || gitConfig.open || insights.open) {
+    if (session.active === session.ignoreTabId)
+      list.push({ id: 'tabs.close', group: 'Tabs', title: 'Close Ignore rules', keywords: 'tab', shortcut: 'Mod+W', whenTyping: true, run: () => ignoreRules.requestClose() })
+    if (session.activeTab) {
+      const repo = session.activeTab.path
+      list.push({ id: 'ignore.open', group: 'Repository', title: 'Edit ignore rules', keywords: 'gitignore exclude ignored files', run: () => ignoreRules.show(repo) })
+    }
+    if (session.tabs.length > 0 || gitConfig.open || insights.open || ignoreRules.open) {
       // Cycle through the start page and every tab.
-      const order = ['', ...session.tabs.map((t) => t.path), ...(gitConfig.open ? [session.configTabId] : []), ...(insights.open ? [session.insightsTabId] : [])]
+      const order = ['', ...session.tabs.map((t) => t.path), ...(gitConfig.open ? [session.configTabId] : []), ...(insights.open ? [session.insightsTabId] : []), ...(ignoreRules.open ? [session.ignoreTabId] : [])]
       const step = (d: number) => () => session.select(order[(order.indexOf(session.active) + d + order.length) % order.length])
       list.push(
         { id: 'tabs.next', group: 'Tabs', title: 'Next tab', shortcut: 'Mod+Tab', hidden: true, whenTyping: true, run: step(1) },
@@ -128,6 +135,7 @@
       await session.restore()
       await gitConfig.restore(session.savedConfigTab)
       await insights.restore(session.savedInsightsTab)
+      await ignoreRules.restore(session.savedIgnoreTab)
       void update.startup()
     }
   })
@@ -159,6 +167,19 @@
     <div class="form-actions">
       <InkButton variant="secondary" onclick={() => (gitConfig.confirmClose = false)}>Keep editing</InkButton>
       <InkButton variant="danger" onclick={() => gitConfig.close()}>Discard and close</InkButton>
+    </div>
+  </Modal>
+{/if}
+
+{#if ignoreRules.confirmClose}
+  <Modal title="Discard unsaved ignore rules?" onClose={() => (ignoreRules.confirmClose = false)}>
+    <p>Closing Ignore rules discards your unsaved changes to:</p>
+    <ul class="paths">
+      {#each ignoreRules.dirty as p (p)}<li><code>{p}</code></li>{/each}
+    </ul>
+    <div class="form-actions">
+      <InkButton variant="secondary" onclick={() => (ignoreRules.confirmClose = false)}>Keep editing</InkButton>
+      <InkButton variant="danger" onclick={() => ignoreRules.close()}>Discard and close</InkButton>
     </div>
   </Modal>
 {/if}
@@ -217,6 +238,8 @@
         <Lazy load={() => import('./lib/gitconfig/GitConfigView.svelte')} />
       {:else if session.active === session.insightsTabId && insights.open}
         <Lazy load={() => import('./lib/insights/InsightsView.svelte')} />
+      {:else if session.active === session.ignoreTabId && ignoreRules.open}
+        <Lazy load={() => import('./lib/ignorerules/IgnoreRulesView.svelte')} />
       {:else}
         <StartPage />
       {/if}

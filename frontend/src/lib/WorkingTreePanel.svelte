@@ -46,6 +46,7 @@
   import { appendTrailer, asPerson, trailerKeyChoices } from './trailers'
   import { session } from './session.svelte'
   import { toasts } from './toasts.svelte'
+  import { ignoreRules } from './ignorerules/ignoreRules.svelte'
   import Icon, { type IconName } from './ui/Icon.svelte'
   import InkButton from './ui/InkButton.svelte'
 
@@ -313,13 +314,15 @@
     const name = fileName(f.path)
     const subject: IgnoreSubject = { kind: 'file', path: f.path }
     const more: MenuItem = { label: 'Ignore…', separator: true, run: () => void (ignoring = { subject }) }
-    if (!f.untracked) return [{ label: `Ignore ${name} and stop tracking it`, run: () => quickIgnore(subject, 'root', anchored(f.path), [f.path]) }, more]
+    const rules: MenuItem = { label: 'Edit ignore rules…', run: () => ignoreRules.show(path) }
+    if (!f.untracked) return [{ label: `Ignore ${name} and stop tracking it`, run: () => quickIgnore(subject, 'root', anchored(f.path), [f.path]) }, more, rules]
     const ext = extension(f.path)
     return [
       { label: `Ignore ${name}`, run: () => quickIgnore(subject, 'root', anchored(f.path), []) },
       ...(ext ? [{ label: `Ignore every .${ext} file`, run: () => quickIgnore(subject, 'root', `*.${escapeName(ext)}`, []) }] : []),
       { label: `Ignore ${name} only on this machine`, separator: true, run: () => quickIgnore(subject, 'exclude', anchored(f.path), []) },
       more,
+      rules,
     ]
   }
 
@@ -352,6 +355,7 @@
         { label: `Ignore the folder ${name}`, icon: 'eye', run: () => quickIgnore(subject, 'root', pattern, []) },
         { label: `Ignore ${name} only on this machine`, run: () => quickIgnore(subject, 'exclude', pattern, []) },
         { label: 'Ignore…', separator: true, run: () => void (ignoring = { subject }) },
+        { label: 'Edit ignore rules…', run: () => ignoreRules.show(path) },
         { label: 'Copy path', icon: 'copy', separator: true, run: () => copyPath(dir) },
       ],
       e.clientX,
@@ -434,6 +438,7 @@
               ? [{ label: `Make an exception for ${name}`, separator: true, run: () => stopIgnoring(item, true) }]
               : [{ label: `No exception can reach inside an ignored folder`, separator: true, disabled: true }]),
             { label: `Remove the rule ${item.rule.pattern}${global ? ' from every repository' : ''}${back}`, danger: global, run: () => stopIgnoring(item, false) },
+            { label: `Open ${where(item.rule.source)} at line ${item.rule.line}`, separator: true, run: () => ignoreRules.show(path, item.rule.source, item.rule.line) },
           ],
         },
         { label: 'Copy path', icon: 'copy', separator: true, run: () => copyPath(item.path) },
