@@ -4,14 +4,10 @@
   import { provideCommands } from './commands.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
   import Dialog, { type DialogSpec } from './Dialog.svelte'
-  import RebaseEditor from './RebaseEditor.svelte'
-  import RemotesDialog from './RemotesDialog.svelte'
-  import WorktreesDialog from './WorktreesDialog.svelte'
   import Toolbar from './Toolbar.svelte'
   import Icon from './ui/Icon.svelte'
   import { DEFAULT_WIDTH, fitWidth, loadRightPanel, maxWidth, MIN_WIDTH, saveRightPanel } from './rightPanel'
   import { commitMenuItems, branchAtDialog, checkoutRef, dropItems, newBranchDialog, refItems, stackItems, type MenuContext } from './menus'
-  import ReflogDialog from './ReflogDialog.svelte'
   import CommitPanel from './CommitPanel.svelte'
   import type { DiffTarget } from './diff/DiffView.svelte'
   import Lazy from './ui/Lazy.svelte'
@@ -237,7 +233,7 @@
     </div>
     {#if rebaseBase}
       <div class="graph">
-        <RebaseEditor {path} base={rebaseBase} onClose={() => (rebaseBase = '')} />
+        <Lazy load={() => import('./RebaseEditor.svelte')} {path} base={rebaseBase} onClose={() => (rebaseBase = '')} />
       </div>
     {:else if diff}
       <div class="graph">
@@ -302,14 +298,15 @@
   <Dialog spec={dialog} onClose={() => (dialog = null)} />
 {/if}
 {#if reflogRef}
-  <ReflogDialog
+  <Lazy
+    load={() => import('./ReflogDialog.svelte')}
     {path}
     initialRef={reflogRef}
-    onReveal={(commit) => {
+    onReveal={(commit: string) => {
       reflogRef = ''
       void revealCommit(commit)
     }}
-    onCreateBranch={(commit) => {
+    onCreateBranch={(commit: string) => {
       reflogRef = ''
       dialog = branchAtDialog(path, commit)
     }}
@@ -318,11 +315,11 @@
 {/if}
 
 {#if worktreesOpen}
-  <WorktreesDialog {path} onClose={() => (worktreesOpen = false)} />
+  <Lazy load={() => import('./WorktreesDialog.svelte')} {path} onClose={() => (worktreesOpen = false)} />
 {/if}
 
 {#if remotesOpen}
-  <RemotesDialog {path} onClose={() => (remotesOpen = false)} />
+  <Lazy load={() => import('./RemotesDialog.svelte')} {path} onClose={() => (remotesOpen = false)} />
 {/if}
 
 <style>
