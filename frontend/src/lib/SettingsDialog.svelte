@@ -167,11 +167,10 @@
       </fieldset>
 
       <LinksSettings
-        repo={repoPath}
-        {repoName}
-        onShowConfig={() => {
+        active={repoPath}
+        onShowConfig={(repo) => {
           onClose()
-          void gitConfig.show(repoPath)
+          void gitConfig.show(repo)
         }}
       />
 
