@@ -24,6 +24,8 @@ Git tools: everyday git chores without leaving the app.
 - The graph's density switch is a pair of icons, timeline and compact, that shows which is on, instead of a button whose label changed with the state. (#544)
 ||||||| parent of 1a64be6 (feat: open a repository by clicking its dashboard row)
 - A group dashboard's rows open the repository on click, as rows do everywhere else; the **Open** link stays for the keyboard. (#552)
+||||||| parent of a09c0e5 (feat: a rose dot on the rail for what needs attention)
+- The sidebar rail marks branches that need care, and submodules that need updating, with a rose dot instead of a number, so it no longer looks like the stash count beside it. (#550)
 
 ## [0.10.0] - 2026-11-06
 

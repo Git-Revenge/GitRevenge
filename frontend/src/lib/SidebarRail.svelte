@@ -9,7 +9,9 @@
     key: SidebarPanel
     label: string
     icon: IconName
-    badge: { count: number; text: string }
+    /** A number to show, what it means, and whether it's drawn as a dot (something needs
+     * attention) rather than a count (how many there are). */
+    badge: { count: number; text: string; dot?: boolean }
   }
 
   let { tabs, panel, collapsed, onPick, onToggle }: { tabs: RailTab[]; panel: SidebarPanel; collapsed: boolean; onPick: (key: SidebarPanel) => void; onToggle: () => void } = $props()
@@ -40,7 +42,7 @@
       onclick={() => onPick(t.key)}
     >
       <Icon name={t.icon} size={18} />
-      {#if b.count}<span class="pip" aria-hidden="true">{b.count > 99 ? '99+' : b.count}</span>{/if}
+      {#if b.count}<span class="pip" class:dot={b.dot} aria-hidden="true">{b.dot ? '' : b.count > 99 ? '99+' : b.count}</span>{/if}
     </button>
   {/each}
   <button
@@ -113,6 +115,18 @@
     font-size: 12px;
     line-height: 15px;
     text-align: center;
+  }
+
+  /* Attention, not a tally: a rose dot where the count would be. */
+  .pip.dot {
+    right: 3px;
+    top: 3px;
+    min-width: 0;
+    width: 8px;
+    height: 8px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--link);
   }
 
   @media (prefers-reduced-motion: reduce) {
