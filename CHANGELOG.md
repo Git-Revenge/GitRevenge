@@ -32,6 +32,8 @@ Git tools: everyday git chores without leaving the app.
 - Settings › Appearance picks the theme (System, Light, Dark) and the commit graph (Timeline, Compact) with segmented controls, the same shape as the diff's Unified / Split, instead of drop-downs. (#561)
 ||||||| parent of 1a3cfc9 (feat: cross-fade the window when the theme changes)
 - Switching between the light and dark themes cross-fades the window instead of flipping it. Reduced motion keeps the flip. (#560)
+||||||| parent of 60945ef (feat: ease the graph's selection, hover and dimming; mark the selection with a bar)
+- The selected commit is marked by a bar in its lane's colour at the row's left edge, over a lighter wash, and the selection, hover and search dimming ease into place instead of snapping. Reduced motion keeps the instant draw. (#553)
 
 ## [0.10.0] - 2026-11-06
 

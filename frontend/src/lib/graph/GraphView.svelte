@@ -14,6 +14,7 @@
   import { drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneVar, laneWindow, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
   import { scrollMap, topAfterScroll, toScroll, type ScrollMap } from './scrollMap'
+  import { Washes } from './tween'
 
   let {
     path,
@@ -181,6 +182,8 @@
   }
   let hovered = -1
   let frame = 0
+  /** Each row's selection, hover and search-dimming strength, eased between frames. */
+  const washes = new Washes()
   /** Drag state: the row pressed and where; the row under the pointer while dragging. */
   let drag: { from: number; x: number; y: number; active: boolean } | null = null
   let dropTarget = -1
@@ -307,16 +310,26 @@
     }
     const th = theme()
     const now = Date.now() / 1000
+    const frameAt = performance.now()
     labelSpans.clear()
     for (let i = first; i < last; i++) {
       const row = cache.get(i)
       const y = i * rowH - top
-      // The drop target is highlighted like a selection while dragging.
       if (!row) continue
       wantSignature(row.id)
-      const span = drawRow(ctx, row, cache.refsFor(row.id), y, lay, th, i === selected || i === dropTarget, i === hovered, !!matchSet && !matchSet.has(i), now, sealOf(sigs.get(row.id)), { prev: cache.get(i - 1), prev2: cache.get(i - 2), next: cache.get(i + 1) })
+      // The drop target is highlighted like a selection while dragging. Each strength eases
+      // toward where it should be, so a selection arrives rather than appears.
+      const sel = washes.value(`s${i}`, i === selected || i === dropTarget ? 1 : 0, frameAt)
+      const hov = washes.value(`h${i}`, i === hovered ? 1 : 0, frameAt)
+      const dim = washes.value(`d${i}`, matchSet && !matchSet.has(i) ? 1 : 0, frameAt)
+      const span = drawRow(ctx, row, cache.refsFor(row.id), y, lay, th, sel, hov, dim, now, sealOf(sigs.get(row.id)), { prev: cache.get(i - 1), prev2: cache.get(i - 2), next: cache.get(i + 1) })
       if (span) labelSpans.set(i, span)
     }
+    washes.prune((key) => {
+      const i = Number(key.slice(1))
+      return i >= first - OVERSCAN && i < last + OVERSCAN
+    })
+    if (washes.busy(frameAt)) schedule()
     updateExpanded()
     // Lanes scrolled out on the left fade in from the edge, so the cut doesn't look like the end.
     if (firstLane > 0) {
