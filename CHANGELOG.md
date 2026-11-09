@@ -13,6 +13,12 @@ Git tools: everyday git chores without leaving the app.
 - Right-click a changed file or folder to ignore it: the file, every file with its extension, or only on this machine. **Ignore…** picks the pattern and the file it goes in, previews what it hides, and offers to stop tracking matching tracked files. Every rule added can be undone. (#521, #524)
 - An **Ignored** toggle lists ignored files with the rule behind each, and right-clicking one makes an exception or removes the rule. (#521, #524)
 - An **Ignore rules** tab to read and edit every ignore file that applies: each `.gitignore`, `.git/info/exclude` and your global excludes file. Each rule says what it ignores now, and a checker says which rule decides any path. (#522, #527)
+- Smart links: patterns you set in **Settings › Links** turn ticket keys such as `ABC-1234` in commit messages, trailers and branch names into links that open in your browser. Presets cover Jira, numbered issues, GitHub, GitLab, Linear and Azure Boards. Rules live in git config, in this repository's `.git/config` or your global config. A branch's right-click menu opens its ticket first. Git Revenge only makes the link and never contacts the site. (#525, #528)
+
+### Changed
+
+- Insights › Shipped groups by the references your smart links find, when any link counts for Shipped, and shows them as links. The rules in use are listed in every export. Without such a link, `PROJ-123` and `#123` still group as before. (#525, #528)
+- A bare `#123` in a trailer no longer links to the remote's issues on its own. Add a **Numbered (#123)** link in Settings to say where numbers go. (#525, #528)
 
 ## [0.10.0] - 2026-11-06
 
