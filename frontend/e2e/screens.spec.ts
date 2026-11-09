@@ -125,6 +125,10 @@ test.describe('commit menu', () => {
   })
 })
 
+/** A timeline row's height. In the repository view the working tree is the graph's first row,
+ * so the first commit starts this far down. */
+const ROW = 52
+
 test.describe('commit graph', () => {
   /** The row just inside the top edge, read by right-clicking it. */
   async function topRow(page: Page) {
@@ -620,7 +624,7 @@ test.describe('commit graph', () => {
     const openCommit = async (page: Page, over: object = {}) => {
       await open(page, 'repoView', scenario(over))
       const box = (await page.locator('.scroller').boundingBox())!
-      await page.mouse.click(box.x + 500, box.y + 26)
+      await page.mouse.click(box.x + 500, box.y + ROW + 26)
       await expect(page.getByRole('heading', { name: 'Commit 0' })).toBeVisible()
     }
     const tab = (page: Page, name: string) => page.getByRole('tab', { name, exact: true })
@@ -646,11 +650,11 @@ test.describe('commit graph', () => {
       await openCommit(page)
       await tab(page, 'Details').click()
       const box = (await page.locator('.scroller').boundingBox())!
-      await page.mouse.click(box.x + 500, box.y + 78)
+      await page.mouse.click(box.x + 500, box.y + ROW + 78)
       await expect(tab(page, 'Details')).toHaveAttribute('aria-selected', 'true')
       await page.reload()
       const again = (await page.locator('.scroller').boundingBox())!
-      await page.mouse.click(again.x + 500, again.y + 26)
+      await page.mouse.click(again.x + 500, again.y + ROW + 26)
       await expect(tab(page, 'Details')).toHaveAttribute('aria-selected', 'true')
     })
 
@@ -716,7 +720,7 @@ test.describe('commit graph', () => {
       const openMany = async (page: Page) => {
         await open(page, 'repoView', { ...scenario(), responses: { ...scenario().responses, CommitDetail: { commit, files: many } } })
         const box = (await page.locator('.scroller').boundingBox())!
-        await page.mouse.click(box.x + 500, box.y + 26)
+        await page.mouse.click(box.x + 500, box.y + ROW + 26)
         await tab(page, 'Files').click()
       }
 
@@ -795,7 +799,7 @@ test.describe('commit graph', () => {
     const show = (page: Page) => page.getByRole('button', { name: 'Show the right panel' })
     const selectRow = async (page: Page, y: number) => {
       const box = (await page.locator('.scroller').boundingBox())!
-      await page.mouse.click(box.x + 300, box.y + y)
+      await page.mouse.click(box.x + 300, box.y + ROW + y)
     }
 
     test('the button hides and shows it, and the graph takes the room', async ({ page }) => {
@@ -848,7 +852,7 @@ test.describe('commit graph', () => {
       responses: { Refs: [remote('origin/main')], CommitSignatures: [], WorkingTree: { status: { files: [] } }, CommitDetail: { commit, files: [] } },
     })
     const box = (await page.locator('.scroller').boundingBox())!
-    await page.mouse.click(box.x + 500, box.y + 26)
+    await page.mouse.click(box.x + 500, box.y + ROW + 26)
     const list = page.getByLabel('Branches and tags on this commit')
     await expect(list).toBeVisible()
     await expect(list.getByText('main', { exact: true })).toBeVisible()
@@ -1242,29 +1246,26 @@ test.describe('before the first load has answered', () => {
       expect(color).not.toBe(selected)
     })
 
-    // #514: it followed the graph's columns, and sat under its own circle with a file open.
-    test('keeps its place whatever the graph is doing', async ({ page }) => {
+    // #556: it's the graph's first row, so its words start where the messages do and its mark
+    // sits on the first lane. (#514 pinned it at 44px while it sat above the graph, where the
+    // columns could leave it stranded; inside the graph it leaves with the graph instead.)
+    test('is the first row of the graph, lined up with it, and leaves with it', async ({ page }) => {
       await page.setViewportSize({ width: 1600, height: 800 })
       await open(page, 'repoView', dirty([one]))
       await expect(bar(page)).toContainText('1 file changed')
-      const title = bar(page).locator('.wip-title')
-      await expect(page.locator('.columns')).toBeVisible()
-      const wide = (await title.boundingBox())!.x
-      expect(wide - (await page.locator('.main').boundingBox())!.x).toBe(44)
+      const scroller = (await page.locator('.scroller').boundingBox())!
+      expect((await bar(page).boundingBox())!.y).toBe(scroller.y)
+      const message = (await page.locator('.columns').getByText('Message').boundingBox())!
+      const title = (await bar(page).locator('.wip-title').boundingBox())!
+      expect(Math.abs(title.x - message.x)).toBeLessThanOrEqual(2)
+      const dot = (await bar(page).locator('.dot').boundingBox())!
+      expect(dot.x + dot.width).toBeLessThanOrEqual(title.x)
 
-      await page.setViewportSize({ width: 900, height: 800 })
-      await expect(page.locator('.columns')).toHaveCount(0)
-      expect((await title.boundingBox())!.x).toBe(wide)
-
-      await page.setViewportSize({ width: 1600, height: 800 })
+      // With a file open the graph steps aside, and its first row with it.
       await bar(page).click()
       await page.getByRole('button', { name: /a\.txt/ }).first().click()
       await expect(page.locator('.scroller')).toBeHidden()
-      await page.waitForTimeout(100)
-      const left = (await title.boundingBox())!.x
-      expect(left).toBe(wide)
-      const dot = (await bar(page).locator('.dot').boundingBox())!
-      expect(dot.x + dot.width).toBeLessThanOrEqual(left)
+      await expect(bar(page)).toBeHidden()
     })
   })
 

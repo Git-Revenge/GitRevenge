@@ -220,7 +220,9 @@
     padding: 0 12px;
     white-space: nowrap;
     overflow: hidden;
-    border-bottom: 1px solid var(--paper-edge);
+    /* The bar that holds it draws the rule underneath. */
+    flex: 1;
+    min-width: 0;
   }
 
   .split {

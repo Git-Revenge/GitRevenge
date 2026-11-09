@@ -1,7 +1,7 @@
 <script lang="ts">
   import { KINDS, kindFilterRows, type KindFilterRow } from '../branchKinds'
   import { errorText } from '../errors'
-  import { onMount } from 'svelte'
+  import { onMount, type Snippet } from 'svelte'
   import { CommitRow, CommitSignatures, GraphFocus, GraphRows, Refs, RepoPreferences, SearchGraph, SetGraphFocus, SetKindVisible } from '../../../wailsjs/go/app/App.js'
   import { session } from '../session.svelte'
   import { ClipboardSetText, EventsOn } from '../../../wailsjs/runtime/runtime.js'
@@ -11,7 +11,7 @@
   import { DUR, easeInk, fadeUp, labelsFold, labelsUnfold, menuOut, reducedMotion, stagger } from '../ui/motion'
   import KindFilter from './KindFilter.svelte'
   import RefChip from './RefChip.svelte'
-  import { drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneVar, laneWindow, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
+  import { drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
   import { scrollMap, topAfterScroll, toScroll, type ScrollMap } from './scrollMap'
   import { Washes, landWash } from './tween'
@@ -22,8 +22,13 @@
     onContext,
     onDrop,
     onSelectedRefs,
+    lead,
   }: {
     path: string
+    /** A row of the caller's own above the first commit, such as the working tree. It scrolls
+     * with the history, and is told where the first lane and the messages are so it can line
+     * up with them. */
+    lead?: Snippet<[{ nodeX: number; textX: number }]>
     /** Right-click on a row, with the refs pointing at it and the mouse position. */
     onContext?: (row: Row, refs: Ref[], x: number, y: number) => void
     /** A row dragged onto another row. */
@@ -95,7 +100,16 @@
   let span = $derived(loading && estimate > total ? estimate : total)
 
   let viewH = $state(0)
-  let map = $derived(scrollMap(span * rowH, viewH))
+  /** Rows above the first commit: the caller's lead row, if it gave one. */
+  let leadRows = $derived(lead ? 1 : 0)
+  let map = $derived(scrollMap((span + leadRows) * rowH, viewH))
+  /** Where commit i's row starts within the history's full height, and the commit at a height
+   * (negative on the lead row). */
+  const rowY = (i: number) => (i + leadRows) * rowH
+  const rowAtY = (y: number) => Math.floor(y / rowH) - leadRows
+  /** How far the lead row has scrolled, and how wide the rows are, as of the last paint. */
+  let leadShift = $state(0)
+  let leadWidth = $state(0)
   /** The scroll position within the full history's height. scroller.scrollTop is scaled
    * from it when the history is taller than a scroll area can be (see scrollMap). */
   let top = 0
@@ -170,7 +184,7 @@
   /** Expands the labels under the pointer, if it's over any, and closes them otherwise. */
   function updateExpanded() {
     const rect = scroller?.getBoundingClientRect()
-    const i = pointer && rect && !drag?.active ? Math.floor((pointer.y - rect.top + top) / rowH) : -1
+    const i = pointer && rect && !drag?.active ? rowAtY(pointer.y - rect.top + top) : -1
     const span = labelSpans.get(i)
     const x = pointer && rect ? pointer.x - rect.left : -1
     const row = cache.get(i)
@@ -180,7 +194,7 @@
     }
     const labels = refLabels(cache.refsFor(row.id), remote)
     const height = Math.min(labels.length, EXPANDED_REFS + 1) * CHIP_STEP + EXPAND_PAD * 2
-    const place = Math.round(i * rowH - top + (rowH - CHIP_STEP) / 2 - EXPAND_PAD)
+    const place = Math.round(rowY(i) - top + (rowH - CHIP_STEP) / 2 - EXPAND_PAD)
     const fitted = Math.max(0, Math.min(place, viewH - height))
     if (expanded?.index === i && expanded.top === fitted) return
     expanded = { index: i, left: span[0] - EXPAND_PAD, top: fitted, labels, lane: laneVar(row.color) }
@@ -226,7 +240,7 @@
       clearTimeout(hoverTimer)
       if ((gridFocused || actionsFocused) && selected >= 0) index = selected
     }
-    const y = index * rowH - top
+    const y = rowY(index) - top
     if (index < 0 || !cache.get(index) || y + rowH <= 0 || y >= viewH) {
       if (actions) actions = null
       return
@@ -382,8 +396,13 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, w, h)
 
-    const first = Math.floor(top / rowH)
-    const last = Math.min(span, Math.ceil((top + h) / rowH))
+    const first = Math.max(0, rowAtY(top))
+    const last = Math.min(span, rowAtY(top + h) + 1)
+    if (lead) {
+      const shift = Math.round(top)
+      if (shift !== leadShift) leadShift = shift
+      if (w !== leadWidth) leadWidth = w
+    }
     cache.ensure(first - OVERSCAN, last + OVERSCAN)
 
     let minCol = Infinity
@@ -417,7 +436,7 @@
     let arrivals = 0
     for (let i = first; i < last; i++) {
       const row = cache.get(i)
-      const y = i * rowH - top
+      const y = rowY(i) - top
       if (!row) continue
       wantSignature(row.id)
       // A commit painted for the first time fades up over --dur-move, the first six of a frame
@@ -455,7 +474,7 @@
         ctx.save()
         ctx.globalAlpha = landWash(t)
         ctx.fillStyle = th.selected
-        ctx.fillRect(0, landing.index * rowH - top, w, rowH)
+        ctx.fillRect(0, rowY(landing.index) - top, w, rowH)
         ctx.restore()
         schedule()
       }
@@ -483,7 +502,7 @@
 
   function rowAt(e: MouseEvent): number {
     const rect = scroller.getBoundingClientRect()
-    const i = Math.floor((e.clientY - rect.top + top) / rowH)
+    const i = rowAtY(e.clientY - rect.top + top)
     return i >= 0 && i < span ? i : -1
   }
 
@@ -505,7 +524,7 @@
     if (i < 0) return
     // Center it rather than pinning it to an edge. Within three screens the view glides there,
     // so the eye can follow; further, it cuts. Either way the row lands under a wash that fades.
-    const target = Math.max(0, Math.min(map.maxTop, i * rowH - viewH / 2))
+    const target = Math.max(0, Math.min(map.maxTop, rowY(i) - viewH / 2))
     const at = performance.now()
     const still = reducedMotion()
     if (!still && Math.abs(target - top) > 1 && Math.abs(target - top) <= viewH * 3) {
@@ -570,12 +589,13 @@
     if (!auto) autoSelect = 'done'
     selected = Math.max(0, Math.min(span - 1, i))
     // Keep the selection in view, unless a glide is already on its way there.
-    const y = selected * rowH
+    const y = rowY(selected)
     // The first selection can land before the first draw has measured the view.
     const height = viewH || scroller.clientHeight
     if (glide) {
       // Nothing: the glide centres it.
-    } else if (y < top) scrollTo(y)
+    } else if (y < top)
+      scrollTo(selected === 0 ? 0 : y) // the first commit brings the lead row back with it
     else if (y + rowH > top + height) scrollTo(y + rowH - height)
     selectedId = cache.get(selected)?.id ?? ''
     onSelect?.(cache.get(selected), auto)
@@ -812,6 +832,15 @@
   {/if}
   <div class="viewport">
     <canvas bind:this={canvas}></canvas>
+    <!-- The caller's row above the first commit. It's real DOM, so it keeps its own semantics and
+         focus, placed where row zero is and scrolled with the history. It comes before the grid,
+         so Tab reaches it first. It waits for the first layout, so it never sits somewhere else
+         for a frame. -->
+    {#if lead && columns && leadShift < rowH}
+      <div class="lead" style:top="{-leadShift}px" style:height="{rowH}px" style:width="{leadWidth}px" onwheel={(e) => scrollTo(top + e.deltaY)}>
+        {@render lead({ nodeX: columns.refW + laneX(-columns.firstLane, columns.m), textX: columns.textX })}
+      </div>
+    {/if}
     <div
       class="scroller"
       bind:this={scroller}
@@ -1075,6 +1104,13 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
+  }
+
+  .lead {
+    position: absolute;
+    z-index: 1;
+    left: 0;
+    display: flex;
   }
 
   .scroller {

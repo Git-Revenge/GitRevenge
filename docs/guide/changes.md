@@ -1,6 +1,6 @@
 # Changes and commits
 
-When you have uncommitted changes, a row at the top of the graph says how many files changed and on which branch. Click it (or choose **Show uncommitted changes** in the command palette) to see what's changed in your working tree.
+The graph's first row, above the newest commit, is your working tree. When you have uncommitted changes it says how many files changed and on which branch; otherwise it says the tree is clean. It scrolls with the history. Click it (or choose **Show uncommitted changes** in the command palette) to see what's changed in your working tree.
 
 ## Staging
 
