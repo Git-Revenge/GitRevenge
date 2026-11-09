@@ -43,6 +43,30 @@ type App struct {
 	insights  insightsCache
 	// configBackupDir overrides where config backups are kept; tests use it.
 	configBackupDir string
+	// repoConfigMu orders reads of a repository's settings from git config with writes to
+	// them, so a read that started earlier can't put back what a write just changed.
+	repoConfigMu sync.Mutex
+	// background counts work started off a caller's path, which Shutdown waits for. Once
+	// closing is set, under backgroundMu, no more is started.
+	background   sync.WaitGroup
+	backgroundMu sync.Mutex
+	closing      bool
+}
+
+// inBackground runs fn off the caller's path, unless the app is shutting down. Shutdown
+// waits for whatever was started.
+func (a *App) inBackground(fn func()) {
+	a.backgroundMu.Lock()
+	if a.closing {
+		a.backgroundMu.Unlock()
+		return
+	}
+	a.background.Add(1)
+	a.backgroundMu.Unlock()
+	go func() {
+		defer a.background.Done()
+		fn()
+	}()
 }
 
 // Environment reports the git installation the app will use.
@@ -67,6 +91,10 @@ func (a *App) Startup(ctx context.Context) {
 
 // Shutdown is called by Wails when the app quits. It stops background git processes.
 func (a *App) Shutdown(context.Context) {
+	a.backgroundMu.Lock()
+	a.closing = true
+	a.backgroundMu.Unlock()
+	a.background.Wait()
 	if a.sess != nil {
 		a.sess.CloseAll()
 	}

@@ -139,12 +139,24 @@ func (a *App) SetInsightsThresholds(scope string, t Thresholds) error {
 	if err != nil {
 		return err
 	}
-	return m.Settings().Update(func(s *settings.Settings) {
+	a.repoConfigMu.Lock()
+	defer a.repoConfigMu.Unlock()
+	now := [4]int{t.Stale, t.LongLived, t.Behind, t.Size}
+	var before *[4]int
+	if v, ok := m.Settings().Get().InsightsThresholds[scope]; ok {
+		before = &v
+	}
+	err = m.Settings().Update(func(s *settings.Settings) {
 		if s.InsightsThresholds == nil {
 			s.InsightsThresholds = map[string][4]int{}
 		}
-		s.InsightsThresholds[scope] = [4]int{t.Stale, t.LongLived, t.Behind, t.Size}
+		s.InsightsThresholds[scope] = now
 	})
+	if err != nil {
+		return err
+	}
+	// A repository's thresholds live in its git config; a group's stay with the app.
+	return a.saveRepoThresholds(m, scope, before, now)
 }
 
 // InsightsFetchedAt returns when the repository last fetched (FETCH_HEAD's modification

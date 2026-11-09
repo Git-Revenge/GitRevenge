@@ -2,7 +2,7 @@
 
 Repositories pile up branches: release branches, a `gh-pages` site, dozens of `dependabot/…` branches, work stacked on other work, and branches whose pull requests merged weeks ago. This page covers the tools for keeping that tidy.
 
-Everything here is set per repository and kept on your computer, in Git Revenge's own settings. Nothing is written into the repository, so it never changes what anyone else sees. Open **Settings** with a repository's tab active and look under **This repository**.
+Everything here is set per repository and kept in its git config (`.git/config`), which is never committed, so it never changes what anyone else sees. Set the same keys in your global git config to give every repository your own defaults; a repository's own setting wins, and its list of patterns replaces the global list rather than adding to it. Open **Settings** with a repository's tab active and look under **This repository**.
 
 ## Branch kinds
 

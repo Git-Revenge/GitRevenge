@@ -97,6 +97,10 @@ type RepoSettings struct {
 	// StackParents overrides which local branch each branch is stacked on, by branch name;
 	// "" means not stacked. Branches not listed are inferred.
 	StackParents map[string]string `json:"stackParents,omitempty"`
+	// InGitConfig is set once these settings have been read from, or moved to, git config
+	// (issue #526). From then on this entry is a copy of what git config says, and is never
+	// written back there wholesale.
+	InGitConfig bool `json:"inGitConfig,omitempty"`
 }
 
 func (r RepoSettings) clone() RepoSettings {
