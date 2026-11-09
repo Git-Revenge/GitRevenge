@@ -359,7 +359,7 @@ test.describe('commit graph', () => {
     test("the author button searches for the selected commit's author", async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 800 })
       await open(page, 'graph', scenario)
-      await page.getByRole('button', { name: 'Compact' }).or(page.getByRole('button', { name: 'Timeline' })).click()
+      await page.getByRole('button', { name: 'Compact' }).click()
       await page.getByRole('button', { name: "Search for the selected commit's author" }).click()
       await expect(page.getByRole('searchbox', { name: 'Search commits' })).toHaveValue('Ana Cruz')
       await expect.poll(() => calls(page, 'SearchGraph')).toContainEqual(['/repo', 'Ana Cruz'])

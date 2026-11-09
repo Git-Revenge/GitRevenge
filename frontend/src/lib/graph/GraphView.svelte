@@ -591,14 +591,14 @@
       <span class="meta">{total.toLocaleString()} commits</span>
     {/if}
     {#if kindRows.length}<KindFilter rows={kindRows} onToggle={setKindVisible} />{/if}
-    <button
-      class="btn sm quiet density"
-      onclick={() => session.run(() => colorTheme.toggleDensity())}
-      title={density === 'compact' ? 'Show the timeline: two-line rows with authors' : 'Show compact single-line rows'}
-      aria-pressed={density === 'compact'}
-    >
-      <Icon name={density === 'compact' ? 'rows' : 'timeline'} size={14} />{density === 'compact' ? 'Compact' : 'Timeline'}
-    </button>
+    <span class="segmented" role="group" aria-label="Row density">
+      <button class="icon" aria-pressed={density !== 'compact'} aria-label="Timeline" title="Timeline: two lines per commit, with authors" onclick={() => density === 'compact' && session.run(() => colorTheme.toggleDensity())}
+        ><Icon name="timeline" size={14} /></button
+      >
+      <button class="icon" aria-pressed={density === 'compact'} aria-label="Compact" title="Compact: one line per commit" onclick={() => density !== 'compact' && session.run(() => colorTheme.toggleDensity())}
+        ><Icon name="rows" size={14} /></button
+      >
+    </span>
     {#if focus}
       <span class="focus" title="Only {focusLabel} and what it's built on are showing">
         <Icon name="focus" size={13} /><span class="focus-name">Focused on {focusLabel}</span>
@@ -747,7 +747,8 @@
 
   /* The search box is what gives up width: the count and the buttons keep theirs. */
   .status > :global(.meta),
-  .status > :global(.btn) {
+  .status > :global(.btn),
+  .status > .segmented {
     flex: none;
     white-space: nowrap;
   }

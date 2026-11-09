@@ -675,6 +675,20 @@ textarea {
   box-shadow: 0 0 0 1px var(--paper-edge);
 }
 
+/* Icon-only options: a square of the option's height. Each needs an aria-label. */
+.segmented button.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-h-sm);
+  padding: 0;
+}
+
+.segmented button.icon svg {
+  width: 14px;
+  height: 14px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .segmented button {
     transition: none;
