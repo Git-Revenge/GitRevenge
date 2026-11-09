@@ -3,11 +3,7 @@
   import { Environment, Version } from '../wailsjs/go/app/App.js'
   import type { app } from '../wailsjs/go/models'
   import { BrowserOpenURL } from '../wailsjs/runtime/runtime.js'
-  import CloneDialog from './lib/CloneDialog.svelte'
   import CommandPalette from './lib/CommandPalette.svelte'
-  import KeybindingsDialog from './lib/KeybindingsDialog.svelte'
-  import SettingsDialog from './lib/SettingsDialog.svelte'
-  import ShortcutsDialog from './lib/ShortcutsDialog.svelte'
   import { commands, provideCommands, type Command } from './lib/commands.svelte'
   import { gitConfig } from './lib/gitconfig/config.svelte'
   import { insights } from './lib/insights/insights.svelte'
@@ -147,15 +143,16 @@
 <InkFilters />
 <Toasts />
 <CommandPalette />
+<!-- Dialogs load when first opened, to keep the main chunk small: see scripts/bundle-budget.mjs. -->
 {#if commands.shortcutsOpen}
-  <ShortcutsDialog onClose={() => (commands.shortcutsOpen = false)} />
+  <Lazy load={() => import('./lib/ShortcutsDialog.svelte')} onClose={() => (commands.shortcutsOpen = false)} />
 {/if}
 {#if commands.keybindingsOpen}
-  <KeybindingsDialog onClose={() => (commands.keybindingsOpen = false)} />
+  <Lazy load={() => import('./lib/KeybindingsDialog.svelte')} onClose={() => (commands.keybindingsOpen = false)} />
 {/if}
 
 {#if commands.settingsOpen}
-  <SettingsDialog onClose={() => (commands.settingsOpen = false)} />
+  <Lazy load={() => import('./lib/SettingsDialog.svelte')} onClose={() => (commands.settingsOpen = false)} />
 {/if}
 
 {#if gitConfig.confirmClose}
@@ -185,7 +182,7 @@
 {/if}
 
 {#if commands.cloneOpen}
-  <CloneDialog onClose={() => (commands.cloneOpen = false)} />
+  <Lazy load={() => import('./lib/CloneDialog.svelte')} onClose={() => (commands.cloneOpen = false)} />
 {/if}
 
 <div class="shell">
