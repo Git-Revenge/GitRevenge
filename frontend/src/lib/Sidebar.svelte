@@ -189,18 +189,19 @@
     filterInput?.select()
   }
 
-  /** The rail badge's number, and what it means for screen readers. */
-  function badge(key: SidebarPanel): { count: number; text: string } {
+  /** The rail badge: a count while filtering or for stashes, a dot for things that need
+   * attention, and what it means for screen readers. */
+  function badge(key: SidebarPanel): { count: number; text: string; dot?: boolean } {
     if (filtering) {
       const count = key === 'repo' ? repoMatches : panelMatches(panels[key], filter)
       return { count, text: count === 1 ? '1 match' : `${count} matches` }
     }
-    if (key === 'branches') return { count: needCare, text: needCare === 1 ? '1 needs care' : `${needCare} need care` }
+    if (key === 'branches') return { count: needCare, text: needCare === 1 ? '1 needs care' : `${needCare} need care`, dot: true }
     if (key === 'stashes') {
       const count = panels.stashes.root.total
       return { count, text: count === 1 ? '1 stash' : `${count} stashes` }
     }
-    if (key === 'repo') return { count: repoAttention, text: repoAttention === 1 ? '1 submodule needs updating' : `${repoAttention} submodules need updating` }
+    if (key === 'repo') return { count: repoAttention, text: repoAttention === 1 ? '1 submodule needs updating' : `${repoAttention} submodules need updating`, dot: true }
     return { count: 0, text: '' }
   }
 
