@@ -48,6 +48,10 @@ Git tools: everyday git chores without leaving the app.
 ||||||| parent of a753927 (feat: the timeline names each day once and goes quiet inside a run)
 - The timeline's second line stops repeating itself: the first commit of each day names the day (**Today**, **Yesterday**, then the date) under a dashed line, commits below it in the same day show the author and time, and a run of commits by the same author shows only the time, faded. (#554)
 
+### Fixed
+
+- A link in a commit's subject is rose like the links in its message and trailers, not the browser's blue. (#582)
+
 ## [0.10.0] - 2026-11-06
 
 Linux becomes a first-class platform, with `.deb` and `.rpm` packages.

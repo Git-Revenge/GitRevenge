@@ -767,6 +767,26 @@ test.describe('commit graph', () => {
       await expect(page.getByRole('tabpanel')).toContainText('No description.')
     })
 
+    // #582: a link in the subject was the browser's blue, beside rose ones in the body.
+    test('a link in the subject is the same rose as one in the body', async ({ page }) => {
+      await open(page, 'repoView', scenario({ subject: 'See https://example.com/a', body: 'And https://example.com/b too.' }))
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.click(box.x + 500, box.y + ROW + 26)
+      const inSubject = page.getByRole('heading', { name: /^See/ }).getByRole('link')
+      await expect(inSubject).toBeVisible()
+      const color = (l: typeof inSubject) => l.evaluate((e) => getComputedStyle(e).color)
+      const rose = await page.evaluate(() => {
+        const probe = document.createElement('span')
+        probe.style.color = 'var(--link)'
+        document.body.append(probe)
+        const c = getComputedStyle(probe).color
+        probe.remove()
+        return c
+      })
+      expect(await color(inSubject)).toBe(rose)
+      expect(await color(page.getByRole('tabpanel').getByRole('link').first())).toBe(rose)
+    })
+
     test('copies the SHA, and shows the parent', async ({ page }) => {
       await openCommit(page)
       await page.getByRole('button', { name: 'Copy SHA 0000000' }).click()
