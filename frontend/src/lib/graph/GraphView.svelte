@@ -4,11 +4,11 @@
   import { onMount } from 'svelte'
   import { CommitRow, CommitSignatures, GraphFocus, GraphRows, Refs, RepoPreferences, SearchGraph, SetGraphFocus, SetKindVisible } from '../../../wailsjs/go/app/App.js'
   import { session } from '../session.svelte'
-  import { EventsOn } from '../../../wailsjs/runtime/runtime.js'
+  import { ClipboardSetText, EventsOn } from '../../../wailsjs/runtime/runtime.js'
   import { theme as colorTheme } from '../theme.svelte'
   import { provideCommands } from '../commands.svelte'
   import Icon from '../ui/Icon.svelte'
-  import { labelsFold, labelsUnfold } from '../ui/motion'
+  import { fadeUp, labelsFold, labelsUnfold, menuOut } from '../ui/motion'
   import KindFilter from './KindFilter.svelte'
   import RefChip from './RefChip.svelte'
   import { drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneVar, laneWindow, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
@@ -150,6 +150,8 @@
 
   /** Most refs an expanded label shows; the commit panel and right-click menu have them all. */
   const EXPANDED_REFS = 12
+  /** The row actions card's height: three 24px buttons with 2px around them. */
+  const ACTIONS_H = 28
   /** A chip's height and its gap, and the padding around them, for fitting the list in view. */
   const CHIP_STEP = 26
   const EXPAND_PAD = 4
@@ -182,6 +184,79 @@
   }
   let hovered = -1
   let frame = 0
+  /** Whether the grid itself, or its row actions, has the keyboard focus. */
+  let gridFocused = $state(false)
+  let actionsFocused = $state(false)
+  /** The row actions' card, so leaving the grid for it doesn't count as leaving. */
+  let actionsEl = $state<HTMLElement>()
+  /** Which row shows its actions, and where: the hovered row once the pointer has rested on it
+   * a moment, else the selected row while the graph has focus, so the keyboard reaches them too. */
+  let actions = $state<{ index: number; top: number } | null>(null)
+  /** The row whose SHA was just copied, so its button can say so for a moment. */
+  let copied = $state(-1)
+  let copiedTimer: ReturnType<typeof setTimeout> | undefined
+  /** The card waits this long on a hovered row, so a pointer on its way to click a row doesn't
+   * find a button under it. */
+  const HOVER_DWELL = 200
+  let hoverReady = -1
+  let hoverPending = -1
+  let hoverTimer: ReturnType<typeof setTimeout> | undefined
+
+  function updateActions() {
+    let index = -1
+    if (drag?.active) {
+      // Nothing while dragging.
+    } else if (hovered >= 0) {
+      if (hovered !== hoverPending) {
+        hoverPending = hovered
+        hoverReady = -1
+        clearTimeout(hoverTimer)
+        hoverTimer = setTimeout(() => {
+          hoverReady = hoverPending
+          updateActions()
+        }, HOVER_DWELL)
+      }
+      if (hovered === hoverReady) index = hovered
+    } else {
+      hoverPending = -1
+      hoverReady = -1
+      clearTimeout(hoverTimer)
+      if ((gridFocused || actionsFocused) && selected >= 0) index = selected
+    }
+    const y = index * rowH - top
+    if (index < 0 || !cache.get(index) || y + rowH <= 0 || y >= viewH) {
+      if (actions) actions = null
+      return
+    }
+    const h = Math.min(rowH, ACTIONS_H)
+    const place = Math.round(y + (rowH - h) / 2)
+    if (actions?.index === index && actions.top === place) return
+    actions = { index, top: place }
+  }
+
+  async function copySha(index: number) {
+    const row = cache.get(index)
+    if (!row) return
+    let ok: unknown
+    try {
+      ok = await ClipboardSetText(row.id)
+    } catch {
+      ok = false
+    }
+    if (ok === false) return
+    copied = index
+    clearTimeout(copiedTimer)
+    copiedTimer = setTimeout(() => (copied = -1), 1500)
+  }
+
+  /** Opens the row's menu under its "more" button: the same menu as right-click. */
+  function more(index: number, button: HTMLElement) {
+    const row = cache.get(index)
+    if (!row || !onContext) return
+    select(index)
+    const r = button.getBoundingClientRect()
+    onContext(row, cache.refsFor(row.id), r.left, r.bottom + 2)
+  }
   /** Each row's selection, hover and search-dimming strength, eased between frames. */
   const washes = new Washes()
   /** Drag state: the row pressed and where; the row under the pointer while dragging. */
@@ -332,6 +407,7 @@
     })
     if (washes.busy(frameAt)) schedule()
     updateExpanded()
+    updateActions()
     // Lanes scrolled out on the left fade in from the edge, so the cut doesn't look like the end.
     if (firstLane > 0) {
       const fade = ctx.createLinearGradient(lay.refW, 0, lay.refW + m.pad + m.laneW, 0)
@@ -586,6 +662,8 @@
       off()
       clearTimeout(searchTimer)
       clearTimeout(sigTimer)
+      clearTimeout(copiedTimer)
+      clearTimeout(hoverTimer)
       cancelAnimationFrame(frame)
     }
   })
@@ -668,6 +746,14 @@
       aria-rowcount={span}
       onscroll={onScroll}
       onkeydown={onKey}
+      onfocus={() => {
+        gridFocused = true
+        updateActions()
+      }}
+      onblur={() => {
+        gridFocused = false
+        updateActions()
+      }}
       onclick={(e) => {
         const i = rowAt(e)
         if (i >= 0) select(i)
@@ -713,17 +799,54 @@
         select(i)
         onContext(row, cache.refsFor(row.id), e.clientX, e.clientY)
       }}
-      onmouseleave={() => {
+      onmouseleave={(e) => {
         drag = null
         dropTarget = -1
-        hovered = -1
         pointer = null
+        // Moving onto the row's actions keeps the row hovered, so the card stays put.
+        if (!(e.relatedTarget instanceof Node && actionsEl?.contains(e.relatedTarget))) hovered = -1
         updateExpanded()
         schedule()
       }}
     >
       <div class="spacer" style:height="{map.spacer}px"></div>
     </div>
+    <!-- The hovered row's actions, or the selected row's while the graph has focus: copy the
+         SHA, and the same menu right-click opens. Nothing here changes the repository on one
+         click, since the card sits where a click can land. Tab reaches them after the grid. -->
+    {#if actions}
+      {@const row = cache.get(actions.index)}
+      {#if row}
+        {@const short = row.id.slice(0, 7)}
+        {@const i = actions.index}
+        <div
+          class="row-actions"
+          role="group"
+          aria-label="Actions for {short}"
+          bind:this={actionsEl}
+          style:top="{actions.top}px"
+          in:fadeUp
+          out:menuOut
+          onfocusin={() => (actionsFocused = true)}
+          onfocusout={(e) => {
+            actionsFocused = !!(e.relatedTarget instanceof Node && actionsEl?.contains(e.relatedTarget))
+            updateActions()
+          }}
+          onmouseleave={(e) => {
+            if (e.relatedTarget instanceof Node && scroller.contains(e.relatedTarget)) return
+            hovered = -1
+            schedule()
+          }}
+        >
+          <button class="btn sm quiet icon" aria-label={copied === i ? `Copied ${short}` : `Copy ${short}`} title={copied === i ? 'Copied' : 'Copy the full SHA'} onclick={() => copySha(i)}>
+            <Icon name={copied === i ? 'check' : 'copy'} size={14} />
+          </button>
+          <button class="btn sm quiet icon" aria-label="Menu for {short}" title="Everything you can do here, as on right-click" aria-haspopup="menu" onclick={(e) => more(i, e.currentTarget)}>
+            <Icon name="more" size={14} />
+          </button>
+        </div>
+      {/if}
+    {/if}
     <!-- Hover only, and it never takes the pointer: the commit panel has the same list for the
          keyboard and screen readers, and the row underneath keeps working. -->
     {#each expanded ? [expanded] : [] as open (open.index)}
@@ -913,5 +1036,24 @@
     font-family: var(--font-mono);
     font-size: 12px;
     color: var(--ink-mute);
+  }
+
+  /* On paper over the SHA column, with a hairline, so it reads as a thing on the row rather than
+     part of it. Short enough for a compact row. */
+  .row-actions {
+    position: absolute;
+    z-index: 2;
+    right: 8px;
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--r-md);
+    background: var(--paper);
+    box-shadow: 0 0 0 1px var(--paper-edge);
+  }
+
+  .row-actions .btn {
+    width: 24px;
+    height: 24px;
   }
 </style>

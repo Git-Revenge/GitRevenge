@@ -247,6 +247,29 @@ test.describe('commit graph', () => {
     })
   })
 
+  // #555: a row's actions appear on hover, so right-click isn't the only way in.
+  test('hovering a row shows its actions, and More opens the same menu as right-click', async ({ page }) => {
+    await open(page, 'graph', { graphRows: 5, responses: { Refs: [], CommitSignatures: [] } })
+    const box = (await page.locator('.scroller').boundingBox())!
+    await page.mouse.move(box.x + 400, box.y + 30)
+    const actions = page.getByRole('group', { name: /^Actions for/ })
+    await expect(actions).toBeVisible()
+    // Leaving the graph takes the card away, and coming back brings it.
+    await page.mouse.move(box.x + 400, box.y - 40)
+    await expect(actions).toHaveCount(0)
+    await page.mouse.move(box.x + 400, box.y + 30)
+    await expect(actions).toBeVisible()
+    await actions.getByRole('button', { name: /^Copy/ }).click()
+    await expect(actions.getByRole('button', { name: /^Copied/ })).toBeVisible()
+    await actions.getByRole('button', { name: /^Menu for/ }).click()
+    await expect.poll(async () => (await events(page, 'context-row')).at(-1)?.[0]).toBe(0)
+    // Once its buttons have focus the card stays for the keyboard, pointer or not. (Focused
+    // explicitly: WebKit doesn't focus a button on click.)
+    await actions.getByRole('button', { name: /^Cop/ }).focus()
+    await page.mouse.move(box.x + 400, box.y - 40)
+    await expect(actions).toBeVisible()
+  })
+
   // #340: reaching the top was ignored, leaving part of the first row cut off.
   test('scrolling back up reaches the first row', async ({ page }) => {
     await open(page, 'graph', { graphRows: 500, responses: { Refs: [], CommitSignatures: [] } })
