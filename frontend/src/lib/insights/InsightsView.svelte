@@ -357,7 +357,7 @@
     padding: 8px 12px;
     background: none;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--r-md);
     color: var(--ink-soft);
     font-size: 15px;
     text-align: left;
@@ -484,7 +484,7 @@
     gap: 10px;
     margin: 0;
     padding: 10px 16px;
-    border-radius: 8px;
+    border-radius: var(--r-md);
     background: var(--danger-wash);
   }
 
@@ -578,7 +578,7 @@
   .bar {
     flex: 1;
     min-width: 2px;
-    border-radius: 4px 4px 0 0;
+    border-radius: var(--r-sm) var(--r-sm) 0 0;
     background: var(--accent-a);
     opacity: 0.85;
   }

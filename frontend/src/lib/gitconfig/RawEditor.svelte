@@ -170,7 +170,7 @@
     flex: 999 1 520px;
     min-width: 0;
     padding: 14px 0;
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     background: var(--code-bg);
   }
 

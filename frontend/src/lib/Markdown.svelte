@@ -207,14 +207,14 @@
     color: var(--accent-b);
     background: var(--paper-warm);
     padding: 1px 4px;
-    border-radius: 3px;
+    border-radius: var(--r-sm);
   }
 
   pre {
     overflow-x: auto;
     padding: 10px 12px;
     background: var(--paper-warm);
-    border-radius: 4px;
+    border-radius: var(--r-sm);
   }
 
   pre code {

@@ -75,7 +75,7 @@
     align-items: center;
     gap: 6px;
     padding: 8px 8px 8px 14px;
-    border-radius: 6px;
+    border-radius: var(--r-md);
     box-shadow: var(--shadow);
     pointer-events: auto;
   }

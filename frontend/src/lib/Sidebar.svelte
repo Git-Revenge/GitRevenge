@@ -527,7 +527,7 @@
     padding: 0 4px 0 8px;
     background: var(--paper);
     border: 1px solid var(--paper-edge);
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     color: var(--ink-mute);
   }
 
@@ -561,7 +561,7 @@
     padding: 0;
     background: none;
     border: none;
-    border-radius: 5px;
+    border-radius: var(--r-sm);
     color: inherit;
   }
 
@@ -595,7 +595,7 @@
     padding: 3px 9px;
     background: none;
     border: none;
-    border-radius: 6px;
+    border-radius: 999px;
     color: var(--ink-mute);
     font-size: 13px;
   }

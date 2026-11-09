@@ -259,7 +259,7 @@
     gap: 2px;
     align-items: center;
     padding: 2px;
-    border-radius: 6px;
+    border-radius: var(--r-md);
     background: var(--wash-hover);
   }
 

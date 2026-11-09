@@ -189,7 +189,7 @@
     padding: 10px 14px 10px 18px;
     background: none;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--r-md);
     color: var(--ink-soft);
     font-size: 15px;
     text-align: left;
@@ -260,7 +260,7 @@
   .diff {
     position: relative;
     padding: 14px 0;
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     background: var(--code-bg);
     color: var(--code-text);
     font-family: var(--font-mono);

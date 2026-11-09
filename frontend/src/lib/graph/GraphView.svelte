@@ -775,7 +775,7 @@
     height: 28px;
     padding: 0 10px;
     font-size: 13px;
-    border-radius: 5px;
+    border-radius: var(--r-sm);
   }
 
   .search input:focus {
@@ -791,7 +791,7 @@
     gap: 5px;
     min-width: 0;
     padding-left: 8px;
-    border-radius: 5px;
+    border-radius: var(--r-sm);
     font-size: 13px;
     color: var(--ink-soft);
     background: color-mix(in srgb, var(--accent-a) 14%, transparent);
@@ -887,7 +887,7 @@
     max-width: min(420px, calc(100% - 16px));
     padding: 4px;
     border: 1px solid var(--paper-edge);
-    border-radius: 6px;
+    border-radius: var(--r-md);
     background: var(--paper);
     box-shadow: var(--shadow);
     pointer-events: none;

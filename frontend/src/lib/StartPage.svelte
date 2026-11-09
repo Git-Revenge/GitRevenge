@@ -398,7 +398,7 @@
     position: absolute;
     z-index: 2;
     background: var(--link);
-    border-radius: 2px;
+    border-radius: var(--r-sm);
     pointer-events: none;
   }
 

@@ -142,7 +142,7 @@
     gap: 6px;
     padding: 0 8px;
     border: 1px solid var(--paper-edge);
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     color: var(--ink-mute);
   }
 
@@ -192,7 +192,7 @@
     font-size: 12px;
     padding: 1px 6px;
     border: 1px solid var(--paper-edge);
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     background: var(--paper-warm);
   }
 
@@ -218,7 +218,7 @@
     margin-bottom: 8px;
     padding: 6px 10px;
     background: var(--danger-wash);
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     color: var(--ink);
   }
 

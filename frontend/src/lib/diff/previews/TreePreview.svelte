@@ -77,7 +77,7 @@
     gap: 6px;
     padding: 0 8px;
     border: 1px solid var(--paper-edge);
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     background: var(--paper);
     color: var(--ink-mute);
   }

@@ -207,7 +207,7 @@
 
   .intro code {
     padding: 1px 5px;
-    border-radius: 3px;
+    border-radius: var(--r-sm);
     background: var(--paper-warm);
     color: var(--accent-b);
   }
@@ -306,7 +306,7 @@
     margin: 0;
     padding: 10px 14px;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     background: var(--code-bg);
     color: var(--code-text);
     font-family: var(--font-mono);
@@ -367,7 +367,7 @@
     margin: 6px 0;
     padding: 20px 22px 18px;
     background: var(--paper-warm);
-    border-radius: 10px;
+    border-radius: var(--r-md);
   }
 
   .form-top,

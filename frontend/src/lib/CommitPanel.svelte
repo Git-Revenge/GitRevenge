@@ -769,7 +769,7 @@
     min-height: 28px;
     padding: 2px 4px;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     background: none;
     text-align: left;
   }
@@ -1019,7 +1019,7 @@
     padding: 3px;
     background: none;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     color: var(--ink-mute);
     opacity: 0;
   }
@@ -1060,7 +1060,7 @@
 
   code {
     padding: 1px 4px;
-    border-radius: 3px;
+    border-radius: var(--r-sm);
     background: var(--paper-warm);
     font-family: var(--font-mono);
     font-size: 12px;
@@ -1114,7 +1114,7 @@
     padding: 7px 12px;
     background: none;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     text-align: left;
     transition:
       background-color var(--dur-base),

@@ -228,7 +228,7 @@
     gap: 10px;
     min-height: 34px;
     padding: 0 10px;
-    border-radius: 6px;
+    border-radius: var(--r-md);
     font-size: 14px;
     cursor: pointer;
   }
@@ -270,7 +270,7 @@
     padding: 0 10px;
     font-family: var(--font-mono);
     font-size: 13px;
-    border-radius: 6px;
+    border-radius: var(--r-md);
   }
 
   .hint {
@@ -301,7 +301,7 @@
     gap: 4px;
     padding: 12px;
     background: var(--paper-warm);
-    border-radius: 8px;
+    border-radius: var(--r-md);
     font-size: 13px;
     transition: opacity var(--dur-base) var(--ease-ink);
   }
@@ -320,7 +320,7 @@
     gap: 8px;
     padding: 12px;
     background: var(--warning-wash);
-    border-radius: 8px;
+    border-radius: var(--r-md);
     font-size: 13px;
     line-height: 1.45;
   }

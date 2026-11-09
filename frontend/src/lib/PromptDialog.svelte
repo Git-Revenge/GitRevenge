@@ -91,7 +91,7 @@
     padding: 12px 14px;
     background: var(--code-bg);
     color: var(--code-text);
-    border-radius: 5px;
+    border-radius: var(--r-sm);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     font-family: var(--font-mono);

@@ -193,7 +193,7 @@
   .badge {
     flex: none;
     padding: 0 5px;
-    border-radius: 3px;
+    border-radius: var(--r-sm);
     background: var(--wash-hover);
     color: var(--ink-mute);
     font-family: var(--font-mono);

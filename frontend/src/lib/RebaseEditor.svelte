@@ -194,7 +194,7 @@
   .warn {
     margin: 10px 16px 0;
     padding: 8px 12px;
-    border-radius: 5px;
+    border-radius: var(--r-sm);
     background: var(--warning-wash);
     font-size: 13px;
   }
@@ -237,7 +237,7 @@
     padding: 0 6px;
     font-family: var(--font-mono);
     font-size: 12px;
-    border-radius: 4px;
+    border-radius: var(--r-sm);
   }
 
   .a-reword {

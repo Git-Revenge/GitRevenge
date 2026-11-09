@@ -32,7 +32,7 @@
     height: 28px;
     padding: 0 9px;
     font-size: 13px;
-    border-radius: 5px;
+    border-radius: var(--r-sm);
   }
 
   .on {

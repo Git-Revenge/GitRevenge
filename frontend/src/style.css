@@ -11,8 +11,17 @@
   --font-mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
   --ease-ink: cubic-bezier(0.2, 0.6, 0.2, 1);
 
+  /* Corners. Three radii and the pill cover the app: sm for things inside a row (fields,
+     tags, labels, inline code), md for things you press or that float (buttons, menus, the
+     palette, cards), lg for dialogs, and 999px for chips and counts. Ink blobs keep their own
+     asymmetric radii. */
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 12px;
+
   /* Button sizes: height, side padding, label size, radius, icon size. Size alone sets
-     these; no component overrides them. md is the default. */
+     these; no component overrides them. md is the default. Every size shares one radius: at
+     28, 32 and 40px tall the difference between 7, 8 and 10 wasn't one you could see. */
   --btn-h-sm: 28px;
   --btn-h-md: 32px;
   --btn-h-lg: 40px;
@@ -22,9 +31,9 @@
   --btn-fs-sm: 13px;
   --btn-fs-md: 14px;
   --btn-fs-lg: 15px;
-  --btn-r-sm: 7px;
-  --btn-r-md: 8px;
-  --btn-r-lg: 10px;
+  --btn-r-sm: var(--r-md);
+  --btn-r-md: var(--r-md);
+  --btn-r-lg: var(--r-md);
   --btn-ic-sm: 14px;
   --btn-ic-md: 16px;
   --btn-ic-lg: 18px;
@@ -217,7 +226,7 @@ button {
   padding: 2px 10px;
   background: var(--paper-warm);
   border: 1px solid var(--paper-edge);
-  border-radius: 3px;
+  border-radius: var(--r-sm);
   cursor: pointer;
 }
 
@@ -235,7 +244,7 @@ select,
 textarea {
   background: var(--paper);
   border: 1px solid var(--paper-edge);
-  border-radius: 3px;
+  border-radius: var(--r-sm);
 }
 
 ::selection {
@@ -581,7 +590,7 @@ textarea {
 
 .view-badge {
   padding: 1px 7px;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   background: var(--wash-hover);
   font-family: var(--font-mono);
   font-size: 12px;
@@ -604,7 +613,7 @@ textarea {
   gap: 2px;
   min-height: var(--btn-h-md);
   padding: 2px;
-  border-radius: 9px;
+  border-radius: var(--r-md);
   background: var(--paper-deep);
 }
 
@@ -701,7 +710,7 @@ textarea {
 .field {
   min-height: 34px;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   font-family: var(--font-mono);
   font-size: 13px;
   transition: border-color var(--dur-base);
@@ -762,7 +771,7 @@ textarea {
 .form-field textarea {
   padding: 7px 10px;
   font-size: 14px;
-  border-radius: 5px;
+  border-radius: var(--r-sm);
   transition: border-color var(--dur-base);
 }
 
@@ -800,7 +809,7 @@ textarea {
 .form-error {
   margin: 0;
   padding: 8px 12px;
-  border-radius: 5px;
+  border-radius: var(--r-sm);
   background: var(--danger-wash);
   color: var(--ink);
   font-size: 13px;

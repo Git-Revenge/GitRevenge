@@ -34,7 +34,7 @@
     max-width: 100%;
     min-height: 22px;
     padding: 2px 7px;
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     font-family: var(--font-mono);
     font-size: 12px;
     line-height: 1.4;
