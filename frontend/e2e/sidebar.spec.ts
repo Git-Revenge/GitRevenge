@@ -354,3 +354,13 @@ test('the Repository panel lists worktrees, and LFS opens its dialog', async ({ 
   await page.getByRole('button', { name: 'Check locks' }).click()
   await expect.poll(() => calls(page, 'LFSLocks')).toHaveLength(1)
 })
+
+test('the Repository panel opens Ignore rules, and its filter finds it', async ({ page }) => {
+  await open(page, 'sidebar', { responses: { Refs: REFS, Worktrees: [], Submodules: [], LFS: { available: false } } })
+  await page.getByRole('button', { name: /^Repository/ }).click()
+  await page.getByPlaceholder(/Filter/).fill('gitignore')
+  await expect(page.locator('.repo-panel').getByRole('button', { name: /Ignore rules/ })).toBeVisible()
+  await page.locator('.repo-panel').getByRole('button', { name: /Ignore rules/ }).click()
+  // Opening the tab remembers it for this repository.
+  await expect.poll(() => calls(page, 'SetIgnoreTab')).not.toHaveLength(0)
+})
