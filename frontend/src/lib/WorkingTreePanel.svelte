@@ -691,7 +691,7 @@
                 <button class="btn sm secondary" onclick={() => (confirmDiscard = null)}>No</button>
               </span>
             {:else}
-              <button class="btn sm text" disabled={busy} onclick={() => (confirmDiscard = unstaged.filter((f) => !f.conflicted).map((f) => f.path))} title="Discard all unstaged changes">Discard all</button>
+              <button class="btn sm text danger" disabled={busy} onclick={() => (confirmDiscard = unstaged.filter((f) => !f.conflicted).map((f) => f.path))} title="Discard all unstaged changes">Discard all…</button>
             {/if}
           {/if}
         </header>

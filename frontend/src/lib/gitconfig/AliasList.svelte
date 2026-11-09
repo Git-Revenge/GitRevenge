@@ -158,7 +158,7 @@
                 {#each targets as t (t.path)}
                   <button class="btn text" onclick={() => copy(a, t.path)}>Copy to {destination(t.path)}</button>
                 {/each}
-                <button class="btn text" onclick={() => remove(a)}>Delete</button>
+                <button class="btn text danger" onclick={() => remove(a)}>Delete</button>
               {:else}
                 <button class="btn text" onclick={() => copy(a)}>Copy here</button>
               {/if}

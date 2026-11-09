@@ -287,7 +287,7 @@
                 </button>
               {/if}
               {#if own}
-                <button class="btn text" onclick={() => remove(r)} title={r.inherited.length ? 'Remove from this file, so the inherited value applies again' : 'Remove from this file'}>
+                <button class="btn text danger" onclick={() => remove(r)} title={r.inherited.length ? 'Remove from this file, so the inherited value applies again' : 'Remove from this file'}>
                   {r.inherited.length ? `Use ${source(last(r)).text}` : r.multi ? 'Remove all' : 'Remove'}
                 </button>
               {:else}
