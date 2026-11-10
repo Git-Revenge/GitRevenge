@@ -509,7 +509,7 @@ async function rowMenu(p, i, text) {
 /** Opens the interactive rebase editor for feature/offline-cache, from where it left main. */
 async function openRebase(p) {
   await rowMenu(p, await rowOf(p, 'Set the alert limit in knots too'), 'Interactive rebase')
-  await p.waitForSelector(byText('Start rebase', 'button'))
+  await p.waitForSelector(byText('Rewrite as', 'button'))
   await sleep(500)
 }
 
@@ -519,13 +519,11 @@ scenes.rebase = (page) =>
     await openRebase(p)
   })
 
-/** Sets the action for the commit with this subject in the rebase editor. */
-async function action(p, subject, value) {
-  const sel = `select[aria-label="Action for ${subject}"]`
-  await click(p, sel, { pause: 200 })
-  await p.keyboard.press('Escape')
-  await p.select(sel, value)
-  await sleep(500)
+/** Sets what happens to the commit with this subject in the rebase editor, by its label in
+ * the menu: Keep, Reword, Squash, Fixup or Drop. */
+async function action(p, subject, label) {
+  await click(p, `button[aria-label^="What to do with ${subject}:"]`, { pause: 400 })
+  await click(p, `::-p-xpath(//button[@role='option'][starts-with(normalize-space(.), ${JSON.stringify(label)})])`, { pause: 500 })
 }
 
 scenes.rebaseAnim = (page) =>
@@ -535,12 +533,12 @@ scenes.rebaseAnim = (page) =>
     (p) => reset(p, ['tidewater'], { clean: true, branch: 'feature/offline-cache' }),
     async (p) => {
       await openRebase(p)
-      await action(p, 'debugging', 'drop')
-      await action(p, 'fixup! Cache the last reading from each station', 'fixup')
-      await action(p, 'wip', 'squash')
+      await action(p, 'debugging', 'Drop')
+      await click(p, byText('Fold it in for me', 'button'), { pause: 600 })
+      await action(p, 'wip', 'Squash')
       await sleep(600)
-      await click(p, byText('Start rebase', 'button'), { pause: 300 })
-      await untilSettled(p, () => !document.body.innerText.includes('Interactive rebase') && document.querySelector('.row.ref.head')?.innerText.includes('offline-cache'))
+      await click(p, byText('Rewrite as', 'button'), { pause: 300 })
+      await untilSettled(p, () => !document.querySelector('ol.plan') && document.querySelector('.row.ref.head')?.innerText.includes('offline-cache'))
       await glide(p, 700, 400, 400)
       await p.mouse.wheel({ deltaY: -3000 })
       await sleep(1500)

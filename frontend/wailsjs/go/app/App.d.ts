@@ -176,6 +176,8 @@ export function PreviewMerge(arg1:string,arg2:string):Promise<app.MergePreview>;
 
 export function PreviewRebase(arg1:string,arg2:string):Promise<app.RebasePreview>;
 
+export function PreviewRebasePlan(arg1:string,arg2:string,arg3:Array<git.RebaseItem>):Promise<app.RebasePlanPreview>;
+
 export function Pull(arg1:string,arg2:string):Promise<void>;
 
 export function PullBranch(arg1:string,arg2:string):Promise<void>;

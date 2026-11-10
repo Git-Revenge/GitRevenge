@@ -338,7 +338,8 @@
       </div>
     {/if}
   </div>
-  {#if (view === 'wip' || selected || running) && !right.hidden}
+  <!-- The rebase editor has a panel of its own: the branch as it will be afterwards. -->
+  {#if (view === 'wip' || selected || running) && !right.hidden && !rebaseBase}
     <div class="right" style:width="{rightWidth}px">
       <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
       <div

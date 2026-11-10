@@ -338,6 +338,10 @@ export function PreviewRebase(arg1, arg2) {
   return window['go']['app']['App']['PreviewRebase'](arg1, arg2);
 }
 
+export function PreviewRebasePlan(arg1, arg2, arg3) {
+  return window['go']['app']['App']['PreviewRebasePlan'](arg1, arg2, arg3);
+}
+
 export function Pull(arg1, arg2) {
   return window['go']['app']['App']['Pull'](arg1, arg2);
 }

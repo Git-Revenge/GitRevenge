@@ -61,7 +61,23 @@ Right-click a commit and choose **Reset** to move your branch there. You pick th
 
 ## Interactive rebase
 
-Right-click a commit and choose **Interactive rebase … from here…**. The editor lists every commit after it, and for each you can **pick**, **reword**, **squash**, **fixup** or **drop** it, and move it up or down. Squashing starts from both messages, as git does. **Start rebase** runs it; **Cancel** goes back to the graph with nothing changed.
+Right-click a commit and choose **Interactive rebase … from here…**, or tick **Let me reorder, reword or drop commits first** in a rebase's preview. The editor lists every commit after that point, oldest first, the order git applies them in.
+
+Each commit has a menu for what happens to it. The menu says what each choice does, and the letter beside it sets it from the keyboard when the commit has focus:
+
+| Choice | Key | What it does |
+|---|---|---|
+| **Keep** | <kbd>P</kbd> | Keeps the commit as it is. |
+| **Reword** | <kbd>R</kbd> | Keeps the changes and changes the message. The subject is edited in place: <kbd>Enter</kbd> keeps it, <kbd>Esc</kbd> puts the old one back, and <kbd>Ctrl</kbd>+<kbd>Enter</kbd> opens the whole message. |
+| **Squash** | <kbd>S</kbd> | Folds the commit into the one above and keeps both messages, which you can edit. |
+| **Fixup** | <kbd>F</kbd> | Folds the commit into the one above and discards its message. |
+| **Drop** | <kbd>D</kbd> | Throws the commit's changes away. The row says which files go with it. |
+
+A commit that folds into another sits indented under it. Drag a commit by its grip to reorder, or press <kbd>Alt</kbd>+<kbd>↑</kbd> or <kbd>Alt</kbd>+<kbd>↓</kbd> to move the focused one. When the list has `fixup!` or `squash!` commits for others in it, **Fold it in for me** moves each under the commit it names.
+
+A panel beside the plan shows the branch as it will be afterwards: the commits that will exist, marked *folded* or *reworded*, what is dropped and how many lines go with it, and whether this order would stop on a conflict. The forecast follows the plan as you change it. If the branch is already pushed, the panel says it will need a force push.
+
+The button says the outcome, such as **Rewrite as 3 commits**. **Reset the plan** puts every row back, and **Cancel** goes back to the graph with nothing changed. One Undo brings the whole branch back as it was.
 
 ![The interactive rebase editor](../img/rebase-editor-light.webp#gh-light-mode-only)
 ![The interactive rebase editor](../img/rebase-editor-dark.webp#gh-dark-mode-only)

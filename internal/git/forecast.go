@@ -267,32 +267,15 @@ func (r *Repo) ForecastRebase(ctx context.Context, branch, onto string) (RebaseF
 	if f.CommitCount > len(f.Commits) || len(f.Commits) > ForecastReplayCap {
 		f.Incomplete = true
 	}
-	tip, err := r.ReadString(ctx, "rev-parse", "--verify", onto+"^{commit}")
+	ids := make([]string, 0, len(f.Commits))
+	for _, c := range f.Commits {
+		ids = append(ids, c.ID)
+	}
+	stopsAt, conflicts, incomplete, err := r.replay(ctx, onto, ids)
 	if err != nil {
 		return f, err
 	}
-	for i, c := range f.Commits {
-		if i >= ForecastReplayCap {
-			break
-		}
-		tree, conflicted, err := r.mergeTree(ctx, c.ID+"^", tip, c.ID)
-		if err != nil {
-			f.Incomplete = true
-			return f, nil
-		}
-		if len(conflicted) > 0 {
-			f.StopsAt = c.ID
-			f.Conflicts = r.conflictsIn(ctx, tree, conflicted)
-			return f, nil
-		}
-		// The next commit applies on top of this result: give it a commit to stand on. It's a
-		// loose object nothing points at, and git's own housekeeping removes it.
-		next, err := r.runner.Output(ctx, Cmd{Dir: r.dir, Args: []string{"commit-tree", tree, "-p", tip, "-m", "forecast"}, Env: forecastIdentity})
-		if err != nil {
-			f.Incomplete = true
-			return f, nil
-		}
-		tip = next
-	}
+	f.StopsAt, f.Conflicts = stopsAt, conflicts
+	f.Incomplete = f.Incomplete || incomplete
 	return f, nil
 }
