@@ -5,7 +5,7 @@
 <meta name="generator" content="Docusaurus v3.10.2">
 <title data-rh="true">Branches, merges and rebases | Git Revenge</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" name="twitter:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" property="og:url" content="https://gitrevenge.com/docs/guide/branches"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Branches, merges and rebases | Git Revenge"><meta data-rh="true" name="description" content="Branches and tags"><meta data-rh="true" property="og:description" content="Branches and tags"><link data-rh="true" rel="icon" href="/img/favicon.svg"><link data-rh="true" rel="canonical" href="https://gitrevenge.com/docs/guide/branches"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/guide/branches" hreflang="en"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/guide/branches" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Branches, merges and rebases","item":"https://gitrevenge.com/docs/guide/branches"}]}</script><link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&amp;family=Caveat:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Crimson+Pro:ital,wght@0,400;0,500;0,600;1,400;1,500&amp;display=swap"><link rel="stylesheet" href="/assets/css/styles.9b150b80.css">
-<script src="/assets/js/runtime~main.a8f7c5b3.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.072ce2c4.js" defer="defer"></script>
 <script src="/assets/js/main.969f9d33.js" defer="defer"></script>
 </head>
 <body>
@@ -82,7 +82,47 @@
 <li class=""><strong>Hard:</strong> discard all changes.</li>
 </ul>
 <h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="interactive-rebase">Interactive rebase<a href="#interactive-rebase" class="hash-link" aria-label="Direct link to Interactive rebase" title="Direct link to Interactive rebase" translate="no">​</a></h2>
-<p>Right-click a commit and choose <strong>Interactive rebase … from here…</strong>. The editor lists every commit after it, and for each you can <strong>pick</strong>, <strong>reword</strong>, <strong>squash</strong>, <strong>fixup</strong> or <strong>drop</strong> it, and move it up or down. Squashing starts from both messages, as git does. <strong>Start rebase</strong> runs it; <strong>Cancel</strong> goes back to the graph with nothing changed.</p>
+<p>Right-click a commit and choose <strong>Interactive rebase … from here…</strong>, or tick <strong>Let me reorder, reword or drop commits first</strong> in a rebase&#x27;s preview. The editor lists every commit after that point, oldest first, the order git applies them in.</p>
+<p>Each commit has a menu for what happens to it. The menu says what each choice does, and the letter beside it sets it from the keyboard when the commit has focus:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Choice</th><th>Key</th><th>What it does</th></tr></thead><tbody><tr><td><strong>Keep</strong></td><td><kbd>P</kbd></td><td>Keeps the commit as it is.</td></tr><tr><td><strong>Reword</strong></td><td><kbd>R</kbd></td><td>Keeps the changes and changes the message. The subject is edited in place: <kbd>Enter</kbd> keeps it, <kbd>Esc</kbd> puts the old one back, and <kbd>Ctrl</kbd>+<kbd>Enter</kbd> opens the whole message.</td></tr><tr><td><strong>Squash</strong></td><td><kbd>S</kbd></td><td>Folds the commit into the one above and keeps both messages, which you can edit.</td></tr><tr><td><strong>Fixup</strong></td><td><kbd>F</kbd></td><td>Folds the commit into the one above and discards its message.</td></tr><tr><td><strong>Drop</strong></td><td><kbd>D</kbd></td><td>Throws the commit&#x27;s changes away. The row says which files go with it.</td></tr></tbody></table>
+<p>A commit that folds into another sits indented under it. Drag a commit by its grip to reorder, or press <kbd>Alt</kbd>+<kbd>↑</kbd> or <kbd>Alt</kbd>+<kbd>↓</kbd> to move the focused one. When the list has <code>fixup!</code> or <code>squash!</code> commits for others in it, <strong>Fold it in for me</strong> moves each under the commit it names.</p>
+<p>A panel beside the plan shows the branch as it will be afterwards: the commits that will exist, marked <em>folded</em> or <em>reworded</em>, what is dropped and how many lines go with it, and whether this order would stop on a conflict. The forecast follows the plan as you change it. If the branch is already pushed, the panel says it will need a force push.</p>
+<p>The button says the outcome, such as <strong>Rewrite as 3 commits</strong>. <strong>Reset the plan</strong> puts every row back, and <strong>Cancel</strong> goes back to the graph with nothing changed. One Undo brings the whole branch back as it was.</p>
 <p><img decoding="async" loading="lazy" alt="The interactive rebase editor" src="/assets/images/rebase-editor-light-fa013a21e4225e5cd5cc6b702c3e8332.webp#gh-light-mode-only" width="2560" height="1600" class="img_ev3q">
 <img decoding="async" loading="lazy" alt="The interactive rebase editor" src="/assets/images/rebase-editor-dark-bb55b24367b612ba554b3dc298998452.webp#gh-dark-mode-only" width="2560" height="1600" class="img_ev3q"></p>
 <p>The walkthrough <a class="" href="/docs/walkthroughs/tidy-a-branch">Tidy a branch before you share it</a> shows a full clean-up.</p>
