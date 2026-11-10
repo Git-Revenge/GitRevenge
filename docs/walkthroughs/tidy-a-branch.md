@@ -11,26 +11,28 @@ That's what interactive rebase is for: it rewrites a branch's recent commits, le
 
 1. **Check out the branch.** In the sidebar, open the `feature` folder and double-click `offline-cache`.
 
-2. **Open the rebase editor.** In the graph, right-click the commit the branch started from (here, `main`'s *Set the alert limit in knots too*) and choose **Interactive rebase feature/offline-cache from here…**. The editor lists every commit after that one, newest first.
+2. **Open the rebase editor.** In the graph, right-click the commit the branch started from (here, `main`'s *Set the alert limit in knots too*) and choose **Interactive rebase feature/offline-cache from here…**. The editor lists every commit after that one, oldest first, the order git applies them in.
 
    ![The interactive rebase editor listing five commits](../img/rebase-editor-light.webp#gh-light-mode-only)
    ![The interactive rebase editor listing five commits](../img/rebase-editor-dark.webp#gh-dark-mode-only)
 
 3. **Choose what happens to each commit.** Each commit has a menu:
 
-   | Action | What it does |
+   | Choice | What it does |
    |---|---|
-   | **pick** | Keep the commit as it is. |
-   | **reword** | Keep it, with a new message. A box opens for the message. |
-   | **squash** | Fold it into the commit below it, and combine both messages. |
-   | **fixup** | Fold it into the commit below it, and keep only that commit's message. |
-   | **drop** | Remove the commit and its changes. |
+   | **Keep** | Keep the commit as it is. |
+   | **Reword** | Keep it, with a new message. The subject becomes a field you type in. |
+   | **Squash** | Fold it into the commit above it, and combine both messages. |
+   | **Fixup** | Fold it into the commit above it, and keep only that commit's message. |
+   | **Drop** | Remove the commit and its changes. |
 
-   For Priya's branch: **drop** *debugging*, **fixup** the *fixup!* commit, and **squash** *wip*. Squash starts the message from both commits, the way git does; edit it in the box that opens.
+   For Priya's branch: **Drop** *debugging*, click **Fold it in for me** to put the *fixup!* commit under the commit it names, and **Squash** *wip*. Squash starts the message from both commits, the way git does; **Edit the message** opens it.
 
-   The arrows on the left move a commit up or down, to reorder them.
+   Drag a commit by the grip on its left to reorder, or press <kbd>Alt</kbd>+<kbd>↑</kbd> and <kbd>Alt</kbd>+<kbd>↓</kbd>.
 
-4. **Start the rebase.** Click **Start rebase**. Git Revenge rewrites the branch, and the graph shows the result: two commits where there were five.
+   The panel on the right shows the branch as it will be afterwards, and says whether this order would stop on a conflict.
+
+4. **Run it.** Click **Rewrite as 2 commits**. Git Revenge rewrites the branch, and the graph shows the result: two commits where there were five.
 
 ## If it stops partway
 
