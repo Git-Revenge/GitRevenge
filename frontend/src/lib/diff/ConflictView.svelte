@@ -245,6 +245,8 @@
   }
 
   function keys(e: KeyboardEvent) {
+    // A dialog or menu over the tool has the keys.
+    if (e.defaultPrevented || document.querySelector('[aria-modal="true"], [role="menu"]')) return
     if (e.key === 'F7') {
       e.preventDefault()
       step(e.shiftKey ? -1 : 1)
@@ -262,8 +264,11 @@
   let blocked = $derived(left ? `${count(left, 'place is', 'places are')} still undecided` : '')
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="conflict" onkeydown={keys}>
+<!-- The keys are heard at the window: on WebKit a clicked button doesn't take focus, so a
+     listener on the tool itself would miss a key pressed after a click. -->
+<svelte:window onkeydown={keys} />
+
+<div class="conflict">
   <header class="view-head">
     <button class="btn quiet" onclick={onClose} title="Back"><Icon name="back" />Back</button>
     <span class="view-badge danger">Conflict</span>
