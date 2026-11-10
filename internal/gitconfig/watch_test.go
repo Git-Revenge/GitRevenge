@@ -77,9 +77,15 @@ func TestWatcherReportsAFileThatNeverSettles(t *testing.T) {
 	defer w.Close()
 	w.Add(path)
 
-	stop := make(chan struct{})
-	defer close(stop)
+	// The writer has to be gone before the test ends: a write still under way would put the
+	// file back while the temp dir is being removed, and the cleanup would fail.
+	stop, stopped := make(chan struct{}), make(chan struct{})
+	defer func() {
+		close(stop)
+		<-stopped
+	}()
 	go func() {
+		defer close(stopped)
 		content := "[a]\n"
 		for {
 			select {
