@@ -2,6 +2,10 @@ package git
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/git-revenge/gitrevenge/internal/gittest"
@@ -124,5 +128,83 @@ func TestSubmodulesStatusAndUpdate(t *testing.T) {
 	}
 	if subs, _ := repo.Submodules(ctx); subs[0].State != "ok" {
 		t.Fatalf("after update = %+v", subs)
+	}
+}
+
+// Listing must not install LFS's hooks, which then run git-lfs on every commit (#604).
+func TestLFSStatusLeavesHooksAlone(t *testing.T) {
+	t.Parallel()
+	fx := gittest.New(t)
+	if _, err := fx.TryGit("lfs", "version"); err != nil {
+		t.Skip("git-lfs not installed")
+	}
+	fx.Linear(1)
+	st, err := OpenRepo(newTestRunner(t), fx.Dir).LFS(context.Background())
+	if err != nil || len(st.Patterns) != 0 || len(st.Files) != 0 {
+		t.Fatalf("st = %+v, %v", st, err)
+	}
+	for _, hook := range []string{"post-checkout", "post-commit", "post-merge", "pre-push"} {
+		if _, err := os.Stat(fx.Path(".git/hooks/" + hook)); err == nil {
+			t.Errorf("%s hook was installed", hook)
+		}
+	}
+}
+
+// The patterns read from attributes files match what `git lfs track --json` lists, apart
+// from two of its quirks: it prefixes .git/info/attributes patterns with ".git/info/" and
+// gives global ones no source.
+func TestLFSPatternsMatchGitLFS(t *testing.T) {
+	t.Parallel()
+	fx := gittest.New(t)
+	if _, err := fx.TryGit("lfs", "version"); err != nil {
+		t.Skip("git-lfs not installed")
+	}
+	fx.WriteFile(".gitattributes", "*.bin filter=lfs diff=lfs merge=lfs -text\n"+
+		"*.psd filter=lfs diff=lfs merge=lfs -text lockable\n"+
+		"my[[:space:]]file.dat filter=lfs -text\n"+
+		"\"q x.zip\" filter=lfs\n"+
+		"*.txt -filter\n# a comment\n[attr]big filter=lfs\n*.mov big\n*.md text\n")
+	fx.WriteFile("sub/.gitattributes", "*.wav filter=lfs\r\n")
+	fx.Commit("attributes")
+	fx.WriteFile("new/.gitattributes", "*.ogg filter=lfs\n") // not yet added
+	repo := OpenRepo(newTestRunner(t), fx.Dir)
+	ctx := context.Background()
+	got, err := repo.lfsPatterns(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want struct {
+		Patterns []LFSPattern `json:"patterns"`
+	}
+	if err := repo.lfsJSON(ctx, &want, "track", "--json"); err != nil {
+		t.Fatal(err)
+	}
+	var tracked []LFSPattern
+	for _, p := range want.Patterns {
+		if p.Tracked {
+			p.Source = filepath.ToSlash(p.Source)
+			tracked = append(tracked, p)
+		}
+	}
+	key := func(p LFSPattern) string { return p.Pattern }
+	sortBy := func(ps []LFSPattern) {
+		slices.SortFunc(ps, func(a, b LFSPattern) int { return strings.Compare(key(a), key(b)) })
+	}
+	sortBy(got)
+	sortBy(tracked)
+	if !slices.Equal(got, tracked) {
+		t.Fatalf("got  %+v\nwant %+v", got, tracked)
+	}
+}
+
+func TestParseLFSAttributes(t *testing.T) {
+	t.Parallel()
+	got := parseLFSAttributes("[attr]big filter=lfs\n*.mov big\n\"a\\\"b c\" filter=lfs lockable\n*.x -filter\nlone\n", "d/.gitattributes", "d")
+	want := []LFSPattern{
+		{Pattern: "d/*.mov", Source: "d/.gitattributes", Tracked: true},
+		{Pattern: `d/a"b c`, Source: "d/.gitattributes", Tracked: true, Lockable: true},
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("got %+v", got)
 	}
 }

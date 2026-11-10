@@ -45,6 +45,7 @@ Git tools: everyday git chores without leaving the app.
 
 - A link in a commit's subject is rose like the links in its message and trailers, not the browser's blue. (#582)
 - An ignored file's menu opens on right-click (or the Menu key) only; a plain click no longer opens it. (#583)
+- Opening a repository no longer adds Git LFS's hooks to it. They made every commit, checkout and merge run git-lfs, so a rebase in the app took seconds per commit even in repositories that don't use LFS. Repositories that don't track anything in LFS no longer run git-lfs at all on refresh. Hooks added before stay: in a repository that doesn't use LFS, `git lfs uninstall --local` removes them. (#604, #612)
 
 ## [0.10.0] - 2026-11-06
 
