@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // ConflictFile is everything needed to resolve one conflicted file.
@@ -19,6 +20,10 @@ type ConflictFile struct {
 	Merged Side `json:"merged"`
 	// Binary means the versions can't be merged as text; pick a side instead.
 	Binary bool `json:"binary"`
+	// Diff3 is the three versions merged again with the original of each conflicted place
+	// kept between the markers, whatever merge.conflictStyle says. It is "" when a side is
+	// missing or it couldn't be made; Merged is then all there is.
+	Diff3 string `json:"diff3"`
 }
 
 // Conflict reads the stages of a conflicted file.
@@ -56,8 +61,34 @@ func (r *Repo) Conflict(ctx context.Context, path string) (ConflictFile, error) 
 	}
 	if !cf.Binary {
 		cf.Base.Text, cf.Ours.Text, cf.Theirs.Text, cf.Merged.Text = string(bufs[0]), string(bufs[1]), string(bufs[2]), string(bufs[3])
+		if cf.Base.Exists && cf.Ours.Exists && cf.Theirs.Exists {
+			cf.Diff3 = r.mergeDiff3(ctx, bufs[1], bufs[0], bufs[2])
+		}
 	}
 	return cf, nil
+}
+
+// mergeDiff3 merges three versions of a file as text, keeping the original of each conflicted
+// place between the markers. It returns "" if that fails.
+func (r *Repo) mergeDiff3(ctx context.Context, ours, base, theirs []byte) string {
+	dir, err := os.MkdirTemp("", "gitrevenge-merge-")
+	if err != nil {
+		return ""
+	}
+	defer func() { _ = os.RemoveAll(dir) }()
+	names := [3]string{"ours", "base", "theirs"}
+	for i, b := range [3][]byte{ours, base, theirs} {
+		if err := os.WriteFile(filepath.Join(dir, names[i]), b, 0o600); err != nil {
+			return ""
+		}
+	}
+	// merge-file exits with the number of conflicts, so a failure here is the usual case.
+	out, err := r.runner.Run(ctx, Cmd{Dir: dir, Args: []string{"merge-file", "-p", "--diff3", "-L", "ours", "-L", "base", "-L", "theirs", "ours", "base", "theirs"}})
+	var gerr *Error
+	if err != nil && (!errors.As(err, &gerr) || gerr.ExitCode < 0 || gerr.ExitCode > 127) {
+		return ""
+	}
+	return string(out)
 }
 
 // ResolveWith writes content as the resolved file and stages it, marking it resolved.

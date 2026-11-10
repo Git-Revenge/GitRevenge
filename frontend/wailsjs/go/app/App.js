@@ -98,8 +98,16 @@ export function CommitSignatures(arg1, arg2) {
   return window['go']['app']['App']['CommitSignatures'](arg1, arg2);
 }
 
+export function ConflictContext(arg1) {
+  return window['go']['app']['App']['ConflictContext'](arg1);
+}
+
 export function ConflictFile(arg1, arg2) {
   return window['go']['app']['App']['ConflictFile'](arg1, arg2);
+}
+
+export function ConflictOrigin(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['app']['App']['ConflictOrigin'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function DeletableBranches(arg1, arg2) {
@@ -312,6 +320,10 @@ export function MergedBranches(arg1) {
 
 export function OpenGitConfig(arg1) {
   return window['go']['app']['App']['OpenGitConfig'](arg1);
+}
+
+export function OpenMergeTool(arg1, arg2) {
+  return window['go']['app']['App']['OpenMergeTool'](arg1, arg2);
 }
 
 export function OpenRepo(arg1) {

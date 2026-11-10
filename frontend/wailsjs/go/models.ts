@@ -409,6 +409,20 @@ export namespace app {
 	        this.local = source["local"];
 	    }
 	}
+	export class ConflictContext {
+	    mergeTool: string;
+	    clean: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ConflictContext(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mergeTool = source["mergeTool"];
+	        this.clean = source["clean"];
+	    }
+	}
 	export class DroppedCommit {
 	    commit: string;
 	    files: string[];
@@ -1573,6 +1587,7 @@ export namespace git {
 	    theirs: Side;
 	    merged: Side;
 	    binary: boolean;
+	    diff3: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ConflictFile(source);
@@ -1586,6 +1601,7 @@ export namespace git {
 	        this.theirs = this.convertValues(source["theirs"], Side);
 	        this.merged = this.convertValues(source["merged"], Side);
 	        this.binary = source["binary"];
+	        this.diff3 = source["diff3"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2029,6 +2045,22 @@ export namespace git {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ref = source["ref"];
 	        this.text = source["text"];
+	    }
+	}
+	export class PlaceOrigin {
+	    commit: string;
+	    author: string;
+	    subject: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PlaceOrigin(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.commit = source["commit"];
+	        this.author = source["author"];
+	        this.subject = source["subject"];
 	    }
 	}
 	export class RebaseItem {

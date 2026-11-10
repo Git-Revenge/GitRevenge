@@ -89,10 +89,22 @@ The walkthrough [Tidy a branch before you share it](../walkthroughs/tidy-a-branc
 When a merge, rebase or cherry-pick stops on conflicts, the conflicted files are listed with your uncommitted changes. For each one you can:
 
 - resolve it with **ours** or **theirs** in one click, or
-- open the **conflict tool**, which shows ours, theirs and an editable result side by side. Take either side for each conflict, or edit the result by hand, then choose **Mark resolved**.
+- open the **conflict tool** to decide place by place.
 
-![The conflict tool: ours and theirs side by side, and the editable result](../img/conflict-tool-light.webp#gh-light-mode-only)
-![The conflict tool: ours and theirs side by side, and the editable result](../img/conflict-tool-dark.webp#gh-dark-mode-only)
+In the conflict tool the **result** is the main view: the file as it will be saved, with a block wherever the two sides disagree. Conflict markers never appear in it and are never saved.
+
+- Each **place** has its own choices: **Ours**, **Theirs** or **Both** (ours first). Until you choose, the place is empty and shows what each side would put there. **Start again** puts a place back to undecided.
+- The result is an ordinary editor. Typing inside a place makes it **Edited**, which counts as decided; typing anywhere else just changes the file.
+- Above the result, **Ours and theirs** shows both sides of the current place with a few lines around them, each labelled with its branch and the commit that last changed those lines. **Three-way** adds the **Original**, where both sides started. **Result only** hides them. **Take** on a side, or <kbd>1</kbd> and <kbd>2</kbd> (with <kbd>Alt</kbd> while typing), takes that side for the current place.
+- **Next** and **Previous**, or <kbd>F7</kbd> and <kbd>Shift</kbd>+<kbd>F7</kbd>, move between places, going to the undecided ones first.
+- **Mark resolved** stays off until every place is decided, and its tooltip says how many are left. It saves the result, stages the file, and opens the next conflicted file if there is one.
+
+The panel on the right lists the files of the operation with their progress, and the files that merged without help. For the whole file it offers **Take ours** and **Take theirs**, **Start this file again**, and, when `merge.tool` is set in your git config, **Open in** that tool.
+
+A binary file, or one a side deleted, has no lines to choose between: the tool offers the whole-file choices only.
+
+![The conflict tool: both sides of a place above the result](../img/conflict-tool-light.webp#gh-light-mode-only)
+![The conflict tool: both sides of a place above the result](../img/conflict-tool-dark.webp#gh-dark-mode-only)
 
 See [Resolve a merge conflict](../walkthroughs/resolve-a-conflict.md) for the whole thing, step by step.
 

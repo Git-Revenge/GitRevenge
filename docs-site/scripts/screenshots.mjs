@@ -579,7 +579,7 @@ scenes.conflictAnim = (page) =>
       await sleep(800)
       await click(p, 'button.wip', { pause: 900 })
       await click(p, '[title="Open the conflict tool"]', { pause: 1600 })
-      await click(p, byText('Use theirs', 'button'), { pause: 300 })
+      await click(p, byText('Take theirs', 'button'), { pause: 300 })
       await untilGit(() => !execFileSync('git', ['-C', REPO, 'diff', '--name-only', '--diff-filter=U'], { encoding: 'utf8' }).trim())
       await sleep(1500)
       await click(p, byText('Commit the merge', 'button'), { pause: 300 })

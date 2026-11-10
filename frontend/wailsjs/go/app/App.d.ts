@@ -56,7 +56,11 @@ export function CommitRow(arg1:string,arg2:string):Promise<number>;
 
 export function CommitSignatures(arg1:string,arg2:Array<string>):Promise<Array<git.SignatureCheck>>;
 
+export function ConflictContext(arg1:string):Promise<app.ConflictContext>;
+
 export function ConflictFile(arg1:string,arg2:string):Promise<git.ConflictFile>;
+
+export function ConflictOrigin(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number):Promise<git.PlaceOrigin>;
 
 export function DeletableBranches(arg1:string,arg2:Array<string>):Promise<Array<string>>;
 
@@ -163,6 +167,8 @@ export function MarkBranchKind(arg1:string,arg2:string,arg3:string):Promise<void
 export function MergedBranches(arg1:string):Promise<Record<string, string>>;
 
 export function OpenGitConfig(arg1:string):Promise<app.ConfigDoc>;
+
+export function OpenMergeTool(arg1:string,arg2:string):Promise<void>;
 
 export function OpenRepo(arg1:string):Promise<app.RepoTab>;
 
