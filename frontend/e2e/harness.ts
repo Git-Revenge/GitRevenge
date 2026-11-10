@@ -95,7 +95,8 @@ const EventsOnMultiple = (name: string, listen: (data: unknown) => void) => {
   listeners.set(name, [...(listeners.get(name) ?? []), listen])
   return () => listeners.set(name, listeners.get(name)!.filter((l) => l !== listen))
 }
-win.runtime = new Proxy({ EventsOnMultiple } as Record<string, unknown>, { get: (o, k: string) => o[k] ?? (() => {}) })
+const BrowserOpenURL = (url: string) => void win.__events.push(['open-url', url])
+win.runtime = new Proxy({ EventsOnMultiple, BrowserOpenURL } as Record<string, unknown>, { get: (o, k: string) => o[k] ?? (() => {}) })
 
 const record =
   (name: string) =>
@@ -256,6 +257,10 @@ const mounts = {
     const { default: WorktreesDialog } = await import('../src/lib/WorktreesDialog.svelte')
     mount(WorktreesDialog, { target: host, props: { path: '/r', onClose: () => {} } })
   },
+  async about() {
+    const { default: AboutDialog } = await import('../src/lib/about/AboutDialog.svelte')
+    mount(AboutDialog, { target: host, props: { version: '0.11.0', onClose: record('close') } })
+  },
   async repoPanel() {
     const { default: RepoPanel } = await import('../src/lib/RepoPanel.svelte')
     mount(RepoPanel, { target: host, props: { path: '/r', filter: '', openDialog: () => {} } })
@@ -278,6 +283,9 @@ const mounts = {
 }
 
 switch (new URLSearchParams(location.search).get('mount')) {
+  case 'about':
+    await mounts.about()
+    break
   case 'lazy':
     await mounts.lazy()
     break

@@ -53,6 +53,7 @@ class Commands {
   /** The clone dialog lives at the top level so the palette can open it from anywhere. */
   cloneOpen = $state(false)
   settingsOpen = $state(false)
+  aboutOpen = $state(false)
   keybindingsOpen = $state(false)
   /** The user's shortcut changes, by command id; "" unbinds the command. */
   overrides = $state<Record<string, string>>({})

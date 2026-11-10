@@ -24,6 +24,8 @@ export function BranchAction(arg1:string,arg2:string,arg3:Array<string>):Promise
 
 export function BranchMergeState(arg1:string,arg2:string):Promise<git.BranchMerge>;
 
+export function BuiltWith():Promise<app.BuiltWith>;
+
 export function CancelClone():Promise<void>;
 
 export function CancelNetwork(arg1:string):Promise<void>;

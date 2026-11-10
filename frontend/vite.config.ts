@@ -1,9 +1,14 @@
 import {defineConfig} from 'vite'
 import {svelte} from '@sveltejs/vite-plugin-svelte'
+import {VERSION as svelteVersion} from 'svelte/compiler'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [svelte()],
+  define: {
+    // The Svelte version this build was compiled with, for the About dialog's credits.
+    __SVELTE_VERSION__: JSON.stringify(svelteVersion),
+  },
   build: {
     rolldownOptions: {
       output: {

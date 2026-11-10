@@ -14,7 +14,7 @@ Open a repository and this is what you get. Everything in the screenshots comes 
 7. **Commit message.** Where you write the summary and description, then commit with <kbd>Ctrl</kbd>+<kbd>Enter</kbd>.
 8. **Command palette.** Every command, searchable. <kbd>Ctrl</kbd>+<kbd>K</kbd> opens it from anywhere. The gear next to it opens Settings, and the moon or sun switches between dark and light.
 
-The strip along the bottom shows the git and git-lfs versions in use, and which version of Git Revenge you're running.
+The strip along the bottom shows the git and git-lfs versions in use, and which version of Git Revenge you're running. Click the version, or the heart beside it, for the About dialog: the project's website, how to sponsor it, and the open source projects it's built with.
 
 ## The sidebar
 

@@ -34,6 +34,10 @@ export function BranchMergeState(arg1, arg2) {
   return window['go']['app']['App']['BranchMergeState'](arg1, arg2);
 }
 
+export function BuiltWith() {
+  return window['go']['app']['App']['BuiltWith']();
+}
+
 export function CancelClone() {
   return window['go']['app']['App']['CancelClone']();
 }

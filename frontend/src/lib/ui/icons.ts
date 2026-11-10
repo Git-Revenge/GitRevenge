@@ -89,6 +89,8 @@ export const ICONS = {
   lock: [rr(5, 11, 14, 9, 2), 'M8 11V8a4 4 0 0 1 8 0v3'],
   unlock: [rr(5, 11, 14, 9, 2), 'M8 11V8a4 4 0 0 1 7.5-2'],
   external: ['M14 4h6v6', 'M20 4l-9 9', 'M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4'],
+  // Sponsoring, and the love in the About dialog's credits.
+  heart: ['M12 20.5C5.5 15.5 3 12.3 3 8.9a4.6 4.6 0 0 1 9-2.3 4.6 4.6 0 0 1 9 2.3c0 3.4-2.5 6.6-9 11.6z'],
 
   // Navigation and chrome
   home: ['M3 10.5 12 3l9 7.5', 'M5 9.5V21h14V9.5'],

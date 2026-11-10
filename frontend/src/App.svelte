@@ -54,6 +54,7 @@
         keywords: 'appearance colour color mode',
         run: () => session.run(() => theme.toggle()),
       },
+      { id: 'app.about', group: 'App', title: 'About Git Revenge', keywords: 'version sponsor credits licenses homepage website', run: () => (commands.aboutOpen = true) },
       { id: 'app.update', group: 'App', title: 'Check for updates', keywords: 'new version release download', run: () => session.run(() => update.checkNow()) },
       {
         id: 'app.update-checks',
@@ -155,6 +156,10 @@
   <Lazy load={() => import('./lib/SettingsDialog.svelte')} onClose={() => (commands.settingsOpen = false)} />
 {/if}
 
+{#if commands.aboutOpen}
+  <Lazy load={() => import('./lib/about/AboutDialog.svelte')} {version} onClose={() => (commands.aboutOpen = false)} />
+{/if}
+
 {#if gitConfig.confirmClose}
   <Modal title="Discard unsaved config changes?" onClose={() => (gitConfig.confirmClose = false)}>
     <p>Closing Git Config discards your unsaved changes to:</p>
@@ -245,7 +250,10 @@
       <span class="meta">git {env.gitVersion}</span>
       <span class="meta">{env.lfsVersion ? env.lfsVersion.replace(/^git-lfs\/(\S+).*/, 'lfs $1') : 'git-lfs not found'}</span>
       <span class="spacer"></span>
-      <span class="meta">Git Revenge {version}</span>
+      <span class="about">
+        <button class="heart" onclick={() => (commands.aboutOpen = true)} aria-label="Sponsor Git Revenge" title="Sponsor Git Revenge"><Icon name="heart" size={14} /></button>
+        <button class="meta" onclick={() => (commands.aboutOpen = true)} title="About Git Revenge">Git Revenge {version}</button>
+      </span>
     </footer>
   {/if}
 </div>
@@ -336,6 +344,55 @@
 
   .spacer {
     flex: 1;
+  }
+
+  /* The sponsor heart and the version: both open the About dialog. */
+  .about {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-right: -6px;
+  }
+
+  .about button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    padding: 0 6px;
+    background: none;
+    border: none;
+    border-radius: var(--r-sm);
+    transition:
+      background-color var(--dur-quick),
+      color var(--dur-quick);
+  }
+
+  .about button:focus-visible {
+    outline-offset: -2px;
+  }
+
+  .about .meta:hover,
+  .about .meta:focus-visible {
+    background: var(--wash-hover);
+    color: var(--ink);
+  }
+
+  .about .heart {
+    width: 22px;
+    padding: 0;
+    color: var(--link);
+  }
+
+  .about .heart:hover,
+  .about .heart:focus-visible {
+    background: var(--selected);
+    color: var(--link-hover);
+  }
+
+  .about .heart:hover :global(path),
+  .about .heart:focus-visible :global(path) {
+    fill: currentColor;
   }
 
   .muted {
