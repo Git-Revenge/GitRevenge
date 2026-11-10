@@ -97,6 +97,7 @@
       { id: 'repo.pull-merge', group: 'Repository', title: 'Pull (merge)', run: () => pull('merge') },
       { id: 'repo.pull-rebase', group: 'Repository', title: 'Pull (rebase)', run: () => pull('rebase') },
       { id: 'repo.push', group: 'Repository', title: 'Push the current branch', keywords: 'upload publish', shortcut: 'Mod+Shift+U', run: () => push(false) },
+      { id: 'repo.force-push', group: 'Repository', title: 'Force push the current branch (with lease)', keywords: 'overwrite rebase', run: forcePush },
     ]
     // Always bound (and listed on the cheat sheet); the palette shows them only when there's
     // something to undo or redo, and running them otherwise does nothing.

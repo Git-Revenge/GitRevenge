@@ -30,6 +30,17 @@ type OperationState struct {
 	Step, Total int
 	// Conflicts lists unmerged paths, relative to the work tree.
 	Conflicts []string
+	// Ours is the branch the operation is changing, or "" when HEAD was detached. Theirs is
+	// the other side: what is being merged in, or what a rebase is onto. It is "" for a
+	// cherry-pick or a revert, which have only the commit in hand.
+	Ours, Theirs string
+	// Commit is the commit in hand, with its Subject: the one a rebase stopped on, the one
+	// being merged, cherry-picked or reverted.
+	Commit, Subject string
+	// OrigHead is where the branch was before the operation, which is where aborting returns it.
+	OrigHead string
+	// Written are the commits a rebase has written so far, newest first, up to a cap.
+	Written []string
 }
 
 // DetectOperation reports which operation is in progress, by checking the state files git
@@ -80,6 +91,7 @@ func (r *Repo) OperationState(ctx context.Context, gitDir string) (OperationStat
 			st.Conflicts = append(st.Conflicts, p)
 		}
 	}
+	r.describe(ctx, gitDir, &st)
 	return st, nil
 }
 

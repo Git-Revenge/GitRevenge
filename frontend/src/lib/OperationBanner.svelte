@@ -1,9 +1,12 @@
 <script lang="ts">
-  import { RepoState, RunOperationAction } from '../../wailsjs/go/app/App.js'
+  import { Refs, RepoState, RunOperationAction, Undo, UndoState } from '../../wailsjs/go/app/App.js'
   import type { app } from '../../wailsjs/go/models'
   import { ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
   import { bisect, expectedSteps } from './bisect.svelte'
-  import { provideCommands } from './commands.svelte'
+  import { commands, formatShortcut, provideCommands } from './commands.svelte'
+  import { abortEffect, abortedMessage, beads as stepBeads, blockedBy, continueLabel, finishedMessage, OP_NOUN, opNote, opTitle } from './operation'
+  import { operations } from './operation.svelte'
+  import { toasts } from './toasts.svelte'
   import { session } from './session.svelte'
   import Icon from './ui/Icon.svelte'
   import { reveal } from './ui/motion'
@@ -13,25 +16,80 @@
   let opState = $state<app.RepoState | null>(null)
   let busy = $state(false)
 
-  const labels: Record<string, string> = {
-    merge: 'Merge',
-    rebase: 'Rebase',
-    'cherry-pick': 'Cherry-pick',
-    revert: 'Revert',
-    bisect: 'Bisect',
-    am: 'Applying patches',
-  }
-
   async function refresh() {
     opState = (await session.run(() => RepoState(path))) ?? null
+    operations.state[path] = opState
     void bisect.refresh(path)
   }
 
+  // A merge, rebase, cherry-pick or revert in progress (issue #593).
+  let conflicts = $derived(opState?.conflicts ?? [])
+  let can = $derived(new Set(opState?.actions ?? []))
+  let title = $derived(opState ? opTitle(opState) : null)
+  let aborting = $state(false)
+  /** The most files in conflict at this stop, so the strip can say how many are resolved. */
+  let seen = $state(0)
+  let stopKey = ''
+  $effect(() => {
+    const key = opState?.operation ? `${path} ${opState.operation} ${opState.commit}` : ''
+    const n = opState?.conflicts.length ?? 0
+    if (key !== stopKey) {
+      stopKey = key
+      seen = n
+      aborting = false
+    } else if (n > seen) seen = n
+  })
+
   async function act(action: string) {
+    const before = opState
+    const failed = session.error
     busy = true
+    aborting = false
     await session.run(() => RunOperationAction(path, action))
     busy = false
     await refresh()
+    if (before?.operation && !opState?.operation && session.error === failed) void finished(before, action)
+  }
+
+  /** Says what happened once an operation is over, with the way back. */
+  async function finished(was: app.RepoState, action: string) {
+    const repo = path
+    if (action === 'abort') {
+      toasts.show(abortedMessage(was))
+      return
+    }
+    const label = (await UndoState(repo).catch(() => null))?.undo ?? ''
+    toasts.show(
+      finishedMessage(was),
+      label
+        ? {
+            label: 'Undo',
+            run: async () => {
+              const now = await session.run(() => UndoState(repo))
+              if (now?.undo !== label) {
+                toasts.show('Something else happened since, so this can no longer be undone here. The toolbar Undo steps back one change at a time.')
+                return
+              }
+              await session.run(() => Undo(repo))
+            },
+          }
+        : undefined,
+    )
+    if (was.operation !== 'rebase') return
+    // A rebased branch that was already pushed has left its old commits on the remote.
+    const refs = (await Refs(repo).catch(() => null)) ?? []
+    const head = refs.find((r) => r.kind === 'local' && r.head)
+    if (head?.upstream && head.behind > 0) {
+      toasts.show(`${head.upstream} still has the commits from before the rebase.`, { label: 'Force push…', run: () => void commands.all().find((c) => c.id === 'repo.force-push')?.run() })
+    }
+  }
+
+  function resolveNext() {
+    if (conflicts[0]) operations.resolve = { path, file: conflicts[0] }
+  }
+
+  function goOn() {
+    if (!busy && can.has('continue') && !conflicts.length) void act('continue')
   }
 
   // Re-fetch when the tab changes or the backend reports a change on disk.
@@ -64,7 +122,14 @@
 
   // One key each while a commit is under test, so answering never needs the mouse.
   provideCommands(() =>
-    run && !done
+    !run && opState?.operation
+      ? [
+          ...(can.has('continue') && !conflicts.length ? [{ id: 'op.continue', group: 'Operation', title: continueLabel(opState), keywords: 'continue finish', shortcut: 'Mod+Enter', run: goOn }] : []),
+          ...(conflicts.length ? [{ id: 'op.resolve', group: 'Operation', title: 'Resolve the next conflicted file', keywords: 'conflict', run: resolveNext }] : []),
+          ...(can.has('skip') ? [{ id: 'op.skip', group: 'Operation', title: 'Skip this commit', run: () => act('skip') }] : []),
+          { id: 'op.abort', group: 'Operation', title: `Abort the ${OP_NOUN[opState.operation] ?? opState.operation}…`, keywords: 'stop cancel', run: () => (aborting = true) },
+        ]
+      : run && !done
       ? [
           { id: 'bisect.good', group: 'Bisect', title: 'Bisect: this commit works', keywords: 'good', shortcut: 'G', run: () => bisect.mark(path, 'good') },
           { id: 'bisect.bad', group: 'Bisect', title: 'Bisect: this commit is broken', keywords: 'bad', shortcut: 'B', run: () => bisect.mark(path, 'bad') },
@@ -109,22 +174,41 @@
       {/if}
     </span>
   </div>
-{:else if opState?.operation}
-  <div class="op" role="status" in:reveal out:reveal={{ out: true }}>
-    <Icon name="warning" />
-    <strong>{labels[opState.operation] ?? opState.operation} in progress</strong>
-    {#if opState.total > 0}<span class="meta">Step {opState.step} of {opState.total}</span>{/if}
-    {#if opState.conflicts.length > 0}
-      <span class="conflicts" title={opState.conflicts.join('\n')}>
-        {opState.conflicts.length} conflicted {opState.conflicts.length === 1 ? 'file' : 'files'}
+{:else if opState?.operation && title}
+  <div class={['op', 'run', conflicts.length ? 'stopped' : 'ready']} role="status" in:reveal out:reveal={{ out: true }}>
+    <Icon name={conflicts.length ? 'warning' : opState.operation === 'merge' ? 'merge' : 'check'} />
+    <div class="what">
+      <strong>
+        {title.verb}
+        {#if title.a}<span class="mono">{title.a}</span>{/if}
+        {title.join}
+        {#if title.b}<span class="mono">{title.b}</span>{/if}
+      </strong>
+      <span class="note">{opNote(opState, seen)}</span>
+    </div>
+    {#if stepBeads(opState).length}
+      <span class="beads" role="img" aria-label="{opState.step - 1} of {opState.total} done, {conflicts.length ? 'stopped at' : 'now at'} {opState.step}">
+        {#each stepBeads(opState) as b, i (i)}<i class={b}></i>{/each}
       </span>
     {/if}
     <span class="actions">
-      {#each opState.actions as action (action)}
-        <button class={['btn sm', action === 'continue' ? 'primary' : 'secondary']} disabled={busy} onclick={() => act(action)}>
-          {action === 'abort' && opState.operation === 'bisect' ? 'Stop bisect' : action[0].toUpperCase() + action.slice(1)}
-        </button>
-      {/each}
+      {#if aborting}
+        <span class="ask wide">{abortEffect(opState, seen)}</span>
+        <button class="btn sm danger" disabled={busy} onclick={() => act('abort')}>Abort the {OP_NOUN[opState.operation] ?? opState.operation}</button>
+        <button class="btn sm secondary" onclick={() => (aborting = false)}>Keep going</button>
+      {:else}
+        {#if conflicts.length}
+          <button class="btn sm secondary" onclick={resolveNext}>Resolve {conflicts.length} {conflicts.length === 1 ? 'file' : 'files'}</button>
+        {/if}
+        {#if can.has('continue')}
+          <button class={['btn primary', conflicts.length && 'off']} aria-disabled={conflicts.length > 0 || undefined} disabled={busy} title={blockedBy(opState) || undefined} onclick={goOn}>
+            {conflicts.length ? 'Continue' : continueLabel(opState)}
+            {#if !conflicts.length}<kbd>{formatShortcut('Mod+Enter')}</kbd>{/if}
+          </button>
+        {/if}
+        {#if can.has('skip')}<button class="btn sm quiet" disabled={busy} onclick={() => act('skip')}>Skip this commit</button>{/if}
+        {#if can.has('abort')}<button class="btn sm text danger" disabled={busy} onclick={() => (aborting = true)}>Abort…</button>{/if}
+      {/if}
     </span>
   </div>
 {/if}
@@ -166,8 +250,52 @@
     font-weight: 600;
   }
 
-  .conflicts {
-    color: var(--danger);
+  /* An operation waiting on you: warm paper while it's stopped on conflicts, plain once it's
+     ready to go on. The warning is the icon's to give, not the whole bar's. */
+  .op.run {
+    min-height: 48px;
+    background: var(--paper-warm);
+  }
+
+  .op.run.ready {
+    background: none;
+  }
+
+  .op.run.ready > :global(svg) {
+    color: var(--success);
+  }
+
+  .what {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .note {
+    font-size: 13px;
+    color: var(--ink-mute);
+    overflow-wrap: anywhere;
+  }
+
+  .what .mono {
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .beads i.bad {
+    background: var(--warning);
+    box-shadow: 0 0 0 3px var(--warning-wash);
+  }
+
+  .ask.wide {
+    max-width: 520px;
+    color: var(--ink-soft);
+  }
+
+  /* Off until nothing is conflicted, but still there to say why. */
+  .btn.off {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .actions {

@@ -420,6 +420,8 @@ export type RowMark = 'good' | 'bad' | 'skip' | 'testing' | 'found'
 export interface RowExtra {
   /** Replaces the commit's node. */
   mark?: RowMark
+  /** What the 'testing' mark holds in place of its question mark: a rebase's step number. */
+  glyph?: string
   /** A teal wash across the row: still in question. */
   band?: boolean
   /** A handwritten note in the label column, in place of "you're here". */
@@ -432,7 +434,7 @@ const BAND = 0.12
 
 /** A bisect's mark in place of a commit's node. Each is a shape as well as a colour: a tick, a
  * cross, a dash for a skip, a question mark for the commit under test. */
-function drawMark(ctx: CanvasRenderingContext2D, x: number, y: number, mark: RowMark, theme: Theme, cut: (r: number) => void, comfortable: boolean) {
+function drawMark(ctx: CanvasRenderingContext2D, x: number, y: number, mark: RowMark, theme: Theme, cut: (r: number) => void, comfortable: boolean, glyph = '?') {
   const r = comfortable ? 11 : 7
   ctx.save()
   ctx.lineCap = 'round'
@@ -451,7 +453,7 @@ function drawMark(ctx: CanvasRenderingContext2D, x: number, y: number, mark: Row
     ctx.fillStyle = theme.teal
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText('?', x, y + 0.5)
+    ctx.fillText(glyph, x, y + 0.5)
   } else if (mark === 'skip') {
     disc(ctx, x, y, r, theme.muted)
     cut(r - 1.5)
@@ -486,11 +488,11 @@ function drawMark(ctx: CanvasRenderingContext2D, x: number, y: number, mark: Row
  * or null when that isn't known. */
 export function bisectRow(
   id: string,
-  b: { terms: Record<string, string>; inQuestion: ReadonlySet<string> | null; current: string; found: string },
+  b: { terms: Record<string, string>; inQuestion: ReadonlySet<string> | null; current: string; found: string; currentNote?: string; currentGlyph?: string },
   colors: { bad: string },
 ): { extra: RowExtra; faded: boolean } {
   if (b.found === id) return { extra: { mark: 'found', note: 'it broke here', noteColor: colors.bad }, faded: false }
-  if (b.current === id) return { extra: { mark: 'testing', band: true, note: 'testing this one' }, faded: false }
+  if (b.current === id) return { extra: { mark: 'testing', band: true, glyph: b.currentGlyph, note: b.currentNote ?? 'testing this one' }, faded: false }
   const term = b.terms[id]
   if (term === 'good' || term === 'bad' || term === 'skip') return { extra: { mark: term }, faded: false }
   const open = !!b.inQuestion?.has(id)
@@ -667,7 +669,7 @@ export function drawRow(
     ctx.globalAlpha /= 0.3
   }
   if (extra.mark) {
-    drawMark(ctx, x, mid, extra.mark, theme, cut, comfortable)
+    drawMark(ctx, x, mid, extra.mark, theme, cut, comfortable, extra.glyph)
   } else if (isStash) {
     // Stashes aren't real history: a dashed ring, like the working tree's.
     const r = comfortable ? 9 : 5

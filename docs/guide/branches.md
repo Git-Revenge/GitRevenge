@@ -78,6 +78,21 @@ When a merge, rebase or cherry-pick stops on conflicts, the conflicted files are
 ![The conflict tool: ours and theirs side by side, and the editable result](../img/conflict-tool-light.webp#gh-light-mode-only)
 ![The conflict tool: ours and theirs side by side, and the editable result](../img/conflict-tool-dark.webp#gh-dark-mode-only)
 
-A banner at the top offers **Continue**, **Abort** and **Skip** until the operation is finished. See [Resolve a merge conflict](../walkthroughs/resolve-a-conflict.md) for the whole thing, step by step.
+See [Resolve a merge conflict](../walkthroughs/resolve-a-conflict.md) for the whole thing, step by step.
+
+### While a merge or rebase is in progress
+
+A strip at the top stays until the operation is finished. It names the operation and both sides, such as *Rebasing feature/offline-cache onto main*, and says where things stand: which commit a rebase stopped on and how far along it is, or how many of a merge's conflicted files are resolved.
+
+- **Resolve N files** opens the first conflicted file in the conflict tool.
+- **Continue** is off while anything is conflicted, and its tooltip names what's left. Once everything is resolved it says what it will do: **Continue with 2 more**, **Finish the rebase** or **Commit the merge**. <kbd>Ctrl</kbd>+<kbd>Enter</kbd> presses it.
+- **Skip this commit** leaves out the commit a rebase, cherry-pick or revert stopped on.
+- **Abort…** asks first, and says what it undoes: where your branch goes back to, and what is thrown away.
+
+During a rebase the graph ticks each commit as it's written again on top of the target, and the commit in hand carries its number.
+
+When the operation finishes, a notice says what happened and offers **Undo**, which puts the branch back where it was before the operation began. After a rebase of a branch that was already pushed, a second notice offers **Force push…**.
+
+The strip appears for an operation started in a terminal too.
 
 Any of these can be undone afterwards; see [Undo and redo](changes.md#undo-and-redo).
