@@ -547,10 +547,16 @@ scenes.rebaseAnim = (page) =>
     },
   )
 
+/** The button that runs a merge or rebase from its preview. */
+const PREVIEW_GO = '[role=dialog] button[type=submit]'
+
 /** Merges feature/metric-units into main, which stops on a conflict in src/feed.js. */
 async function merge(p) {
   await click(p, sidebarRef('metric-units'), { button: 'right', pause: 500 })
   await click(p, byText('Merge feature/metric-units into main'), { pause: 300 })
+  // The preview names the conflict; its button goes ahead.
+  await p.waitForSelector(`${PREVIEW_GO}:not([disabled])`)
+  await click(p, PREVIEW_GO, { pause: 300 })
   // The merge stops on the conflict: wait for its banner, and put away git's own message.
   await p.waitForSelector('.op')
   await sleep(1000)
@@ -613,6 +619,8 @@ scenes.undoAnim = (page) =>
       const before = headOf()
       await click(p, sidebarRef('offline-cache'), { button: 'right', pause: 500 })
       await click(p, byText('Merge feature/offline-cache into main'), { pause: 300 })
+      await p.waitForSelector(`${PREVIEW_GO}:not([disabled])`)
+      await click(p, PREVIEW_GO, { pause: 300 })
       await untilGit(() => headOf() !== before)
       await untilSettled(p, () => [...document.querySelectorAll('button')].find((b) => b.innerText.trim().startsWith('Undo'))?.disabled === false)
       const merged = headOf()

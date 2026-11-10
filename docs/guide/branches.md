@@ -21,12 +21,35 @@
 
 Right-click a branch or commit, and the menu offers what makes sense for it against the branch you have checked out. In the graph, the branches and tags on a commit each have a [submenu](graph.md#right-click-menus), which is where you'll find merging and rebasing:
 
-- **Merge** *it* **into** *your branch*, with or without a fast-forward.
-- **Rebase** *your branch* **onto** *it*.
+- **Merge** *it* **into** *your branch*…
+- **Rebase** *your branch* **onto** *it*…
 - **Cherry-pick** *it* **onto** *your branch*.
 - **Revert** a commit. Reverting a merge asks which parent to keep.
 
 You can also drag. Drop a branch or commit onto the checked-out branch to merge, rebase or cherry-pick it in, or drag the checked-out branch onto another commit. A menu asks which you meant.
+
+### Before a merge or rebase runs
+
+Merge and rebase first show what they would do. Nothing has happened yet: **Cancel** leaves everything as it was, and <kbd>Enter</kbd> goes ahead.
+
+The preview says whether files will conflict, and names them with how many places in each. It works this out in memory, without touching your files, your index or any branch. It's a forecast: the operation itself still has the last word. If the conflicts can't be checked, the preview says so and you can still go ahead.
+
+A merge preview also lists the commits and the number of files coming in, and asks **how** to merge:
+
+- **Fast-forward only** moves your branch forward with no merge commit. It's chosen for you when it's possible, and turned off when your branch has commits of its own.
+- **Merge commit** always makes a merge commit.
+- **Squash into one** stages everything the other branch changed as one change for you to commit. Nothing is committed, and the other branch isn't recorded as merged. It's turned off when files would conflict.
+
+The button says what it will do, such as **Fast-forward main** or **Merge, and resolve 2 conflicts**.
+
+A rebase preview lists the commits that will be written again, oldest first, and says which commit it would first stop on. Later commits can't be tried until that one is settled, so there may be more. It also offers:
+
+- **Fold the fixups into the commits they name**, when the branch has `fixup!` or `squash!` commits. It's on to begin with.
+- **Let me reorder, reword or drop commits first**, which opens the [interactive rebase editor](#interactive-rebase) instead.
+
+If the branch is already pushed, the preview warns that it will need a force push afterwards.
+
+Cherry-pick and revert run straight away: they're one commit, and Undo takes them back.
 
 ## Resetting
 

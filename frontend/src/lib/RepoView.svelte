@@ -69,6 +69,7 @@
   let worktreesOpen = $state(false)
   /** Commit after which the interactive rebase editor rewrites history, or "" when closed. */
   let rebaseBase = $state('')
+  let preview = $state<{ kind: 'merge' | 'rebase'; target: string; label: string } | null>(null)
   /** The ref whose reflog is open, or "" when closed. */
   let reflogRef = $state('')
   const ctx: MenuContext = {
@@ -82,12 +83,17 @@
     openDialog: (spec) => (dialog = spec),
     // One bisect at a time: the entry goes while one is running.
     get openBisect() {
-      return running ? undefined : (bad: string) => (bisect.starting = { path, bad })
+      return running
+        ? undefined
+        : (bad: string) => {
+            bisect.starting = { path, bad }
+          }
     },
     openRebase: (base) => {
       diff = null
       rebaseBase = base
     },
+    openPreview: (kind, target, label) => (preview = { kind, target, label }),
     openReflog: (ref) => (reflogRef = ref),
   }
 
@@ -351,6 +357,9 @@
 {/if}
 {#if dialog}
   <Dialog spec={dialog} onClose={() => (dialog = null)} />
+{/if}
+{#if preview}
+  <Lazy load={() => import('./PreviewDialog.svelte')} {path} {...preview} current={ctx.current()} onClose={() => (preview = null)} onEdit={ctx.openRebase} />
 {/if}
 {#if bisect.starting?.path === path}
   <Lazy load={() => import('./BisectDialog.svelte')} {path} bad={bisect.starting.bad} onClose={() => (bisect.starting = null)} />

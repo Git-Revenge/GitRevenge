@@ -22,6 +22,8 @@ export interface Scenario {
   /** What's checked out, as the tab shows it. */
   head?: string
   menuX?: number
+  /** Which preview the preview dialog shows; a merge unless said. */
+  previewKind?: 'merge' | 'rebase'
   theme?: 'light' | 'dark'
 }
 

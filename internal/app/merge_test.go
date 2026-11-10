@@ -58,3 +58,44 @@ func TestResetAndRevertActions(t *testing.T) {
 		t.Fatal("bad mode accepted")
 	}
 }
+
+func TestIntegrateSquashAndAutosquash(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.CommitFile("c.txt", "base\n", "base")
+	fx.Branch("feature")
+	fx.CommitFile("f.txt", "f\n", "Add f")
+	fx.CommitFile("g.txt", "g\n", "Add g")
+	fx.CommitFile("f.txt", "f2\n", "fixup! Add f")
+	fx.Checkout("main")
+	head := fx.CommitFile("m.txt", "m\n", "On main")
+	tab, _ := a.OpenRepo(fx.Dir)
+
+	// A squash stages the branch's changes and commits nothing.
+	if err := a.Integrate(tab.Path, "merge", []string{"feature", "squash"}); err != nil {
+		t.Fatal(err)
+	}
+	if fx.Head() != head {
+		t.Fatal("a squash merge moved the branch")
+	}
+	if got := fx.Git("diff", "--cached", "--name-only"); got != "f.txt\ng.txt" {
+		t.Fatalf("staged = %q", got)
+	}
+	fx.Git("reset", "--hard", "-q")
+
+	// A rebase that folds fixups leaves two commits where there were three.
+	fx.Checkout("feature")
+	if err := a.Integrate(tab.Path, "rebase", []string{"main", "autosquash"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := fx.Git("log", "--format=%s", "main..HEAD"); got != "Add g\nAdd f" {
+		t.Fatalf("after the rebase: %q", got)
+	}
+	if got := fx.Git("show", "HEAD~1:f.txt"); got != "f2" {
+		t.Fatalf("the fixup wasn't folded in: f.txt = %q", got)
+	}
+	if info, _ := a.UndoState(tab.Path); info.Undo == "" {
+		t.Fatal("the rebase should be undoable")
+	}
+}

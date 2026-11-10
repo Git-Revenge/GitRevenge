@@ -35,10 +35,12 @@ type MergePreview struct {
 	// needed, and nothing can conflict.
 	FastForward bool `json:"fastForward"`
 	// Commits come in newest first, up to a cap; CommitCount is how many there are in all.
-	Commits     []ForecastCommit   `json:"commits"`
-	CommitCount int                `json:"commitCount"`
-	Files       int                `json:"files"`
-	Conflicts   []ForecastConflict `json:"conflicts"`
+	Commits     []ForecastCommit `json:"commits"`
+	CommitCount int              `json:"commitCount"`
+	// IntoOnly is how many commits the checked-out branch has that the other side doesn't.
+	IntoOnly  int                `json:"intoOnly"`
+	Files     int                `json:"files"`
+	Conflicts []ForecastConflict `json:"conflicts"`
 	// Unknown means the conflicts couldn't be worked out; Conflicts then says nothing.
 	Unknown bool `json:"unknown"`
 }
@@ -109,7 +111,7 @@ func (a *App) PreviewMerge(path, source string) (MergePreview, error) {
 	}
 	return MergePreview{
 		Into: currentBranch(ctx, r.Git), AlreadyMerged: f.AlreadyMerged, FastForward: f.FastForward,
-		Commits: forecastCommits(f.Commits), CommitCount: f.CommitCount, Files: f.Files,
+		Commits: forecastCommits(f.Commits), CommitCount: f.CommitCount, IntoOnly: f.OursOnly, Files: f.Files,
 		Conflicts: forecastConflicts(f.Conflicts), Unknown: f.Incomplete,
 	}, nil
 }

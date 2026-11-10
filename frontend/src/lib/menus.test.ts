@@ -26,7 +26,7 @@ const ref = (short: string, kind: Ref['kind'], head = false): Ref => ({
   behind: 0,
   gone: false,
 })
-const ctx = (current: string): MenuContext => ({ path: '/r', current: () => current, openDialog: () => {}, openRebase: () => {}, openReflog: () => {} })
+const ctx = (current: string): MenuContext => ({ path: '/r', current: () => current, openDialog: () => {}, openRebase: () => {}, openPreview: () => {}, openReflog: () => {} })
 const labels = (items: { label: string }[]) => items.map((i) => i.label)
 
 describe('dropItems', () => {
@@ -34,7 +34,7 @@ describe('dropItems', () => {
 
   it('dropping a branch onto the checked-out branch merges or rebases', () => {
     const items = dropItems(row('a'.repeat(40)), [ref('feature', 'local')], row('b'.repeat(40)), head, ctx('main'))
-    expect(labels(items)).toEqual(['Merge feature into main', 'Merge feature into main (no fast-forward)', 'Rebase main onto feature'])
+    expect(labels(items)).toEqual(['Merge feature into main…', 'Rebase main onto feature…'])
   })
 
   it('dropping a bare commit onto the checked-out branch also offers cherry-pick', () => {
@@ -44,7 +44,7 @@ describe('dropItems', () => {
 
   it('dragging the checked-out branch onto a tag offers rebasing onto it', () => {
     const items = dropItems(row('b'.repeat(40)), head, row('d'.repeat(40)), [ref('v1.0', 'tag')], ctx('main'))
-    expect(labels(items)).toContain('Rebase main onto v1.0')
+    expect(labels(items)).toContain('Rebase main onto v1.0…')
   })
 
   it('offers nothing when neither side is checked out, or HEAD is detached', () => {
@@ -126,7 +126,7 @@ describe('refItems', () => {
 
 // #506
 describe('focusing the graph', () => {
-  const ctx = { path: '/r', current: () => 'main', openDialog: () => {}, openRebase: () => {}, openReflog: () => {} } as unknown as MenuContext
+  const ctx = { path: '/r', current: () => 'main', openDialog: () => {}, openRebase: () => {}, openPreview: () => {}, openReflog: () => {} } as unknown as MenuContext
   const labels = (items: { label: string }[]) => items.map((i) => i.label)
 
   it('offers a branch, and its stack when it has one', () => {
@@ -160,7 +160,7 @@ describe('focusing the graph', () => {
 // #505
 describe('a branch in another worktree', () => {
   const topic = { ...ref('topic', 'local'), worktree: '/wt/topic' }
-  const ctx = { path: '/r', current: () => 'main', openDialog: () => {}, openRebase: () => {}, openReflog: () => {} } as unknown as MenuContext
+  const ctx = { path: '/r', current: () => 'main', openDialog: () => {}, openRebase: () => {}, openPreview: () => {}, openReflog: () => {} } as unknown as MenuContext
   const keys = (d: ReturnType<typeof deleteWorktreeBranchDialog>) => (d.fields ?? []).map((f) => f.key)
   const linked = { path: '/wt/topic', main: false, prunable: false }
 

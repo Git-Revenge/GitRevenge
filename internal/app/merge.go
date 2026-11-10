@@ -10,9 +10,9 @@ import (
 
 // Integrate merges, cherry-picks, rebases, resets or reverts on the current branch:
 //
-//	merge:       ref, mode ("" / "no-ff" / "ff-only")
+//	merge:       ref, mode ("" / "no-ff" / "ff-only" / "squash")
 //	cherry-pick: commit IDs, oldest first
-//	rebase:      onto
+//	rebase:      onto, "autosquash" to fold fixup! and squash! commits into the ones they name
 //	reset:       target, mode ("soft" / "mixed" / "hard")
 //	revert:      commit, mainline parent for merges ("" for ordinary commits)
 //
@@ -38,7 +38,12 @@ func (a *App) Integrate(path, action string, args []string) error {
 		}
 		err = a.record(r, "Cherry-pick "+shortRef(args[0]), kindMove, "", func() error { return r.Git.CherryPick(ctx, args...) })
 	case "rebase":
-		err = a.record(r, "Rebase onto "+shortRef(arg(0)), kindMove, "", func() error { return r.Git.Rebase(ctx, arg(0)) })
+		err = a.record(r, "Rebase onto "+shortRef(arg(0)), kindMove, "", func() error {
+			if arg(1) == "autosquash" {
+				return r.Git.RebaseAutosquash(ctx, arg(0))
+			}
+			return r.Git.Rebase(ctx, arg(0))
+		})
 	case "reset":
 		err = a.record(r, "Reset to "+shortRef(arg(0))+" ("+arg(1)+")", kindReset, git.ResetMode(arg(1)), func() error {
 			return r.Git.Reset(ctx, arg(0), git.ResetMode(arg(1)))

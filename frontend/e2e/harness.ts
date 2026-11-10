@@ -158,7 +158,7 @@ const mounts = {
     const { default: ContextMenu } = await import('../src/lib/ContextMenu.svelte')
     const { commitMenuItems } = await import('../src/lib/menus')
     const refs = (scenario.responses?.Refs ?? []) as never[]
-    const ctx = { path: '/r', current: () => scenario.current ?? 'main', openDialog: record('dialog'), openRebase: record('rebase'), openReflog: record('reflog') }
+    const ctx = { path: '/r', current: () => scenario.current ?? 'main', openDialog: record('dialog'), openRebase: record('rebase'), openPreview: record('preview'), openReflog: record('reflog') }
     const row = { ...graphRow(0), id: 'a'.repeat(40) } as never
     const items = commitMenuItems(row, refs, ctx)
     const { session } = await import('../src/lib/session.svelte')
@@ -211,6 +211,25 @@ const mounts = {
     const { commands } = await import('../src/lib/commands.svelte')
     window.addEventListener('keydown', (e) => void commands.dispatch(e))
   },
+  async previewDialog() {
+    const { default: PreviewDialog } = await import('../src/lib/PreviewDialog.svelte')
+    // As in the app, closing takes the dialog's props away: it must not read them afterwards.
+    let closed = false
+    const until = <T,>(v: T) => (closed ? undefined : v) as T
+    const close = record('close')
+    const props = {
+      get path() { return until('/r') },
+      get kind() { return until(scenario.previewKind ?? 'merge') },
+      get target() { return until('feature/metric-units') },
+      get label() { return until('feature/metric-units') },
+      get current() { return until('main') },
+      onClose: () => { closed = true; close() },
+      onEdit: record('edit'),
+    }
+    const { session } = await import('../src/lib/session.svelte')
+    Object.assign(win, { __sessionError: () => session.error })
+    mount(PreviewDialog, { target: host, props })
+  },
   async worktreesDialog() {
     const { default: WorktreesDialog } = await import('../src/lib/WorktreesDialog.svelte')
     mount(WorktreesDialog, { target: host, props: { path: '/r', onClose: () => {} } })
@@ -260,6 +279,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'graph':
     await mounts.graph()
+    break
+  case 'previewDialog':
+    await mounts.previewDialog()
     break
   case 'commitMenu':
     await mounts.commitMenu()
