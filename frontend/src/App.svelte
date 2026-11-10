@@ -5,6 +5,7 @@
   import { BrowserOpenURL } from '../wailsjs/runtime/runtime.js'
   import CommandPalette from './lib/CommandPalette.svelte'
   import { commands, provideCommands, type Command } from './lib/commands.svelte'
+  import ErrorBanner from './lib/ErrorBanner.svelte'
   import { gitConfig } from './lib/gitconfig/config.svelte'
   import { insights } from './lib/insights/insights.svelte'
   import { ignoreRules } from './lib/ignorerules/ignoreRules.svelte'
@@ -207,12 +208,10 @@
     </main>
   {:else if env}
     <TabBar />
-    {#if session.error}
-      <div class="banner" role="alert" in:reveal out:reveal={{ out: true }}>
-        <Icon name="warning" />
-        <span class="message">{session.error}</span>
-        <button class="btn sm quiet" onclick={() => (session.error = '')}>Dismiss</button>
-      </div>
+    {#if session.problem}
+      {#key session.problem}
+        <ErrorBanner problem={session.problem} />
+      {/key}
     {/if}
     {#if update.available || update.upToDate}
       <div class="banner notice" role="status" in:reveal out:reveal={{ out: true }}>
@@ -309,13 +308,8 @@
     align-items: center;
     gap: 10px;
     padding: 6px 8px 6px 14px;
-    background: var(--danger-wash);
     border-bottom: 1px solid var(--paper-edge);
     color: var(--ink);
-  }
-
-  .banner > :global(svg) {
-    color: var(--danger);
   }
 
   .notice {

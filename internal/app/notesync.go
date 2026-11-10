@@ -40,7 +40,7 @@ func (a *App) syncNotesIn(ctx context.Context, r *session.Repo, remotes []string
 	var diverged []string
 	for _, rm := range remotes {
 		if err := r.Git.FetchNotes(ctx, rm, o); err != nil {
-			a.notice(r.Path, "Couldn't fetch notes from "+rm+": "+sentence(netErr(err).Error()))
+			a.notice(r.Path, "Couldn't fetch notes from "+rm+": "+sentence(plainErr(netErr(err))))
 			continue
 		}
 		d, err := r.Git.IntegrateNotes(ctx, rm)
@@ -63,7 +63,7 @@ func (a *App) pushNotesTo(ctx context.Context, r *session.Repo, remote string, o
 		return
 	}
 	if err := r.Git.PushNotes(ctx, remote, o); err != nil {
-		a.notice(r.Path, "The branch was pushed, but notes weren't: "+sentence(netErr(err).Error())+" Fetch to bring in the remote's notes first.")
+		a.notice(r.Path, "The branch was pushed, but notes weren't: "+sentence(plainErr(netErr(err)))+" Fetch to bring in the remote's notes first.")
 	}
 }
 

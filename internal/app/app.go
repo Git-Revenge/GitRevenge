@@ -27,6 +27,8 @@ type App struct {
 
 	net  network
 	undo undoStacks
+	// problems holds the last structured error, until the frontend takes it.
+	problems problems
 	// upstreams remembers where branches' upstreams were before fetches prune them, for
 	// cleanup on pull.
 	upstreams upstreamMemory

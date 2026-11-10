@@ -156,7 +156,7 @@ func (a *App) track(key, path, op string, busy userError, fn func(ctx context.Co
 	if errors.Is(err, context.Canceled) {
 		return userError("Cancelled.")
 	}
-	return netErr(err)
+	return a.remember(path, netProblem(op, err))
 }
 
 // CancelNetwork stops the repository's running fetch, pull or push.
@@ -437,40 +437,7 @@ func isRejectedPush(err error) bool {
 	return errors.As(err, &gerr) && rejectedPushText(gerr.Stderr)
 }
 
-// netErr explains common network failures.
+// netErr explains a network failure whose operation the caller doesn't name.
 func netErr(err error) error {
-	var gerr *git.Error
-	if !errors.As(err, &gerr) {
-		return writeErr(err)
-	}
-	s := gerr.Stderr
-	switch {
-	case strings.Contains(s, "Authentication failed"), strings.Contains(s, "could not read Username"),
-		strings.Contains(s, "Invalid username or password"):
-		return userError("Authentication failed. Check your credentials (or Git Credential Manager) and try again.\n\n" + string(gitMessage(s)))
-	case strings.Contains(s, "returned error: 403"):
-		return userError("The server refused this operation (HTTP 403). Your account may not have permission to push to or read this repository.")
-	case strings.Contains(s, "returned error: 401"):
-		return userError("Authentication failed (HTTP 401). Check your credentials and try again.")
-	case strings.Contains(s, "Permission denied (publickey"):
-		return userError("The server refused your SSH key. Make sure your key is loaded in ssh-agent and added to your account.\n\n" + string(gitMessage(s)))
-	case strings.Contains(s, "Host key verification failed"):
-		return userError("The server's SSH host key wasn't trusted, so the connection was stopped.")
-	case strings.Contains(s, "Repository not found"), strings.Contains(s, "' does not exist"),
-		strings.Contains(s, "does not appear to be a git repository"),
-		strings.Contains(s, "repository '") && strings.Contains(s, "' not found"):
-		return userError("No repository was found at that URL. Check the URL, and that your account can access the repository.")
-	case strings.Contains(s, "Could not resolve host"), strings.Contains(s, "unable to access"):
-		return userError("Couldn't reach the remote. Check the URL and your network connection.\n\n" + string(gitMessage(s)))
-	case rejectedPushText(s):
-		return userError("The remote has commits you don't have. Pull first, or force push (with lease) to overwrite them.")
-	case strings.Contains(s, "stale info"):
-		return userError("The remote branch moved since you last fetched, so force push was refused to protect it. Fetch, review, then try again.")
-	case strings.Contains(s, "Not possible to fast-forward"), strings.Contains(s, "Diverging branches"):
-		return userError("Your branch and its upstream have diverged. Pull with merge or rebase instead of fast-forward only.")
-	}
-	if strings.TrimSpace(s) != "" {
-		return gitMessage(s)
-	}
-	return err
+	return netProblem("", err)
 }

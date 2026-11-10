@@ -250,7 +250,7 @@ func batchMessage(err error) string {
 			return "Local changes would be overwritten. Commit or stash them first."
 		}
 	}
-	return netErr(err).Error()
+	return plainErr(netErr(err))
 }
 
 func (a *App) groupPaths(name string) (*session.Manager, []string, error) {

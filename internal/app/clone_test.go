@@ -94,7 +94,7 @@ func TestCloneMissingRepoIsExplained(t *testing.T) {
 	parent := t.TempDir()
 
 	_, err := a.Clone(filepath.Join(t.TempDir(), "nope"), parent, "copy")
-	if err == nil || !strings.Contains(err.Error(), "No repository was found") {
+	if err == nil || !strings.Contains(err.Error(), "no repository was found") {
 		t.Fatalf("err = %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(parent, "copy")); !os.IsNotExist(err) {
