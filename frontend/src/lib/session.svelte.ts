@@ -7,10 +7,12 @@ import {
   RepoInfo,
   RestoreSession,
   SetActiveRepo,
+  TakeProblem,
 } from '../../wailsjs/go/app/App.js'
 import type { app } from '../../wailsjs/go/models'
 import { EventsOn } from '../../wailsjs/runtime/runtime.js'
 import { errorText } from './errors'
+import { fromText, type Problem } from './problem'
 
 /** Payload of the "repo:changed" event (RepoChange in Go). Events aren't bindings, so
  * Wails doesn't generate this type. */
@@ -25,8 +27,17 @@ class Session {
   /** Path of the active tab, or '' for the start page. */
   active = $state('')
   recent = $state<app.RecentRepo[]>([])
-  /** Last error to show in the banner, or ''. */
-  error = $state('')
+  /** The error the banner is showing, or null. */
+  problem = $state<Problem | null>(null)
+
+  /** The banner's error as text, or ''. Setting it shows that text, and '' clears the banner. */
+  get error(): string {
+    return this.problem?.text ?? ''
+  }
+
+  set error(text: string) {
+    this.problem = text ? fromText(text) : null
+  }
   /** Per-repo counter bumped on every change on disk; views re-fetch when it moves. */
   revision = $state<Record<string, number>>({})
   /** Per-repo counter bumped when its undo or redo history changes. */
@@ -139,12 +150,15 @@ class Session {
     void this.refreshRecent()
   }
 
-  /** Runs a backend call, turning a rejection into the error banner. */
+  /** Runs a backend call, turning a rejection into the error banner. The backend keeps more
+   * than the message for failures it understands: a headline, next steps and git's output. */
   async run<T>(fn: () => Promise<T>): Promise<T | undefined> {
     try {
       return await fn()
     } catch (e) {
-      this.error = errorText(e)
+      const text = errorText(e)
+      const known = await TakeProblem(text).catch(() => null)
+      this.problem = known ? { ...known, actions: known.actions ?? [], text, retry: fn } : fromText(text)
       return undefined
     }
   }

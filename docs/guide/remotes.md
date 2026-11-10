@@ -20,6 +20,16 @@ Git Revenge uses your existing credential helpers and SSH agent, so if `git push
 
 The first time you connect to an SSH host your machine doesn't know yet, the app shows the host key's fingerprint and asks before accepting it.
 
+### When a fetch, pull or push fails
+
+A strip under the tabs says what failed and why in one line, then where that leaves you, such as "Nothing was pushed". Where there's an obvious next step it's a button:
+
+- **Pull, then push** or **Force push…** when the remote has commits you don't have.
+- **Push to a new branch…** when the server refuses the branch, for example one that only takes changes through a pull request. It starts a branch at your current commit, switches to it and pushes it; the branch you were on stays as it is. **See the rules** opens the page the server pointed to.
+- **Try again** after a sign-in or connection problem.
+
+**Details** shows what git itself said, without its progress lines, and **Copy everything** copies all of git's output for a bug report.
+
 ## Managing remotes
 
 **Manage remotes…** (in the command palette, or the gear at the top of the Remotes panel in the sidebar) adds, edits and removes remotes.

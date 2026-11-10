@@ -96,7 +96,8 @@ const EventsOnMultiple = (name: string, listen: (data: unknown) => void) => {
   return () => listeners.set(name, listeners.get(name)!.filter((l) => l !== listen))
 }
 const BrowserOpenURL = (url: string) => void win.__events.push(['open-url', url])
-win.runtime = new Proxy({ EventsOnMultiple, BrowserOpenURL } as Record<string, unknown>, { get: (o, k: string) => o[k] ?? (() => {}) })
+const ClipboardSetText = async (text: string) => (win.__events.push(['copy', text]), true)
+win.runtime = new Proxy({ EventsOnMultiple, BrowserOpenURL, ClipboardSetText } as Record<string, unknown>, { get: (o, k: string) => o[k] ?? (() => {}) })
 
 const record =
   (name: string) =>
@@ -261,6 +262,35 @@ const mounts = {
     const { default: AboutDialog } = await import('../src/lib/about/AboutDialog.svelte')
     mount(AboutDialog, { target: host, props: { version: '0.11.0', onClose: record('close') } })
   },
+  async errorBanner() {
+    const { mount: show, unmount } = await import('svelte')
+    const { default: ErrorBanner } = await import('../src/lib/ErrorBanner.svelte')
+    const { default: Toolbar } = await import('../src/lib/Toolbar.svelte')
+    const { session } = await import('../src/lib/session.svelte')
+    host.style.cssText = 'display:block'
+    const banner = host.appendChild(document.createElement('div'))
+    session.tabs = [{ path: '/r', name: 'r', head: 'main' } as never]
+    session.active = '/r'
+    // The toolbar's commands are how the banner pulls and pushes.
+    if (scenario.toolbar) mount(Toolbar, { target: host.appendChild(document.createElement('div')), props: { path: '/r' } })
+    // As App does: the banner shows whatever the session last failed at, and is made again
+    // when that changes.
+    let shown: Record<string, never> | null = null
+    let last: unknown = null
+    setInterval(() => {
+      if (session.problem === last) return
+      last = session.problem
+      if (shown) void unmount(shown)
+      shown = session.problem ? show(ErrorBanner, { target: banner, props: { problem: session.problem } }) : null
+    }, 20)
+    const app = (win.go as { app: { App: Record<string, (...a: unknown[]) => Promise<unknown>> } }).app.App
+    Object.assign(win, {
+      __sessionError: () => session.error,
+      /** Makes a backend call through the session, as a command would, so a failure lands in the banner. */
+      __call: (method: string, ...args: unknown[]) => session.run(() => app[method](...args)),
+      __say: (text: string) => void (session.error = text),
+    })
+  },
   async repoPanel() {
     const { default: RepoPanel } = await import('../src/lib/RepoPanel.svelte')
     mount(RepoPanel, { target: host, props: { path: '/r', filter: '', openDialog: () => {} } })
@@ -285,6 +315,9 @@ const mounts = {
 switch (new URLSearchParams(location.search).get('mount')) {
   case 'about':
     await mounts.about()
+    break
+  case 'errorBanner':
+    await mounts.errorBanner()
     break
   case 'lazy':
     await mounts.lazy()

@@ -330,6 +330,8 @@ export function Submodules(arg1:string):Promise<Array<git.Submodule>>;
 
 export function TakeConflictSide(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function TakeProblem(arg1:string):Promise<app.Problem>;
+
 export function Theme():Promise<string>;
 
 export function TrailerHints(arg1:string):Promise<git.TrailerHints>;

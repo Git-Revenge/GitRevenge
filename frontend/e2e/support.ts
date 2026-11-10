@@ -25,6 +25,8 @@ export interface Scenario {
   /** Which preview the preview dialog shows; a merge unless said. */
   previewKind?: 'merge' | 'rebase'
   theme?: 'light' | 'dark'
+  /** Mounts the toolbar under the error banner, for the commands its actions run. */
+  toolbar?: boolean
 }
 
 /** Opens one real component against the stub, and fails on any uncaught error. */
