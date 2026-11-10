@@ -1025,6 +1025,12 @@ export namespace app {
 	    total: number;
 	    actions: string[];
 	    conflicts: string[];
+	    ours: string;
+	    theirs: string;
+	    commit: string;
+	    subject: string;
+	    origHead: string;
+	    written: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new RepoState(source);
@@ -1037,6 +1043,12 @@ export namespace app {
 	        this.total = source["total"];
 	        this.actions = source["actions"];
 	        this.conflicts = source["conflicts"];
+	        this.ours = source["ours"];
+	        this.theirs = source["theirs"];
+	        this.commit = source["commit"];
+	        this.subject = source["subject"];
+	        this.origHead = source["origHead"];
+	        this.written = source["written"];
 	    }
 	}
 	export class RepoTab {

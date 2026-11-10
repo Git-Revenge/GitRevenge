@@ -13,6 +13,10 @@ type Harness = Window &
     __ready: boolean
     /** Sends an event from the stubbed backend. */
     __emit: (name: string, data: unknown) => void
+    /** Changes what the stubbed backend answers from now on. */
+    __respond: (responses: Record<string, unknown>) => void
+    /** Tells the app the repository changed on disk, as the watcher would. */
+    __changed: (path: string) => void
     go: unknown
     runtime: unknown
   }
@@ -21,6 +25,8 @@ const win = window as Harness
 const scenario = win.__scenario ?? {}
 const responses: Record<string, unknown> = { ...scenario.responses }
 win.__calls = []
+win.__respond = (r) => void Object.assign(responses, r)
+win.__changed = () => {}
 win.__events = []
 
 const graphRow = (i: number) => ({
@@ -230,6 +236,14 @@ const mounts = {
     Object.assign(win, { __sessionError: () => session.error })
     mount(PreviewDialog, { target: host, props })
   },
+  // The operation strip over the repository view, with the toasts it raises.
+  async operation() {
+    await mounts.bisect()
+    const { default: Toasts } = await import('../src/lib/ui/Toasts.svelte')
+    mount(Toasts, { target: document.body })
+    const { session } = await import('../src/lib/session.svelte')
+    win.__changed = (path) => (session.revision[path] = (session.revision[path] ?? 0) + 1)
+  },
   async worktreesDialog() {
     const { default: WorktreesDialog } = await import('../src/lib/WorktreesDialog.svelte')
     mount(WorktreesDialog, { target: host, props: { path: '/r', onClose: () => {} } })
@@ -300,6 +314,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'repoView':
     await mounts.repoView()
+    break
+  case 'operation':
+    await mounts.operation()
     break
   case 'bisect':
     await mounts.bisect()

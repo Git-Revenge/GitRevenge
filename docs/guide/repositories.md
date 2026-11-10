@@ -49,4 +49,4 @@ The **Repository** panel of the sidebar lists them, with each one's branch, and 
 
 ## Changes made outside the app
 
-Git Revenge watches each open repository. If you commit, check out or rebase in a terminal or another tool, the app picks it up within about a second, with no refresh button needed. If a merge, rebase, cherry-pick, revert or bisect is in progress, even one you started elsewhere, a banner offers **Continue**, **Abort** and **Skip**.
+Git Revenge watches each open repository. If you commit, check out or rebase in a terminal or another tool, the app picks it up within about a second, with no refresh button needed. If a merge, rebase, cherry-pick, revert or bisect is in progress, even one you started elsewhere, a strip at the top says what it is and where it stands, with **Continue**, **Skip** and **Abort**. See [While a merge or rebase is in progress](branches.md#while-a-merge-or-rebase-is-in-progress).

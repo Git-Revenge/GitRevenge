@@ -28,7 +28,7 @@
     bisect = null,
   }: {
     path: string
-    /** A bisect in progress, to mark in the graph: answers given, the commits still in
+    /** A bisect in progress (or a rebase, which marks its commits the same way), to mark in the graph: answers given, the commits still in
      * question, the commit under test and the answer. */
     bisect?: BisectMarks | null
     /** Somewhere else to put the header's tools (count, Kinds, density, search), such as the
@@ -301,9 +301,9 @@
   /** Each row's selection, hover and search-dimming strength, eased between frames. */
   const washes = new Washes()
   /** The bisect as the paint loop wants it: the range as a set. Repaints when it changes. */
-  let bisectView: { terms: Record<string, string>; inQuestion: Set<string> | null; current: string; found: string } | null = null
+  let bisectView: { terms: Record<string, string>; inQuestion: Set<string> | null; current: string; found: string; currentNote?: string; currentGlyph?: string } | null = null
   $effect(() => {
-    bisectView = bisect ? { terms: bisect.terms, inQuestion: bisect.inQuestion ? new Set(bisect.inQuestion) : null, current: bisect.current, found: bisect.found } : null
+    bisectView = bisect ? { terms: bisect.terms, inQuestion: bisect.inQuestion ? new Set(bisect.inQuestion) : null, current: bisect.current, found: bisect.found, currentNote: bisect.currentNote, currentGlyph: bisect.currentGlyph } : null
     schedule()
   })
   /** A glide to a commit someone asked for, so the eye can follow it; null between glides. */

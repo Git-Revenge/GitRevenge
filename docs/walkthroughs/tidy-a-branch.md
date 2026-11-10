@@ -34,7 +34,7 @@ That's what interactive rebase is for: it rewrites a branch's recent commits, le
 
 ## If it stops partway
 
-A rebase stops if a commit doesn't apply cleanly. A banner at the top says so, with **Continue**, **Skip** and **Abort**. Fix the conflict as in [Resolve a merge conflict](resolve-a-conflict.md), then **Continue**. **Abort** puts the branch back exactly as it was.
+A rebase stops if a commit doesn't apply cleanly. A strip at the top says which commit it stopped on, with **Continue**, **Skip this commit** and **Abort…**. Fix the conflict as in [Resolve a merge conflict](resolve-a-conflict.md), then **Continue**. **Abort** puts the branch back exactly as it was.
 
 ## Good to know
 

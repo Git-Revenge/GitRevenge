@@ -11,6 +11,11 @@ export interface BisectMarks {
   inQuestion: string[] | null
   current: string
   found: string
+  /** What to write beside the current commit, when it isn't one under test: a rebase marks
+   * its commits the same way (see operation.ts). */
+  currentNote?: string
+  /** What its mark holds in place of the question mark. */
+  currentGlyph?: string
 }
 
 /** The words for an answer, wherever one is shown. */

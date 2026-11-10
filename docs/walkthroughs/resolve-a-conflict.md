@@ -7,7 +7,7 @@ Maya switched the dashboard's wind readings to knots on `main`. Meanwhile Sam, o
 
 ## Steps
 
-1. **Merge.** In the sidebar, open the `feature` folder, right-click `metric-units`, and choose **Merge feature/metric-units into main…**. A preview names the files that will conflict; press **Merge, and resolve 1 conflict**. Git merges everything it can and stops at the conflict. A banner at the top says *Merge in progress* and how many files conflict.
+1. **Merge.** In the sidebar, open the `feature` folder, right-click `metric-units`, and choose **Merge feature/metric-units into main…**. A preview names the files that will conflict; press **Merge, and resolve 1 conflict**. Git merges everything it can and stops at the conflict. A strip at the top says *Merging feature/metric-units into main* and how many files need resolving.
 
 2. **Find the conflicted files.** Click the row at the top of the graph that says how many files changed. Conflicted files are listed first, under **Conflicts**.
 
@@ -27,11 +27,11 @@ Maya switched the dashboard's wind readings to knots on `main`. Meanwhile Sam, o
 
    After taking the conflicts one by one or editing by hand, click **Mark resolved** when the result is right.
 
-5. **Finish the merge.** Once nothing is left in **Conflicts**, click **Continue** in the banner. Git Revenge makes the merge commit.
+5. **Finish the merge.** Once nothing is left in **Conflicts**, click **Commit the merge** in the strip. Git Revenge makes the merge commit, and a notice offers **Undo**.
 
 ## Good to know
 
-- **Not ready to decide?** **Abort** in the banner puts everything back as it was before the merge.
-- **Rebases and cherry-picks stop the same way.** The banner says which operation is in progress, and the steps are the same. A rebase may stop more than once, once for each commit that conflicts.
-- **Started the merge in a terminal?** Git Revenge notices, and shows the same banner and conflict list.
+- **Not ready to decide?** **Abort…** in the strip says what it undoes, then puts everything back as it was before the merge.
+- **Rebases and cherry-picks stop the same way.** The strip says which operation is in progress and which commit it stopped on, and the steps are the same. A rebase may stop more than once, once for each commit that conflicts.
+- **Started the merge in a terminal?** Git Revenge notices, and shows the same strip and conflict list.
 - **Merged and regretted it?** <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes the merge back. See [Undo a mistake](undo-a-mistake.md).

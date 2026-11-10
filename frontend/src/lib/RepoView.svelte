@@ -19,6 +19,8 @@
   import { linkStore } from './links/links.svelte'
   import WorkingTreePanel from './WorkingTreePanel.svelte'
   import { bisect, marksOf } from './bisect.svelte'
+  import { rebaseMarks } from './operation'
+  import { operations } from './operation.svelte'
   import { Integrate } from '../../wailsjs/go/app/App.js'
 
   let { path }: { path: string } = $props()
@@ -156,7 +158,32 @@
   // A bisect in progress (issue #592). The banner keeps the store up to date; here it picks
   // what the graph marks and what the right panel shows.
   let running = $derived(bisect.of(path))
-  let bisectMarks = $derived(marksOf(running))
+  // A rebase in progress marks the commits it has written and the one in hand (issue #593).
+  let bisectMarks = $derived(marksOf(running) ?? rebaseMarks(operations.of(path)))
+
+  // A conflict tool left open on a file that's no longer in conflict (resolved elsewhere, or the
+  // operation moved on or ended) has nothing true to show.
+  // It only closes once the strip has seen that file in conflict, so a tool opened a moment
+  // before the strip catches up isn't shut again.
+  let wasConflicted = ''
+  $effect(() => {
+    const state = operations.state[path]
+    if (diff?.mode !== 'conflict' || !state) return
+    if (state.conflicts.includes(diff.file)) wasConflicted = diff.file
+    else if (wasConflicted === diff.file) {
+      wasConflicted = ''
+      diff = null
+    }
+  })
+
+  // The operation strip asks for a conflicted file to be opened.
+  $effect(() => {
+    const ask = operations.resolve
+    if (ask?.path !== path) return
+    operations.resolve = null
+    rebaseBase = ''
+    diff = { mode: 'conflict', file: ask.file }
+  })
   /** The commit a bisect is about right now: the one under test, or the answer. */
   let bisectSubject = $derived(running ? running.firstBad || running.current : '')
   /** Set when someone asks for the commit's own details instead of the bisect's panel. */
