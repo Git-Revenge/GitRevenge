@@ -51,6 +51,8 @@ type MergeForecast struct {
 	// CommitCount is how many there are in all.
 	Commits     []ForecastCommit
 	CommitCount int
+	// OursOnly is how many commits ours has that theirs doesn't.
+	OursOnly int
 	// Files is how many files the merge would change in ours.
 	Files     int
 	Conflicts []ForecastConflict
@@ -166,6 +168,7 @@ func (r *Repo) ForecastMerge(ctx context.Context, ours, theirs string) (MergeFor
 	}
 	f.FastForward = r.isAncestor(ctx, ours, theirs)
 	f.CommitCount = r.count(ctx, ours+".."+theirs)
+	f.OursOnly = r.count(ctx, theirs+".."+ours)
 	var err error
 	if f.Commits, err = r.forecastCommits(ctx, nil, ours+".."+theirs); err != nil {
 		return f, err

@@ -17,6 +17,9 @@ export interface MenuContext {
   openDialog: (spec: DialogSpec) => void
   /** Opens the interactive rebase editor for the commits after base. */
   openRebase: (base: string) => void
+  /** Opens the preview of merging target into the checked-out branch, or of rebasing that
+   * branch onto it. label is how target is named to the user. */
+  openPreview: (kind: 'merge' | 'rebase', target: string, label: string) => void
   /** Opens the reflog browser on a ref ("HEAD" or refs/heads/…). */
   openReflog: (ref: string) => void
   /** Opens the dialog that starts a bisect with this commit as the bad one; absent while one
@@ -46,14 +49,14 @@ export function groups(...lists: MenuItem[][]): MenuItem[] {
 const integrate = (path: string, action: string, ...args: string[]) => () =>
   session.run(() => Integrate(path, action, args))
 
-/** Merge and rebase items for integrating target (a ref name or commit) with the current branch. */
+/** Merge and rebase items for integrating target (a ref name or commit) with the current
+ * branch. Each opens a preview of what it would do: nothing runs from the menu itself. */
 function integrateItems(ctx: MenuContext, target: string, label: string): MenuItem[] {
   const cur = ctx.current()
   if (!cur) return []
   return [
-    { label: `Merge ${label} into ${cur}`, icon: 'merge', run: integrate(ctx.path, 'merge', target) },
-    { label: `Merge ${label} into ${cur} (no fast-forward)`, icon: 'merge', run: integrate(ctx.path, 'merge', target, 'no-ff') },
-    { label: `Rebase ${cur} onto ${label}`, icon: 'rebase', run: integrate(ctx.path, 'rebase', target) },
+    { label: `Merge ${label} into ${cur}…`, icon: 'merge', run: () => ctx.openPreview('merge', target, label) },
+    { label: `Rebase ${cur} onto ${label}…`, icon: 'rebase', run: () => ctx.openPreview('rebase', target, label) },
   ]
 }
 

@@ -20,6 +20,9 @@ const (
 	MergeNoFF MergeMode = "no-ff"
 	// MergeFFOnly refuses unless the current branch can simply move forward.
 	MergeFFOnly MergeMode = "ff-only"
+	// MergeSquash stages everything the other side changed as one change and commits nothing:
+	// the current branch does not move, and the other side is not recorded as merged.
+	MergeSquash MergeMode = "squash"
 )
 
 // Merge merges ref into the current branch, keeping git's default merge message.
@@ -30,6 +33,8 @@ func (r *Repo) Merge(ctx context.Context, ref string, mode MergeMode) error {
 		args = append(args, "--no-ff")
 	case MergeFFOnly:
 		args = append(args, "--ff-only")
+	case MergeSquash:
+		args = append(args, "--squash")
 	}
 	args = append(args, ref)
 	return r.conflictAware(ctx, Cmd{Args: args, Env: []string{"GIT_EDITOR=true"}})
@@ -55,6 +60,13 @@ func (r *Repo) RebaseStack(ctx context.Context, onto, upstream, top string) erro
 // Rebase replays the current branch's commits onto ref.
 func (r *Repo) Rebase(ctx context.Context, onto string) error {
 	return r.conflictAware(ctx, Cmd{Args: []string{"rebase", onto}, Env: []string{"GIT_EDITOR=true"}})
+}
+
+// RebaseAutosquash replays the current branch's commits onto ref, folding each fixup! and
+// squash! commit into the commit it names. Before git 2.44 --autosquash needs an interactive
+// rebase, so it runs one with the todo list accepted as git wrote it.
+func (r *Repo) RebaseAutosquash(ctx context.Context, onto string) error {
+	return r.conflictAware(ctx, Cmd{Args: []string{"rebase", "-i", "--autosquash", onto}, Env: []string{"GIT_EDITOR=true", "GIT_SEQUENCE_EDITOR=true"}})
 }
 
 // conflictAware runs a merge-like command, reporting ErrConflicts when it stopped with

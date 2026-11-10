@@ -26,7 +26,7 @@ func TestPreviewMergeForecastsConflicts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Into != "main" || p.FastForward || p.AlreadyMerged || p.Unknown || p.CommitCount != 2 || p.Files != 2 {
+	if p.Into != "main" || p.FastForward || p.AlreadyMerged || p.Unknown || p.CommitCount != 2 || p.IntoOnly != 1 || p.Files != 2 {
 		t.Fatalf("preview = %+v", p)
 	}
 	if len(p.Conflicts) != 1 || p.Conflicts[0].Path != "f.txt" || p.Conflicts[0].Places != 1 {

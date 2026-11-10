@@ -27,9 +27,9 @@ test.describe('commit menu', () => {
 
   const twoBranches = { responses: { Refs: [branch('main', { head: true }), remote('origin/main'), tag('v1.0')] } }
 
-  // #385: the words that tell two merge items apart were the ones cut off.
+  // #385: a label too long for the menu is cut off, and then its tooltip says it in full.
   test.describe('a long label', () => {
-    const merge = (name: string) => `Merge ${name} into main (no fast-forward)`
+    const merge = (name: string) => `Merge ${name} into main…`
     const opened = async (page: Page, name: string) => {
       await open(page, 'commitMenu', { menuX: 20, responses: { Refs: [branch('main', { head: true }), branch(name)] } })
       await page.getByRole('menuitem', { name, exact: true }).hover()

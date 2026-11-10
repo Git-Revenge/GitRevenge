@@ -814,6 +814,7 @@ export namespace app {
 	    fastForward: boolean;
 	    commits: ForecastCommit[];
 	    commitCount: number;
+	    intoOnly: number;
 	    files: number;
 	    conflicts: ForecastConflict[];
 	    unknown: boolean;
@@ -829,6 +830,7 @@ export namespace app {
 	        this.fastForward = source["fastForward"];
 	        this.commits = this.convertValues(source["commits"], ForecastCommit);
 	        this.commitCount = source["commitCount"];
+	        this.intoOnly = source["intoOnly"];
 	        this.files = source["files"];
 	        this.conflicts = this.convertValues(source["conflicts"], ForecastConflict);
 	        this.unknown = source["unknown"];
