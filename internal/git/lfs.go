@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync/atomic"
 )
 
 // ErrNoLFS means git-lfs is not installed.
@@ -45,21 +46,41 @@ func (r *Repo) lfsJSON(ctx context.Context, v any, args ...string) error {
 	return json.Unmarshal(out, v)
 }
 
-// LFS reports tracked patterns and LFS files at HEAD.
+// lfsFound remembers that git-lfs was found, so it's asked for only once. Not finding it isn't
+// remembered: it may be installed while the app runs.
+var lfsFound atomic.Bool
+
+// lfsInstalled reports whether git can run git-lfs.
+func (r *Repo) lfsInstalled(ctx context.Context) (bool, error) {
+	if lfsFound.Load() {
+		return true, nil
+	}
+	if _, err := r.Read(ctx, "lfs", "version"); err != nil {
+		var gerr *Error
+		if errors.As(err, &gerr) && gerr.MissingLFS() {
+			return false, nil
+		}
+		return false, err
+	}
+	lfsFound.Store(true)
+	return true, nil
+}
+
+// LFS reports tracked patterns and LFS files at HEAD. It runs no git-lfs command in a
+// repository that tracks nothing in LFS.
 func (r *Repo) LFS(ctx context.Context) (LFSStatus, error) {
 	st := LFSStatus{Patterns: []LFSPattern{}, Files: []LFSFile{}}
-	var pats struct {
-		Patterns []LFSPattern `json:"patterns"`
+	if ok, err := r.lfsInstalled(ctx); err != nil {
+		return st, err
+	} else if !ok {
+		return st, ErrNoLFS
 	}
-	if err := r.lfsJSON(ctx, &pats, "track", "--json"); err != nil {
+	pats, err := r.lfsPatterns(ctx)
+	if err != nil {
 		return st, err
 	}
-	for _, p := range pats.Patterns {
-		if p.Tracked {
-			st.Patterns = append(st.Patterns, p)
-		}
-	}
-	if !r.hasHead(ctx) {
+	st.Patterns = append(st.Patterns, pats...)
+	if len(st.Patterns) == 0 || !r.hasHead(ctx) {
 		return st, nil
 	}
 	var files struct {
