@@ -158,6 +158,11 @@ func TestClassifyGitPath(t *testing.T) {
 		"FETCH_HEAD":             Refs,
 		"refs/remotes/origin/x":  Refs,
 		"worktrees/wt/HEAD":      Refs,
+		"worktrees/wt":           Refs,
+		"worktrees/wt/gitdir":    Refs,
+		"worktrees/wt/locked":    Refs,
+		"worktrees":              Refs,
+		"worktrees/wt/refs/x":    0,
 		"worktrees/wt/index":     0,
 		"worktrees/wt/ORIG_HEAD": 0,
 		"worktrees/wt/logs/HEAD": 0,
@@ -224,6 +229,22 @@ func TestLinkedWorktreeReportsSharedRefs(t *testing.T) {
 	fx.WriteFile("main-only.txt", "x")
 	fx.Git("add", "main-only.txt")
 	rec.expectNothing(t)
+}
+
+// A small `git worktree add` can finish before Linux watches the new .git/worktrees, which
+// failed about one run in three with two CPUs (#608) when only worktrees/<name>/HEAD counted.
+func TestReportsAWorktreeAddedOutside(t *testing.T) {
+	fx := gittest.New(t)
+	fx.CommitFile("a.txt", "1", "base")
+	fx.Git("branch", "feature")
+	rec := start(t, fx, nil)
+	fx.Git("worktree", "add", filepath.Join(t.TempDir(), "wt"), "feature")
+	rec.waitFor(t, Refs)
+	rec.drain()
+
+	// A second one goes into the folder the first made.
+	fx.Git("worktree", "add", "-b", "second", filepath.Join(t.TempDir(), "wt2"))
+	rec.waitFor(t, Refs)
 }
 
 func TestKindNames(t *testing.T) {
