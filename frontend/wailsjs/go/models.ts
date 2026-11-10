@@ -443,6 +443,38 @@ export namespace app {
 	        this.error = source["error"];
 	    }
 	}
+	export class ForecastCommit {
+	    id: string;
+	    subject: string;
+	    author: string;
+	    fixupOf: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ForecastCommit(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.subject = source["subject"];
+	        this.author = source["author"];
+	        this.fixupOf = source["fixupOf"];
+	    }
+	}
+	export class ForecastConflict {
+	    path: string;
+	    places: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ForecastConflict(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.places = source["places"];
+	    }
+	}
 	export class GraphPage {
 	    rows: graph.Row[];
 	    refs: Record<string, Array<git.Ref>>;
@@ -776,6 +808,50 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class MergePreview {
+	    into: string;
+	    alreadyMerged: boolean;
+	    fastForward: boolean;
+	    commits: ForecastCommit[];
+	    commitCount: number;
+	    files: number;
+	    conflicts: ForecastConflict[];
+	    unknown: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new MergePreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.into = source["into"];
+	        this.alreadyMerged = source["alreadyMerged"];
+	        this.fastForward = source["fastForward"];
+	        this.commits = this.convertValues(source["commits"], ForecastCommit);
+	        this.commitCount = source["commitCount"];
+	        this.files = source["files"];
+	        this.conflicts = this.convertValues(source["conflicts"], ForecastConflict);
+	        this.unknown = source["unknown"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Preferences {
 	    theme: string;
 	    graphDensity: string;
@@ -799,6 +875,58 @@ export namespace app {
 	        this.cloneDir = source["cloneDir"];
 	        this.zoom = source["zoom"];
 	    }
+	}
+	export class RebasePreview {
+	    branch: string;
+	    commits: ForecastCommit[];
+	    commitCount: number;
+	    fixups: number;
+	    upToDate: boolean;
+	    stopsAt: string;
+	    stopsAtSubject: string;
+	    stopsAtNumber: number;
+	    conflicts: ForecastConflict[];
+	    incomplete: boolean;
+	    pushed: boolean;
+	    upstream: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RebasePreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.branch = source["branch"];
+	        this.commits = this.convertValues(source["commits"], ForecastCommit);
+	        this.commitCount = source["commitCount"];
+	        this.fixups = source["fixups"];
+	        this.upToDate = source["upToDate"];
+	        this.stopsAt = source["stopsAt"];
+	        this.stopsAtSubject = source["stopsAtSubject"];
+	        this.stopsAtNumber = source["stopsAtNumber"];
+	        this.conflicts = this.convertValues(source["conflicts"], ForecastConflict);
+	        this.incomplete = source["incomplete"];
+	        this.pushed = source["pushed"];
+	        this.upstream = source["upstream"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class RecentRepo {
 	    path: string;

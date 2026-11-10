@@ -330,6 +330,14 @@ export function PreviewIgnore(arg1, arg2, arg3) {
   return window['go']['app']['App']['PreviewIgnore'](arg1, arg2, arg3);
 }
 
+export function PreviewMerge(arg1, arg2) {
+  return window['go']['app']['App']['PreviewMerge'](arg1, arg2);
+}
+
+export function PreviewRebase(arg1, arg2) {
+  return window['go']['app']['App']['PreviewRebase'](arg1, arg2);
+}
+
 export function Pull(arg1, arg2) {
   return window['go']['app']['App']['Pull'](arg1, arg2);
 }
