@@ -16,16 +16,16 @@ Maya switched the dashboard's wind readings to knots on `main`. Meanwhile Sam, o
    - choose **Ours** (keep your branch's version) or **Theirs** (take the incoming one) right there in the list, or
    - click the file to open the **conflict tool**, when you need to see the detail or combine both.
 
-4. **Use the conflict tool.** It shows your version (*ours*) and the incoming one (*theirs*) side by side, and below them the **result**, which you can edit.
+4. **Use the conflict tool.** The **result** is the file as it will be saved, with a block at each place the two sides disagree. Above it are your version of that place (*ours*) and the incoming one (*theirs*), each with the commit that last changed it.
 
    ![The conflict tool: ours and theirs side by side, with the editable result below](../img/conflict-tool-light.webp#gh-light-mode-only)
    ![The conflict tool: ours and theirs side by side, with the editable result below](../img/conflict-tool-dark.webp#gh-dark-mode-only)
 
-   - **Use ours** and **Use theirs** at the top take one whole version and mark the file resolved, with nothing more to do in the tool.
-   - For each conflict in the file, the numbered buttons take **Ours**, **Theirs**, **Both**, or the **Base** they started from.
-   - Or edit the result by hand, for the cases where the answer is a bit of each.
+   - Each place has its own choices: **Ours**, **Theirs** or **Both**. Until you choose, it shows what each side would put there.
+   - Or type in the result, for the cases where the answer is a bit of each. A place you type in counts as decided.
+   - **Take ours** and **Take theirs** in the panel on the right take one whole version and mark the file resolved, with nothing more to do in the tool.
 
-   After taking the conflicts one by one or editing by hand, click **Mark resolved** when the result is right.
+   **Mark resolved** comes on once every place is decided. The file is saved without any conflict markers, and the tool moves on to the next conflicted file.
 
 5. **Finish the merge.** Once nothing is left in **Conflicts**, click **Commit the merge** in the strip. Git Revenge makes the merge commit, and a notice offers **Undo**.
 

@@ -244,6 +244,14 @@ const mounts = {
     const { session } = await import('../src/lib/session.svelte')
     win.__changed = (path) => (session.revision[path] = (session.revision[path] ?? 0) + 1)
   },
+  async conflictView() {
+    host.style.cssText = 'display:block;height:100vh'
+    const { default: ConflictView } = await import('../src/lib/diff/ConflictView.svelte')
+    const { session } = await import('../src/lib/session.svelte')
+    win.__changed = (path) => (session.revision[path] = (session.revision[path] ?? 0) + 1)
+    Object.assign(win, { __sessionError: () => session.error })
+    mount(ConflictView, { target: host, props: { path: '/r', file: scenario.diffFile ?? 'src/feed.js', onClose: record('close'), onOpen: record('open') } })
+  },
   async worktreesDialog() {
     const { default: WorktreesDialog } = await import('../src/lib/WorktreesDialog.svelte')
     mount(WorktreesDialog, { target: host, props: { path: '/r', onClose: () => {} } })
@@ -314,6 +322,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'repoView':
     await mounts.repoView()
+    break
+  case 'conflictView':
+    await mounts.conflictView()
     break
   case 'operation':
     await mounts.operation()

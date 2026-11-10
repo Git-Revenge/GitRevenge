@@ -314,7 +314,7 @@
       <div class="graph">
         {#if diff.mode === 'conflict'}
           {#key diff.file}
-            <Lazy load={() => import('./diff/ConflictView.svelte')} {path} file={diff.file} onClose={() => (diff = null)} />
+            <Lazy load={() => import('./diff/ConflictView.svelte')} {path} file={diff.file} onClose={() => (diff = null)} onOpen={(file: string) => (diff = { mode: 'conflict', file })} />
           {/key}
         {:else if diff.mode === 'history'}
           {#key diff.file}
@@ -338,8 +338,8 @@
       </div>
     {/if}
   </div>
-  <!-- The rebase editor has a panel of its own: the branch as it will be afterwards. -->
-  {#if (view === 'wip' || selected || running) && !right.hidden && !rebaseBase}
+  <!-- The rebase editor and the conflict tool each have a panel of their own. -->
+  {#if (view === 'wip' || selected || running) && !right.hidden && !rebaseBase && diff?.mode !== 'conflict'}
     <div class="right" style:width="{rightWidth}px">
       <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
       <div
