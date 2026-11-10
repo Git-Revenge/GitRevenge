@@ -270,6 +270,20 @@ export namespace app {
 		}
 	}
 	
+	export class BuiltWith {
+	    go: string;
+	    wails: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BuiltWith(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.go = source["go"];
+	        this.wails = source["wails"];
+	    }
+	}
 	export class CommitInfo {
 	    commit: git.CommitDetail;
 	    files: git.FileChange[];

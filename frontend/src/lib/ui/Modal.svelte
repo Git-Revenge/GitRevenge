@@ -12,6 +12,8 @@
   let {
     title,
     eyebrow,
+    mark,
+    subtitle,
     width = 460,
     layer = 200,
     dismissable = true,
@@ -22,6 +24,10 @@
     title: string
     /** A handwritten note above the title. */
     eyebrow?: string
+    /** Something drawn beside the title, such as the app's mark. The title is set larger then. */
+    mark?: Snippet
+    /** A line under the title. */
+    subtitle?: Snippet
     width?: number
     /** z-index: credential prompts sit above other dialogs. */
     layer?: number
@@ -100,7 +106,17 @@
     <span class="splash" aria-hidden="true"></span>
     <header>
       {#if eyebrow}<span class="hand">{eyebrow}</span>{/if}
-      <h2 id="{id}-title">{title}</h2>
+      {#if mark || subtitle}
+        <div class="lead">
+          {@render mark?.()}
+          <div class="titles">
+            <h2 id="{id}-title" class:large={!!mark}>{title}</h2>
+            {@render subtitle?.()}
+          </div>
+        </div>
+      {:else}
+        <h2 id="{id}-title">{title}</h2>
+      {/if}
     </header>
     {@render children()}
   </div>
@@ -166,5 +182,24 @@
     font-variation-settings:
       'SOFT' 50,
       'WONK' 1;
+  }
+
+  h2.large {
+    font-size: 26px;
+    line-height: 1.15;
+  }
+
+  .lead {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 4px;
+  }
+
+  .titles {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
   }
 </style>

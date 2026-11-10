@@ -10,7 +10,8 @@ export default ts.config(
   ...ts.configs.recommended,
   ...svelte.configs.recommended,
   {
-    languageOptions: { globals: globals.browser },
+    // __SVELTE_VERSION__ is set at build time: see vite.config.ts.
+    languageOptions: { globals: { ...globals.browser, __SVELTE_VERSION__: 'readonly' } },
   },
   {
     files: ['**/*.svelte', '**/*.svelte.ts'],

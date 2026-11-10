@@ -10,6 +10,7 @@ Git tools: everyday git chores without leaving the app.
 
 ### Added
 
+- An **About** dialog with the version, a link to gitrevenge.com, how to sponsor the project, and credits for Go, Svelte and Wails. Click the version in the status bar, or the heart beside it, or choose **About Git Revenge** in the command palette. (#613)
 - Right-click a changed file or folder to ignore it: the file, every file with its extension, or only on this machine. **Ignore…** picks the pattern and the file it goes in, previews what it hides, and offers to stop tracking matching tracked files. Every rule added can be undone. (#521, #524)
 - An **Ignored** toggle lists ignored files with the rule behind each, and right-clicking one makes an exception or removes the rule. (#521, #524)
 - An **Ignore rules** tab to read and edit every ignore file that applies: each `.gitignore`, `.git/info/exclude` and your global excludes file. Each rule says what it ignores now, and a checker says which rule decides any path. Open it from the sidebar's Repository panel or the command palette. (#522, #527, #540)
