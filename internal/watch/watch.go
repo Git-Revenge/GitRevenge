@@ -244,7 +244,18 @@ func classifyGitPath(rel string) Kind {
 	case "worktrees":
 		// Another worktree added, removed or switched branches, which changes what the refs
 		// report. Its commits and the like are its own business.
-		if strings.HasSuffix(rest, "/HEAD") && strings.Count(rest, "/") == 1 {
+		//
+		// On Linux a new directory is watched a moment after it's made, so a quick `git worktree
+		// add` can finish before anything inside .git/worktrees is seen. What is always seen is
+		// the directory itself being made (the first worktree makes .git/worktrees, later ones
+		// a folder in it), and on a slower checkout the watch is up before git removes "locked",
+		// its last step.
+		name, file, nested := strings.Cut(rest, "/")
+		if strings.Contains(file, "/") {
+			return 0
+		}
+		switch {
+		case name == "", !nested, file == "HEAD", file == "gitdir", file == "locked":
 			return Refs
 		}
 		return 0
