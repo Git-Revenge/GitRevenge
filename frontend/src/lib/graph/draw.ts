@@ -115,26 +115,50 @@ export function timeLabel(unixSeconds: number): string {
   return timeFmt.format(new Date(unixSeconds * 1000))
 }
 
-/** What the timeline's second line says for a row, given its neighbours. */
+/** What the second line says under a commit that starts a run, given its neighbours. */
 export interface MetaLine {
   text: string
   /** The row starts a new day after a loaded row, so it draws the day's hairline. */
   divider: boolean
-  /** The same author carrying on: the line is only the time, drawn faint. */
-  quiet: boolean
 }
 
-/** The second line of a timeline row. The first row of a day names the day, the author and the
- * time; rows that follow in the same day drop the day; an author's run drops the author too and
- * fades, since the node above already said who. A row whose previous row isn't loaded yet names
- * its day, to be safe, but draws no divider. */
-export function metaLine(row: Pick<Row, 'author' | 'authorTime' | 'parents' | 'col'>, near: Near, nowSeconds: number): MetaLine {
+/** The second line of a timeline row, which only a commit that starts a run has (see
+ * `startsRun`): who and when. The first row of a day names the day too. A row whose previous
+ * row isn't loaded yet names its day, to be safe, but draws no divider. */
+export function metaLine(row: Pick<Row, 'author' | 'authorTime'>, near: Near, nowSeconds: number): MetaLine {
   const prev = near.prev
   const newDay = !prev || !sameDay(prev.authorTime, row.authorTime)
   const time = timeLabel(row.authorTime)
-  if (newDay) return { text: `${dayLabel(row.authorTime, nowSeconds)} · ${row.author} · ${time}`, divider: !!prev, quiet: false }
-  if (repeatsAuthor(row as Row, near)) return { text: time, divider: false, quiet: true }
-  return { text: `${row.author} · ${time}`, divider: false, quiet: false }
+  if (newDay) return { text: `${dayLabel(row.authorTime, nowSeconds)} · ${row.author} · ${time}`, divider: !!prev }
+  return { text: `${row.author} · ${time}`, divider: false }
+}
+
+/** How tall a timeline row is for a commit that carries on a run: one line. */
+export const FOLLOWER_H = 30
+
+/** How long a pause between an author's commits ends their run, in seconds: a sitting is over
+ * after two hours. Fixed, not a setting. */
+export const RUN_PAUSE = 2 * 60 * 60
+
+/**
+ * Whether a commit starts a run in the timeline, and so takes two lines: its author's initials
+ * and who and when. A commit that carries a run on takes one line. It starts one when:
+ *
+ * - it's the checked-out commit, so "you're here" is never a thin row;
+ * - it's a merge, or the commit above it on its lane is;
+ * - it's the first row of its day;
+ * - the commit above it on its lane (within two rows) is someone else's, or there isn't one;
+ * - that commit is two hours or more away: the same person, another sitting.
+ *
+ * A row whose neighbours aren't loaded yet starts a run until they are.
+ */
+export function startsRun(row: Pick<Row, 'author' | 'authorTime' | 'parents' | 'col'>, near: Near, head: boolean): boolean {
+  if (head || row.parents > 1) return true
+  const above = near.prev
+  if (!above || !sameDay(above.authorTime, row.authorTime)) return true
+  const before = above.col === row.col ? above : near.prev2?.col === row.col ? near.prev2 : undefined
+  if (!before || before.author !== row.author || before.parents > 1) return true
+  return Math.abs(before.authorTime - row.authorTime) >= RUN_PAUSE
 }
 
 /** Up to two initials for an author's node: "Ris Adams" → "RA", "dependabot[bot]" → "D". */
@@ -149,7 +173,7 @@ export interface Theme {
   fg: string
   soft: string
   muted: string
-  /** The smallest labels: a quiet row's time. */
+  /** The smallest labels: the time on a row that carries on a run. */
   faint: string
   deep: string
   selected: string
@@ -464,6 +488,8 @@ export interface RowExtra {
   noted?: boolean
   /** The commit just arrived on its branch, by a pull or the like: a teal bar at the right edge. */
   arrived?: boolean
+  /** In the timeline, the commit carries on a run: one line, FOLLOWER_H tall. */
+  follower?: boolean
 }
 
 /** How strong the wash is on a row still in question during a bisect. */
@@ -556,8 +582,10 @@ export function drawRow(
 ): LabelSpan | null {
   let labelSpan: LabelSpan | null = null
   const { m } = lay
-  const h = m.rowH
   const comfortable = lay.density === 'comfortable'
+  /** A two-line timeline row: a commit that starts a run. */
+  const tall = comfortable && !extra.follower
+  const h = comfortable && extra.follower ? FOLLOWER_H : m.rowH
   const unit = (v: number) => Math.min(1, Math.max(0, v))
   const sel = unit(selected)
   // Hovering the selected row shows the selection alone.
@@ -685,14 +713,14 @@ export function drawRow(
   if (isHead) {
     // A soft halo marks the checked-out commit.
     ctx.globalAlpha *= 0.3
-    disc(ctx, x, mid, comfortable ? 16 : 8.5, color)
+    disc(ctx, x, mid, tall ? 16 : 8.5, color)
     ctx.globalAlpha /= 0.3
   }
   if (extra.mark) {
-    drawMark(ctx, x, mid, extra.mark, theme, cut, comfortable, extra.glyph)
+    drawMark(ctx, x, mid, extra.mark, theme, cut, tall, extra.glyph)
   } else if (isStash) {
     // Stashes aren't real history: a dashed ring, like the working tree's.
-    const r = comfortable ? 9 : 5
+    const r = tall ? 9 : 5
     cut(r + 2)
     ctx.setLineDash([3, 2.5])
     ctx.strokeStyle = color
@@ -702,13 +730,13 @@ export function drawRow(
     ctx.setLineDash([])
   } else if (row.parents > 1) {
     // Merges: a ringed dot.
-    const r = comfortable ? 7.5 : 5.5
+    const r = tall ? 7.5 : 5.5
     cut(r + 1.5)
     disc(ctx, x, mid, r, color)
     cut(r - 2)
     disc(ctx, x, mid, r - 4, color)
-  } else if (comfortable && (isHead || !repeatsAuthor(row, near))) {
-    // The author's initials in a lane-coloured ring, as on dev-null's timeline; on a
+  } else if (tall) {
+    // A commit that starts a run: the author's initials in a lane-coloured ring; on a
     // Release, Environment, Docs or Bot lane, the kind's icon instead. Trunk and Feature keep
     // the initials, because who did the work matters on those lanes.
     cut(13.5)
@@ -736,7 +764,7 @@ export function drawRow(
       ctx.letterSpacing = '0px'
     }
   } else if (comfortable) {
-    // The same author carrying on: a dot, since the initials just above already say who.
+    // Carrying on a run: a dot, since the initials at the top of the run already say who.
     cut(6.5)
     disc(ctx, x, mid, 5, color)
   } else {
@@ -747,7 +775,7 @@ export function drawRow(
   ctx.restore()
 
   ctx.textBaseline = 'middle'
-  const line1 = comfortable ? y + 19 : mid
+  const line1 = tall ? y + 19 : mid
   ctx.textAlign = 'left'
   setFont(ctx, `12px ${MONO}`)
   ctx.fillStyle = theme.muted
@@ -773,7 +801,17 @@ export function drawRow(
 
   let left = lay.textX
   // The subject stops short of the next column, or of the marks when the SHA is next.
-  const subjectRight = lay.authorW ? lay.authorX - 22 : lay.dateW ? lay.dateX - 22 : lay.shaX - MARKS_W
+  let subjectRight = lay.authorW ? lay.authorX - 22 : lay.dateW ? lay.dateX - 22 : lay.shaX - MARKS_W
+  if (comfortable && extra.follower) {
+    // A row that carries on a run says only when, quietly, at the end of its one line.
+    const time = timeLabel(row.authorTime).toLowerCase()
+    setFont(ctx, `13px ${SERIF}`)
+    ctx.fillStyle = theme.faint
+    ctx.textAlign = 'right'
+    ctx.fillText(time, subjectRight - 4, line1)
+    ctx.textAlign = 'left'
+    subjectRight -= ctx.measureText(time).width + 18
+  }
   if (!lay.refW && refs.length) {
     left = drawLabels(ctx, refs, left, line1, Math.min(subjectRight - left, (subjectRight - left) * 0.6), color, theme, comfortable, lay.remote)
     labelSpan = [lay.textX, left - LABEL_TRAIL]
@@ -782,7 +820,7 @@ export function drawRow(
   ctx.fillStyle = docs ? theme.muted : theme.fg
   ctx.fillText(clip(ctx, row.subject, subjectRight - left), left, line1)
 
-  if (comfortable) {
+  if (tall) {
     const meta = metaLine(row, near, nowSeconds)
     if (meta.divider) {
       // The day changes here: a dashed hairline along the row's top edge, from the message on.
@@ -798,7 +836,7 @@ export function drawRow(
       ctx.restore()
     }
     setFont(ctx, `12px ${MONO}`, '0.08em')
-    ctx.fillStyle = meta.quiet ? theme.faint : theme.muted
+    ctx.fillStyle = theme.muted
     ctx.fillText(clip(ctx, meta.text.toUpperCase(), lay.width - 14 - lay.textX), lay.textX, y + 37)
     ctx.letterSpacing = '0px'
   }

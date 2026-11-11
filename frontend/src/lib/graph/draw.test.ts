@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clip, DATE_COLUMN, noteMarkSpan, middleCut, fitLabelColumn, LABEL_COLUMN, labelColumnNeed, moreLabels, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine, bisectRow } from './draw'
+import { clip, DATE_COLUMN, noteMarkSpan, middleCut, fitLabelColumn, LABEL_COLUMN, labelColumnNeed, moreLabels, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine, bisectRow, startsRun, RUN_PAUSE } from './draw'
 import type { Ref, Row } from './rowCache'
 
 describe('graph geometry', () => {
@@ -460,7 +460,6 @@ describe('metaLine', () => {
     const m = metaLine(row('Ana', day(29, 9)), {}, now)
     expect(m.text).toMatch(/^Today · Ana · /)
     expect(m.divider).toBe(false)
-    expect(m.quiet).toBe(false)
   })
 
   it('draws the divider when the loaded row above is from another day', () => {
@@ -469,20 +468,66 @@ describe('metaLine', () => {
     expect(m.divider).toBe(true)
   })
 
-  it('drops the day inside it, and drops the author too inside a run', () => {
+  it('drops the day inside it, and always says who: only a commit that starts a run has this line', () => {
     const prev = row('Ana', day(29, 10))
     const other = metaLine(row('Ben', day(29, 9)), { prev }, now)
     expect(other.text).toMatch(/^Ben · /)
     expect(other.divider).toBe(false)
-    const same = metaLine(row('Ana', day(29, 9)), { prev }, now)
-    expect(same.text).not.toMatch(/Ana/)
-    expect(same.quiet).toBe(true)
+    expect(metaLine(row('Ana', day(29, 9)), { prev }, now).text).toMatch(/^Ana · /)
+  })
+})
+
+// #622: a second line only when it has something to say.
+describe('startsRun', () => {
+  const at = (h: number, min = 0, d = 29) => new Date(2026, 9, d, h, min).getTime() / 1000
+  const row = (author: string, authorTime: number, col = 0, parents = 1): Row => ({ index: 0, col, color: 0, up: [], down: [], width: 1, id: 'x', parents, author, authorTime, subject: 's' })
+
+  it('is false for a commit carrying on its author\'s run: same lane, same day, soon after', () => {
+    expect(startsRun(row('Ana', at(9)), { prev: row('Ana', at(10)) }, false)).toBe(false)
   })
 
-  it('a merge breaks the run, and a different lane does too', () => {
-    const prev = row('Ana', day(29, 10))
-    expect(metaLine(row('Ana', day(29, 9), 0, 2), { prev }, now).quiet).toBe(false)
-    expect(metaLine(row('Ana', day(29, 9), 1), { prev }, now).quiet).toBe(false)
+  it('is true when the author changes on the lane', () => {
+    expect(startsRun(row('Ben', at(9)), { prev: row('Ana', at(10)) }, false)).toBe(true)
+  })
+
+  it('is true for the first row of a day, whoever is above it', () => {
+    expect(startsRun(row('Ana', at(23, 0, 28)), { prev: row('Ana', at(0, 30, 29)) }, false)).toBe(true)
+    // Even half an hour apart, across midnight.
+    expect(startsRun(row('Ana', at(23, 50, 28)), { prev: row('Ana', at(0, 10, 29)) }, false)).toBe(true)
+  })
+
+  it('is true after a pause of two hours, and not a minute before', () => {
+    expect(RUN_PAUSE).toBe(7200)
+    const prev = row('Ana', at(12))
+    expect(startsRun(row('Ana', at(10, 1)), { prev }, false)).toBe(false)
+    expect(startsRun(row('Ana', at(10, 0)), { prev }, false)).toBe(true)
+    expect(startsRun(row('Ana', at(9, 0)), { prev }, false)).toBe(true)
+  })
+
+  it('measures the pause either way, for commits dated out of order', () => {
+    expect(startsRun(row('Ana', at(13)), { prev: row('Ana', at(10)) }, false)).toBe(true)
+  })
+
+  it('is true for the checked-out commit, whatever is above it', () => {
+    expect(startsRun(row('Ana', at(9)), { prev: row('Ana', at(10)) }, true)).toBe(true)
+  })
+
+  it('is true for a merge, and for the commit under one', () => {
+    expect(startsRun(row('Ana', at(9), 0, 2), { prev: row('Ana', at(10)) }, false)).toBe(true)
+    expect(startsRun(row('Ana', at(9)), { prev: row('Ana', at(10), 0, 2) }, false)).toBe(true)
+  })
+
+  it('looks past one row on another lane for the commit above on its own', () => {
+    const elsewhere = row('Ben', at(10), 1)
+    expect(startsRun(row('Ana', at(9)), { prev: elsewhere, prev2: row('Ana', at(10, 30)) }, false)).toBe(false)
+    expect(startsRun(row('Ana', at(9)), { prev: elsewhere, prev2: row('Cy', at(10, 30)) }, false)).toBe(true)
+    // Nothing on its lane within two rows: it starts one.
+    expect(startsRun(row('Ana', at(9)), { prev: elsewhere, prev2: row('Ana', at(10, 30), 2) }, false)).toBe(true)
+    expect(startsRun(row('Ana', at(9)), { prev: elsewhere }, false)).toBe(true)
+  })
+
+  it('is true until the row above has loaded', () => {
+    expect(startsRun(row('Ana', at(9)), {}, false)).toBe(true)
   })
 })
 

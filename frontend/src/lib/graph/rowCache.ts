@@ -89,6 +89,8 @@ export class RowCache {
   private labels = new Map<string, Ref[]>()
   private inflight = new Map<number, Promise<void>>()
   private generation = 0
+  /** Goes up whenever what's cached changes, so anything worked out from rows can be redone. */
+  version = 0
   total = 0
   loading = true
   paused = false
@@ -138,6 +140,7 @@ export class RowCache {
     this.labels.clear()
     this.inflight.clear()
     this.generation++
+    this.version++
   }
 
   private load(c: number) {
@@ -146,6 +149,7 @@ export class RowCache {
       .then((page) => {
         if (gen !== this.generation) return
         this.chunks.set(c, page.rows)
+        this.version++
         for (const [id, refs] of Object.entries(page.refs ?? {})) this.labels.set(id, refs)
         this.total = page.total
         this.loading = page.loading
