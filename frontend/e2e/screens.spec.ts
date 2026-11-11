@@ -352,35 +352,17 @@ test.describe('commit graph', () => {
       expect(busy).toBeGreaterThan(idle * 2)
     })
 
-    test("a branch's row carries its lane's colour from the node toward the message", async ({ page }) => {
+    // #625: the band of lane colour behind a node, and the line tying a label to it, are gone.
+    test('nothing is drawn between a node and its message, or between the labels and the lanes', async ({ page }) => {
       await open(page, 'graph', scenario)
       await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '20')
-      // Between the node and the message, on an unselected row: lane 2's wash and nothing else.
-      await expect.poll(() => inkAt(page, lane(2) + 15, 78)).toBeGreaterThan(0)
-      // Left of the node, between two idle lanes: nothing at all.
+      // The lane itself draws, so the row has painted by now.
+      await expect.poll(() => inkAt(page, lane(2), 78)).toBeGreaterThan(0)
+      // Between the node and the message, on an unselected row.
+      expect(await inkAt(page, lane(2) + 15, 78)).toBe(0)
+      // Between two idle lanes, and in the label column of a row with no labels.
       expect(await inkAt(page, lane(1) + 8, 78)).toBe(0)
-      // The gap between rows stays clear, so a run of commits doesn't merge into a block.
-      expect(await inkAt(page, lane(2) + 15, 104)).toBe(0)
-    })
-
-    for (const kind of ['trunk', 'docs']) {
-      test(`a ${kind} row has no wash`, async ({ page }) => {
-        const rows = graphData.map((r) => ({ ...r, kind }))
-        await open(page, 'graph', { ...scenario, graphData: rows })
-        await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '20')
-        // The lane itself draws, so the row has painted by now.
-        await expect.poll(() => inkAt(page, lane(2), 78)).toBeGreaterThan(0)
-        expect(await inkAt(page, lane(2) + 15, 78)).toBe(0)
-      })
-    }
-
-    test('the wash stops before the message', async ({ page }) => {
-      await open(page, 'graph', scenario)
-      await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '20')
-      await expect.poll(() => inkAt(page, lane(2) + 15, 78)).toBeGreaterThan(0)
-      // Three lanes wide: the message starts at 150 + (2 * 10 + 3 * 16) + 6 = 224. Past the
-      // subject's first letters, on the row's clear lower edge, is nothing.
-      expect(await inkAt(page, 230, 78 + 18)).toBe(0)
+      expect(await inkAt(page, 100, 78)).toBe(0)
     })
 
     test("the author button searches for the selected commit's author", async ({ page }) => {
@@ -438,6 +420,69 @@ test.describe('commit graph', () => {
       await expect(list.locator('.chip')).toHaveCount(3)
       await page.mouse.move(x + 600, y)
       await expect(list).toHaveCount(0)
+    })
+
+    // #625: one label then a count, so the rest need a way in that isn't the pointer.
+    test("the row's label button lists every label for the keyboard, each with its own menu", async ({ page }) => {
+      await open(page, 'graph', scenario)
+      await ready(page)
+      await page.locator('.scroller').focus()
+      const actions = page.getByRole('group', { name: /^Actions for/ })
+      const all = actions.getByRole('button', { name: 'All 3 branches and tags on 0000000' })
+      await expect(all).toHaveAttribute('aria-expanded', 'false')
+      // Tab goes from the graph to its row's actions, and the label button is the first of them.
+      await page.keyboard.press('Tab')
+      await expect(all).toBeFocused()
+      await page.keyboard.press('Enter')
+      const list = page.getByRole('group', { name: 'Branches and tags on this commit' })
+      await expect(list.getByRole('button')).toHaveCount(3)
+      // The focus moves into the list, on its first label.
+      await expect(list.getByRole('button', { name: 'Menu for main' })).toBeFocused()
+      await expect(all).toHaveAttribute('aria-expanded', 'true')
+      await list.getByRole('button', { name: 'Menu for ◆ v1.0' }).focus()
+      await page.keyboard.press('Enter')
+      await expect.poll(async () => (await events(page, 'context-row')).at(-1)?.[0]).toBe(0)
+      // Escape closes it and gives the focus back to the graph.
+      await list.getByRole('button', { name: 'Menu for main' }).focus()
+      await page.keyboard.press('Escape')
+      await expect(list).toHaveCount(0)
+      await expect(page.locator('.scroller')).toBeFocused()
+    })
+
+    test('a row with one label has no label button', async ({ page }) => {
+      const one = { [id]: [branch('main', { head: true, branchKind: 'trunk' })] }
+      await open(page, 'graph', { graphRows: 5, graphRefs: one, responses: { Refs: one[id], CommitSignatures: [] } })
+      await ready(page)
+      await page.locator('.scroller').focus()
+      const actions = page.getByRole('group', { name: /^Actions for/ })
+      await expect(actions).toBeVisible()
+      await expect(actions.getByRole('button', { name: /branches and tags/ })).toHaveCount(0)
+    })
+
+    // #625: the column fits its labels, and its edge can be dragged.
+    test('the label column fits its labels, and can be resized and set back to fitting', async ({ page }) => {
+      await open(page, 'graph', scenario)
+      await ready(page)
+      const edge = page.getByRole('separator', { name: 'Resize the branch and tag column' })
+      const width = async () => Number(await edge.getAttribute('aria-valuenow'))
+      // "main", its kind icon and remote mark, and "+2": narrower than the old fixed 150.
+      await expect.poll(width).toBeLessThan(150)
+      const fitted = await width()
+      expect(fitted).toBeGreaterThanOrEqual(120)
+      await edge.focus()
+      await page.keyboard.press('ArrowRight')
+      await expect.poll(width).toBe(fitted + 16)
+      expect(await page.evaluate(() => localStorage.getItem('gitrevenge.labelColumn:/repo'))).toBe(String(fitted + 16))
+      const box = (await edge.boundingBox())!
+      await page.mouse.move(box.x + 3, box.y + 200)
+      await page.mouse.down()
+      await page.mouse.move(box.x + 3 + 40, box.y + 200, { steps: 4 })
+      await page.mouse.up()
+      await expect.poll(width).toBe(fitted + 56)
+      await edge.focus()
+      await page.keyboard.press('Home')
+      await expect.poll(width).toBe(fitted)
+      expect(await page.evaluate(() => localStorage.getItem('gitrevenge.labelColumn:/repo'))).toBeNull()
     })
 
     test('the row without labels has nothing to expand', async ({ page }) => {

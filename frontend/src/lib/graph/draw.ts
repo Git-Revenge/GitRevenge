@@ -190,12 +190,6 @@ const QUIET_ALPHA = 0.3
 const HALO_WIDTH = 4.5
 const ELBOW_RADIUS = 8
 
-/** How strong the lane's colour is behind a branch's row, where it stops being solid on its way
- * to the message, and the gap it leaves above and below so rows don't merge into a block. */
-const LANE_WASH = 0.08
-const LANE_WASH_SOLID = 0.55
-const LANE_WASH_INSET = 2
-
 /** How far past a label's right edge drawLabels' returned position is. */
 const LABEL_TRAIL = 8
 
@@ -288,10 +282,25 @@ export interface Layout {
   remote: string
 }
 
-/** The branch and tag column's width: labels go back inline when the window can't spare it. */
-export function refColumnWidth(width: number): number {
-  return width >= 640 ? 150 : 0
+/** The branch and tag column is as wide as the labels in view need, within these bounds;
+ * `default` is its width before anything has been measured. */
+export const LABEL_COLUMN = { min: 120, max: 240, default: 150 }
+
+/** A label column width within its bounds, in whole pixels. */
+export function fitLabelColumn(wanted: number): number {
+  return Math.round(Math.max(LABEL_COLUMN.min, Math.min(wanted, LABEL_COLUMN.max)))
 }
+
+/** The branch and tag column's width, given the width its labels want: labels go back inline
+ * when the window can't spare a column. */
+export function refColumnWidth(width: number, wanted = LABEL_COLUMN.default): number {
+  return width >= 640 ? fitLabelColumn(wanted) : 0
+}
+
+/** The margins around the labels in their column: where they start, and what stays clear after
+ * them. */
+const LABEL_LEFT = 8
+const LABEL_RIGHT = 8
 
 /** Compact's date column: the longest date, `Sep 17, 2024`, then room for a signature's seal,
  * which sits at the column's right-hand end. */
@@ -299,9 +308,9 @@ export const DATE_COLUMN = 120
 /** How far left of the SHA a seal's centre sits. */
 export const SEAL_OFFSET = 12
 
-export function layoutColumns(width: number, graphW: number, density: Density, firstLane = 0, remote = 'origin'): Layout {
+export function layoutColumns(width: number, graphW: number, density: Density, firstLane = 0, remote = 'origin', labelW = LABEL_COLUMN.default): Layout {
   const compact = density === 'compact'
-  const refW = refColumnWidth(width)
+  const refW = refColumnWidth(width, labelW)
   const shaW = 76
   const dateW = compact && width >= 960 ? DATE_COLUMN : 0
   const authorW = compact && width >= 800 ? 150 : 0
@@ -396,17 +405,6 @@ export function elbow(x1: number, y1: number, x2: number, y2: number, leaving: b
   return leaving
     ? { start: [x1, y1], before: [x2 - side * r, y1], corner: [x2, y1], after: [x2, y1 + r], end: [x2, y2] }
     : { start: [x1, y1], before: [x1, y2 - r], corner: [x1, y2], after: [x1 + side * r, y2], end: [x2, y2] }
-}
-
-/** The same colour fully transparent, so a fade doesn't drift to grey on the way out. */
-export function clearOf(color: string): string {
-  return /^#[0-9a-f]{6}$/i.test(color) ? `${color}00` : 'transparent'
-}
-
-/** Whether a row carries its lane's colour. Trunk is always the left-hand line, and it holds so
- * many commits that its wash would be a block across the graph; Docs lines are meant to recede. */
-export function rowWashed(row: Pick<Row, 'kind'>): boolean {
-  return row.kind !== 'trunk' && row.kind !== 'docs'
 }
 
 /** Where a row's labels were drawn, from their left edge to their right. */
@@ -568,41 +566,15 @@ export function drawRow(
   const color = laneColor(row.color)
   const docs = row.kind === 'docs'
 
-  // A branch's colour runs from its node to the message, so the row reads as belonging to its
-  // lane without tracing the line.
   const before = ctx.globalAlpha
-  const washX = Math.max(x, graphLeft)
-  if (rowWashed(row) && washX < lay.textX) {
-    const tint = ctx.createLinearGradient(washX, 0, lay.textX, 0)
-    tint.addColorStop(0, color)
-    tint.addColorStop(LANE_WASH_SOLID, color)
-    tint.addColorStop(1, clearOf(color))
-    ctx.globalAlpha = before * LANE_WASH
-    ctx.fillStyle = tint
-    ctx.beginPath()
-    ctx.roundRect(washX, y + LANE_WASH_INSET, lay.textX - washX, h - LANE_WASH_INSET * 2, 3)
-    ctx.fill()
-    ctx.globalAlpha = before
-  }
 
-  // Labels in their own column, each tied to its node by a thin line.
+  // Labels in their own column. A label wears its node's colour, which is all that ties the two.
   if (lay.refW && refs.length) {
-    let end = drawLabels(ctx, refs, 8, mid, lay.refW - 16, color, theme, comfortable, lay.remote) - LABEL_TRAIL
-    labelSpan = [8, end]
+    const end = drawLabels(ctx, refs, LABEL_LEFT, mid, lay.refW - LABEL_LEFT - LABEL_RIGHT, color, theme, comfortable, lay.remote) - LABEL_TRAIL
+    labelSpan = [LABEL_LEFT, end]
     // The checked-out commit gets the graph's one handwritten word, when the column has room.
-    if (comfortable && !extra.note && refs.some((r) => r.head)) end = drawNote(ctx, HERE_NOTE, theme.link, end, mid, lay.refW)
-    if (extra.note) end = drawNote(ctx, extra.note, extra.noteColor ?? theme.teal, end, mid, lay.refW)
-    const to = Math.min(x, graphRight)
-    if (end < to && x >= graphLeft) {
-      ctx.globalAlpha = before * 0.45
-      ctx.lineWidth = 1
-      ctx.strokeStyle = color
-      ctx.beginPath()
-      ctx.moveTo(end, mid)
-      ctx.lineTo(to, mid)
-      ctx.stroke()
-      ctx.globalAlpha = before
-    }
+    if (comfortable && !extra.note && refs.some((r) => r.head)) drawNote(ctx, HERE_NOTE, theme.link, end, mid, lay.refW)
+    if (extra.note) drawNote(ctx, extra.note, extra.noteColor ?? theme.teal, end, mid, lay.refW)
   }
 
   // A row with no labels still gets its note, from the column's edge.
@@ -873,7 +845,35 @@ export function refLabels(refs: Ref[], main = 'origin'): RefLabel[] {
   return labels
 }
 
-/** Draws ref labels starting at x; returns the x where the subject should start. */
+/** What a label needs besides its name: its padding, its kind and stack icons, its remote mark. */
+function labelChrome(ctx: Pick<CanvasRenderingContext2D, 'measureText'>, r: Ref, remotes: number): number {
+  return 14 + (labelKind(r) ? KIND_ICON_W : 0) + (r.stackDepth ? KIND_ICON_W : 0) + remoteMarkWidth(ctx, remotes)
+}
+
+/** The gap between a label and what follows it. */
+const LABEL_GAP = 5
+
+/** The font labels are set in, for measuring them. */
+export const LABEL_FONT = `12px ${MONO}`
+
+/** The count after a commit's one label: "+2" for two more, nothing for a label alone. */
+export function moreLabels(count: number): string {
+  return count > 1 ? `+${count - 1}` : ''
+}
+
+/** How wide the label column has to be to show a commit's first label whole, with the count of
+ * the rest; 0 for a commit with no labels. The context's font must be LABEL_FONT. */
+export function labelColumnNeed(ctx: Pick<CanvasRenderingContext2D, 'measureText'>, refs: Ref[], remoteName: string): number {
+  if (refs.length === 0) return 0
+  const labels = refLabels(refs, remoteName)
+  const { ref, text, remotes } = labels[0]
+  const more = moreLabels(labels.length)
+  return LABEL_LEFT + ctx.measureText(text).width + labelChrome(ctx, ref, remotes) + (more ? LABEL_GAP + ctx.measureText(more).width : 0) + LABEL_RIGHT
+}
+
+/** Draws a commit's labels starting at x: the one that ranks first, then a count of the rest.
+ * A name too long for maxWidth is cut in the middle. Returns the x where the subject should
+ * start. */
 function drawLabels(
   ctx: CanvasRenderingContext2D,
   refs: Ref[],
@@ -886,48 +886,40 @@ function drawLabels(
   remoteName: string,
 ): number {
   if (refs.length === 0) return x
-  const end = x + maxWidth
   const h = comfortable ? 18 : 17
   const labels = refLabels(refs, remoteName)
+  const { ref: r, text, remotes } = labels[0]
   ctx.save()
-  setFont(ctx, `12px ${MONO}`)
-  for (let i = 0; i < labels.length; i++) {
-    const { ref: r, text, remotes } = labels[i]
-    const remaining = labels.length - i
-    const more = remaining > 1 ? ` +${remaining - 1}` : ''
-    const extra = 14 + (labelKind(r) ? KIND_ICON_W : 0) + (r.stackDepth ? KIND_ICON_W : 0) + remoteMarkWidth(ctx, remotes)
-    let w = ctx.measureText(text).width + extra
-    if (x + w > end) {
-      // Out of room: one clipped label that also counts the rest, while enough of its name is left.
-      const clipped = clippedName(ctx, text, Math.max(0, end - x - extra - ctx.measureText(more).width))
-      if (clipped !== null) {
-        const label = clipped + more
-        w = ctx.measureText(label).width + extra
-        drawLabel(ctx, label, x, mid, w, h, r, color, theme, remotes)
-        x += w + 5
-        break
-      }
-      // Otherwise only say how many there are, if even that fits.
-      setFont(ctx, `12px ${MONO}`)
-      const count = `+${remaining}`
-      const countW = ctx.measureText(count).width
-      if (x + countW <= end) {
-        ctx.fillStyle = theme.muted
-        ctx.textBaseline = 'middle'
-        ctx.fillText(count, x, mid + 0.5)
-        x += countW + 5
-      }
-      break
+  setFont(ctx, LABEL_FONT)
+  let more = moreLabels(labels.length)
+  const moreW = more ? LABEL_GAP + ctx.measureText(more).width : 0
+  const chrome = labelChrome(ctx, r, remotes)
+  const name = middleCut(ctx, text, maxWidth - moreW - chrome)
+  if (name === null) {
+    // No room for even a cut name: only say how many labels there are.
+    more = `+${labels.length}`
+  } else {
+    const w = ctx.measureText(name).width + chrome
+    drawLabel(ctx, name, x, mid, w, h, r, color, theme, remotes)
+    x += w + LABEL_GAP
+  }
+  if (more) {
+    setFont(ctx, LABEL_FONT)
+    const w = ctx.measureText(more).width
+    if (name !== null || w <= maxWidth) {
+      ctx.fillStyle = theme.muted
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(more, x, mid + 0.5)
+      x += w + LABEL_GAP
     }
-    drawLabel(ctx, text, x, mid, w, h, r, color, theme, remotes)
-    x += w + 5
   }
   ctx.restore()
   return x + 3
 }
 
 /** The width of a label's remote icon, and its count when there's more than one remote. */
-function remoteMarkWidth(ctx: CanvasRenderingContext2D, remotes: number): number {
+function remoteMarkWidth(ctx: Pick<CanvasRenderingContext2D, 'measureText'>, remotes: number): number {
   if (!remotes) return 0
   return KIND_ICON_W + (remotes > 1 ? ctx.measureText(String(remotes)).width + 2 : 0)
 }
@@ -1020,15 +1012,27 @@ function drawLabel(ctx: CanvasRenderingContext2D, text: string, x: number, mid: 
   }
 }
 
-/** The fewest characters of a cut-off name worth showing: "origin/f…" is about the least that
- * says anything. */
-const MIN_CLIPPED_NAME = 8
+/** The fewest characters of a cut name worth showing: "617-…ends" is about the least that says
+ * anything. */
+const MIN_CUT_NAME = 8
 
-/** A ref's name cut to fit maxWidth, or null if too little of it would be left to read. */
-export function clippedName(ctx: Pick<CanvasRenderingContext2D, 'measureText'>, text: string, maxWidth: number): string | null {
-  const clipped = clip(ctx, text, maxWidth)
-  if (clipped === text) return text
-  return clipped.replace(/^[◆≡] /, '').length - 1 < MIN_CLIPPED_NAME ? null : clipped
+/** A ref's name cut in the middle to fit maxWidth, or null if too little of it would be left to
+ * read. Branch names in a team share their beginnings (`feature/`, an issue number, a person),
+ * so the end is kept as well as the start; an odd character goes to the start. A tag's or a
+ * stash's mark stays in front and isn't counted as part of the name. */
+export function middleCut(ctx: Pick<CanvasRenderingContext2D, 'measureText'>, text: string, maxWidth: number): string | null {
+  if (ctx.measureText(text).width <= maxWidth) return text
+  const mark = /^[◆≡] /.exec(text)?.[0] ?? ''
+  const name = [...text.slice(mark.length)]
+  const cut = (keep: number) => mark + name.slice(0, Math.ceil(keep / 2)).join('') + '…' + name.slice(name.length - Math.floor(keep / 2)).join('')
+  let lo = 0
+  let hi = name.length - 1
+  while (lo < hi) {
+    const m = (lo + hi + 1) >> 1
+    if (ctx.measureText(cut(m)).width <= maxWidth) lo = m
+    else hi = m - 1
+  }
+  return lo < MIN_CUT_NAME ? null : cut(lo)
 }
 
 /** Truncates text with an ellipsis to fit maxWidth pixels. */
