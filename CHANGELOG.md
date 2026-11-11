@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Rendered previews use newer libraries: Mermaid 12.3.0 for diagrams, PDF.js 6.5.438 for PDFs and marked 18.1.3 for Markdown. (#643)
+
 ## [0.11.0] - 2026-11-11
 
 Git tools: everyday git chores without leaving the app.
