@@ -10,6 +10,7 @@ Git tools: everyday git chores without leaving the app.
 
 ### Added
 
+- A ruler takes the scrollbar's place at the graph's right edge. Its box shows what's in view and can be dragged, with the month beside it as it moves; a press anywhere on it goes there. Ticks mark the checked-out commit, branches, tags, commits with notes and search matches, a faint line marks each month, and a hatched foot is the part of a long history not read yet. Point at a tick to see what's there. (#627, #638)
 - A button at the foot of the graph goes back to the checked-out commit whenever that commit is out of view. It names the branch (or the short SHA when detached), points the way, and selects nothing; **Alt+Home** does the same. After a fetch it counts what's new on the upstream. (#619, #633)
 - A commit with a git note wears a folded-page mark in the graph, beside its signature seal. Hover the mark to read the note, or click it to open the commit with its notes in view. Notes in every notes ref count. Type `has:note` in the graph's search to step through the commits that have one. (#620, #631)
 - An **About** dialog with the version, a link to gitrevenge.com, how to sponsor the project, and credits for Go, Svelte and Wails. Click the version in the status bar, or the heart beside it, or choose **About Git Revenge** in the command palette. (#613)

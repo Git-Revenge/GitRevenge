@@ -361,7 +361,7 @@ test.describe('commit graph', () => {
 
     /** How much ink is on a pixel: the canvas is clear where nothing is drawn. */
     const inkAt = (page: Page, x: number, y: number) =>
-      page.locator('canvas').evaluate(
+      page.locator('.viewport > canvas').evaluate(
         (el, [px, py]) => {
           const dpr = window.devicePixelRatio || 1
           return (el as HTMLCanvasElement).getContext('2d')!.getImageData(px * dpr, py * dpr, 1, 1).data[3]
@@ -437,6 +437,144 @@ test.describe('commit graph', () => {
       await page.mouse.wheel(0, -2000)
       await page.waitForTimeout(150)
       expect((await message.boundingBox())!.x).toBe(widened)
+    })
+  })
+
+  // #627: the ruler is the scrollbar, with the history marked on it.
+  test.describe('the ruler', () => {
+    const id = (i: number) => String(i).padStart(40, '0')
+    const marks = { loaded: 1000, months: [{ row: 0, time: 1793500000 }, { row: 600, time: 1790000000 }], tips: [0, 400], tags: [401, 402, 800], notes: [400] }
+    const scenario = (rows = 1000, over: object = {}) => ({
+      graphRows: rows,
+      responses: { CommitSignatures: [], Refs: [{ ...branch('main', { head: true, branchKind: 'trunk' }), commit: id(0) }], HeadCommit: { branch: 'main', commit: id(0) }, RulerMarks: marks, ...over },
+    })
+    const ruler = (page: Page) => page.getByRole('scrollbar', { name: 'Position in the history' })
+    const ready = async (page: Page, rows = 1000, over: object = {}) => {
+      await open(page, 'graph', scenario(rows, over))
+      await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', String(rows))
+      await expect.poll(() => calls(page, 'RulerMarks')).toContainEqual(['/repo'])
+      await page.waitForTimeout(300)
+    }
+    const selected = async (page: Page) => ((await events(page, 'select')).at(-1)?.[0] as { index: number } | undefined)?.index
+    /** The commit just under the pinned day line, found by clicking it. */
+    const topCommit = async (page: Page) => {
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.click(box.x + 300, box.y + 26 + 10)
+      return selected(page)
+    }
+    const boxOf = async (page: Page) => (await page.locator('.ruler-box').boundingBox())!
+
+    test('stands in for the scrollbar: it says where the view is, and the browser draws none', async ({ page }) => {
+      await ready(page)
+      await expect(ruler(page)).toHaveAttribute('aria-valuenow', '0')
+      await expect(ruler(page)).toHaveAttribute('aria-valuetext', 'Commit 1 of 1,000')
+      await expect(ruler(page)).toHaveAttribute('aria-orientation', 'vertical')
+      // It names the rows it scrolls, and isn't a Tab stop.
+      const controls = await ruler(page).getAttribute('aria-controls')
+      expect(await page.locator('.scroller').getAttribute('id')).toBe(controls)
+      await expect(ruler(page)).toHaveAttribute('tabindex', '-1')
+      // The rows end where it begins, and the scroll area shows no bar of its own.
+      const r = (await ruler(page).boundingBox())!
+      const view = (await page.locator('.scroller').boundingBox())!
+      expect(Math.round(r.width)).toBe(14)
+      expect(Math.round(r.x + r.width)).toBe(Math.round(view.x + view.width))
+      expect(await page.locator('.scroller').evaluate((e) => getComputedStyle(e).scrollbarWidth)).toBe('none')
+      // The box is at the top, and not too small to take hold of.
+      const b = await boxOf(page)
+      expect(Math.round(b.y)).toBe(Math.round(r.y))
+      expect(b.height).toBeGreaterThanOrEqual(24)
+    })
+
+    test('the box follows the view, and reaches the bottom at the end', async ({ page }) => {
+      await ready(page)
+      await page.locator('.scroller').focus()
+      await page.keyboard.press('End')
+      await expect(ruler(page)).toHaveAttribute('aria-valuenow', '100')
+      const r = (await ruler(page).boundingBox())!
+      await expect.poll(async () => Math.round((await boxOf(page)).y + (await boxOf(page)).height)).toBe(Math.round(r.y + r.height))
+      await page.keyboard.press('Home')
+      await expect(ruler(page)).toHaveAttribute('aria-valuenow', '0')
+    })
+
+    test('dragging the box moves through the history, and says the month beside it', async ({ page }) => {
+      await ready(page)
+      const r = (await ruler(page).boundingBox())!
+      const b = await boxOf(page)
+      await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(b.x + b.width / 2, r.y + r.height * 0.75, { steps: 6 })
+      // While it's held, the month under it shows beside it.
+      await expect(page.locator('.ruler-when')).toBeVisible()
+      await expect(page.locator('.ruler-when')).toHaveText(/\d{4}/)
+      await page.mouse.up()
+      await expect(page.locator('.ruler-when')).toHaveCount(0)
+      const now = Number(await ruler(page).getAttribute('aria-valuenow'))
+      expect(now).toBeGreaterThan(55)
+      expect(now).toBeLessThan(95)
+      // The view really is there: the commit at the top is well into the history.
+      const top = (await topCommit(page))!
+      expect(top).toBeGreaterThan(500)
+      expect(top).toBeLessThan(950)
+    })
+
+    test('a press on the track brings the box there', async ({ page }) => {
+      await ready(page)
+      const r = (await ruler(page).boundingBox())!
+      await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2)
+      const now = Number(await ruler(page).getAttribute('aria-valuenow'))
+      expect(now).toBeGreaterThan(40)
+      expect(now).toBeLessThan(60)
+      const b = await boxOf(page)
+      expect(Math.abs(b.y + b.height / 2 - (r.y + r.height / 2))).toBeLessThan(3)
+    })
+
+    test('a tick says what is there when the pointer is on it', async ({ page }) => {
+      await ready(page)
+      const r = (await ruler(page).boundingBox())!
+      // Rows 400, 401 and 402 of 1000 are within 2px of each other: one tick for a branch, two
+      // tags and a note.
+      await page.mouse.move(r.x + r.width / 2, r.y + (400 / 1000) * r.height + 1)
+      await expect(ruler(page)).toHaveAttribute('title', '1 branch, 2 tags, 1 note')
+      // The checked-out commit and its branch are at the very top.
+      await page.mouse.move(r.x + r.width / 2, r.y + 1)
+      await expect(ruler(page)).toHaveAttribute('title', 'the checked-out commit, 1 branch')
+      await page.mouse.move(r.x + r.width / 2, r.y + r.height * 0.6)
+      await expect(ruler(page)).toHaveAttribute('title', '')
+    })
+
+    test('search matches are marked on it', async ({ page }) => {
+      await ready(page, 1000, { SearchGraph: { rows: [650, 651], total: 2 } })
+      await page.getByRole('searchbox', { name: 'Search commits' }).fill('something')
+      await expect.poll(() => calls(page, 'SearchGraph')).toHaveLength(1)
+      const r = (await ruler(page).boundingBox())!
+      await page.mouse.move(r.x + r.width / 2, r.y + (650 / 1000) * r.height + 1)
+      await expect(ruler(page)).toHaveAttribute('title', '2 matches')
+    })
+
+    test('works to the far end of a very long history', async ({ page }) => {
+      await ready(page, 1_500_000)
+      await expect(ruler(page)).toHaveAttribute('aria-valuetext', 'Commit 1 of 1,500,000')
+      const r = (await ruler(page).boundingBox())!
+      const b = await boxOf(page)
+      expect(Math.round(b.height)).toBe(24)
+      await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(b.x + b.width / 2, r.y + r.height + 50, { steps: 8 })
+      await page.mouse.up()
+      await expect(ruler(page)).toHaveAttribute('aria-valuenow', '100')
+      await page.waitForTimeout(400)
+      const view = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.click(view.x + 300, view.y + view.height - 10)
+      expect(await selected(page)).toBe(1_499_999)
+    })
+
+    test('the wheel over it scrolls the history', async ({ page }) => {
+      await ready(page)
+      const r = (await ruler(page).boundingBox())!
+      await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2)
+      await page.mouse.wheel(0, 900)
+      await page.waitForTimeout(500)
+      expect((await topCommit(page))!).toBeGreaterThan(20)
     })
   })
 
@@ -615,7 +753,7 @@ test.describe('commit graph', () => {
     }
     /** How much ink is in a strip of the canvas: its left third at a height, 4px tall. */
     const inkAcross = (page: Page, y: number) =>
-      page.locator('canvas').evaluate((el, py) => {
+      page.locator('.viewport > canvas').evaluate((el, py) => {
         const c = el as HTMLCanvasElement
         const dpr = window.devicePixelRatio || 1
         const data = c.getContext('2d')!.getImageData(0, py * dpr, c.width / 3, 4 * dpr).data
@@ -821,7 +959,7 @@ test.describe('commit graph', () => {
       )
     /** Ink at the right edge of the row drawn at a height in the view, where an arrived commit's bar is. */
     const barAt = (page: Page, y: number) =>
-      page.locator('canvas').evaluate((el, py) => {
+      page.locator('.viewport > canvas').evaluate((el, py) => {
         const c = el as HTMLCanvasElement
         const dpr = window.devicePixelRatio || 1
         return c.getContext('2d')!.getImageData(c.width - 2 * dpr, py * dpr, 1, 1).data[3]
@@ -960,12 +1098,15 @@ test.describe('commit graph', () => {
       // Under the day line (26), the first row starts a run: two lines, the mark on the first.
       // The stub's other commits carry it on: one line each, 30 tall.
       const y = 26 + (row === 0 ? 19 : 52 + (row - 1) * 30 + 15)
-      return { x: box.x + box.width - 76 - 28, y: box.y + y, left: box.width - 76 - 28 - 8, top: y - 8 }
+      // The rows end where the ruler (14px) begins; the SHA column (76) is at their right, and
+      // the note mark's slot 28px before it.
+      const x = box.width - 14 - 76 - 28
+      return { x: box.x + x, y: box.y + y, left: x - 8, top: y - 8 }
     }
     /** How much ink is in a row's slot. */
     const inkIn = async (page: Page, row: number) => {
       const s = await slot(page, row)
-      return page.locator('canvas').evaluate(
+      return page.locator('.viewport > canvas').evaluate(
         (el, [x, y]) => {
           const dpr = window.devicePixelRatio || 1
           const data = (el as HTMLCanvasElement).getContext('2d')!.getImageData(x * dpr, y * dpr, 16 * dpr, 16 * dpr).data

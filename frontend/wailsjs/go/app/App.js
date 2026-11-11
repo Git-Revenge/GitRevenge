@@ -514,6 +514,10 @@ export function RestoreStack(arg1, arg2, arg3) {
   return window['go']['app']['App']['RestoreStack'](arg1, arg2, arg3);
 }
 
+export function RulerMarks(arg1) {
+  return window['go']['app']['App']['RulerMarks'](arg1);
+}
+
 export function RunOperationAction(arg1, arg2) {
   return window['go']['app']['App']['RunOperationAction'](arg1, arg2);
 }
