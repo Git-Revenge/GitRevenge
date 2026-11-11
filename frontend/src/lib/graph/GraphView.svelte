@@ -297,7 +297,7 @@
   let actionsEl = $state<HTMLElement>()
   /** Which row shows its actions, and where: the hovered row once the pointer has rested on it
    * a moment, else the selected row while the graph has focus, so the keyboard reaches them too. */
-  let actions = $state<{ index: number; top: number } | null>(null)
+  let actions = $state<{ index: number; top: number; labels: number } | null>(null)
   /** The row whose SHA was just copied, so its button can say so for a moment. */
   let copied = $state(-1)
   let copiedTimer: ReturnType<typeof setTimeout> | undefined
@@ -338,8 +338,10 @@
     }
     const h = Math.min(rowH, ACTIONS_H)
     const place = Math.round(y + (rowH - h) / 2)
-    if (actions?.index === index && actions.top === place) return
-    actions = { index, top: place }
+    // How many labels the row has, for its button that lists them all.
+    const labels = refLabels(cache.refsFor(cache.get(index)!.id), remote).length
+    if (actions?.index === index && actions.top === place && actions.labels === labels) return
+    actions = { index, top: place, labels }
   }
 
   async function copySha(index: number) {
@@ -1043,7 +1045,7 @@
       {#if row}
         {@const short = row.id.slice(0, 7)}
         {@const i = actions.index}
-        {@const labelCount = refLabels(cache.refsFor(row.id), remote).length}
+        {@const labelCount = actions.labels}
         <div
           class="row-actions"
           role="group"
