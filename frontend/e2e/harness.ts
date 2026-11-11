@@ -51,6 +51,12 @@ const behaviours: Record<string, (...args: never[]) => unknown> = {
     const total = scenario.graphData?.length ?? scenario.graphRows ?? 0
     return { rows: Array.from({ length: Math.max(0, Math.min(count, total - start)) }, (_, k) => scenario.graphData?.[start + k] ?? graphRow(start + k)), refs: scenario.graphRefs ?? {}, total, loading: false, paused: false, estimate: total }
   },
+  // The stub's commits are numbered, so a commit's row is its number, unless a test says otherwise.
+  CommitRow: (_path: string, id: string) => {
+    if ('CommitRow' in responses) return responses.CommitRow
+    const total = scenario.graphData?.length ?? scenario.graphRows ?? 0
+    return /^\d{40}$/.test(id) && Number(id) < total ? Number(id) : -1
+  },
   GroupAction: (action: string, args: string[]) => {
     const groups = responses.Groups as Group[]
     if (action === 'move') {

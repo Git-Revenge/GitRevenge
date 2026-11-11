@@ -462,6 +462,8 @@ export interface RowExtra {
   noteColor?: string
   /** The commit has a git note: a folded-page mark beside the seal. */
   noted?: boolean
+  /** The commit just arrived on its branch, by a pull or the like: a teal bar at the right edge. */
+  arrived?: boolean
 }
 
 /** How strong the wash is on a row still in question during a bisect. */
@@ -593,6 +595,15 @@ export function drawRow(
     ctx.roundRect(bar.x, bar.y, bar.w, bar.h, bar.r)
     ctx.fill()
     ctx.globalAlpha = base
+  }
+
+  if (extra.arrived) {
+    // The mirror of the selection's bar, in teal: this commit is new here.
+    const bar = selectionBar(y, h)
+    ctx.fillStyle = theme.teal
+    ctx.beginPath()
+    ctx.roundRect(lay.width - bar.w, bar.y, bar.w, bar.h, bar.r)
+    ctx.fill()
   }
 
   const mid = y + h / 2

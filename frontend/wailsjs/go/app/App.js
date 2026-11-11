@@ -18,6 +18,10 @@ export function AnswerPrompt(arg1, arg2, arg3) {
   return window['go']['app']['App']['AnswerPrompt'](arg1, arg2, arg3);
 }
 
+export function ArrivedCommits(arg1, arg2, arg3) {
+  return window['go']['app']['App']['ArrivedCommits'](arg1, arg2, arg3);
+}
+
 export function Bisect(arg1) {
   return window['go']['app']['App']['Bisect'](arg1);
 }
@@ -218,6 +222,10 @@ export function Groups() {
   return window['go']['app']['App']['Groups']();
 }
 
+export function HeadCommit(arg1) {
+  return window['go']['app']['App']['HeadCommit'](arg1);
+}
+
 export function HideBranch(arg1, arg2, arg3) {
   return window['go']['app']['App']['HideBranch'](arg1, arg2, arg3);
 }
@@ -336,6 +344,10 @@ export function OpenMergeTool(arg1, arg2) {
 
 export function OpenRepo(arg1) {
   return window['go']['app']['App']['OpenRepo'](arg1);
+}
+
+export function OwnMoveAge(arg1) {
+  return window['go']['app']['App']['OwnMoveAge'](arg1);
 }
 
 export function PlanBisect(arg1, arg2, arg3) {

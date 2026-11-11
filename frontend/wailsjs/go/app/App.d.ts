@@ -16,6 +16,8 @@ export function AddWorktree(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function AnswerPrompt(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
+export function ArrivedCommits(arg1:string,arg2:string,arg3:string):Promise<app.Arrived>;
+
 export function Bisect(arg1:string):Promise<app.BisectInfo>;
 
 export function Blame(arg1:string,arg2:string,arg3:string):Promise<Array<git.BlameLine>>;
@@ -116,6 +118,8 @@ export function GroupDashboard(arg1:string):Promise<Array<app.GroupRepo>>;
 
 export function Groups():Promise<Array<settings.Group>>;
 
+export function HeadCommit(arg1:string):Promise<git.HeadState>;
+
 export function HideBranch(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function IgnoreFileNames(arg1:string):Promise<app.IgnoreFiles>;
@@ -175,6 +179,8 @@ export function OpenGitConfig(arg1:string):Promise<app.ConfigDoc>;
 export function OpenMergeTool(arg1:string,arg2:string):Promise<void>;
 
 export function OpenRepo(arg1:string):Promise<app.RepoTab>;
+
+export function OwnMoveAge(arg1:string):Promise<number>;
 
 export function PlanBisect(arg1:string,arg2:string,arg3:string):Promise<app.BisectPlan>;
 

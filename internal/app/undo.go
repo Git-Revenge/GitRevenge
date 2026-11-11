@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/git-revenge/gitrevenge/internal/fsutil"
 	"github.com/git-revenge/gitrevenge/internal/git"
@@ -59,6 +60,27 @@ type undoStacks struct {
 	mu   sync.Mutex
 	undo map[string][]undoEntry
 	redo map[string][]undoEntry
+	// moved is when this app last ran something that can move a branch, by repository: what
+	// tells a move the person made here from one that happened under them.
+	moved map[string]time.Time
+}
+
+// touch notes that the app is moving something in the repository at path, or just has.
+func (u *undoStacks) touch(path string) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	if u.moved == nil {
+		u.moved = map[string]time.Time{}
+	}
+	u.moved[path] = time.Now()
+}
+
+// movedAgo returns how long ago the app last moved something in the repository at path.
+func (u *undoStacks) movedAgo(path string) (time.Duration, bool) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	at, ok := u.moved[path]
+	return time.Since(at), ok
 }
 
 // maxUndo bounds history kept per repository.
@@ -70,6 +92,10 @@ func (u *undoStacks) push(path string, e undoEntry) {
 	if u.undo == nil {
 		u.undo, u.redo = map[string][]undoEntry{}, map[string][]undoEntry{}
 	}
+	if u.moved == nil {
+		u.moved = map[string]time.Time{}
+	}
+	u.moved[path] = time.Now()
 	u.undo[path] = append(u.undo[path], e)
 	if n := len(u.undo[path]); n > maxUndo {
 		u.undo[path] = u.undo[path][n-maxUndo:]
@@ -96,6 +122,8 @@ func (u *undoStacks) forget(path string) {
 func (a *App) record(r *session.Repo, label string, kind undoKind, mode git.ResetMode, op func() error) error {
 	ctx := context.Background()
 	before := r.Git.Head(ctx)
+	// Said before the operation runs: the file watcher can report its effects before it returns.
+	a.undo.touch(r.Path)
 	if err := op(); err != nil {
 		return err
 	}
@@ -181,6 +209,7 @@ func (a *App) step(path string, undo bool) error {
 	e := stack[len(stack)-1]
 	u.mu.Unlock()
 
+	u.touch(r.Path)
 	r.Quietly(func() { err = apply(context.Background(), r.Git, e, undo) })
 	if err != nil {
 		return err

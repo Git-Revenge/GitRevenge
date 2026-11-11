@@ -3,16 +3,17 @@
   import { errorText } from '../errors'
   import { onMount, tick, untrack, type Snippet } from 'svelte'
   import { ALONE_STEPS, searchPlaceholder, SQUEEZE, squeezeFor } from '../barSqueeze'
-  import { CommitNotes, CommitRow, CommitSignatures, GraphFocus, GraphRows, NotedCommits, Refs, RepoPreferences, SearchGraph, SetGraphFocus, SetKindVisible } from '../../../wailsjs/go/app/App.js'
+  import { ArrivedCommits, CommitNotes, CommitRow, CommitSignatures, GraphFocus, HeadCommit, OwnMoveAge, GraphRows, NotedCommits, Refs, RepoPreferences, SearchGraph, SetGraphFocus, SetKindVisible } from '../../../wailsjs/go/app/App.js'
   import { session } from '../session.svelte'
   import { ClipboardSetText, EventsOn } from '../../../wailsjs/runtime/runtime.js'
   import { theme as colorTheme } from '../theme.svelte'
-  import { provideCommands } from '../commands.svelte'
+  import { formatShortcut, provideCommands } from '../commands.svelte'
   import Icon from '../ui/Icon.svelte'
   import { DUR, easeInk, fadeUp, labelsFold, labelsUnfold, menuOut, reducedMotion, stagger } from '../ui/motion'
   import KindFilter from './KindFilter.svelte'
   import RefChip from './RefChip.svelte'
   import { bisectRow, drawRow, sealOf, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
+  import { branchMove, headAway, headLabel, isOwnMove, LANDING, landingTop, moveAnnouncement, tipsOf, type Tips } from './follow'
   import { loadLabelWidth, nextLabelWidth, REFIT_AFTER_MS, saveLabelWidth } from './labelColumn'
   import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
   import { scrollMap, topAfterScroll, toScroll, type ScrollMap } from './scrollMap'
@@ -71,6 +72,64 @@
     remote = mainRemote(refs as Ref[])
     schedule()
     kindRows = kindFilterRows(refs as Ref[], prefs?.hideKinds ?? [])
+    return refs as Ref[]
+  }
+
+  /** Where the branches and HEAD were at the last reading, to tell what a reload moved. */
+  let tips: Tips | null = null
+  /** The checked-out commit's row, or -1 when it isn't in the graph (or isn't known yet). */
+  let headRow = -1
+  /** The commits that just arrived on a branch the view followed, until something else is
+   * selected. */
+  let arrived = new Set<string>()
+  /** How many commits arrived above the checked-out commit that it hasn't been shown yet:
+   * from a move the view followed, or on its upstream after a fetch. */
+  let unseen = 0
+  /** The button that goes to the checked-out commit, while that commit is out of view. */
+  let goHead = $state<{ dir: 'up' | 'down'; label: string; count: number } | null>(null)
+  /** What a screen reader hears when the view follows a branch. */
+  let announce = $state('')
+
+  /** Reads the refs and HEAD again, and finds the checked-out commit's row. */
+  async function readTips(): Promise<Tips> {
+    const [refs, head] = await Promise.all([loadKinds(), HeadCommit(path).catch(() => null)])
+    const next = tipsOf(refs, { branch: head?.branch ?? '', commit: head?.commit ?? '' })
+    headRow = next.headCommit ? await CommitRow(path, next.headCommit).catch(() => -1) : -1
+    schedule()
+    return next
+  }
+
+  /** After a reload: keeps the selection on its commit, and, when the reload came of something
+   * the person did that moved a branch, takes the view to that branch's new tip. */
+  async function afterReload() {
+    const before = tips
+    const now = await readTips()
+    tips = now
+    // A fetch moves no local branch: the view stays, and the button counts what's new upstream.
+    if (before && now.head === before.head && now.headCommit === before.headCommit && now.behind > before.behind) unseen += now.behind - before.behind
+    // Only a move the person made here is followed: the app says when it last ran something
+    // that moves a branch. One made by another tool leaves the view alone.
+    const age = await OwnMoveAge(path).catch(() => -1)
+    const move = isOwnMove(age) ? branchMove(before, now) : null
+    const gone = await followSelection(!!move)
+    if (query) void runSearch()
+    if (!move) return
+    const got = move.from ? await ArrivedCommits(path, move.from, move.to).catch(() => null) : null
+    arrived = new Set(got?.commits ?? [])
+    const row = await CommitRow(path, move.to).catch(() => -1)
+    if (row < 0) return
+    if (move.to === now.headCommit) unseen = got?.total ?? 0
+    glideTo(row, LANDING)
+    // The tip is selected only when the person hadn't chosen a commit, or theirs is gone.
+    if (!chosen || gone) selectWhenLoaded(row, true)
+    announce = moveAnnouncement(move, got?.total ?? 0)
+  }
+
+  /** Takes the view to the checked-out commit, without selecting it. */
+  function goToHead() {
+    if (headRow < 0) return
+    glideTo(headRow, LANDING)
+    scroller.focus()
   }
 
   async function setKindVisible(kind: string, visible: boolean) {
@@ -659,7 +718,9 @@
       // During a bisect a commit wears its answer, and fades once it's out of the running.
       const place = bisectView ? bisectRow(row.id, bisectView, { bad: th.bad }) : null
       const dim = washes.value(`d${i}`, (matchSet && !matchSet.has(i)) || place?.faded ? 1 : 0, frameAt)
-      const extra = noted.has(row.id) ? { ...place?.extra, noted: true } : place?.extra
+      const isNoted = noted.has(row.id)
+      const isArrived = arrived.has(row.id)
+      const extra = isNoted || isArrived ? { ...place?.extra, noted: isNoted, arrived: isArrived } : place?.extra
       const span = drawRow(ctx, row, cache.refsFor(row.id), y, lay, th, sel, hov, dim, now, sealOf(sigs.get(row.id)), { prev: cache.get(i - 1), prev2: cache.get(i - 2), next: cache.get(i + 1) }, extra)
       if (arriving) ctx.restore()
       if (span) labelSpans.set(i, span)
@@ -690,6 +751,12 @@
     updateExpanded()
     updateNoteCard()
     updateActions()
+    // The way back to the checked-out commit shows while that commit is out of view, once the
+    // graph has held still, so it doesn't flicker past during a drag.
+    const away = headRow >= 0 && tips ? headAway(rowY(headRow), rowH, top, h) : null
+    if (!away) unseen = 0
+    const wanted = away && (settled || goHead) ? { dir: away, label: headLabel(tips!.head, tips!.headCommit), count: unseen } : null
+    if (wanted?.dir !== goHead?.dir || wanted?.label !== goHead?.label || wanted?.count !== goHead?.count) goHead = wanted
     paintedTop = top
     // Lanes scrolled out on the left fade in from the edge, so the cut doesn't look like the end.
     if (firstLane > 0) {
@@ -723,20 +790,24 @@
   /** Scrolls to and selects row i (e.g. when a branch is picked in the sidebar). */
   export function reveal(i: number) {
     if (i < 0) return
-    // Center it rather than pinning it to an edge. Within three screens the view glides there,
-    // so the eye can follow; further, it cuts. Either way the row lands under a wash that fades.
-    const target = Math.max(0, Math.min(map.maxTop, rowY(i) - viewH / 2))
-    const at = performance.now()
-    const still = reducedMotion()
-    if (!still && Math.abs(target - top) > 1 && Math.abs(target - top) <= viewH * 3) {
-      glide = { from: top, to: target, start: at }
+    // Center it rather than pinning it to an edge. Either way the row lands under a wash that
+    // fades.
+    glideTo(i, 0.5)
+    landing = reducedMotion() ? null : { index: i, start: performance.now() }
+    select(i)
+    scroller.focus()
+  }
+
+  /** Moves the view so row i sits `share` of the way down it. Within three screens the view
+   * glides there, so the eye can follow; further, or with reduced motion, it cuts. */
+  function glideTo(i: number, share: number) {
+    const target = landingTop(rowY(i), viewH || scroller.clientHeight, map.maxTop, share)
+    if (!reducedMotion() && Math.abs(target - top) > 1 && Math.abs(target - top) <= viewH * 3) {
+      glide = { from: top, to: target, start: performance.now() }
       schedule()
     } else {
       scrollTo(target)
     }
-    landing = still ? null : { index: i, start: at }
-    select(i)
-    scroller.focus()
   }
 
   /**
@@ -764,37 +835,56 @@
   /** The commit selected before a reload, so the selection follows it to its new row. */
   let selectedId = ''
 
-  /** Keeps the selection on its commit after a reload. A new focus starts from its top. */
-  async function followSelection() {
+  /** Keeps the selection on its commit after a reload. A new focus starts from its top. With
+   * `moving`, the view is on its way to a branch that moved, so the selection is kept without
+   * scrolling to it. Returns whether the selected commit is gone (amended or rebased away); when
+   * moving, that's left for the caller, who selects the branch's new tip instead. */
+  async function followSelection(moving = false): Promise<boolean> {
     const refocused = await loadFocus()
     if (refocused) scrollTo(0)
-    if (selected < 0) return
+    if (selected < 0) return false
     const id = selectedId
     const row = refocused ? 0 : id ? await CommitRow(path, id).catch(() => -1) : -1
     // The selection moved while that was being asked, to HEAD or by the person: it stands.
-    if (selectedId !== id) return
+    if (selectedId !== id) return false
+    if (row < 0 && moving) return true
     // If the commit is gone (e.g. amended), stay on the same position but refresh details.
-    const target = row >= 0 ? row : selected
+    selectWhenLoaded(row >= 0 ? row : selected, moving)
+    return row < 0
+  }
+
+  /** Selects a row once it has loaded, giving up after ~5s (e.g. the graph got shorter) or as
+   * soon as the selection changes some other way. */
+  function selectWhenLoaded(target: number, keepView: boolean) {
+    const id = selectedId
     cache.ensure(target, target + 1)
-    // Wait for the row to load, giving up after ~5s (e.g. the graph got shorter).
     let frames = 300
     const wait = () => {
       if (selectedId !== id) return
-      if (cache.get(target)) select(target, true)
+      if (cache.get(target)) select(target, true, keepView)
       else if (frames-- > 0) requestAnimationFrame(wait)
     }
     wait()
   }
 
-  function select(i: number, auto = false) {
-    if (!auto) autoSelect = 'done'
+  /** Whether the person has picked a commit themselves, as against the selection the graph
+   * starts with. */
+  let chosen = false
+
+  function select(i: number, auto = false, keepView = false) {
+    if (!auto) {
+      autoSelect = 'done'
+      chosen = true
+      // The marks on what just arrived last until the person moves on.
+      if (arrived.size) arrived = new Set()
+    }
     selected = Math.max(0, Math.min(span - 1, i))
     // Keep the selection in view, unless a glide is already on its way there.
     const y = rowY(selected)
     // The first selection can land before the first draw has measured the view.
     const height = viewH || scroller.clientHeight
-    if (glide) {
-      // Nothing: the glide centres it.
+    if (glide || keepView) {
+      // Nothing: a glide is centring it, or the view is going somewhere else on purpose.
     } else if (y < top)
       scrollTo(selected === 0 ? 0 : y) // the first commit brings the lead row back with it
     else if (y + rowH > top + height) scrollTo(y + rowH - height)
@@ -874,6 +964,14 @@
       whenTyping: true,
       run: () => void focusSearch(),
     },
+    {
+      id: 'graph.goHead',
+      group: 'View',
+      title: 'Go to the checked-out commit',
+      keywords: 'head current branch where am i top here',
+      shortcut: 'Alt+Home',
+      run: goToHead,
+    },
   ])
 
   let currentMatch = $derived(matches.indexOf(selected))
@@ -918,12 +1016,11 @@
     // The canvas paints with the bundled fonts; repaint once they finish loading.
     void document.fonts.ready.then(schedule)
     document.fonts.addEventListener('loadingdone', schedule)
-    void loadKinds()
+    void readTips().then((t) => (tips = t))
     void loadFocus()
     void loadNoted()
     const off = EventsOn('graph:progress', (p: GraphProgress) => {
       if (p.path !== path) return
-      if (p.done) void loadKinds()
       if (p.done) void loadNoted()
       cache.setTotal(p.rows, !p.done, p.paused, p.estimate)
       if (p.refsReady) cache.invalidate() // labels arrived after the first rows
@@ -938,8 +1035,7 @@
         // A reload swaps in a new graph; anything cached may be stale.
         cache.invalidate()
         error = p.error
-        if (query) void runSearch()
-        void followSelection()
+        void afterReload()
       }
       total = p.rows
       loading = !p.done
@@ -1187,6 +1283,23 @@
     {/if}
     <!-- Hover only, and it never takes the pointer: the commit panel has the same list for the
          keyboard and screen readers, and the row underneath keeps working. -->
+    <!-- The way back to where you are: shown while the checked-out commit is out of view. It goes
+         there without selecting anything. Tab reaches it after the row's actions. -->
+    {#if goHead}
+      <button
+        class="go-head"
+        in:fadeUp
+        out:menuOut
+        aria-label="Go to the checked-out commit, {goHead.label}{goHead.count ? `, ${goHead.count.toLocaleString()} new` : ''}"
+        title="Go to the checked-out commit ({formatShortcut('Alt+Home')})"
+        onclick={goToHead}
+      >
+        <span class="arrow" class:down={goHead.dir === 'down'}><Icon name="chevron" size={14} /></span>
+        <span class="name">{goHead.label}</span>
+        {#if goHead.count}<span class="new">{goHead.count.toLocaleString()} new</span>{/if}
+      </button>
+    {/if}
+    <div class="visually-hidden" role="status" aria-live="polite">{announce}</div>
     <!-- The notes of the commit whose mark the pointer is on. Hover only, and it never takes the
          pointer: the commit panel has the notes for the keyboard and screen readers, and a click on
          the mark goes there. -->
@@ -1496,6 +1609,63 @@
 
   .ref-expand.pinned {
     pointer-events: auto;
+  }
+
+  /* Over the subject column, clear of the SHAs, the marks and a row's actions on the right. */
+  .go-head {
+    position: absolute;
+    z-index: 2;
+    right: 140px;
+    bottom: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: calc(100% - 156px);
+    height: 32px;
+    padding: 0 12px 0 8px;
+    border: 0;
+    border-radius: 16px;
+    background: var(--paper);
+    box-shadow:
+      0 0 0 1px var(--paper-edge),
+      var(--shadow);
+    font-family: var(--font-serif);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .go-head:hover {
+    background: var(--paper-warm);
+  }
+
+  .go-head:focus-visible {
+    outline: 2px solid var(--link);
+    outline-offset: 2px;
+  }
+
+  .go-head .arrow {
+    display: inline-flex;
+    transform: rotate(180deg);
+  }
+
+  .go-head .arrow.down {
+    transform: none;
+  }
+
+  .go-head .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .go-head .new {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--link-hover);
   }
 
   .note-card {

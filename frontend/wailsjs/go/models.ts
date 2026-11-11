@@ -1,5 +1,19 @@
 export namespace app {
 	
+	export class Arrived {
+	    commits: string[];
+	    total: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Arrived(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.commits = source["commits"];
+	        this.total = source["total"];
+	    }
+	}
 	export class BranchSignal {
 	    name: string;
 	    sha: string;
@@ -1811,6 +1825,20 @@ export namespace git {
 	        this.deleted = source["deleted"];
 	        this.binary = source["binary"];
 	        this.caseClash = source["caseClash"];
+	    }
+	}
+	export class HeadState {
+	    branch: string;
+	    commit: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HeadState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.branch = source["branch"];
+	        this.commit = source["commit"];
 	    }
 	}
 	export class Identity {
