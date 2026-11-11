@@ -14,8 +14,19 @@
   import { session } from './session.svelte'
   import Busy from './ui/Busy.svelte'
   import Icon from './ui/Icon.svelte'
+  import { SQUEEZE } from './barSqueeze'
 
-  let { path }: { path: string } = $props()
+  let {
+    path,
+    squeeze = 0,
+  }: {
+    path: string
+    /** How far the bar has given way to stay on one line: Undo and Redo lose their words first,
+     * then Fetch, Pull and Push (see barSqueeze). */
+    squeeze?: number
+  } = $props()
+  let undoWords = $derived(squeeze < SQUEEZE.undo)
+  let netWords = $derived(squeeze < SQUEEZE.network)
 
   /** The running network operation, if any. */
   let running = $state<string | null>(null)
@@ -130,16 +141,18 @@
 </script>
 
 <div class="toolbar" role="toolbar" aria-label="Repository actions">
-  <button class="btn quiet" disabled={!undoLabel || !!running} onclick={undo} title={undoLabel ? `Undo: ${undoLabel} (${formatShortcut('Mod+Z')})` : 'Nothing to undo'}>
-    <Icon name="undo" />Undo
+  <button class="btn quiet" class:icon={!undoWords} aria-label="Undo" disabled={!undoLabel || !!running} onclick={undo} title={undoLabel ? `Undo: ${undoLabel} (${formatShortcut('Mod+Z')})` : 'Nothing to undo'}>
+    <Icon name="undo" />{#if undoWords}Undo{/if}
   </button>
-  <button class="btn quiet" disabled={!redoLabel || !!running} onclick={redo} title={redoLabel ? `Redo: ${redoLabel} (${formatShortcut('Mod+Shift+Z')})` : 'Nothing to redo'}>
-    <Icon name="redo" />Redo
+  <button class="btn quiet" class:icon={!undoWords} aria-label="Redo" disabled={!redoLabel || !!running} onclick={redo} title={redoLabel ? `Redo: ${redoLabel} (${formatShortcut('Mod+Shift+Z')})` : 'Nothing to redo'}>
+    <Icon name="redo" />{#if undoWords}Redo{/if}
   </button>
   <span class="sep" aria-hidden="true"></span>
-  <button class="btn quiet" disabled={!!running} onclick={fetchAll} title="Fetch all remotes ({formatShortcut('Mod+Shift+F')})"><Icon name="fetch" />Fetch</button>
+  <button class="btn quiet" class:icon={!netWords} aria-label="Fetch" disabled={!!running} onclick={fetchAll} title="Fetch all remotes ({formatShortcut('Mod+Shift+F')})"><Icon name="fetch" />{#if netWords}Fetch{/if}</button>
   <span class="split">
-    <button class="btn quiet" disabled={!!running} onclick={() => pull('')} title="Pull using your git config (pull.rebase) ({formatShortcut('Mod+Shift+L')})"><Icon name="pull" />Pull</button>
+    <button class="btn quiet" class:icon={!netWords} aria-label="Pull" disabled={!!running} onclick={() => pull('')} title="Pull using your git config (pull.rebase) ({formatShortcut('Mod+Shift+L')})"
+      ><Icon name="pull" />{#if netWords}Pull{/if}</button
+    >
     <button
       class="btn quiet caret"
       disabled={!!running}
@@ -153,7 +166,9 @@
     >
   </span>
   <span class="split">
-    <button class="btn quiet" disabled={!!running} onclick={() => push(false)} title="Push the current branch ({formatShortcut('Mod+Shift+U')})"><Icon name="push" />Push</button>
+    <button class="btn quiet" class:icon={!netWords} aria-label="Push" disabled={!!running} onclick={() => push(false)} title="Push the current branch ({formatShortcut('Mod+Shift+U')})"
+      ><Icon name="push" />{#if netWords}Push{/if}</button
+    >
     <button
       class="btn quiet caret"
       disabled={!!running}
@@ -221,8 +236,9 @@
     padding: 0 12px;
     white-space: nowrap;
     overflow: hidden;
-    /* The bar that holds it draws the rule underneath, and shares the row with the graph's tools. */
-    flex: 0 1 auto;
+    /* The bar that holds it draws the rule underneath, and shares the row with the graph's tools.
+       It keeps its width: the bar squeezes in steps, and the buttons are never cut. */
+    flex: none;
     min-width: 0;
   }
 

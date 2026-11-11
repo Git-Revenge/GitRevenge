@@ -241,13 +241,53 @@ test.describe('commit graph', () => {
       expect(next.x + next.width).toBeLessThanOrEqual(640)
     })
 
-    test('the search takes its own line when nothing else fits', async ({ page }) => {
+    // #626: the bar never wraps. The count goes into the search's placeholder, then the search
+    // becomes an icon.
+    test('the count moves into the search placeholder when there is no room for both', async ({ page }) => {
       await page.setViewportSize({ width: 420, height: 600 })
       await open(page, 'graph', narrow)
-      const count = (await page.getByText('32 commits').boundingBox())!
-      const search = (await page.getByRole('searchbox', { name: 'Search commits' }).boundingBox())!
-      expect(search.y).toBeGreaterThan(count.y + count.height)
-      expect(search.x + search.width).toBeLessThanOrEqual(420)
+      const search = page.getByRole('searchbox', { name: 'Search commits' })
+      await expect(search).toHaveAttribute('placeholder', 'Search 32 commits')
+      await expect(page.locator('.status .meta')).toHaveCount(0)
+      const status = page.locator('.status')
+      expect((await status.boundingBox())!.height).toBeLessThan(50)
+      expect(await status.evaluate((e) => e.scrollWidth - e.clientWidth)).toBe(0)
+    })
+
+    test('the search is an icon when even that is too much, and opens over the bar', async ({ page }) => {
+      await page.setViewportSize({ width: 360, height: 600 })
+      await open(page, 'graph', { ...narrow, responses: { ...narrow.responses, SearchGraph: { rows: [1], total: 1 } } })
+      const status = page.locator('.status')
+      const opener = page.getByRole('button', { name: 'Search commits' })
+      const search = page.getByRole('searchbox', { name: 'Search commits' })
+      await expect(opener).toBeVisible()
+      await expect(search).toBeHidden()
+      expect((await status.boundingBox())!.height).toBeLessThan(50)
+      expect(await status.evaluate((e) => e.scrollWidth - e.clientWidth)).toBe(0)
+
+      await opener.click()
+      await expect(search).toBeFocused()
+      await expect(search).toHaveAttribute('placeholder', 'Search 32 commits')
+      // It takes the bar's whole width, on the same line.
+      const bar = (await status.boundingBox())!
+      const field = (await page.locator('.search').boundingBox())!
+      expect(field.width).toBeGreaterThanOrEqual(bar.width - 1)
+      expect(field.height).toBeLessThanOrEqual(bar.height)
+
+      // Leaving it empty closes it; with something typed it stays, so the matches can be stepped.
+      await page.locator('.scroller').focus()
+      await expect(opener).toBeVisible()
+      await opener.click()
+      await search.fill('Commit')
+      await page.locator('.scroller').focus()
+      await expect(search).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Next match' })).toBeVisible()
+
+      // Escape, or its close button, clears it and puts the icon back.
+      await page.getByRole('button', { name: 'Close search' }).click()
+      await expect(opener).toBeVisible()
+      await expect(search).toBeHidden()
+      await expect(page.locator('.scroller')).toBeFocused()
     })
   })
 
@@ -326,12 +366,14 @@ test.describe('commit graph', () => {
         [x, y],
       )
 
-    test('headers name the columns when there is room', async ({ page }) => {
+    // #626: compact is a table, so its columns are named; the timeline has one column of words.
+    test('headers name the columns in compact, and the timeline has none', async ({ page }) => {
       await open(page, 'graph', scenario)
+      await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '20')
       const header = page.locator('.columns')
-      for (const name of ['Branch / tag', 'Graph', 'Message', 'SHA']) await expect(header.getByText(name)).toBeVisible()
-      // The timeline shows the author and date under the subject, not in columns of their own.
-      await expect(header.getByText('Author')).toHaveCount(0)
+      await expect(header).toHaveCount(0)
+      await page.getByRole('button', { name: 'Compact' }).click()
+      for (const name of ['Branch / tag', 'Message', 'Author', 'When', 'SHA']) await expect(header.getByText(name, { exact: true })).toBeVisible()
     })
 
     test('a narrow window has no column headers', async ({ page }) => {
@@ -378,6 +420,8 @@ test.describe('commit graph', () => {
       const wideLater = graphData.map((r, i) => (i === 19 ? { ...r, width: 9 } : r))
       await page.setViewportSize({ width: 1280, height: 300 })
       await open(page, 'graph', { ...scenario, graphData: wideLater })
+      // Compact names its columns, which is how this test finds the message column.
+      await page.getByRole('button', { name: 'Compact' }).click()
       const message = page.locator('.columns').getByText('Message')
       await expect(message).toBeVisible()
       const before = (await message.boundingBox())!.x
@@ -1292,6 +1336,80 @@ test.describe('before the first load has answered', () => {
       await expect(fetch).toBeVisible()
     })
 
+    // #626: the bar stays on one line, giving way in a fixed order as it narrows.
+    test.describe('the bar on one line', () => {
+      const kinds = [branch('main', { head: true, branchKind: 'trunk' }), branch('gh-pages', { branchKind: 'docs' })]
+      const scenario = { ...dirty([one]), graphRows: 411, responses: { ...dirty([one]).responses, Refs: kinds } }
+      const theBar = (page: Page) => page.locator('.main > .bar')
+      /** Whether a toolbar button still shows its word; its name is the same either way. */
+      const worded = async (page: Page, name: string) => ((await page.getByRole('toolbar', { name: 'Repository actions' }).getByRole('button', { name, exact: true }).textContent()) ?? '').trim() === name
+      const oneLine = async (page: Page) => {
+        const box = (await theBar(page).boundingBox())!
+        expect(box.height).toBeLessThanOrEqual(45)
+        // Nothing is pushed out of the bar or out of the graph's share of it.
+        expect(await theBar(page).evaluate((e) => e.scrollWidth - e.clientWidth)).toBe(0)
+        expect(await page.locator('.graph-tools .status').evaluate((e) => e.scrollWidth - e.clientWidth)).toBe(0)
+      }
+      const at = async (page: Page, barWidth: number) => {
+        await page.setViewportSize({ width: 1900, height: 700 })
+        await open(page, 'repoView', scenario)
+        await expect(page.getByRole('button', { name: 'Kinds' })).toBeVisible()
+        // The sidebar and the right panel take a fixed share, so size the window for the bar.
+        const spare = 1900 - (await theBar(page).evaluate((e) => e.clientWidth))
+        await page.setViewportSize({ width: barWidth + spare, height: 700 })
+        await expect.poll(() => theBar(page).evaluate((e) => e.clientWidth)).toBe(barWidth)
+      }
+
+      test('with room, everything is spelled out', async ({ page }) => {
+        await at(page, 1100)
+        await expect(page.getByText('411 commits')).toBeVisible()
+        await expect(page.getByRole('searchbox', { name: 'Search commits' })).toHaveAttribute('placeholder', 'Search message, author or SHA')
+        for (const name of ['Undo', 'Redo', 'Fetch', 'Pull', 'Push']) expect(await worded(page, name)).toBe(true)
+        await oneLine(page)
+      })
+
+      test('first the count moves into the search placeholder', async ({ page }) => {
+        await at(page, 1000)
+        await expect(page.locator('.status .meta')).toHaveCount(0)
+        await expect(page.getByRole('searchbox', { name: 'Search commits' })).toHaveAttribute('placeholder', 'Search 411 commits')
+        expect(await worded(page, 'Undo')).toBe(true)
+        await oneLine(page)
+      })
+
+      test('then the search becomes an icon', async ({ page }) => {
+        await at(page, 880)
+        await expect(page.getByRole('button', { name: 'Search commits' })).toBeVisible()
+        await expect(page.getByRole('searchbox', { name: 'Search commits' })).toBeHidden()
+        expect(await worded(page, 'Undo')).toBe(true)
+        await oneLine(page)
+        // Opened, it covers the bar, toolbar included, and Escape gives the bar back.
+        await page.getByRole('button', { name: 'Search commits' }).click()
+        const field = (await page.locator('.search').boundingBox())!
+        const box = (await theBar(page).boundingBox())!
+        expect(field.width).toBeGreaterThanOrEqual(box.width - 1)
+        await expect(page.getByRole('searchbox', { name: 'Search commits' })).toBeFocused()
+        await page.keyboard.press('Escape')
+        await expect(page.getByRole('button', { name: 'Search commits' })).toBeVisible()
+        await oneLine(page)
+      })
+
+      test('then Undo and Redo lose their words, and keep their names', async ({ page }) => {
+        await at(page, 780)
+        expect(await worded(page, 'Undo')).toBe(false)
+        expect(await worded(page, 'Redo')).toBe(false)
+        for (const name of ['Fetch', 'Pull', 'Push']) expect(await worded(page, name)).toBe(true)
+        await oneLine(page)
+      })
+
+      test('last, Fetch, Pull and Push lose theirs', async ({ page }) => {
+        await at(page, 600)
+        for (const name of ['Undo', 'Redo', 'Fetch', 'Pull', 'Push']) expect(await worded(page, name)).toBe(false)
+        await expect(page.getByRole('button', { name: /^Kinds/ })).toBeVisible()
+        await expect(page.getByRole('group', { name: 'Row density' })).toBeVisible()
+        await oneLine(page)
+      })
+    })
+
     // #583: a plain click on an ignored file opened its menu, as if it were a right-click.
     test('an ignored file opens its menu on right-click only', async ({ page }) => {
       const s = dirty([one])
@@ -1321,6 +1439,8 @@ test.describe('before the first load has answered', () => {
       await expect(bar(page)).toContainText('1 file changed')
       const scroller = (await page.locator('.scroller').boundingBox())!
       expect((await bar(page).boundingBox())!.y).toBe(scroller.y)
+      // Compact names its columns, which says where the messages start.
+      await page.getByRole('button', { name: 'Compact' }).click()
       const message = (await page.locator('.columns').getByText('Message').boundingBox())!
       const title = (await bar(page).locator('.wip-title').boundingBox())!
       expect(Math.abs(title.x - message.x)).toBeLessThanOrEqual(2)

@@ -20,6 +20,7 @@
   import WorkingTreePanel from './WorkingTreePanel.svelte'
   import { bisect, marksOf } from './bisect.svelte'
   import { rebaseMarks } from './operation'
+  import { SHARED_STEPS, squeezeFor } from './barSqueeze'
   import { operations } from './operation.svelte'
   import { Integrate } from '../../wailsjs/go/app/App.js'
 
@@ -56,6 +57,9 @@
   }
 
   let graph: GraphView
+  /** The bar stays on one line: as it narrows, its parts give way in steps. */
+  let barWidth = $state(0)
+  let barSqueeze = $derived(squeezeFor(barWidth, SHARED_STEPS))
   /** Where the graph puts its header tools: in the bar, beside the repository's actions. */
   let toolsHost = $state<HTMLElement>()
   let selected = $state<Row | undefined>()
@@ -260,8 +264,8 @@
     openDialog={ctx.openDialog}
   />
   <div class="main">
-    <div class="bar">
-      <Toolbar {path} />
+    <div class="bar" bind:clientWidth={barWidth}>
+      <Toolbar {path} squeeze={barSqueeze} />
       <!-- The graph's own tools join the bar while the graph is showing; a file or the rebase
            editor has its own header, so they step aside for it. -->
       <div class="graph-tools" class:hidden={diff || rebaseBase} bind:this={toolsHost}></div>
@@ -270,7 +274,7 @@
     <!-- The graph stays mounted while a diff is open, so scroll position and selection
          survive returning to it. -->
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} bisect={bisectMarks} {onSelect} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           openMenu(commitMenuItems(row, refs, ctx), x, y)}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
@@ -475,17 +479,19 @@
 
   /* The repository's actions, with the right panel's toggle at the end. */
   .bar {
+    position: relative;
     flex: none;
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     border-bottom: 1px solid var(--paper-edge);
   }
 
-  /* Takes the room the actions leave, and a line of its own once that's too little. */
+  /* Takes the room the actions leave. */
   .graph-tools {
-    flex: 1 1 380px;
+    flex: 1 1 0;
     min-width: 0;
+    /* Narrower than the last step allows for: cut, never wrapped. Kinds' list still drops below. */
+    overflow-x: clip;
     display: flex;
     border-left: 1px solid var(--paper-edge);
   }
