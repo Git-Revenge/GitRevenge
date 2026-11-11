@@ -6,8 +6,11 @@
   let {
     rows,
     onToggle,
+    iconOnly = false,
   }: {
     rows: KindFilterRow[]
+    /** No room for the word: the button is its icon, and still named Kinds. */
+    iconOnly?: boolean
     onToggle: (kind: string, visible: boolean) => void
   } = $props()
 
@@ -37,8 +40,17 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="kinds" bind:this={root} onkeydown={onKey}>
-  <button bind:this={button} class="btn sm quiet" aria-expanded={open} aria-haspopup="true" title="Choose which kinds of branch the graph shows" onclick={() => (open = !open)}>
-    <Icon name="tag" size={14} />Kinds{#if hiddenCount}<span class="filtered">{hiddenCount} hidden</span>{/if}
+  <button
+    bind:this={button}
+    class="btn sm quiet"
+    class:icon={iconOnly}
+    aria-expanded={open}
+    aria-haspopup="true"
+    aria-label={iconOnly ? (hiddenCount ? `Kinds, ${hiddenCount} hidden` : 'Kinds') : undefined}
+    title="Choose which kinds of branch the graph shows"
+    onclick={() => (open = !open)}
+  >
+    <Icon name="tag" size={14} />{#if !iconOnly}Kinds{#if hiddenCount}<span class="filtered">{hiddenCount} hidden</span>{/if}{/if}
   </button>
   {#if open}
     <div class="popover" role="group" aria-label="Kinds of branch to show">

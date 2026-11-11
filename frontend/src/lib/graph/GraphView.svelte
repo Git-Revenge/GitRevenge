@@ -1,7 +1,8 @@
 <script lang="ts">
   import { KINDS, kindFilterRows, type KindFilterRow } from '../branchKinds'
   import { errorText } from '../errors'
-  import { onMount, untrack, type Snippet } from 'svelte'
+  import { onMount, tick, untrack, type Snippet } from 'svelte'
+  import { ALONE_STEPS, searchPlaceholder, SQUEEZE, squeezeFor } from '../barSqueeze'
   import { CommitRow, CommitSignatures, GraphFocus, GraphRows, Refs, RepoPreferences, SearchGraph, SetGraphFocus, SetKindVisible } from '../../../wailsjs/go/app/App.js'
   import { session } from '../session.svelte'
   import { ClipboardSetText, EventsOn } from '../../../wailsjs/runtime/runtime.js'
@@ -26,6 +27,7 @@
     onSelectedRefs,
     lead,
     toolsHost,
+    squeeze,
     bisect = null,
   }: {
     path: string
@@ -35,6 +37,9 @@
     /** Somewhere else to put the header's tools (count, Kinds, density, search), such as the
      * caller's own toolbar, so the two share one bar. Without one they sit above the graph. */
     toolsHost?: HTMLElement | null
+    /** How far the caller's bar has given way to stay on one line (see barSqueeze). Without it
+     * the graph's own bar is measured. */
+    squeeze?: number
     /** A row of the caller's own above the first commit, such as the working tree. It scrolls
      * with the history, and is told where the first lane and the messages are so it can line
      * up with them. */
@@ -110,6 +115,29 @@
   let span = $derived(loading && estimate > total ? estimate : total)
 
   let viewH = $state(0)
+  /** The graph's own width, for squeezing its own bar when no caller says how far. */
+  let ownWidth = $state(0)
+  let level = $derived(squeeze ?? squeezeFor(ownWidth, ALONE_STEPS))
+  /** Whether the search field is showing while the bar only has room for its icon. */
+  let searchOpen = $state(false)
+  let searchIconOnly = $derived(level >= SQUEEZE.search)
+
+  /** Puts the caret in the search field, opening it first if it's only an icon. */
+  async function focusSearch() {
+    if (searchIconOnly && !searchOpen) {
+      searchOpen = true
+      await tick()
+    }
+    searchInput.focus()
+    searchInput.select()
+  }
+
+  function closeSearch() {
+    query = ''
+    void runSearch()
+    searchOpen = false
+    scroller.focus()
+  }
   /** Moves the header into the caller's host while there is one, and back out with the graph.
    * Svelte keeps updating the node wherever it lives; it only needs taking away by hand, since
    * it's no longer under this component's root when the component goes. */
@@ -765,7 +793,7 @@
         ? (matches.find((m) => m > selected) ?? matches[0])
         : (matches.findLast((m) => m < selected) ?? matches[matches.length - 1])
     reveal(next)
-    searchInput.focus()
+    void focusSearch()
   }
 
   function onSearchKey(e: KeyboardEvent) {
@@ -776,9 +804,7 @@
       if (searchPending) void runSearch().then(() => jump(dir))
       else jump(dir)
     } else if (e.key === 'Escape') {
-      query = ''
-      void runSearch()
-      scroller.focus()
+      closeSearch()
     }
   }
 
@@ -791,10 +817,7 @@
       keywords: 'find message author sha history',
       shortcut: 'Mod+F',
       whenTyping: true,
-      run: () => {
-        searchInput.focus()
-        searchInput.select()
-      },
+      run: () => void focusSearch(),
     },
   ])
 
@@ -883,10 +906,12 @@
   })
 </script>
 
-<div class="graph">
-  <div class="status" use:hosted={toolsHost}>
+<div class="graph" bind:clientWidth={ownWidth}>
+  <div class="status" class:searching={searchIconOnly && (searchOpen || !!query.trim())} use:hosted={toolsHost}>
     {#if error || rowError}
       <span class="error">Couldn't read history: {error || rowError}</span>
+    {:else if level >= SQUEEZE.count}
+      <!-- The count has left the bar: the search field's placeholder says it. -->
     {:else if loading && paused}
       <span class="meta" title="More history loads as you scroll, search or jump to a commit"
         >{total.toLocaleString()}{estimate > total ? ` of about ${estimate.toLocaleString()}` : ''} commits loaded</span
@@ -896,7 +921,8 @@
     {:else}
       <span class="meta">{total.toLocaleString()} commits</span>
     {/if}
-    {#if kindRows.length}<KindFilter rows={kindRows} onToggle={setKindVisible} />{/if}
+    {#if kindRows.length}<KindFilter rows={kindRows} onToggle={setKindVisible} iconOnly={level >= SQUEEZE.network} />{/if}
+    {#if level < SQUEEZE.density}
     <span class="segmented" role="group" aria-label="Row density">
       <button class="icon" aria-pressed={density !== 'compact'} aria-label="Timeline" title="Timeline: two lines per commit, with authors" onclick={() => density === 'compact' && session.run(() => colorTheme.toggleDensity())}
         ><Icon name="timeline" size={14} /></button
@@ -905,21 +931,28 @@
         ><Icon name="rows" size={14} /></button
       >
     </span>
+    {/if}
     {#if focus}
       <span class="focus" title="Only {focusLabel} and what it's built on are showing">
-        <Icon name="focus" size={13} /><span class="focus-name">Focused on {focusLabel}</span>
+        <Icon name="focus" size={13} />{#if !searchIconOnly}<span class="focus-name">Focused on {focusLabel}</span>{/if}
         <button class="btn sm quiet icon" onclick={stopFocusing} aria-label="Stop focusing" title="Stop focusing, and show every branch again"><Icon name="close" size={13} /></button>
       </span>
     {/if}
-    <span class="search">
+    {#if searchIconOnly && !searchOpen && !query.trim()}
+      <button class="btn sm quiet icon search-open" aria-label="Search commits" title="Search commits" aria-expanded="false" onclick={focusSearch}><Icon name="search" size={14} /></button>
+    {/if}
+    <span class="search" class:closed={searchIconOnly && !searchOpen && !query.trim()} class:over={searchIconOnly}>
       <Icon name="search" size={14} />
       <input
         bind:this={searchInput}
         bind:value={query}
         oninput={searchSoon}
         onkeydown={onSearchKey}
+        onblur={() => {
+          if (!query.trim()) searchOpen = false
+        }}
         type="search"
-        placeholder="Search message, author or SHA"
+        placeholder={searchPlaceholder(level, total, loading)}
         title="Search subjects, authors and SHAs, or a trailer such as Co-authored-by: name or Closes: #12"
         aria-label="Search commits"
       />
@@ -932,9 +965,13 @@
         >
         <button class="btn sm quiet icon step" onclick={() => jump(1)} disabled={!matchTotal} aria-label="Next match" title="Next match (Enter)"><Icon name="chevron" size={13} /></button>
       {/if}
+      {#if searchIconOnly}
+        <button class="btn sm quiet icon" onclick={closeSearch} aria-label="Close search" title="Close search (Escape)"><Icon name="close" size={13} /></button>
+      {/if}
     </span>
   </div>
-  {#if columns?.refW}
+  <!-- Compact is a table, so its columns are named. The timeline has one column of words. -->
+  {#if columns?.refW && density === 'compact'}
     <div class="columns">
       <span style:left="12px">Branch / tag</span>
       {#if columns.graphW >= 56}<span style:left="{columns.refW + columns.m.pad}px">Graph</span>{/if}
@@ -1166,8 +1203,8 @@
   .status {
     display: flex;
     align-items: center;
-    /* Too narrow even with the search box at its smallest, and the search takes its own line. */
-    flex-wrap: wrap;
+    /* One line at every width: the bar gives way in steps instead (see barSqueeze). */
+    position: relative;
     gap: 6px 10px;
     min-height: 40px;
     box-sizing: border-box;
@@ -1182,14 +1219,49 @@
     min-height: 0;
     padding: 4px 4px 4px 12px;
     border-bottom: none;
+    /* An open search covers the caller's whole bar, not only this share of it. */
+    position: static;
   }
 
-  /* The search box is what gives up width: the count and the buttons keep theirs. */
-  .status > :global(.meta),
+  /* A long count, such as a history still loading, is cut before it pushes anything out. */
+  .status > :global(.meta) {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The search box is what gives up width: the buttons keep theirs. */
   .status > :global(.btn),
   .status > .segmented {
     flex: none;
     white-space: nowrap;
+  }
+
+  /* Only an icon's worth of room: the field waits behind its button, and opens over the bar. */
+  .search.closed {
+    display: none;
+  }
+
+  .search-open {
+    margin-left: auto;
+  }
+
+  .status.searching > :global(*:not(.search)) {
+    visibility: hidden;
+  }
+
+  .search.over {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    padding: 0 8px 0 12px;
+    background: var(--paper);
+  }
+
+  .search.over input {
+    max-width: none;
   }
 
   .search {
