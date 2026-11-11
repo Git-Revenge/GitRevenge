@@ -1,7 +1,7 @@
 <script lang="ts">
   import { KINDS, kindFilterRows, type KindFilterRow } from '../branchKinds'
   import { errorText } from '../errors'
-  import { onMount, type Snippet } from 'svelte'
+  import { onMount, untrack, type Snippet } from 'svelte'
   import { CommitRow, CommitSignatures, GraphFocus, GraphRows, Refs, RepoPreferences, SearchGraph, SetGraphFocus, SetKindVisible } from '../../../wailsjs/go/app/App.js'
   import { session } from '../session.svelte'
   import { ClipboardSetText, EventsOn } from '../../../wailsjs/runtime/runtime.js'
@@ -11,7 +11,8 @@
   import { DUR, easeInk, fadeUp, labelsFold, labelsUnfold, menuOut, reducedMotion, stagger } from '../ui/motion'
   import KindFilter from './KindFilter.svelte'
   import RefChip from './RefChip.svelte'
-  import { bisectRow, drawRow, sealOf, graphWidth, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
+  import { bisectRow, drawRow, sealOf, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
+  import { loadLabelWidth, nextLabelWidth, REFIT_AFTER_MS, saveLabelWidth } from './labelColumn'
   import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
   import { scrollMap, topAfterScroll, toScroll, type ScrollMap } from './scrollMap'
   import { Washes, landWash } from './tween'
@@ -189,6 +190,70 @@
    * the message column doesn't move while scrolling. A reload starts it again. */
   let widest = 1
 
+  /** The label column's width: what someone dragged it to in this repository, else what the
+   * labels in view need, refitted once the graph holds still. */
+  let labelChosen = $state<number | null>(loadLabelWidth(untrack(() => path), localStorage))
+  let labelW: number | null = null
+  /** Where the graph was at the last paint, and when it last moved. */
+  let paintedTop = 0
+  let movedAt = 0
+  let refitTimer: ReturnType<typeof setTimeout> | undefined
+
+  function setLabelWidth(width: number | null) {
+    labelChosen = width
+    saveLabelWidth(path, width, localStorage)
+    schedule()
+  }
+  // Dragging the column's edge, or the arrow keys on it, sets its width; Home or a double-click
+  // goes back to fitting the labels.
+  let labelDrag: { x: number; width: number } | null = null
+  function startLabelResize(e: PointerEvent) {
+    if (!columns) return
+    labelDrag = { x: e.clientX, width: columns.refW }
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  }
+  function labelResize(e: PointerEvent) {
+    if (labelDrag) setLabelWidth(labelDrag.width + e.clientX - labelDrag.x)
+  }
+  function labelResizeKey(e: KeyboardEvent) {
+    const step = e.key === 'ArrowLeft' ? -16 : e.key === 'ArrowRight' ? 16 : 0
+    if (step && columns) setLabelWidth(columns.refW + step)
+    else if (e.key === 'Home') setLabelWidth(null)
+    else return
+    e.preventDefault()
+  }
+
+  /** The row whose labels are all listed because someone asked, with the keyboard or a click on
+   * the row's label button. Unlike the hover list, its labels are buttons. */
+  let pinned = $state<{ index: number; top: number; labels: RefLabel[]; lane: string } | null>(null)
+  let pinnedEl = $state<HTMLElement>()
+
+  function togglePinned(index: number) {
+    const row = cache.get(index)
+    if (!row || pinned?.index === index) {
+      pinned = null
+      return
+    }
+    // The list belongs to the selected row, so it stays while the pointer or the focus is in it.
+    select(index)
+    const labels = refLabels(cache.refsFor(row.id), remote)
+    const height = Math.min(labels.length, EXPANDED_REFS + 1) * CHIP_STEP + EXPAND_PAD * 2
+    const place = Math.round(rowY(index) - top + (rowH - CHIP_STEP) / 2 - EXPAND_PAD)
+    pinned = { index, top: Math.max(0, Math.min(place, viewH - height)), labels, lane: laneVar(row.color) }
+  }
+  // Opening the list moves the focus into it, so the next key is on its first label.
+  $effect(() => {
+    if (pinned) pinnedEl?.querySelector('button')?.focus()
+  })
+
+  /** Opens one label's own menu under it: the commit's menu, for that ref alone. */
+  function labelMenu(index: number, label: RefLabel, button: HTMLElement) {
+    const row = cache.get(index)
+    if (!row || !onContext) return
+    const r = button.getBoundingClientRect()
+    onContext(row, [label.ref], r.left, r.bottom + 2)
+  }
+
   /** Most refs an expanded label shows; the commit panel and right-click menu have them all. */
   const EXPANDED_REFS = 12
   /** The row actions card's height: three 24px buttons with 2px around them. */
@@ -265,6 +330,8 @@
       if ((gridFocused || actionsFocused) && selected >= 0) index = selected
     }
     const y = rowY(index) - top
+    // A pinned list of labels belongs to the row that has the actions: it goes when they move on.
+    if (pinned && (pinned.index !== index || Math.abs(top - paintedTop) > 0.5)) pinned = null
     if (index < 0 || !cache.get(index) || y + rowH <= 0 || y >= viewH) {
       if (actions) actions = null
       return
@@ -427,6 +494,7 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, w, h)
 
+    if (Math.abs(top - paintedTop) > 0.5) movedAt = frameAt
     const first = Math.max(0, rowAtY(top))
     const last = Math.min(span, rowAtY(top + h) + 1)
     if (lead) {
@@ -446,7 +514,21 @@
       maxCol = Math.max(maxCol, row.col)
     }
     const m = METRICS[density]
-    const graphW = graphWidth(widest, (w - refColumnWidth(w)) * MAX_GRAPH_SHARE, m)
+    // The label column fits the labels in view, once the graph has held still for a moment.
+    ctx.font = LABEL_FONT
+    ctx.letterSpacing = '0px'
+    let need = 0
+    for (let i = first; i < last; i++) {
+      const row = cache.get(i)
+      if (row) need = Math.max(need, labelColumnNeed(ctx, cache.refsFor(row.id), remote))
+    }
+    const settled = !glide && frameAt - movedAt >= REFIT_AFTER_MS
+    labelW = nextLabelWidth(labelW, labelChosen, need, settled)
+    if (!settled) {
+      clearTimeout(refitTimer)
+      refitTimer = setTimeout(schedule, REFIT_AFTER_MS)
+    }
+    const graphW = graphWidth(widest, (w - refColumnWidth(w, labelW)) * MAX_GRAPH_SHARE, m)
     // A history wider than the column scrolls its lanes so the nodes in view stay visible.
     const sel = cache.get(selected)
     const selectedRefs = sel ? cache.refsFor(sel.id) : []
@@ -456,8 +538,8 @@
       onSelectedRefs?.(refLabels(selectedRefs, remote))
     }
     const firstLane = minCol === Infinity ? 0 : laneWindow(minCol, maxCol, sel && selected >= first && selected < last ? sel.col : null, laneCapacity(graphW, m))
-    const lay = layoutColumns(w, graphW, density, firstLane, remote)
-    if (!columns || columns.width !== lay.width || columns.graphW !== lay.graphW || columns.density !== lay.density) {
+    const lay = layoutColumns(w, graphW, density, firstLane, remote, labelW)
+    if (!columns || columns.width !== lay.width || columns.graphW !== lay.graphW || columns.density !== lay.density || columns.refW !== lay.refW) {
       columns = lay
     }
     const th = theme()
@@ -523,6 +605,7 @@
     if (washes.busy(frameAt)) schedule()
     updateExpanded()
     updateActions()
+    paintedTop = top
     // Lanes scrolled out on the left fade in from the edge, so the cut doesn't look like the end.
     if (firstLane > 0) {
       const fade = ctx.createLinearGradient(lay.refW, 0, lay.refW + m.pad + m.laneW, 0)
@@ -792,6 +875,7 @@
       clearTimeout(sigTimer)
       clearTimeout(copiedTimer)
       clearTimeout(hoverTimer)
+      clearTimeout(refitTimer)
       cancelAnimationFrame(frame)
     }
   })
@@ -887,8 +971,11 @@
         gridFocused = true
         updateActions()
       }}
-      onblur={() => {
+      onblur={(e) => {
         gridFocused = false
+        // Tab from the graph lands on the row's actions: they have the focus from this moment,
+        // or the card would go before the focus arrived.
+        if (e.relatedTarget instanceof Node && (actionsEl?.contains(e.relatedTarget) || pinnedEl?.contains(e.relatedTarget))) actionsFocused = true
         updateActions()
       }}
       onclick={(e) => {
@@ -956,6 +1043,7 @@
       {#if row}
         {@const short = row.id.slice(0, 7)}
         {@const i = actions.index}
+        {@const labelCount = refLabels(cache.refsFor(row.id), remote).length}
         <div
           class="row-actions"
           role="group"
@@ -966,7 +1054,7 @@
           out:menuOut
           onfocusin={() => (actionsFocused = true)}
           onfocusout={(e) => {
-            actionsFocused = !!(e.relatedTarget instanceof Node && actionsEl?.contains(e.relatedTarget))
+            actionsFocused = !!(e.relatedTarget instanceof Node && (actionsEl?.contains(e.relatedTarget) || pinnedEl?.contains(e.relatedTarget)))
             updateActions()
           }}
           onmouseleave={(e) => {
@@ -975,6 +1063,17 @@
             schedule()
           }}
         >
+          {#if labelCount > 1}
+            <button
+              class="btn sm quiet icon"
+              aria-label="All {labelCount} branches and tags on {short}"
+              title="Every branch and tag on this commit"
+              aria-expanded={pinned?.index === i}
+              onclick={() => togglePinned(i)}
+            >
+              <Icon name="tag" size={14} />
+            </button>
+          {/if}
           <button class="btn sm quiet icon" aria-label={copied === i ? `Copied ${short}` : `Copy ${short}`} title={copied === i ? 'Copied' : 'Copy the full SHA'} onclick={() => copySha(i)}>
             <Icon name={copied === i ? 'check' : 'copy'} size={14} />
           </button>
@@ -986,7 +1085,62 @@
     {/if}
     <!-- Hover only, and it never takes the pointer: the commit panel has the same list for the
          keyboard and screen readers, and the row underneath keeps working. -->
-    {#each expanded ? [expanded] : [] as open (open.index)}
+    <!-- The same list, asked for from the row's label button: here each label is a button that
+         opens its own menu, and Escape closes the list. Tab reaches it after the row's actions. -->
+    {#if pinned}
+      {@const at = pinned.index}
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <div
+        class="ref-expand pinned"
+        role="group"
+        aria-label="Branches and tags on this commit"
+        bind:this={pinnedEl}
+        style:left="4px"
+        style:top="{pinned.top}px"
+        in:labelsUnfold
+        out:labelsFold
+        onfocusin={() => (actionsFocused = true)}
+        onfocusout={(e) => {
+          actionsFocused = !!(e.relatedTarget instanceof Node && (actionsEl?.contains(e.relatedTarget) || pinnedEl?.contains(e.relatedTarget)))
+          updateActions()
+        }}
+        onkeydown={(e) => {
+          if (e.key !== 'Escape') return
+          e.stopPropagation()
+          pinned = null
+          scroller.focus()
+        }}
+      >
+        {#each pinned.labels.slice(0, EXPANDED_REFS) as l (l.ref.name)}
+          <button class="label-button" aria-haspopup="menu" aria-label="Menu for {l.text}" onclick={(e) => labelMenu(at, l, e.currentTarget)}><RefChip label={l} lane={pinned.lane} /></button>
+        {/each}
+        {#if pinned.labels.length > EXPANDED_REFS}
+          <span class="more">and {pinned.labels.length - EXPANDED_REFS} more</span>
+        {/if}
+      </div>
+    {/if}
+    {#if columns?.refW}
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+      <div
+        class="label-edge"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize the branch and tag column"
+        aria-valuenow={columns.refW}
+        aria-valuemin={LABEL_COLUMN.min}
+        aria-valuemax={LABEL_COLUMN.max}
+        tabindex="0"
+        title="Drag to resize. Double-click to fit the labels again."
+        style:left="{columns.refW - 3}px"
+        onpointerdown={startLabelResize}
+        onpointermove={labelResize}
+        onpointerup={() => (labelDrag = null)}
+        ondblclick={() => setLabelWidth(null)}
+        onkeydown={labelResizeKey}
+        onwheel={(e) => scrollTo(top + e.deltaY)}
+      ></div>
+    {/if}
+    {#each expanded && expanded.index !== pinned?.index ? [expanded] : [] as open (open.index)}
       <div class="ref-expand" aria-hidden="true" style:left="{open.left}px" style:top="{open.top}px" in:labelsUnfold out:labelsFold>
         {#each open.labels.slice(0, EXPANDED_REFS) as l (l.ref.name)}
           <RefChip label={l} lane={open.lane} />
@@ -1182,6 +1336,44 @@
     background: var(--paper);
     box-shadow: var(--shadow);
     pointer-events: none;
+  }
+
+  .ref-expand.pinned {
+    pointer-events: auto;
+  }
+
+  .label-button {
+    display: flex;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    cursor: pointer;
+  }
+
+  /* The edge between the labels and the graph: drag it to resize the label column. */
+  .label-edge {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    z-index: 1;
+    cursor: col-resize;
+    touch-action: none;
+    transition: background-color var(--dur-quick);
+  }
+
+  .label-edge:hover,
+  .label-edge:focus-visible {
+    background: var(--link);
+    outline: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .label-edge {
+      transition: none;
+    }
   }
 
   .more {

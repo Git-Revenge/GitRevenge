@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clearOf, clip, DATE_COLUMN, clippedName, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, rowWashed, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine, bisectRow } from './draw'
+import { clip, DATE_COLUMN, middleCut, fitLabelColumn, LABEL_COLUMN, labelColumnNeed, moreLabels, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine, bisectRow } from './draw'
 import type { Ref, Row } from './rowCache'
 
 describe('graph geometry', () => {
@@ -95,14 +95,37 @@ describe('lanes', () => {
   })
 })
 
-describe('rowWashed', () => {
-  it('tints branch rows', () => {
-    for (const kind of [undefined, '', 'feature', 'release', 'environment', 'bot']) expect(rowWashed({ kind })).toBe(true)
+describe('the label column', () => {
+  // One pixel a character, so widths are counts of characters.
+  const ctx = { measureText: (s: string) => ({ width: s.length }) as TextMetrics }
+  const branch = (short: string) => ({ name: `refs/heads/${short}`, short, kind: 'local', head: false, commit: '', upstream: '', ahead: 0, behind: 0, gone: false }) as Ref
+
+  it('keeps a wanted width within its bounds', () => {
+    expect(fitLabelColumn(60)).toBe(LABEL_COLUMN.min)
+    expect(fitLabelColumn(180.4)).toBe(180)
+    expect(fitLabelColumn(900)).toBe(LABEL_COLUMN.max)
   })
 
-  it('leaves Trunk and Docs rows bare', () => {
-    expect(rowWashed({ kind: 'trunk' })).toBe(false)
-    expect(rowWashed({ kind: 'docs' })).toBe(false)
+  it('takes the fitted width when the window has room for a column', () => {
+    expect(refColumnWidth(1200, 200)).toBe(200)
+    expect(refColumnWidth(1200, 900)).toBe(LABEL_COLUMN.max)
+    expect(refColumnWidth(500, 200)).toBe(0)
+    expect(layoutColumns(1200, 100, 'compact', 0, 'origin', 200).refW).toBe(200)
+  })
+
+  it('needs room for the first label, and for a count when there are more', () => {
+    expect(labelColumnNeed(ctx, [], 'origin')).toBe(0)
+    const one = labelColumnNeed(ctx, [branch('topic')], 'origin')
+    // Margins of 8 either side, 14 of padding in the label, and the name.
+    expect(one).toBe(8 + 5 + 14 + 8)
+    // "+1" and the gap before it.
+    expect(labelColumnNeed(ctx, [branch('topic'), branch('other')], 'origin')).toBe(one + 5 + 2)
+  })
+
+  it('counts the labels after the first', () => {
+    expect(moreLabels(0)).toBe('')
+    expect(moreLabels(1)).toBe('')
+    expect(moreLabels(3)).toBe('+2')
   })
 })
 
@@ -130,16 +153,6 @@ describe('elbow', () => {
   })
 })
 
-describe('clearOf', () => {
-  it('keeps the hue while fading a full hex colour out', () => {
-    expect(clearOf('#cb0162')).toBe('#cb016200')
-  })
-
-  it('falls back for anything else', () => {
-    expect(clearOf('#888')).toBe('transparent')
-    expect(clearOf('rgb(1, 2, 3)')).toBe('transparent')
-  })
-})
 
 describe('refLabels', () => {
   const ref = (short: string, kind: Ref['kind'], head = false) => ({ name: short, short, kind, head, commit: '', upstream: '', ahead: 0, behind: 0, gone: false }) as Ref
@@ -290,27 +303,33 @@ describe('clip', () => {
   })
 })
 
-describe('clippedName', () => {
+describe('middleCut', () => {
   // One pixel a character, so room is a count of characters.
   const ctx = { measureText: (s: string) => ({ width: s.length }) as TextMetrics }
 
   it('keeps a name that fits, however short', () => {
-    expect(clippedName(ctx, 'v1.0', 4)).toBe('v1.0')
+    expect(middleCut(ctx, 'v1.0', 4)).toBe('v1.0')
   })
 
-  it('cuts a name while enough of it is left to read', () => {
-    expect(clippedName(ctx, 'origin/feature/offline-cache', 12)).toBe('origin/feat…')
-    expect(clippedName(ctx, 'origin/feature/offline-cache', 9)).toBe('origin/f…')
+  it('cuts the middle out, so names that start alike can still be told apart', () => {
+    expect(middleCut(ctx, '617-watch-test-ends', 15)).toBe('617-wat…st-ends')
+    expect(middleCut(ctx, '617-watch-test-cleanup', 15)).toBe('617-wat…cleanup')
+    expect(middleCut(ctx, 'feature/offline-cache', 16)).toBe('feature/…e-cache')
+  })
+
+  it('gives the odd character to the start', () => {
+    expect(middleCut(ctx, 'origin/feature/offline-cache', 10)).toBe('origi…ache')
   })
 
   it('gives up when too little would be left', () => {
-    expect(clippedName(ctx, 'origin/feature/offline-cache', 8)).toBeNull()
-    expect(clippedName(ctx, 'origin/feature/offline-cache', 0)).toBeNull()
+    expect(middleCut(ctx, 'origin/feature/offline-cache', 9)).toBe('orig…ache')
+    expect(middleCut(ctx, 'origin/feature/offline-cache', 8)).toBeNull()
+    expect(middleCut(ctx, 'origin/feature/offline-cache', 0)).toBeNull()
   })
 
-  it("doesn't count a tag's mark as part of its name", () => {
-    expect(clippedName(ctx, '◆ a-very-long-tag-name', 9)).toBeNull()
-    expect(clippedName(ctx, '◆ a-very-long-tag-name', 11)).toBe('◆ a-very-l…')
+  it("keeps a tag's mark in front, and doesn't count it as part of the name", () => {
+    expect(middleCut(ctx, '◆ a-very-long-tag-name', 10)).toBeNull()
+    expect(middleCut(ctx, '◆ a-very-long-tag-name', 11)).toBe('◆ a-ve…name')
   })
 })
 
