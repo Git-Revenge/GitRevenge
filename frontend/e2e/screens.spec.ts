@@ -400,13 +400,19 @@ test.describe('commit graph', () => {
     test('nothing is drawn between a node and its message, or between the labels and the lanes', async ({ page }) => {
       await open(page, 'graph', scenario)
       await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '20')
+      // The middle of the third commit's row, an unselected one that carries on a run: under
+      // the day line (26), the first commit (52) and the second (30).
+      const y = 26 + 52 + 30 + 15
       // The lane itself draws, so the row has painted by now.
-      await expect.poll(() => inkAt(page, lane(2), 78)).toBeGreaterThan(0)
-      // Between the node and the message, on an unselected row.
-      expect(await inkAt(page, lane(2) + 15, 78)).toBe(0)
+      await expect.poll(() => inkAt(page, lane(2), y)).toBeGreaterThan(0)
+      // Rows fade up into place as they arrive, a few px low at first: let that finish, or a
+      // row's wash can still be where it will not stay.
+      await page.waitForTimeout(600)
+      // Between the node and the message.
+      expect(await inkAt(page, lane(2) + 15, y)).toBe(0)
       // Between two idle lanes, and in the label column of a row with no labels.
-      expect(await inkAt(page, lane(1) + 8, 78)).toBe(0)
-      expect(await inkAt(page, 100, 78)).toBe(0)
+      expect(await inkAt(page, lane(1) + 8, y)).toBe(0)
+      expect(await inkAt(page, 100, y)).toBe(0)
     })
 
     test("the author button searches for the selected commit's author", async ({ page }) => {
