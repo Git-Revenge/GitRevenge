@@ -221,6 +221,7 @@ func (a *App) PullBranch(path, branch string) error {
 			}
 		}
 		a.upstreams.remember(ctx, r.Path, r.Git)
+		a.undo.touch(r.Path)
 		from, to, err := r.Git.PullBranch(ctx, branch, o)
 		if err != nil {
 			return pullBranchErr(branch, err)

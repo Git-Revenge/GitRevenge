@@ -437,6 +437,145 @@ test.describe('commit graph', () => {
     })
   })
 
+  // #619: a way back to the checked-out commit, and the view follows a branch you move.
+  test.describe('the checked-out commit', () => {
+    const id = (i: number) => String(i).padStart(40, '0')
+    const at = (row: number, behind = 0) => ({ HeadCommit: { branch: 'main', commit: id(row) }, Refs: [{ ...branch('main', { head: true, branchKind: 'trunk' }), commit: id(row), behind }] })
+    const scenario = (row: number) => ({ graphRows: 400, responses: { CommitSignatures: [], ...at(row) } })
+    const button = (page: Page) => page.getByRole('button', { name: /^Go to the checked-out commit/ })
+    const scrollTop = (page: Page) => page.locator('.scroller').evaluate((e) => e.scrollTop)
+    const ready = async (page: Page, row: number) => {
+      await open(page, 'graph', scenario(row))
+      await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '400')
+      await expect.poll(() => calls(page, 'HeadCommit')).toContainEqual(['/repo'])
+    }
+    /** The app has just run something that moves a branch, as a pull would have. */
+    const acted = (page: Page) => page.evaluate(() => (window as unknown as { __respond: (r: object) => void }).__respond({ OwnMoveAge: 120 }))
+    /** The repository as it is after a branch moved, and the reload that follows. */
+    const reloadAt = (page: Page, row: number, arrived: number[], behind = 0) =>
+      page.evaluate(
+        ([answers, gained]) => {
+          const w = window as unknown as { __respond: (r: object) => void; __emit: (n: string, d: object) => void }
+          w.__respond({ ...(answers as object), ArrivedCommits: gained })
+          w.__emit('graph:progress', { path: '/repo', rows: 400, done: true, paused: false, estimate: 400 })
+        },
+        [at(row, behind), { commits: arrived.map(id), total: arrived.length }] as const,
+      )
+    /** Ink at the right edge of the row drawn at a height in the view, where an arrived commit's bar is. */
+    const barAt = (page: Page, y: number) =>
+      page.locator('canvas').evaluate((el, py) => {
+        const c = el as HTMLCanvasElement
+        const dpr = window.devicePixelRatio || 1
+        return c.getContext('2d')!.getImageData(c.width - 2 * dpr, py * dpr, 1, 1).data[3]
+      }, y)
+
+    test('has no button while it is in view', async ({ page }) => {
+      await ready(page, 0)
+      await page.waitForTimeout(400)
+      await expect(button(page)).toHaveCount(0)
+    })
+
+    test('a button goes back to it once it has scrolled away, and selects nothing', async ({ page }) => {
+      await ready(page, 0)
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.move(box.x + 300, box.y + 200)
+      await page.mouse.wheel(0, 3000)
+      await expect(button(page)).toBeVisible()
+      await expect(button(page)).toHaveAccessibleName('Go to the checked-out commit, main')
+      await expect(button(page).locator('.arrow')).not.toHaveClass(/down/)
+      // Clear of the SHA column and the row actions at the right.
+      const b = (await button(page).boundingBox())!
+      expect(b.x + b.width).toBeLessThanOrEqual(box.x + box.width - 130)
+      expect(b.height).toBeGreaterThanOrEqual(32)
+      const selections = (await events(page, 'select')).length
+      await button(page).focus()
+      await page.keyboard.press('Enter')
+      await expect.poll(() => scrollTop(page)).toBe(0)
+      await expect(button(page)).toHaveCount(0)
+      await expect(page.locator('.scroller')).toBeFocused()
+      expect((await events(page, 'select')).length).toBe(selections)
+    })
+
+    test('points down when the checked-out commit is below the view, and lands it a third of the way down', async ({ page }) => {
+      await ready(page, 200)
+      await expect(button(page)).toBeVisible()
+      await expect(button(page).locator('.arrow')).toHaveClass(/down/)
+      await button(page).click()
+      const view = (await page.locator('.scroller').boundingBox())!.height
+      await expect.poll(async () => Math.round(await scrollTop(page))).toBe(Math.round(200 * 52 - view / 3))
+      await expect(button(page)).toHaveCount(0)
+    })
+
+    test('a detached HEAD is named by its short SHA', async ({ page }) => {
+      await open(page, 'graph', { graphRows: 400, responses: { CommitSignatures: [], Refs: [], HeadCommit: { branch: '', commit: id(200) } } })
+      await expect(button(page)).toHaveAccessibleName('Go to the checked-out commit, 0000000')
+    })
+
+    test('the view follows a branch the person moved, marks what arrived, and selects the tip', async ({ page }) => {
+      await ready(page, 200)
+      await acted(page)
+      await reloadAt(page, 150, [150, 151, 152])
+      const view = (await page.locator('.scroller').boundingBox())!.height
+      await expect.poll(async () => Math.round(await scrollTop(page))).toBe(Math.round(150 * 52 - view / 3))
+      await expect(page.getByRole('status')).toHaveText('main moved to 0000000, 3 new commits')
+      // Nothing had been chosen, so the tip is selected.
+      await expect.poll(async () => (await events(page, 'select')).at(-1)?.[0]).toMatchObject({ index: 150 })
+      // The three that arrived wear a bar at the right edge; the row above them and the one below don't.
+      const rowMid = (row: number) => Math.round(row * 52 - (150 * 52 - view / 3) + 26)
+      await expect.poll(() => barAt(page, rowMid(151))).toBeGreaterThan(0)
+      expect(await barAt(page, rowMid(152))).toBeGreaterThan(0)
+      expect(await barAt(page, rowMid(149))).toBe(0)
+      expect(await barAt(page, rowMid(153))).toBe(0)
+      // Selecting something else clears the marks.
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.click(box.x + 300, box.y + rowMid(153))
+      await expect.poll(() => barAt(page, rowMid(151))).toBe(0)
+    })
+
+    test('a commit the person selected stays selected, and only the view moves', async ({ page }) => {
+      await ready(page, 200)
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.click(box.x + 300, box.y + 3 * 52 + 20)
+      await expect.poll(async () => (await events(page, 'select')).at(-1)?.[0]).toMatchObject({ index: 3 })
+      await acted(page)
+      await reloadAt(page, 150, [150])
+      await expect.poll(async () => Math.round(await scrollTop(page))).toBe(Math.round(150 * 52 - box.height / 3))
+      await page.waitForTimeout(300)
+      expect((await events(page, 'select')).at(-1)?.[0]).toMatchObject({ index: 3 })
+      // The selection is out of view now, and the view did not go back for it.
+      expect(Math.round(await scrollTop(page))).toBe(Math.round(150 * 52 - box.height / 3))
+    })
+
+    test('a branch that moved without the person doing anything is not followed', async ({ page }) => {
+      await ready(page, 200)
+      await page.waitForTimeout(200)
+      await reloadAt(page, 150, [150])
+      await page.waitForTimeout(500)
+      expect(await scrollTop(page)).toBe(0)
+      await expect(page.getByRole('status')).toHaveText('')
+    })
+
+    test('after a fetch the view stays, and the button counts what is new upstream', async ({ page }) => {
+      await ready(page, 200)
+      await expect(button(page)).toHaveAccessibleName('Go to the checked-out commit, main')
+      await acted(page)
+      await reloadAt(page, 200, [], 3)
+      await expect(button(page)).toHaveAccessibleName('Go to the checked-out commit, main, 3 new')
+      await expect(button(page)).toContainText('3 new')
+      expect(await scrollTop(page)).toBe(0)
+    })
+
+    test('with reduced motion the view jumps', async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      await ready(page, 20)
+      await button(page).click()
+      // No glide: it is there on the next frame.
+      await page.waitForTimeout(50)
+      const view = (await page.locator('.scroller').boundingBox())!.height
+      expect(Math.round(await scrollTop(page))).toBe(Math.round(20 * 52 - view / 3))
+    })
+  })
+
   // #620: a commit with a git note says so in the graph.
   test.describe('note marks', () => {
     const id = (i: number) => String(i).padStart(40, '0')
