@@ -9,7 +9,7 @@ Maya switched the dashboard's wind readings to knots on `main`. Meanwhile Sam, o
 
 1. **Merge.** In the sidebar, open the `feature` folder, right-click `metric-units`, and choose **Merge feature/metric-units into main…**. A preview names the files that will conflict; press **Merge, and resolve 1 conflict**. Git merges everything it can and stops at the conflict. A strip at the top says *Merging feature/metric-units into main* and how many files need resolving.
 
-2. **Find the conflicted files.** Click the row at the top of the graph that says how many files changed. Conflicted files are listed first, under **Conflicts**.
+2. **Find the conflicted files.** Click the row at the top of the graph that says how many files changed. Conflicted files are listed first, under **Fix these first**.
 
 3. **Decide, file by file.** For each file, either:
 
@@ -27,7 +27,7 @@ Maya switched the dashboard's wind readings to knots on `main`. Meanwhile Sam, o
 
    **Mark resolved** comes on once every place is decided. The file is saved without any conflict markers, and the tool moves on to the next conflicted file.
 
-5. **Finish the merge.** Once nothing is left in **Conflicts**, click **Commit the merge** in the strip. Git Revenge makes the merge commit, and a notice offers **Undo**.
+5. **Finish the merge.** Once nothing is left under **Fix these first**, click **Commit the merge** in the strip. Git Revenge makes the merge commit, and a notice offers **Undo**.
 
 ## Good to know
 

@@ -39,7 +39,9 @@ Below the tiles are items shipped per day, the branches that most need attention
 
 An **item** is one commit on the target branch's main line (its first parents). A merge commit stands for the whole branch it brought in, and a squash merge is a single item, so merge, squash and rebase workflows all count one item per piece of work.
 
-Items are grouped **by reference**: ticket IDs like `TIDE-88` or `#41` found in the subject, or in trailers such as `Refs:`, `Closes:` or `Fixes:`. An item with several goes under its first. Items without one are grouped at the end. Switch to **by date** to see them day by day.
+Items are grouped **by reference**: ticket IDs like `TIDE-88` or `#41` found in the subject, or in trailers such as `Refs:`, `Closes:` or `Fixes:`. An item with several goes under its first. Items without one are grouped at the end.
+
+If any of your [smart links](settings.md#links) is set to count for Shipped, the references are whatever those links find instead, and each one is a link to its ticket. Switch to **by date** to see them day by day.
 
 Each item shows its author, how many files and lines it changed, and its **cycle time**: from the merged branch's first commit to the merge. Only merge commits have one. Squash merges and direct commits don't keep the branch's history, so they say **single commit** rather than show a guess.
 
@@ -77,7 +79,7 @@ The files the window's items changed most, by lines. A file that open branches a
 
 **Export CSV**, in the Shipped, Needs attention and Hotspots views, saves that list for a spreadsheet.
 
-Both start with the inputs they came from: the scope, each repository's target branch and exact commit, the window in UTC, the as-of point, the [branch kind](branch-care.md#branch-kinds) patterns and the thresholds. That's what makes them reproducible. Anyone with those commits, using those inputs, gets the same result. The design decision behind this is [ADR 0008](../adr/0008-insights-from-repository-state.md).
+Both start with the inputs they came from: the scope, each repository's target branch and exact commit, the window in UTC, the as-of point, the [branch kind](branch-care.md#branch-kinds) patterns, the smart links that count for Shipped, and the thresholds. That's what makes them reproducible. Anyone with those commits, using those inputs, gets the same result. The design decision behind this is [ADR 0008](../adr/0008-insights-from-repository-state.md).
 
 ## What it doesn't do
 

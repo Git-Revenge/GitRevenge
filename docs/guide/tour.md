@@ -7,14 +7,17 @@ Open a repository and this is what you get. Everything in the screenshots comes 
 
 1. **Tabs.** One per open repository, each showing the branch it's on. The flag at the far left goes back to the start page.
 2. **Sidebar.** An icon rail switches between branches, remotes, tags, stashes and the repository's LFS and submodules. The arrow next to `main` says it's one commit behind `origin/main`. Type in the box at the top to filter the lists. Right-click anything for what you can do with it.
-3. **Toolbar.** Undo and redo, then fetch, pull and push. The arrows next to Pull and Push hold the less common variants. The graph's commit count, search and layout switch share the bar, and the button at its right end hides the panel on the right.
+3. **Toolbar.** Undo and redo, then fetch, pull and push. The arrows next to Pull and Push hold the less common variants. The **Kinds** filter, the layout switch and the search share the bar, and the button at its right end hides the panel on the right.
 4. **Working tree.** The graph's first row, above the newest commit. It says whether you have uncommitted changes. Click it to see them on the right.
-5. **The commit graph.** Every commit, newest first, with branch and tag labels and the lines between them. Click a commit to see it on the right. Right-click for everything else: branch, merge, rebase, cherry-pick, revert, reset. [More about the graph](graph.md).
+5. **The commit graph.** Every commit, newest first, under a line for each day, with branch and tag labels and the lines between them. The ruler at its right edge shows where you are in the history. Click a commit to see it on the right. Right-click for everything else: branch, merge, rebase, cherry-pick, revert, reset. [More about the graph](graph.md).
 6. **The right-hand panel.** Your uncommitted changes, or the commit you selected: its message, author, notes, signature and the files it changed. Click a file to see its diff.
 7. **Commit message.** Where you write the summary and description, then commit with <kbd>Ctrl</kbd>+<kbd>Enter</kbd>.
 8. **Command palette.** Every command, searchable. <kbd>Ctrl</kbd>+<kbd>K</kbd> opens it from anywhere. The gear next to it opens Settings, and the moon or sun switches between dark and light.
 
 The strip along the bottom shows the git and git-lfs versions in use, and which version of Git Revenge you're running. Click the version, or the heart beside it, for the About dialog: the project's website, how to sponsor it, and the open source projects it's built with.
+
+![The About dialog](../img/about-light.webp#gh-light-mode-only)
+![The About dialog](../img/about-dark.webp#gh-dark-mode-only)
 
 ## The sidebar
 

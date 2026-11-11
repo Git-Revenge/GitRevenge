@@ -68,11 +68,18 @@ The graph shows where things stand. Commits you've answered for carry a tick or 
 
 When the answer is known, the strip says how many steps it took and the graph marks the commit "it broke here". The panel shows what that commit changed and offers to open its changes, start a branch for the fix, or revert it. **Copy the log** copies your answers as text for an issue. **Done** returns you to your branch. If the commits you skipped hide the answer, you're told which commits it could be instead.
 
+![A bisect in progress: the strip asks about the commit under test, and the graph marks the answers so far](../img/bisect-step-light.webp#gh-light-mode-only)
+![A bisect in progress: the strip asks about the commit under test, and the graph marks the answers so far](../img/bisect-step-dark.webp#gh-dark-mode-only)
+
+The walkthrough [Find what broke it](../walkthroughs/find-what-broke.md) goes through one from start to finish.
+
 A bisect lives in the repository, not the app: one started with `git bisect` in a terminal shows up here, and one started here carries on in a terminal.
 
 ## Notes
 
 Git notes attach extra text to a commit without changing it. The details panel shows a selected commit's notes, and lets you add, edit or remove one.
+
+In the graph, a commit with a note wears a folded-page mark. Hover over the mark to read the note, or click it to open the commit with its notes in view. Notes in every notes ref count. Type `has:note` in the graph's [search](graph.md#searching) to step through the commits that have one.
 
 git doesn't fetch or push notes on its own. To share them, turn on [syncing notes](branch-care.md#syncing-notes) for the repository.
 

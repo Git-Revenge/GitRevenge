@@ -9,11 +9,12 @@ Each walkthrough takes one everyday job from start to finish, with a short anima
 | [Resolve a merge conflict](resolve-a-conflict.md) | Merge a branch that changed the same lines as yours. |
 | [Undo a mistake](undo-a-mistake.md) | Take back a merge, and find work you thought you'd lost. |
 | [Find a commit](find-a-commit.md) | Search by message, author, SHA or trailer. |
+| [Find what broke it](find-what-broke.md) | Bisect down to the one commit that introduced a bug. |
 | [Look after several repositories](several-repositories.md) | Fetch and pull a whole group at once. |
 
 ## A practice repository
 
-The walkthroughs all use Tidewater, a small made-up project: a dashboard for a network of coastal weather stations, with a few months of history by four people. It has everything the walkthroughs need: a branch with a messy history, a branch that conflicts with `main`, a stash, a remote that's one commit ahead, and some uncommitted changes. For exploring the sidebar, it also has a release folder, a bot's branch, a branch whose upstream is gone, and a second worktree.
+The walkthroughs all use Tidewater, a small made-up project: a dashboard for a network of coastal weather stations, with a few months of history by four people. It has everything the walkthroughs need: a branch with a messy history, a branch that conflicts with `main`, a stash, a remote that's one commit ahead, some uncommitted changes, and a bug that crept in after a release, for a bisect to find. For exploring the sidebar, it also has a release folder, a bot's branch, a branch whose upstream is gone, and a second worktree.
 
 You can build the same repository and follow along. You need `git` and a bash shell; on Windows, use Git Bash, which comes with Git for Windows.
 

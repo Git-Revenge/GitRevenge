@@ -2,16 +2,25 @@
   <img src="build/social-preview.png" alt="Git Revenge: a fast, local-only desktop git client, built for very large repositories" width="720">
 </p>
 
-Git Revenge is a fast, free, and privacy-focused desktop git client for Windows, macOS, and Linux that stays fast on huge repositories. It's a Go app that drives the `git` you already have installed. There are no accounts, no cloud features and no AI.
+Git Revenge is a free, private desktop git client for Windows, macOS and Linux that stays fast on huge repositories. It drives the `git` you already have installed, so your config, hooks and credentials work as they do in a terminal.
 
-> **Status:** early development. The latest release is [`0.10.0`](https://github.com/Git-Revenge/GitRevenge/releases/tag/v0.10.0), and `0.11.0` is in progress.
+- **Free.** No paid tier and no licence to buy, for private repositories or for work. Apache-2.0.
+- **Private.** No accounts, no telemetry, no cloud features and no AI.
+- **Fast.** On the Linux kernel (1.5M commits) the first screen arrives in under half a second.
+
+The user guide, with pictures and walkthroughs, is at [gitrevenge.com](https://gitrevenge.com).
+
+> **Status:** early development. The latest release is [`0.11.0`](https://github.com/Git-Revenge/GitRevenge/releases/tag/v0.11.0).
 
 ## What it does
 
-- **A commit graph that copes with big histories.** It loads history just ahead of where you're scrolling instead of all at once. On the Linux kernel (1.5M commits) the first screen arrives in under half a second. Commits are in date order, with `main` pinned down the left as a spine. You can search, jump to any commit, and filter branches and tags.
+- **A commit graph that copes with big histories.** It loads history just ahead of where you're scrolling instead of all at once. Commits are in date order under a line for each day, with `main` pinned down the left as a spine, bot and docs commits folded away, and a ruler at the edge that marks branches, tags and search matches. You can search, jump to any commit, and filter branches and tags.
 - **Branch care.** Branches get kinds (Trunk, Release, Environment, Docs, Bot) that change how they look and behave. Hide the noise, clean up merged branches after a pull (squash merges included), sync git notes, and see stacked branches, with a one-click restack once the branch below merges.
 - **Everyday git.** Stage whole files, hunks or single lines. Commit and amend (signed, if your git config signs). Stash, branch, tag, merge, rebase, cherry-pick, reset and revert, with undo and redo.
-- **Digging through history.** Interactive rebase, a 3-pane conflict tool, file history, blame, the reflog, and git notes. Signed commits get a badge showing whether the signature checks out.
+- **Previews before it happens.** A merge or rebase says which files will conflict before it runs, and a strip shows where an operation in progress stands, with Continue, Skip and Abort.
+- **Digging through history.** An interactive rebase editor that shows the branch as it will be, a conflict tool built around the result, bisect, file history, blame, the reflog, and git notes. Signed commits get a badge showing whether the signature checks out.
+- **Git's own files.** Ignore a file from its menu, see which rule ignores any path, and edit every ignore file that applies. Edit git config with a line on what each setting does and a backup on every save.
+- **Smart links.** Ticket keys in commit messages, trailers and branch names become links to Jira, GitHub, GitLab, Linear, Azure Boards or anywhere else. The app only builds the link.
 - **Diffs and previews.** Unified or split diffs with syntax highlighting and image diffs. Files can also be shown rendered: Markdown, SVG, images, CSV tables, JSON/YAML/TOML trees, LaTeX math, Mermaid diagrams and PDFs.
 - **Remotes.** Fetch, pull and push through your existing credential helpers and SSH agent. If they can't answer, the app asks you.
 - **Lots of repos at once.** Repos open in tabs, worktrees are supported, and a group of local projects gets a dashboard with batch fetch and pull.
@@ -25,9 +34,9 @@ No accounts, no cloud sync, no telemetry. Git Revenge uses your own git config, 
 
 ## Install
 
-Grab the Windows installer, the macOS disk image, or a Linux `.deb` or `.rpm` (from 0.10.0) from the [latest release](https://github.com/Git-Revenge/GitRevenge/releases/latest).
+Grab the Windows installer, the macOS disk image, or a Linux `.deb` or `.rpm` from the [latest release](https://github.com/Git-Revenge/GitRevenge/releases/latest).
 
-- **macOS:** the disk image is signed and notarized (since 0.6.0).
+- **macOS:** the disk image is signed and notarized. With Homebrew: `brew install --cask git-revenge/tap/gitrevenge`.
 - **Windows:** the installer isn't signed yet, so SmartScreen will warn you before it runs.
 - **Linux:** Ubuntu 24.04, Debian 13, RHEL 9, and RHEL 10 with EPEL, or newer. See the [install guide](docs/guide/install.md).
 

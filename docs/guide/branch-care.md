@@ -29,6 +29,7 @@ A pattern matches the branch name without its remote, so `release/*` covers `rel
 - **Graph chips** take the kind's colour and icon: Trunk in rose and bold, Release in plum, Environment in ochre, Docs as a teal outline, Feature in green, Bot in faint text.
 - **The timeline** shows the kind's icon in a commit's circle, instead of the author's initials, for commits on Release, Environment, Docs and Bot lines.
 - **Docs lines** are drawn faded, with their commit messages muted, since a published site isn't code. A line that also has an ordinary or Feature branch at its tip isn't faded.
+- **Bot and Docs lines** fold in the timeline: each line's commits of a day take [one line](graph.md#folded-lanes), such as "11 Docs commits".
 - **When branches of different kinds point at one commit**, each keeps its own label, and the commit's line takes the kind that comes first in the order Trunk, Release, Environment, Docs, Bot, Feature.
 - **The sidebar** keeps your local branches in one tree in the **Branches** panel, with the checked-out branch first, or the folder holding it, and Trunk next. A kind's icon marks a folder when every branch in it shares that kind, and otherwise marks each branch. Remote branches do the same in the **Remotes** panel.
 
@@ -40,7 +41,7 @@ Hidden branches leave the sidebar and the graph. Commits that only they reach di
 
 - **One branch:** right-click it and choose **Hide**. Hiding `wip/x` hides `origin/wip/x` too.
 - **Patterns:** under **This repository** in Settings, list them in **Hidden branches**, such as `wip/*, archive/*`.
-- **A whole kind:** the **Kinds** dropdown in the bar above the graph has a checkbox for each kind the repository has. Clear one to hide every branch of that kind. They all start checked (showing).
+- **A whole kind:** the **Kinds** dropdown in the bar above the graph has a checkbox for each kind the repository has. Clear one to hide every branch of that kind. They all start checked (showing). Bot and Docs lines that are showing are [folded](graph.md#folded-lanes) to one line a day unless you turn **Fold** off.
 
 When something is hidden, the sidebar says how many, under the branch lists. **Show them** brings them back for now, in italics; **Hide them again** undoes that. To unhide a branch for good, right-click it while it's showing and choose **Unhide**.
 

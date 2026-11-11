@@ -27,7 +27,7 @@
 // It needs Chrome, Git Bash, ffmpeg and ImageMagick (magick). CHROME, BASH_EXE, APP_URL and
 // DEMO override where Chrome and bash are, where the app is served, and the demo folder.
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -35,7 +35,8 @@ import puppeteer from 'puppeteer-core'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const out = path.resolve(here, '../../docs/img')
-const work = path.join(tmpdir(), 'gitrevenge-shots')
+// Two runs at once, against two instances of the app, need a folder each: set SHOTS_WORK.
+const work = process.env.SHOTS_WORK ?? path.join(tmpdir(), 'gitrevenge-shots')
 const APP = process.env.APP_URL ?? 'http://localhost:34115/'
 const DEMO = process.env.DEMO ?? 'T:\\'
 const CHROME = process.env.CHROME ?? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
@@ -64,7 +65,7 @@ async function reset(page, open = ['tidewater'], { clean = false, branch } = {})
   await page.evaluate(async () => {
     // Tabs that aren't repositories stay open across a reload.
     const pause = (ms) => new Promise((r) => setTimeout(r, ms))
-    for (const name of ['Insights', 'Git Config']) {
+    for (const name of ['Insights', 'Git Config', 'Ignore rules']) {
       const close = document.querySelector(`[aria-label="Close ${name}"]`)
       if (!close) continue
       close.click()
@@ -100,8 +101,11 @@ async function reset(page, open = ['tidewater'], { clean = false, branch } = {})
       const tab = await A.OpenRepo(`${demo}${name}`)
       await A.CloseRepo(tab.path)
     }
-    // The sidebar remembers its panel, filter and sort for each repository.
+    // The sidebar remembers its panel, filter and sort for each repository, and a diff the
+    // layout it was last shown in.
     for (const key of Object.keys(localStorage)) if (key.startsWith('gitrevenge.sidebar:')) localStorage.removeItem(key)
+    localStorage.removeItem('gitrevenge.diffLayout')
+    localStorage.removeItem('gitrevenge.renderPreviews')
   }, DEMO)
   for (const name of open) {
     await page.evaluate((p) => window.go.app.App.OpenRepo(p), path.win32.join(DEMO, name))
@@ -110,8 +114,24 @@ async function reset(page, open = ['tidewater'], { clean = false, branch } = {})
   await page.reload({ waitUntil: 'networkidle0' })
   await overlay(page)
   if (open.length) {
+    const loaded = () => !!document.querySelector('.row.ref') && !document.body.innerText.includes('Loading history')
     await page.waitForSelector('.scroller')
-    await untilSettled(page, () => !!document.querySelector('.row.ref') && !document.body.innerText.includes('Loading history'))
+    try {
+      await untilSettled(page, loaded)
+    } catch {
+      // Background work from the scene before (Insights' trial merges) can still be reading the
+      // old folder as it's rebuilt, and the tab then opens without its branches. Open it afresh.
+      await page.evaluate(async (paths) => {
+        const A = window.go.app.App
+        for (const t of (await A.RestoreSession())?.tabs ?? []) await A.CloseRepo(t.path)
+        for (const p of paths) await A.OpenRepo(p)
+        await A.SetActiveRepo(paths[0])
+      }, open.map((name) => path.win32.join(DEMO, name)))
+      await page.reload({ waitUntil: 'networkidle0' })
+      await overlay(page)
+      await page.waitForSelector('.scroller')
+      await untilSettled(page, loaded)
+    }
   }
   await sleep(800)
 }
@@ -120,6 +140,15 @@ async function reset(page, open = ['tidewater'], { clean = false, branch } = {})
 
 /** Adds a pointer that follows the mouse, a ring on each click, and a caption for keys. */
 async function overlay(page) {
+  // A build older than the newest release says so in a banner, some seconds after each start,
+  // which can be the middle of a recording. It's kept off the page altogether.
+  await page.evaluate(() => {
+    if (document.getElementById('demo-no-update')) return
+    const css = document.createElement('style')
+    css.id = 'demo-no-update'
+    css.textContent = '.banner.notice { display: none !important; }'
+    document.head.append(css)
+  })
   await page.evaluate(() => {
     if (document.getElementById('demo-cursor')) return
     const css = document.createElement('style')
@@ -224,32 +253,28 @@ async function type(page, text, delay = 45) {
   await page.keyboard.type(text, { delay })
 }
 
+/** A file's row in a list of files, which shows its name under its folder's heading. */
+const file = (name) => `::-p-xpath(//button[@data-file-row][contains(normalize-space(.), ${JSON.stringify(path.posix.basename(name))})])`
+
+/** Shows the files of the selected commit. In a narrow panel they're behind a tab. */
+async function showFiles(p) {
+  const tab = await p.$(`::-p-xpath(//button[@role='tab'][normalize-space(.)='Files'])`)
+  if (tab) await click(p, `::-p-xpath(//button[@role='tab'][normalize-space(.)='Files'])`, { pause: 400 })
+}
+
 /** A button, link or menu item whose text contains text. */
 const byText = (text, tag = '*') =>
   `::-p-xpath(//${tag}[(self::button or self::a or @role='menuitem' or self::summary) and contains(normalize-space(.), ${JSON.stringify(text)})])`
 
 // ── The commit graph ──────────────────────────────────────────────────────────────────
 
-/** Where row i of the graph is on screen (its middle), counting from the top row shown. */
-async function row(page, i) {
-  return page.evaluate((i) => {
-    const s = document.querySelector('.scroller')
-    const r = s.getBoundingClientRect()
-    const h = document.documentElement.dataset.density === 'compact' ? 30 : 52
-    return { x: r.left + Math.min(r.width / 2, 360), y: r.top + (i + 0.5) * h, left: r.left }
-  }, i)
-}
-
-/** Which row of the graph holds the commit with this subject, counting from the top. */
+/** Where the commit with this subject is on screen: the middle of its row. Rows differ in
+ * height, so the commit is selected by searching, and its row's action card says where it is. */
 async function rowOf(page, subject) {
-  const i = await page.evaluate(async (subject) => {
-    const A = window.go.app.App
-    const tab = (await A.RestoreSession()).tabs[0]
-    const { rows } = await A.GraphRows(tab.path, 0, 40)
-    return rows.findIndex((r) => r.subject === subject)
-  }, subject)
-  if (i < 0) throw new Error(`no commit "${subject}" in the first 40 rows`)
-  return i
+  await selectCommit(page, subject)
+  const card = await (await page.waitForSelector('.row-actions', { visible: true })).boundingBox()
+  const s = await (await page.$('.scroller')).boundingBox()
+  return { x: s.x + Math.min(s.width / 2, 360), y: card.y + card.height / 2 }
 }
 
 /** A branch's row in the sidebar, by the name it shows there: the part after its folder. */
@@ -332,10 +357,14 @@ async function animation(page, name, prepare, act) {
     const rec = await page.screencast({ path: webm, scale: 1 })
     cuts = []
     recording = Date.now()
-    await sleep(600)
-    await act(page)
-    await sleep(1200)
-    await rec.stop()
+    // A recorder left running by a scene that failed takes the whole run down with it.
+    try {
+      await sleep(600)
+      await act(page)
+      await sleep(1200)
+    } finally {
+      await rec.stop()
+    }
     await page.evaluate(() => {
       clearInterval(window.__heartbeat)
       document.getElementById('shots-heartbeat')?.remove()
@@ -391,7 +420,7 @@ scenes.start = (page) =>
 scenes.repo = async (page) => {
   await stills(page, 'repository', async (p) => {
     await reset(p)
-    await p.waitForSelector(byText('src/alerts.js', 'button'))
+    await p.waitForSelector(file('src/alerts.js'))
     await sleep(500)
   })
   // The tour's copy, with numbered markers on each part of the window. Positions are in the
@@ -399,11 +428,11 @@ scenes.repo = async (page) => {
   const marks = [
     [400, 45], // tabs
     [250, 1100], // sidebar
-    [1650, 124], // toolbar
+    [1057, 124], // toolbar
     [1180, 205], // working tree
-    [1510, 780], // graph
+    [1189, 869], // graph
     [2490, 130], // right panel
-    [2050, 1000], // commit message
+    [2377, 1174], // commit message
     [2030, 40], // command palette
   ]
   for (const theme of ['light', 'dark']) annotate('repository', theme, marks)
@@ -440,15 +469,16 @@ scenes.palette = (page) =>
 scenes.diff = (page) =>
   stills(page, 'diff-unified', async (p) => {
     await reset(p)
-    await click(p, byText('src/alerts.js', 'button'))
+    await click(p, file('src/alerts.js'))
     await sleep(800)
   })
 
 /** Opens file in the commit with this subject, in the File layout, rendered. */
-async function preview(p, subject, file) {
+async function preview(p, subject, name) {
   await reset(p, ['tidewater'], { clean: true })
   await selectCommit(p, subject)
-  await click(p, byText(file, 'button'))
+  await showFiles(p)
+  await click(p, file(name))
   await sleep(700)
   await click(p, byText('File', 'button'))
   const rendered = await p.$(byText('Rendered', 'button'))
@@ -465,7 +495,8 @@ scenes.blame = (page) =>
   stills(page, 'blame', async (p) => {
     await reset(p, ['tidewater'], { clean: true })
     await selectCommit(p, 'Show wind in knots')
-    await click(p, byText('src/feed.js', 'button'))
+    await showFiles(p)
+    await click(p, file('src/feed.js'))
     await sleep(600)
     await click(p, byText('Blame', 'button'))
     await sleep(1200)
@@ -499,16 +530,17 @@ scenes.reflog = (page) =>
     await sleep(1000)
   })
 
-/** Right-clicks row i of the graph and chooses the menu item containing text. */
-async function rowMenu(p, i, text) {
-  const r = await row(p, i)
+/** Right-clicks the graph at r, a commit's row, and chooses the menu item containing text. */
+async function rowMenu(p, r, text) {
   await clickAt(p, r.x, r.y, { button: 'right', pause: 500 })
   await click(p, byText(text), { pause: 700 })
 }
 
+const REBASE_FROM = 'Set the alert limit in knots too'
+
 /** Opens the interactive rebase editor for feature/offline-cache, from where it left main. */
-async function openRebase(p) {
-  await rowMenu(p, await rowOf(p, 'Set the alert limit in knots too'), 'Interactive rebase')
+async function openRebase(p, from) {
+  await rowMenu(p, from ?? (await rowOf(p, REBASE_FROM)), 'Interactive rebase')
   await p.waitForSelector(byText('Rewrite as', 'button'))
   await sleep(500)
 }
@@ -526,13 +558,19 @@ async function action(p, subject, label) {
   await click(p, `::-p-xpath(//button[@role='option'][starts-with(normalize-space(.), ${JSON.stringify(label)})])`, { pause: 500 })
 }
 
+let rebaseFrom = null
+
 scenes.rebaseAnim = (page) =>
   animation(
     page,
     'rebase',
-    (p) => reset(p, ['tidewater'], { clean: true, branch: 'feature/offline-cache' }),
+    // The commit is found before the recording starts, so the search isn't part of it.
     async (p) => {
-      await openRebase(p)
+      await reset(p, ['tidewater'], { clean: true, branch: 'feature/offline-cache' })
+      rebaseFrom = await rowOf(p, REBASE_FROM)
+    },
+    async (p) => {
+      await openRebase(p, rebaseFrom)
       await action(p, 'debugging', 'Drop')
       await click(p, byText('Fold it in for me', 'button'), { pause: 600 })
       await action(p, 'wip', 'Squash')
@@ -594,7 +632,7 @@ scenes.commitAnim = (page) =>
     'stage-and-commit',
     (p) => reset(p),
     async (p) => {
-      await click(p, byText('src/alerts.js', 'button'), { pause: 1200 })
+      await click(p, file('src/alerts.js'), { pause: 1200 })
       await click(p, byText('Stage hunk', 'button'), { pause: 300 })
       // Esc while it's still staging shows an error (#391).
       await untilGit(() => execFileSync('git', ['-C', REPO, 'diff', '--cached', '--name-only'], { encoding: 'utf8' }).includes('src/alerts.js'))
@@ -605,6 +643,8 @@ scenes.commitAnim = (page) =>
       await sleep(500)
       await keys(p, 'Ctrl+Enter', { hold: 800 })
       await untilSettled(p, () => document.querySelector('[aria-label="Commit summary"]')?.value === '')
+      // Long enough to see the new commit arrive at the top of the graph.
+      await sleep(2500)
     },
   )
 
@@ -620,7 +660,7 @@ scenes.undoAnim = (page) =>
       await p.waitForSelector(`${PREVIEW_GO}:not([disabled])`)
       await click(p, PREVIEW_GO, { pause: 300 })
       await untilGit(() => headOf() !== before)
-      await untilSettled(p, () => [...document.querySelectorAll('button')].find((b) => b.innerText.trim().startsWith('Undo'))?.disabled === false)
+      await untilSettled(p, () => document.querySelector('button[aria-label="Undo"]')?.disabled === false)
       const merged = headOf()
       await keys(p, 'Ctrl+Z', { hold: 1000 })
       await untilGit(() => headOf() !== merged)
@@ -737,7 +777,7 @@ scenes.sidebarAnim = (page) =>
 scenes.commitMenu = (page) =>
   stills(page, 'commit-menu', async (p) => {
     await reset(p, ['tidewater'], { clean: true })
-    const r = await row(p, await rowOf(p, 'Document the units'))
+    const r = await rowOf(p, 'Document the units')
     await clickAt(p, r.x, r.y, { button: 'right', pause: 500 })
     await p.keyboard.press('End')
     await p.keyboard.press('ArrowUp')
@@ -907,6 +947,12 @@ async function insightsTab(p, view, { group = false } = {}) {
   await sleep(400)
   await click(p, byText('tidewater', 'button'), { button: 'right', pause: 400 })
   await click(p, `::-p-xpath(//*[@role="menuitem" and contains(., "Insights")])`, { pause: 2500 })
+  // A tab that came back with the session can be open without being the one in front.
+  if (!(await p.$('.insights'))) {
+    await p.evaluate(() => [...document.querySelectorAll('.tab')].find((t) => t.innerText.includes('Insights'))?.click())
+    await p.waitForSelector('.insights .rail select', { timeout: 30000 })
+    await sleep(2000)
+  }
   if (group) {
     await p.evaluate(() => {
       const sel = document.querySelector('.insights .rail select')
@@ -938,6 +984,204 @@ scenes.insightsSummary = (page) =>
     await sleep(400)
   })
 
+// ── Git tools: previews, bisect, ignoring and links ───────────────────────────────────
+
+/** Opens the command palette and runs the command its text finds. */
+async function palette(p, text, { show = false } = {}) {
+  if (show) await keys(p, 'Ctrl+K', { hold: 400 })
+  else {
+    await p.keyboard.down('Control')
+    await p.keyboard.press('k')
+    await p.keyboard.up('Control')
+    await sleep(300)
+  }
+  await type(p, text, show ? 80 : 0)
+  await sleep(show ? 600 : 300)
+  await p.keyboard.press('Enter')
+  await sleep(800)
+}
+
+/** Parks the pointer in one jump, so no row is left mid-fade from its hover. */
+async function park(p) {
+  await p.mouse.move(WIDTH - 2, HEIGHT - 2)
+  mouse = { x: WIDTH - 2, y: HEIGHT - 2 }
+  await sleep(400)
+}
+
+scenes.mergePreview = (page) =>
+  stills(page, 'merge-preview', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await click(p, sidebarRef('metric-units'), { button: 'right', pause: 500 })
+    await click(p, byText('Merge feature/metric-units into main'), { pause: 300 })
+    await p.waitForSelector(`${PREVIEW_GO}:not([disabled])`)
+    await park(p)
+  })
+
+scenes.operationStrip = (page) =>
+  stills(page, 'operation-strip', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await merge(p)
+    await click(p, 'button.wip', { pause: 800 })
+    await park(p)
+  })
+
+// The bug the bisect looks for: the map still says "km/h" after this commit made it knots.
+const BROKE_IT = 'Show wind in knots'
+const git = (...args) => execFileSync('git', ['-C', REPO, ...args], { encoding: 'utf8' }).trim()
+
+/** Starts a bisect from the command palette: HEAD is bad, and the last tag is suggested as good. */
+async function startBisect(p, show = false) {
+  await palette(p, 'broke it', { show })
+  await p.waitForSelector('[role=dialog] button[type=submit]:not([disabled])')
+  await sleep(show ? 1500 : 300)
+  await click(p, '[role=dialog] button[type=submit]', { pause: 300 })
+  await p.waitForSelector('.op.bisect')
+  await sleep(1500)
+}
+
+/** Answers the bisect's question about the commit it checked out, as someone testing it would. */
+async function answerBisect(p) {
+  const culprit = git('log', '--all', '--format=%H', `--grep=^${BROKE_IT}$`).split('\n')[0]
+  let broken = true
+  try {
+    git('merge-base', '--is-ancestor', culprit, headOf())
+  } catch {
+    broken = false
+  }
+  const ask = () => p.evaluate(() => document.querySelector('.op.bisect .ask')?.innerText ?? '')
+  const asked = await ask()
+  await click(p, broken ? '.op.bisect .actions button.btn.danger:not(.sm)' : '.op.bisect .actions button.btn.success', { pause: 300 })
+  // The strip stays up for the whole bisect, so there's no quiet page to wait for: it moves
+  // on when it asks about another commit, or says the commit is found.
+  await waiting(async () => {
+    for (const start = Date.now(); !(await p.$('.op.bisect.found')) && (await ask()) === asked; await sleep(100)) {
+      if (Date.now() - start > 90000) throw new Error('the bisect never moved on')
+    }
+  })
+  await sleep(1500)
+}
+
+scenes.bisect = (page) =>
+  stills(page, 'bisect-step', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await startBisect(p)
+    await answerBisect(p)
+    await park(p)
+  })
+
+scenes.bisectAnim = (page) =>
+  animation(
+    page,
+    'bisect',
+    (p) => reset(p, ['tidewater'], { clean: true }),
+    async (p) => {
+      await startBisect(p, true)
+      await sleep(1200)
+      for (let step = 0; step < 6 && !(await p.$('.op.bisect.found')); step++) {
+        await answerBisect(p)
+        await sleep(1400)
+      }
+      await sleep(1500)
+    },
+  )
+
+/** Untracked files worth ignoring: two logs and a private settings file. */
+async function clutter(p) {
+  mkdirSync(path.join(REPO, 'logs'), { recursive: true })
+  writeFileSync(path.join(REPO, 'logs', 'server.log'), 'listening on 8080\n')
+  writeFileSync(path.join(REPO, 'logs', 'feed.log'), 'HBR ok\n')
+  writeFileSync(path.join(REPO, '.env.local'), 'FEED_URL=http://localhost:9000\n')
+  await p.waitForSelector(file('server.log'), { timeout: 30000 })
+  await untilSettled(p)
+}
+
+scenes.ignoreDialog = (page) =>
+  stills(page, 'ignore-dialog', async (p) => {
+    await reset(p)
+    await clutter(p)
+    await click(p, file('server.log'), { button: 'right', pause: 500 })
+    // The submenu opens on hover, and closes if the pointer wanders on its way to an item.
+    const parent = await centre(p, `::-p-xpath(//*[@role='menuitem'][@aria-haspopup='menu'][starts-with(normalize-space(.), 'Ignore')])`)
+    await glide(p, parent.x, parent.y)
+    await sleep(600)
+    await (await p.waitForSelector(byText('Ignore…'), { visible: true })).click()
+    await sleep(800)
+    await click(p, `::-p-xpath(//label[contains(., 'Every .log file')])`, { pause: 900 })
+    await park(p)
+  })
+
+scenes.ignoreRules = (page) =>
+  stills(page, 'ignore-rules', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    // Something for each rule to be ignoring, so the counts aren't all zero.
+    mkdirSync(path.join(REPO, 'node_modules', 'vite'), { recursive: true })
+    writeFileSync(path.join(REPO, 'node_modules', 'vite', 'package.json'), '{}\n')
+    writeFileSync(path.join(REPO, '.env'), 'FEED_URL=http://localhost:9000\n')
+    writeFileSync(path.join(REPO, '.gitignore'), 'node_modules/\n.env\n*.log\n!keep.log\n/build/\n')
+    git('add', '.gitignore')
+    await sleep(1500)
+    // The global excludes file in the shot has to be the demo's, never the one of whoever runs this.
+    const excludes = await p.evaluate(() => window.go.app.App.RestoreSession().then((s) => window.go.app.App.IgnoreFileNames(s.tabs[0].path)).then((n) => n.global))
+    if (path.win32.resolve(excludes).toLowerCase() !== path.win32.join(DEMO, 'gitignore').toLowerCase()) {
+      throw new Error(`the app reads global excludes from ${excludes}, not the demo's`)
+    }
+    await palette(p, 'Edit ignore rules')
+    await p.waitForSelector('aside.check input')
+    await click(p, 'aside.check input', { pause: 200 })
+    await p.keyboard.type('logs/keep.log')
+    await sleep(1200)
+    await park(p)
+  })
+
+scenes.links = (page) =>
+  stills(page, 'links', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await p.evaluate(async () => {
+      const A = window.go.app.App
+      const repo = (await A.RestoreSession()).tabs[0].path
+      const rule = (name, pattern, url) => ({ name, pattern, url, in: ['message', 'trailers', 'branches'], shipped: true, enabled: true, scope: 'local' })
+      await A.SaveLinkRule(repo, rule('Tidewater issues', '#(\\d+)', 'https://tracker.tidewater.example/issues/{1}'), '')
+      await A.SaveLinkRule(repo, rule('Harbour Jira', '\\b(HBR|TIDE)-\\d+\\b', 'https://harbour.atlassian.net/browse/{0}'), '')
+    })
+    await p.keyboard.down('Control')
+    await p.keyboard.press(',')
+    await p.keyboard.up('Control')
+    // The links are read after the dialog opens.
+    await p.waitForSelector('input[aria-label="Tidewater issues on"]', { timeout: 30000 })
+    await sleep(500)
+    // Bring the Links section to the top of the dialog, with a little air above its heading.
+    await p.evaluate(() => {
+      const legend = [...document.querySelectorAll('legend')].find((l) => l.textContent.trim() === 'Links')
+      let box = legend?.parentElement
+      while (box && !(box.scrollHeight > box.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(box).overflowY))) box = box.parentElement
+      if (box) box.scrollTop += legend.getBoundingClientRect().top - box.getBoundingClientRect().top - 24
+    })
+    await sleep(300)
+    await park(p)
+  })
+
+/** The graph alone, with the ruler at its right edge. */
+scenes.ruler = (page) =>
+  stills(
+    page,
+    'graph-ruler',
+    async (p) => {
+      await reset(p, ['tidewater'], { clean: true })
+      await park(p)
+    },
+    async (p) => {
+      const g = await (await p.$('.scroller')).boundingBox()
+      return { x: g.x, y: g.y, width: g.width + 16, height: Math.min(g.height, 560) }
+    },
+  )
+
+scenes.about = (page) =>
+  stills(page, 'about', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await palette(p, 'About Git Revenge')
+    await park(p)
+  })
+
 // ── Main ──────────────────────────────────────────────────────────────────────────────
 
 mkdirSync(out, { recursive: true })
@@ -959,16 +1203,26 @@ try {
     throw new Error(`${APP} reads global config from ${global}, so it looks like a session in use. See the top of this file.`)
   }
   const wanted = process.argv.slice(2)
+  const unknown = wanted.filter((name) => !scenes[name])
+  if (unknown.length) throw new Error(`no scene named ${unknown.join(', ')}; there are: ${Object.keys(scenes).join(', ')}`)
+  // A scene that fails is reported and the rest still run, since a full run takes over an hour.
+  const failed = []
   for (const [name, scene] of Object.entries(scenes)) {
     if (wanted.length && !wanted.includes(name)) continue
     console.log(name)
     try {
       await scene(page)
     } catch (e) {
-      await page.screenshot({ path: path.join(work, `failed-${name}.png`) })
-      console.error(`  failed; the page is in ${path.join(work, `failed-${name}.png`)}`)
-      throw e
+      await page.screenshot({ path: path.join(work, `failed-${name}.png`) }).catch(() => {})
+      console.error(`  failed: ${e.message}
+  the page is in ${path.join(work, `failed-${name}.png`)}`)
+      failed.push(name)
+      await page.keyboard.press('Escape').catch(() => {})
     }
+  }
+  if (failed.length) {
+    console.error(`failed: ${failed.join(' ')}`)
+    process.exitCode = 1
   }
 } finally {
   await browser.close()
