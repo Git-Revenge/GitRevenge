@@ -133,7 +133,9 @@ test.describe('commit graph', () => {
   /** The row just inside the top edge, read by right-clicking it. */
   async function topRow(page: Page) {
     const box = (await page.locator('.scroller').boundingBox())!
-    await page.mouse.click(box.x + 400, box.y + 2, { button: 'right' })
+    // Just under the day line, which is the first 26px of the view: in its place at the top of
+    // the history, and pinned there anywhere else.
+    await page.mouse.click(box.x + 400, box.y + 26 + 8, { button: 'right' })
     return (await events(page, 'context-row')).at(-1)?.[0]
   }
 
@@ -437,6 +439,121 @@ test.describe('commit graph', () => {
     })
   })
 
+  // #623: the day is a line of its own above its first commit, and stays at the top of the view
+  // while its commits scroll past.
+  test.describe('day lines', () => {
+    const noon = (daysAgo: number) => {
+      const d = new Date()
+      d.setHours(12, 0, 0, 0)
+      d.setDate(d.getDate() - daysAgo)
+      return Math.floor(d.getTime() / 1000)
+    }
+    /** Ten commits today by one person, then sixty yesterday by two. */
+    const graphData = Array.from({ length: 70 }, (_, i) => ({
+      index: i,
+      col: 0,
+      color: 0,
+      up: i ? [{ from: 0, to: 0, color: 0 }] : [],
+      down: [{ from: 0, to: 0, color: 0 }],
+      width: 1,
+      id: String(i).padStart(40, '0'),
+      parents: 1,
+      author: i >= 10 && i % 2 ? 'Ben Ode' : 'Ana Cruz',
+      authorTime: (i < 10 ? noon(0) : noon(1)) - i * 60,
+      subject: `Commit ${i}`,
+    }))
+    const scenario = { graphData, responses: { Refs: [], CommitSignatures: [] } }
+    const ready = async (page: Page) => {
+      await open(page, 'graph', scenario)
+      await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '70')
+      await page.waitForTimeout(300)
+    }
+    /** How much ink is in a strip of the canvas: its left third at a height, 4px tall. */
+    const inkAcross = (page: Page, y: number) =>
+      page.locator('canvas').evaluate((el, py) => {
+        const c = el as HTMLCanvasElement
+        const dpr = window.devicePixelRatio || 1
+        const data = c.getContext('2d')!.getImageData(0, py * dpr, c.width / 3, 4 * dpr).data
+        let ink = 0
+        for (let i = 3; i < data.length; i += 4) ink += data[i] ? 1 : 0
+        return ink / (data.length / 4)
+      }, y)
+    const selected = async (page: Page) => ((await events(page, 'select')).at(-1)?.[0] as { index: number } | undefined)?.index
+    const clickAt = async (page: Page, y: number) => {
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.click(box.x + 300, box.y + y)
+      return selected(page)
+    }
+
+    test('the first commit sits under its day line, which is not a commit', async ({ page }) => {
+      await ready(page)
+      // A click on the day line selects nothing new; under it is the first commit.
+      const before = (await events(page, 'select')).length
+      await clickAt(page, 10)
+      expect((await events(page, 'select')).length).toBe(before)
+      expect(await clickAt(page, 26 + 10)).toBe(0)
+      // The line in its place has no ground of its own: above its text is clear.
+      expect(await inkAcross(page, 1)).toBe(0)
+    })
+
+    test("stays at the top while its day scrolls past, on a ground of its own, and gives way to the next day's", async ({ page }) => {
+      await ready(page)
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.move(box.x + 300, box.y + 200)
+      // Today is its line, a starter and nine followers: 26 + 52 + 9 * 30 = 348 tall.
+      await page.mouse.wheel(0, 150)
+      await page.waitForTimeout(600)
+      // Pinned: the strip at the very top is filled edge to edge.
+      expect(await inkAcross(page, 1)).toBe(1)
+      // The row under the pinned line is still one of today's.
+      expect(await clickAt(page, 26 + 4)).toBeLessThan(10)
+      // Well into yesterday, its line is the one pinned, and the rows under it are yesterday's.
+      await page.mouse.move(box.x + 300, box.y + 200)
+      await page.mouse.wheel(0, 600)
+      await page.waitForTimeout(600)
+      expect(await inkAcross(page, 1)).toBe(1)
+      expect(await clickAt(page, 26 + 4)).toBeGreaterThanOrEqual(10)
+    })
+
+    test('moving the selection into another day says which day, and what it holds', async ({ page }) => {
+      await ready(page)
+      await page.locator('.scroller').focus()
+      expect(await clickAt(page, 26 + 52 + 8 * 30 + 15)).toBe(9)
+      await expect(page.getByRole('status')).toHaveText('')
+      await page.keyboard.press('ArrowDown')
+      await expect.poll(() => selected(page)).toBe(10)
+      await expect(page.getByRole('status')).toHaveText(/^Yesterday, .+, 60 commits · 2 people$/)
+      // Within the day, nothing more is said; back into today, today is.
+      await page.keyboard.press('ArrowDown')
+      await expect(page.getByRole('status')).toHaveText(/^Yesterday, /)
+      await page.keyboard.press('ArrowUp')
+      await page.keyboard.press('ArrowUp')
+      await expect(page.getByRole('status')).toHaveText(/^Today, .+, 10 commits$/)
+    })
+
+    test('a selection brought into view from above lands under the pinned line, not behind it', async ({ page }) => {
+      await ready(page)
+      await page.locator('.scroller').focus()
+      await page.keyboard.press('End')
+      await expect.poll(() => selected(page)).toBe(69)
+      await page.keyboard.press('PageUp')
+      await page.keyboard.press('PageUp')
+      const at = (await selected(page))!
+      // The selected row is the one just under the pinned day line.
+      expect(await clickAt(page, 26 + 6)).toBe(at)
+    })
+
+    test('compact has no day lines', async ({ page }) => {
+      await ready(page)
+      await page.getByRole('button', { name: 'Compact' }).click()
+      await page.waitForTimeout(200)
+      // Under compact's column headings the first row is the first commit, and the eleventh
+      // follows the tenth with nothing between.
+      expect(await clickAt(page, 10)).toBe(0)
+      expect(await clickAt(page, 10 * 30 + 10)).toBe(10)
+    })
+  })
+
   // #621: the view is placed by the row at its top edge, not by a height added up from the first
   // commit, so it has to behave the same at the far end of a history too long to measure.
   test.describe('a very long history', () => {
@@ -467,7 +584,8 @@ test.describe('commit graph', () => {
       await page.keyboard.press('Home')
       await expect.poll(() => selected(page)).toBe(0)
       expect((await scrollState(page)).top).toBe(0)
-      expect(await commitAt(page, 10)).toBe(0)
+      // The day line is first, then the first commit.
+      expect(await commitAt(page, 26 + 10)).toBe(0)
     })
 
     test('the wheel moves through rows at its usual speed, wherever it is', async ({ page }) => {
@@ -477,33 +595,38 @@ test.describe('commit graph', () => {
       // A row is taken to start a run until it has loaded, so let the first rows arrive.
       await page.waitForTimeout(400)
       // The first commit starts a run (52), and the stub's commits after it carry it on (30 each).
+      // Its day line (26) scrolls off, and the same day's line is then pinned over the top 26px,
+      // so the row found just under that is the twenty-second.
+      const under = 26 + 10
       await page.mouse.wheel(0, 52 + 20 * 30)
       // A wheel notch is eased over a few frames. Finding the row by clicking it would stop it
       // part way, so wait for it to finish.
       const settle = () => page.waitForTimeout(600)
       await settle()
       // Twenty-one rows have gone by, not a ten-thousandth of the history.
-      expect(await commitAt(page, 10)).toBe(21)
+      expect(await commitAt(page, under)).toBe(21)
       // The same from the middle: drag the scrollbar there, then wheel.
       await page.locator('.scroller').evaluate((e) => e.scrollTo(0, (e.scrollHeight - e.clientHeight) / 2))
       await page.waitForTimeout(500)
-      const middle = (await commitAt(page, 10))!
+      const middle = (await commitAt(page, under))!
       expect(Math.abs(middle - rows / 2)).toBeLessThan(rows / 100)
-      // Bring that row's top edge to the view's, so whole rows can be counted from it.
+      // Bring a row's top edge to just under the pinned day line, so whole rows can be counted.
       await page.keyboard.press('ArrowUp')
       await page.keyboard.press('ArrowUp')
       await page.keyboard.press('ArrowDown')
-      const from = (await selected(page))!
-      const at = (await commitAt(page, 10))!
+      const at = (await commitAt(page, under))!
       await page.mouse.move(box.x + 300, box.y + 100)
       await page.mouse.wheel(0, 600)
       await settle()
-      expect(await commitAt(page, 10)).toBe(at + 20)
+      // Twenty rows of 30, or nineteen and a day line if midnight falls among them.
+      const down = (await commitAt(page, under))!
+      expect([at + 19, at + 20]).toContain(down)
       await page.mouse.move(box.x + 300, box.y + 100)
       await page.mouse.wheel(0, -1200)
       await settle()
-      expect(await commitAt(page, 10)).toBe(at - 20)
-      expect(from).toBeGreaterThan(0)
+      const up = (await commitAt(page, under))!
+      expect(up).toBeGreaterThanOrEqual(at - 21)
+      expect(up).toBeLessThanOrEqual(at - 19)
     })
 
     test('the arrow keys keep the selection in view a row at a time', async ({ page }) => {
@@ -630,8 +753,8 @@ test.describe('commit graph', () => {
     test('a commit the person selected stays selected, and only the view moves', async ({ page }) => {
       await ready(page, 200)
       const box = (await page.locator('.scroller').boundingBox())!
-      // The fourth row: one that starts a run, then two that carry it on, are above it.
-      await page.mouse.click(box.x + 300, box.y + 52 + 2 * 30 + 15)
+      // The fourth row: the day line, one that starts a run, then two that carry it on, are above it.
+      await page.mouse.click(box.x + 300, box.y + 26 + 52 + 2 * 30 + 15)
       await expect.poll(async () => (await events(page, 'select')).at(-1)?.[0]).toMatchObject({ index: 3 })
       await acted(page)
       await reloadAt(page, 150, [150])
@@ -689,9 +812,9 @@ test.describe('commit graph', () => {
     /** The note mark's slot on a row: 28px left of the SHA column, on the subject's line. */
     const slot = async (page: Page, row: number) => {
       const box = (await page.locator('.scroller').boundingBox())!
-      // The first row starts a run: two lines, the mark on the first. The stub's other commits
-      // carry it on: one line each, 30 tall.
-      const y = row === 0 ? 19 : 52 + (row - 1) * 30 + 15
+      // Under the day line (26), the first row starts a run: two lines, the mark on the first.
+      // The stub's other commits carry it on: one line each, 30 tall.
+      const y = 26 + (row === 0 ? 19 : 52 + (row - 1) * 30 + 15)
       return { x: box.x + box.width - 76 - 28, y: box.y + y, left: box.width - 76 - 28 - 8, top: y - 8 }
     }
     /** How much ink is in a row's slot. */
@@ -782,7 +905,8 @@ test.describe('commit graph', () => {
     /** The first row's labels, in the label column. */
     const overLabels = async (page: Page) => {
       const box = (await page.locator('.scroller').boundingBox())!
-      return { x: box.x + 30, y: box.y + 26 }
+      // The middle of the first commit's row, which is under the day line.
+      return { x: box.x + 30, y: box.y + 26 + 26 }
     }
     const ready = async (page: Page) => {
       await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '5')
