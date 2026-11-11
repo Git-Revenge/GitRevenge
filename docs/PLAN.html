@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="generator" content="Docusaurus v3.10.2">
 <title data-rh="true">Git Revenge — Plan | Git Revenge</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" name="twitter:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" property="og:url" content="https://gitrevenge.com/docs/PLAN"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Git Revenge — Plan | Git Revenge"><meta data-rh="true" name="description" content="Git Revenge is a fast, local-only desktop git client. It has a Go backend and is built to handle multiple repos, including very large ones."><meta data-rh="true" property="og:description" content="Git Revenge is a fast, local-only desktop git client. It has a Go backend and is built to handle multiple repos, including very large ones."><link data-rh="true" rel="icon" href="/img/favicon.svg"><link data-rh="true" rel="canonical" href="https://gitrevenge.com/docs/PLAN"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/PLAN" hreflang="en"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/PLAN" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Plan","item":"https://gitrevenge.com/docs/PLAN"}]}</script><link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&amp;family=Caveat:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Crimson+Pro:ital,wght@0,400;0,500;0,600;1,400;1,500&amp;display=swap"><link rel="stylesheet" href="/assets/css/styles.9b150b80.css">
-<script src="/assets/js/runtime~main.b89fcb4c.js" defer="defer"></script>
-<script src="/assets/js/main.14080a73.js" defer="defer"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&amp;family=Caveat:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Crimson+Pro:ital,wght@0,400;0,500;0,600;1,400;1,500&amp;display=swap"><link rel="stylesheet" href="/assets/css/styles.ab712c4c.css">
+<script src="/assets/js/runtime~main.4bb6db54.js" defer="defer"></script>
+<script src="/assets/js/main.f26e73aa.js" defer="defer"></script>
 </head>
 <body>
 <svg style="display: none;"><defs>
@@ -128,15 +128,20 @@
 <li class="">Clone and init.</li>
 <li class="">Command palette, keyboard shortcuts, and light/dark themes.</li>
 </ul>
-<p><strong>Later (1.1+):</strong></p>
+<p><strong>Added since (milestones 0.7 to 0.11):</strong></p>
 <ul>
-<li class="">Worktrees.</li>
-<li class="">Bisect UI.</li>
+<li class="">Insights for sprint reviews, rendered file previews, and a Git Config editor.</li>
+<li class="">Branch care: branch kinds, hidden branches, cleanup after a pull, notes syncing, and stacked branches.</li>
+<li class="">Worktrees, and signature verification badges.</li>
+<li class="">Linux packages.</li>
+<li class="">Ignore rules, smart links, bisect, and previews of a merge or rebase before it runs.</li>
+</ul>
+<p><strong>Later:</strong></p>
+<ul>
 <li class="">Hooks UI.</li>
 <li class="">Gitflow.</li>
 <li class="">An integrated terminal.</li>
 <li class="">A setup UI for partial clone and sparse checkout. The app still works on repos that already use them.</li>
-<li class="">Signature verification badges.</li>
 </ul>
 <h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="performance-targets">Performance targets<a href="#performance-targets" class="hash-link" aria-label="Direct link to Performance targets" title="Direct link to Performance targets" translate="no">​</a></h2>
 <p>The reference repo is the Linux kernel (about 1.3M commits and 90k files).</p>
@@ -257,7 +262,13 @@
 <li class=""><strong>0.4.0 History rewriting:</strong> interactive rebase, reset, revert, undo/redo, conflict tool.</li>
 <li class=""><strong>0.5.0 Multi-repo &amp; extras:</strong> project groups and dashboard, LFS, submodules, file history and blame, clone and init.</li>
 <li class=""><strong>0.6.0 Polish:</strong> visual design, themes, command palette, shortcuts, word wrap, perf pass, update check, signed releases.</li>
+<li class=""><strong>0.7.0 Insights:</strong> Insights, rendered previews, the Git Config editor, settings.</li>
+<li class=""><strong>0.8.0 UI touch:</strong> one button family and motion, and branch care: kinds, cleanup, notes syncing, stacks.</li>
+<li class=""><strong>0.9.0 Use testing and cleanup:</strong> a new sidebar and fixes from daily use, followed by 0.9.1.</li>
+<li class=""><strong>0.10.0 Linux:</strong> Linux as a first-class platform, with <code>.deb</code> and <code>.rpm</code> packages.</li>
+<li class=""><strong>0.11.0 Git tools:</strong> ignore rules, smart links, bisect, merge and rebase previews, a rebuilt rebase editor and conflict tool, and a second pass on the graph.</li>
 </ol>
+<p><a href="https://github.com/Git-Revenge/GitRevenge/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer" class="">CHANGELOG.md</a> says what each release changed.</p>
 <p>Each feature area has an epic issue. Its tasks are tracked as sub-issues, each sized for one PR.</p>
 <h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="workflow">Workflow<a href="#workflow" class="hash-link" aria-label="Direct link to Workflow" title="Direct link to Workflow" translate="no">​</a></h2>
 <ul>
@@ -279,7 +290,8 @@
 <li class=""><strong>Builds.</strong> A GitHub Actions workflow is triggered by <code>v*</code> tags.
 <ul>
 <li class="">Windows: an NSIS installer, unsigned for now.</li>
-<li class="">macOS: a universal <code>.dmg</code>, signed and notarized with the maintainer&#x27;s Apple Developer account.</li>
+<li class="">macOS: a universal <code>.dmg</code>, signed and notarized with the maintainer&#x27;s Apple Developer account. A Homebrew tap (<code>git-revenge/tap</code>) follows the latest release.</li>
+<li class="">Linux: a <code>.deb</code> for Ubuntu and Debian, and an <code>.rpm</code> each for RHEL 9 and RHEL 10. They&#x27;re unsigned, and there&#x27;s no apt or dnf repository yet.</li>
 </ul>
 </li>
 <li class=""><strong>Update check.</strong> At startup the app asks the GitHub API for the latest release (no identifiers beyond a User-Agent) and shows a banner with a download link when it&#x27;s a newer semver version. A dismissed version isn&#x27;t announced again. The startup check can be turned off from the command palette; &quot;Check for updates&quot; always runs. There is no auto-update.</li>
