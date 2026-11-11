@@ -5,11 +5,25 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/gittest"
 	"github.com/git-revenge/gitrevenge/internal/settings"
 )
+
+// waitIdle waits for the background work the app has started so far, such as the settings
+// read that opening a repository sets off. It doesn't wait on the app's WaitGroup: the file
+// watcher can start more work at any moment, and adding to a group while it's waited on is a
+// data race (issue #639). Only Shutdown, which stops new work first, may do that.
+func waitIdle(t *testing.T, a *App) {
+	t.Helper()
+	for deadline := time.Now().Add(30 * time.Second); !a.idle(); time.Sleep(2 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("background work didn't finish")
+		}
+	}
+}
 
 // openForConfig opens a fresh repository in a test app with a global config of its own, and
 // waits for the settings read that opening starts.
@@ -23,7 +37,7 @@ func openForConfig(t *testing.T) (*App, *gittest.Repo, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a.background.Wait()
+	waitIdle(t, a)
 	return a, fx, tab.Path
 }
 

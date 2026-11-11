@@ -53,6 +53,10 @@ type App struct {
 	background   sync.WaitGroup
 	backgroundMu sync.Mutex
 	closing      bool
+	// running is how much of that work hasn't finished, under backgroundMu. The group can
+	// only be waited on once nothing more will be added, which is Shutdown; anything that
+	// wants to know the work so far is done, while more may still start, reads this.
+	running int
 }
 
 // inBackground runs fn off the caller's path, unless the app is shutting down. Shutdown
@@ -64,11 +68,24 @@ func (a *App) inBackground(fn func()) {
 		return
 	}
 	a.background.Add(1)
+	a.running++
 	a.backgroundMu.Unlock()
 	go func() {
 		defer a.background.Done()
+		defer func() {
+			a.backgroundMu.Lock()
+			a.running--
+			a.backgroundMu.Unlock()
+		}()
 		fn()
 	}()
+}
+
+// idle reports whether no background work is running. More can start straight after.
+func (a *App) idle() bool {
+	a.backgroundMu.Lock()
+	defer a.backgroundMu.Unlock()
+	return a.running == 0
 }
 
 // Environment reports the git installation the app will use.
