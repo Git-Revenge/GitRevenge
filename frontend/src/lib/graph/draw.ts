@@ -175,6 +175,96 @@ export interface DayLine {
   stuck?: boolean
 }
 
+/** The lanes that reach a commit, drawn on through a row above it that isn't a commit, so the
+ * graph isn't cut there: each as it is at the commit's top edge. */
+function drawPassing(ctx: CanvasRenderingContext2D, below: Row, near: Near, y: number, h: number, lay: Layout) {
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(lay.refW, y, lay.graphW, h)
+  ctx.clip()
+  ctx.lineCap = 'butt'
+  for (const s of below.up) {
+    const x = lay.refW + laneX(s.from - lay.firstLane, lay.m)
+    const active = s.kind === 'trunk' || laneActive(s.from, below, near)
+    ctx.globalAlpha = (s.kind === 'docs' ? MUTED : 1) * (active ? 1 : QUIET_ALPHA)
+    ctx.lineWidth = active ? LINE_WIDTH : QUIET_WIDTH
+    ctx.strokeStyle = laneColor(s.color)
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.lineTo(x, y + h)
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
+/** How tall a fold's line is: a lane's machine commits of one day, as one row. */
+export const FOLD_H = 28
+
+/** A fold's line. */
+export interface FoldLine {
+  /** "11 Docs commits". */
+  label: string
+  /** When the newest was made. */
+  last: number
+  open: boolean
+  /** How strongly the row is washed as hovered, 0 to 1. */
+  hovered?: number
+}
+
+/** Draws a fold's line with its top edge at y, above `below`, the newest commit it holds: a
+ * small node on the lane, a caret that says whether it's open, the count, and when the newest
+ * was made. */
+export function drawFoldLine(ctx: CanvasRenderingContext2D, fold: FoldLine, y: number, lay: Layout, theme: Theme, below: Row, near: Near = {}) {
+  const mid = y + FOLD_H / 2
+  ctx.save()
+  if (fold.hovered) {
+    ctx.globalAlpha = Math.min(1, fold.hovered)
+    ctx.fillStyle = theme.hover
+    ctx.fillRect(0, y, lay.width, FOLD_H)
+    ctx.globalAlpha = 1
+  }
+  drawPassing(ctx, below, near, y, FOLD_H, lay)
+  // A stub of a node on the lane, so the branch is still in the picture.
+  const x = lay.refW + laneX(below.col - lay.firstLane, lay.m)
+  if (x >= lay.refW && x <= lay.refW + lay.graphW) {
+    disc(ctx, x, mid, 5, theme.bg)
+    ctx.globalAlpha = below.kind === 'docs' ? MUTED + 0.2 : 0.7
+    disc(ctx, x, mid, 3, laneColor(below.color))
+    ctx.globalAlpha = 1
+  }
+  // The caret: pointing right when closed, down when open.
+  const cx = lay.textX + 5
+  ctx.strokeStyle = theme.muted
+  ctx.lineWidth = 1.6
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.beginPath()
+  if (fold.open) {
+    ctx.moveTo(cx - 4, mid - 2)
+    ctx.lineTo(cx, mid + 2)
+    ctx.lineTo(cx + 4, mid - 2)
+  } else {
+    ctx.moveTo(cx - 2, mid - 4)
+    ctx.lineTo(cx + 2, mid)
+    ctx.lineTo(cx - 2, mid + 4)
+  }
+  ctx.stroke()
+  ctx.textBaseline = 'middle'
+  // When, at the end of the line, where a run's time is.
+  const right = (lay.authorW ? lay.authorX - 22 : lay.dateW ? lay.dateX - 22 : lay.shaX - MARKS_W) - 4
+  const time = `last ${timeLabel(fold.last).toLowerCase()}`
+  setFont(ctx, `13px ${SERIF}`)
+  ctx.fillStyle = theme.faint
+  ctx.textAlign = 'right'
+  ctx.fillText(time, right, mid)
+  ctx.textAlign = 'left'
+  const left = lay.textX + 16
+  setFont(ctx, `italic 13px ${SERIF}`)
+  ctx.fillStyle = theme.muted
+  ctx.fillText(clip(ctx, fold.label, right - ctx.measureText(time).width - 14 - left), left, mid)
+  ctx.restore()
+}
+
 /** Draws a day line with its top edge at y. `below` is the commit under it, whose lanes run on
  * through the line so the graph isn't cut every day; a stuck line covers them instead. */
 export function drawDayLine(ctx: CanvasRenderingContext2D, day: DayLine, y: number, lay: Layout, theme: Theme, below?: Row, near: Near = {}) {
@@ -188,24 +278,7 @@ export function drawDayLine(ctx: CanvasRenderingContext2D, day: DayLine, y: numb
     ctx.fillRect(0, y, lay.width, DAY_H)
     ctx.globalAlpha = 1
   } else if (below) {
-    // The lanes that reach the commit below pass through, drawn as they are at its top edge.
-    ctx.save()
-    ctx.beginPath()
-    ctx.rect(lay.refW, y, lay.graphW, DAY_H)
-    ctx.clip()
-    ctx.lineCap = 'butt'
-    for (const s of below.up) {
-      const x = lay.refW + laneX(s.from - lay.firstLane, lay.m)
-      const active = s.kind === 'trunk' || laneActive(s.from, below, near)
-      ctx.globalAlpha = (s.kind === 'docs' ? MUTED : 1) * (active ? 1 : QUIET_ALPHA)
-      ctx.lineWidth = active ? LINE_WIDTH : QUIET_WIDTH
-      ctx.strokeStyle = laneColor(s.color)
-      ctx.beginPath()
-      ctx.moveTo(x, y)
-      ctx.lineTo(x, y + DAY_H)
-      ctx.stroke()
-    }
-    ctx.restore()
+    drawPassing(ctx, below, near, y, DAY_H, lay)
   }
   ctx.textBaseline = 'middle'
   // The count, and anything new, at the right.

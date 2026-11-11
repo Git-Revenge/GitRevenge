@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { KINDS, kindFilterRows, type KindFilterRow } from '../branchKinds'
+  import { foldingKinds, kindFilterRows, kindInfo, KINDS, type KindFilterRow, type KindView } from '../branchKinds'
+  import { foldDay, foldedAway, foldLabel, type Fold } from './folds'
   import { errorText } from '../errors'
   import { onMount, tick, untrack, type Snippet } from 'svelte'
   import { ALONE_STEPS, searchPlaceholder, SQUEEZE, squeezeFor } from '../barSqueeze'
-  import { ArrivedCommits, CommitNotes, CommitRow, CommitSignatures, GraphFocus, HeadCommit, OwnMoveAge, GraphRows, NotedCommits, Refs, RepoPreferences, SearchGraph, SetGraphFocus, SetKindVisible } from '../../../wailsjs/go/app/App.js'
+  import { ArrivedCommits, CommitNotes, CommitRow, CommitSignatures, GraphFocus, HeadCommit, OwnMoveAge, GraphRows, NotedCommits, Refs, RepoPreferences, SearchGraph, SetGraphFocus, SetKindView } from '../../../wailsjs/go/app/App.js'
   import { session } from '../session.svelte'
   import { ClipboardSetText, EventsOn } from '../../../wailsjs/runtime/runtime.js'
   import { theme as colorTheme } from '../theme.svelte'
@@ -12,11 +13,11 @@
   import { DUR, easeInk, fadeUp, labelsFold, labelsUnfold, menuOut, reducedMotion, stagger } from '../ui/motion'
   import KindFilter from './KindFilter.svelte'
   import RefChip from './RefChip.svelte'
-  import { bisectRow, DAY_H, dayCountLabel, dayLineLabel, dayLineSpoken, drawDayLine, drawRow, FOLLOWER_H, gapLabel, sameDay, sealOf, startsRun, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
+  import { bisectRow, DAY_H, dayCountLabel, dayLineLabel, dayLineSpoken, drawDayLine, drawFoldLine, drawRow, FOLD_H, FOLLOWER_H, gapLabel, sameDay, sealOf, startsRun, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { branchMove, headAway, headLabel, isOwnMove, LANDING, moveAnnouncement, tipsOf, type Tips } from './follow'
   import { loadLabelWidth, nextLabelWidth, REFIT_AFTER_MS, saveLabelWidth } from './labelColumn'
   import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
-  import { anchorAt, anchorFor, anchorForBottom, clampToEnd, compareAnchors, distance, endAnchor, layout, moveBy, ownHeight, position, rowAt as viewRowAt, START, stepSlots, yOf, type Anchor, type SlotRow, type Slots, type ViewRow } from './rows'
+  import { anchorAt, anchorFor, anchorForBottom, clampToEnd, compareAnchors, distance, endAnchor, layout, moveBy, ownHeight, position, rowAt as viewRowAt, START, yOf, type Anchor, type SlotRow, type Slots, type ViewRow } from './rows'
   import { scrollMap } from './scrollMap'
   import { Washes, landWash } from './tween'
   import type { BisectMarks } from '../bisect.svelte'
@@ -72,8 +73,25 @@
     ])
     remote = mainRemote(refs as Ref[])
     schedule()
-    kindRows = kindFilterRows(refs as Ref[], prefs?.hideKinds ?? [])
+    kindRows = kindFilterRows(refs as Ref[], prefs?.hideKinds ?? [], prefs?.showKinds ?? [], prefs?.foldableKinds ?? [])
+    foldKinds = foldingKinds(prefs?.foldableKinds ?? [], prefs?.showKinds ?? [])
+    schedule()
     return refs as Ref[]
+  }
+
+  /** The kinds whose lanes fold to a line a day (Bot and Docs, unless shown in full), and the
+   * folds opened this session, by their keys. Plain sets: the canvas repaints through schedule(). */
+  let foldKinds = new Set<string>()
+   
+  let openFolds = new Set<string>()
+
+  function toggleFold(fold: Fold, open = !openFolds.has(fold.key)) {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+    const next = new Set(openFolds)
+    if (open) next.add(fold.key)
+    else next.delete(fold.key)
+    openFolds = next
+    schedule()
   }
 
   /** Where the branches and HEAD were at the last reading, to tell what a reload moved. */
@@ -133,8 +151,8 @@
     scroller.focus()
   }
 
-  async function setKindVisible(kind: string, visible: boolean) {
-    await session.run(() => SetKindVisible(path, kind, visible))
+  async function setKindView(kind: string, view: KindView) {
+    await session.run(() => SetKindView(path, kind, view))
     await loadKinds()
   }
 
@@ -235,14 +253,22 @@
     rows(s: number) {
       if (slotRows?.h !== rowH) {
         const day: SlotRow = { kind: 'day', h: DAY_H }
-        const starter: SlotRow = { kind: 'commit', h: rowH }
-        const follower: SlotRow = { kind: 'commit', h: FOLLOWER_H }
-        // By whether the commit carries on a run, then whether it's the first of its day.
-        slotRows = { h: rowH, lead: [{ kind: 'lead', h: rowH }], rows: [[starter], [day, starter], [follower], [day, follower]] }
+        const fold: SlotRow = { kind: 'fold', h: FOLD_H }
+        // The commit's own row: one that starts a run, one that carries it on, one folded away.
+        const owns: SlotRow[] = [
+          { kind: 'commit', h: rowH },
+          { kind: 'commit', h: FOLLOWER_H },
+          { kind: 'commit', h: 0 },
+        ]
+        // By its own row, then whether it has its day's line above it, then its fold's.
+        const rows: SlotRow[][] = []
+        for (const own of owns) rows.push([own], [day, own], [fold, own], [day, fold, own])
+        slotRows = { h: rowH, lead: [{ kind: 'lead', h: rowH }], rows }
       }
       if (leadRows && s === 0) return slotRows.lead
       const i = s - leadRows
-      return slotRows.rows[(isFollower(i) ? 2 : 0) + (startsDay(i) ? 1 : 0)]
+      const own = isHidden(i) ? 2 : isFollower(i) ? 1 : 0
+      return slotRows.rows[own * 4 + (startsDay(i) ? 1 : 0) + (foldOf(i)?.head === i ? 2 : 0)]
     },
   }
   /** What's been worked out from the rows loaded, remembered until they change: the layout asks
@@ -255,17 +281,65 @@
     days: new Map<number, boolean>(),
     dayStarts: new Map<number, number>(),
     dayInfo: new Map<number, { commits: number; people: number; complete: boolean; arrived: number }>(),
+    folding: null as Set<string> | null,
+    /** Each day's folds by commit, by the day's first commit. */
+    folds: new Map<number, Map<number, Fold>>(),
   }
   function fresh() {
-    if (known.version === cache.version && known.density === density && known.arrived === arrived) return known
+    if (known.version === cache.version && known.density === density && known.arrived === arrived && known.folding === foldKinds) return known
     known.version = cache.version
     known.density = density
     known.arrived = arrived
+    known.folding = foldKinds
     known.followers.clear()
     known.days.clear()
     known.dayStarts.clear()
     known.dayInfo.clear()
+    known.folds.clear()
     return known
+  }
+  /** The fold commit i is in, if its lane folds: its lane's commits of the day as one line. It's
+   * null for a commit whose day isn't loaded back to its start, which shows until it is. */
+  function foldOf(i: number): Fold | null {
+    if (!foldKinds.size) return null
+    const row = cache.get(i)
+    if (!row?.kind || !foldKinds.has(row.kind)) return null
+    const start = dayStartOf(i)
+    if (start < 0) return null
+    const { folds } = fresh()
+    let day = folds.get(start)
+    if (!day) {
+      const first = cache.get(start)!
+      const commits = []
+      for (let k = start; k < span && commits.length < DAY_SCAN; k++) {
+        const r = cache.get(k)
+        if (!r || !sameDay(first.authorTime, r.authorTime)) break
+        commits.push({ index: k, kind: r.kind, col: r.col, authorTime: r.authorTime, labelled: cache.refsFor(r.id).length > 0 })
+      }
+      day = foldDay(commits, foldKinds)
+      folds.set(start, day)
+    }
+    return day.get(i) ?? null
+  }
+  /** Whether commit i is folded out of sight. The selected commit and search matches always
+   * show, so nothing is ever landed on that can't be seen. */
+  const isHidden = (i: number) => foldedAway(foldOf(i), openFolds, i === selected, matchRows.has(i))
+  /** Whether the keyboard can land on commit i: it shows, or it's the newest of a closed fold,
+   * which is how the fold is reached. Landing there shows it, under its fold's line. */
+  const canSelect = (i: number) => !isHidden(i) || foldOf(i)?.head === i
+  /** The commit `by` rows on from commit i among those the keyboard can land on. */
+  function stepCommits(i: number, by: number): number {
+    const dir = by < 0 ? -1 : 1
+    let at = i
+    let last = i
+    for (let left = Math.abs(by); left > 0; ) {
+      at += dir
+      if (at < 0 || at >= span) break
+      if (!canSelect(at)) continue
+      last = at
+      left--
+    }
+    return last
   }
   /** Whether commit i takes one line in the timeline: it carries on a run (see startsRun). A row
    * that isn't loaded is taken to start one, and so are all rows in compact, which has no runs. */
@@ -275,15 +349,26 @@
     let f = followers.get(i)
     if (f === undefined) {
       const row = cache.get(i)
-      f = !!row && !startsRun(row, { prev: cache.get(i - 1), prev2: cache.get(i - 2) }, cache.refsFor(row.id).some((r) => r.head))
+      // A run is judged by the rows around it that are somebody's work: commits on a folding
+      // lane, which mostly aren't showing, don't come between two commits of a run.
+      const above = foldOf(i) ? i - 1 : aboveUnfolded(i)
+      const above2 = foldOf(i) ? i - 2 : aboveUnfolded(above)
+      f = !!row && !startsRun(row, { prev: cache.get(above), prev2: cache.get(above2) }, cache.refsFor(row.id).some((r) => r.head))
       followers.set(i, f)
     }
     return f
   }
+  /** The nearest commit above commit i that isn't in a fold, or -1. */
+  function aboveUnfolded(i: number): number {
+    let k = i - 1
+    while (k >= 0 && foldOf(k)) k--
+    return k
+  }
   /** Whether commit i is the first of its day in the timeline, and so has the day's line above
    * it. Compact has no day lines: its When column dates every row. */
-  function startsDay(i: number): boolean {
-    if (density === 'compact') return false
+  const startsDay = (i: number) => density !== 'compact' && isDayStart(i)
+  /** Whether commit i is the first of its day, whichever the density: folds go by day in both. */
+  function isDayStart(i: number): boolean {
     const { days } = fresh()
     let d = days.get(i)
     if (d === undefined) {
@@ -309,7 +394,7 @@
         start = seen
         break
       }
-      if (startsDay(at)) {
+      if (isDayStart(at)) {
         start = at
         break
       }
@@ -336,6 +421,8 @@
         break
       }
       if (!sameDay(first.authorTime, row.authorTime)) break
+      // A folding lane's commits are counted on its fold's line, not here.
+      if (row.kind && foldKinds.has(row.kind)) continue
       commits++
       people.add(row.author)
       if (arrived.has(row.id)) came++
@@ -383,6 +470,14 @@
     const y = yOf(slots, anchor, slotOf(i), viewH, viewH * 3)
     return y ?? (slotOf(i) < anchor.index ? -FAR : FAR)
   }
+  /** The fold whose line is at a height in the view, if any. */
+  function foldAtY(y: number): Fold | null {
+    if (y < stuckH) return null
+    const r = viewRowAt(viewRows, y)
+    return r?.kind === 'fold' ? foldOf(commitOf(r.slot)) : null
+  }
+  /** The fold whose line the pointer is on, by its key. */
+  let hoveredFold = ''
   /** The commit whose row is at a height in the view, or -1. */
   function commitAtY(y: number): number {
     // The stuck day line covers the row under it.
@@ -694,6 +789,9 @@
   let matches = $state<number[]>([])
   let matchTotal = $state(0)
   let matchSet: Set<number> | null = null
+  /** The matches that came back, which always show even when their lane is folded. */
+   
+  let matchRows = new Set<number>()
   let searchSeq = 0
 
   const cache = new RowCache(
@@ -960,6 +1058,16 @@
       if (arriving) ctx.restore()
       if (span) labelSpans.set(i, span)
     }
+    // Each fold's line, above the newest commit it holds.
+    for (const r of viewRows) {
+      if (r.kind !== 'fold') continue
+      const i = commitOf(r.slot)
+      const fold = foldOf(i)
+      const below = cache.get(i)
+      if (!fold || !below) continue
+      const label = foldLabel(fold.count, kindInfo(fold.kind)?.label ?? fold.kind)
+      drawFoldLine(ctx, { label, last: fold.last, open: openFolds.has(fold.key), hovered: hoveredFold === fold.key ? 1 : 0 }, r.y, lay, th, below, { prev: cache.get(i - 1), next: cache.get(i + 1) })
+    }
     // The day lines: each in its place above its day's first commit, and the day of whatever
     // is at the top of the view pinned there, until the next day's line pushes it out.
     let nextStuck = 0
@@ -1194,6 +1302,7 @@
       matches = []
       matchTotal = 0
       matchSet = null
+      matchRows = new Set()
       schedule()
       return
     }
@@ -1202,6 +1311,7 @@
     matches = res.rows
     matchTotal = res.total
     matchSet = res.total === res.rows.length ? new Set(res.rows) : null
+    matchRows = new Set(res.rows)
     schedule()
   }
 
@@ -1273,7 +1383,13 @@
       e.preventDefault()
       const d = moves[e.key]
       // Rows that aren't commits, or that are folded away, are stepped over.
-      select(d === -Infinity ? 0 : d === Infinity ? span - 1 : selected < 0 ? 0 : Math.max(0, commitOf(stepSlots(slots, slotOf(selected), d))))
+      select(d === -Infinity ? 0 : d === Infinity ? span - 1 : selected < 0 ? 0 : stepCommits(selected, d))
+    } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      // On a commit in a fold: Right opens the fold, Left closes it.
+      const fold = selected >= 0 ? foldOf(selected) : null
+      if (!fold) return
+      e.preventDefault()
+      toggleFold(fold, e.key === 'ArrowRight')
     }
   }
 
@@ -1358,7 +1474,7 @@
     {:else}
       <span class="meta">{total.toLocaleString()} commits</span>
     {/if}
-    {#if kindRows.length}<KindFilter rows={kindRows} onToggle={setKindVisible} iconOnly={level >= SQUEEZE.network} />{/if}
+    {#if kindRows.length}<KindFilter rows={kindRows} onToggle={setKindView} iconOnly={level >= SQUEEZE.network} />{/if}
     {#if level < SQUEEZE.density}
     <span class="segmented" role="group" aria-label="Row density">
       <button class="icon" aria-pressed={density !== 'compact'} aria-label="Timeline" title="Timeline: two lines per commit, with authors" onclick={() => density === 'compact' && session.run(() => colorTheme.toggleDensity())}
@@ -1456,7 +1572,12 @@
       }}
       onclick={(e) => {
         const i = rowAt(e)
-        if (i < 0) return
+        if (i < 0) {
+          // A fold's line opens and closes it.
+          const fold = foldAtY(e.clientY - scroller.getBoundingClientRect().top)
+          if (fold) toggleFold(fold)
+          return
+        }
         select(i)
         // A click on the note mark also asks for the note itself.
         const row = cache.get(i)
@@ -1482,6 +1603,12 @@
           schedule()
         }
         pointer = { x: e.clientX, y: e.clientY }
+        const over = foldAtY(e.clientY - scroller.getBoundingClientRect().top)?.key ?? ''
+        if (over !== hoveredFold) {
+          hoveredFold = over
+          scroller.style.cursor = over ? 'pointer' : ''
+          schedule()
+        }
         updateExpanded()
         updateNoteCard()
       }}

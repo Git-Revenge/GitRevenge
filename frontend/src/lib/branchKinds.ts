@@ -37,17 +37,30 @@ export function kindWarning(name: string, kind: string | undefined, kinds: reado
   return `${name} is ${/^[AEIOU]/.test(info.label) ? 'an' : 'a'} ${info.label} branch.`
 }
 
+/** How the graph shows a kind's branches: in full, folded to a line a day, or not at all. */
+export type KindView = 'show' | 'fold' | 'hide'
+
 export interface KindFilterRow extends KindInfo {
   kind: Exclude<BranchKind, ''>
   hidden: boolean
+  /** The kind's lanes can fold to one line a day: machine commits, not somebody's work. */
+  foldable: boolean
+  /** They do, when they aren't hidden. */
+  folded: boolean
 }
 
 /** The Kinds filter's rows (ADR 0009): each kind the repository has branches of, or has
- * hidden, so one that's filtered out can always be brought back. */
-export function kindFilterRows(refs: readonly { branchKind?: string }[], hideKinds: readonly string[]): KindFilterRow[] {
+ * hidden, so one that's filtered out can always be brought back. A kind that can fold does
+ * unless it's among those shown in full. */
+export function kindFilterRows(refs: readonly { branchKind?: string }[], hideKinds: readonly string[], showKinds: readonly string[] = [], foldable: readonly string[] = []): KindFilterRow[] {
   const present = new Set(refs.map((r) => r.branchKind))
   const hidden = new Set(hideKinds)
   return (Object.keys(KINDS) as Exclude<BranchKind, ''>[])
     .filter((k) => present.has(k) || hidden.has(k))
-    .map((k) => ({ kind: k, ...KINDS[k], hidden: hidden.has(k) }))
+    .map((k) => ({ kind: k, ...KINDS[k], hidden: hidden.has(k), foldable: foldable.includes(k), folded: foldable.includes(k) && !showKinds.includes(k) }))
+}
+
+/** The kinds whose lanes fold, given the kinds that can and those shown in full instead. */
+export function foldingKinds(foldable: readonly string[], showKinds: readonly string[]): Set<string> {
+  return new Set(foldable.filter((k) => !showKinds.includes(k)))
 }

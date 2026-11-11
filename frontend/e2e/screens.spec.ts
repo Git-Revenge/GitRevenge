@@ -182,7 +182,7 @@ test.describe('commit graph', () => {
       const docs = page.getByRole('checkbox', { name: 'Docs' })
       await expect(docs).toBeChecked()
       await docs.click()
-      await expect.poll(() => calls(page, 'SetKindVisible')).toEqual([['/repo', 'docs', false]])
+      await expect.poll(() => calls(page, 'SetKindView')).toEqual([['/repo', 'docs', 'hide']])
     })
 
     test('says when a kind is filtered out, and can bring it back', async ({ page }) => {
@@ -193,7 +193,8 @@ test.describe('commit graph', () => {
       const docs = page.getByRole('checkbox', { name: 'Docs' })
       await expect(docs).not.toBeChecked()
       await docs.click()
-      await expect.poll(() => calls(page, 'SetKindVisible')).toEqual([['/repo', 'docs', true]])
+      // Brought back as it was: it doesn't fold here, since the stub names no kinds that do.
+      await expect.poll(() => calls(page, 'SetKindView')).toEqual([['/repo', 'docs', 'show']])
     })
 
     test('closes on Escape, handing focus back, and on a click elsewhere', async ({ page }) => {
@@ -436,6 +437,150 @@ test.describe('commit graph', () => {
       await page.mouse.wheel(0, -2000)
       await page.waitForTimeout(150)
       expect((await message.boundingBox())!.x).toBe(widened)
+    })
+  })
+
+  // #624: a Bot or Docs lane's commits take one line a day.
+  test.describe('folded lanes', () => {
+    const id = (i: number) => String(i).padStart(40, '0')
+    const noon = (daysAgo: number) => {
+      const d = new Date()
+      d.setHours(12, 0, 0, 0)
+      d.setDate(d.getDate() - daysAgo)
+      return Math.floor(d.getTime() / 1000)
+    }
+    // Newest first. Today: main, the docs lane's tip, then main and docs commits between each
+    // other. Yesterday: two more docs commits among main's.
+    const lanes = ['m', 'd', 'm', 'd', 'm', 'd', 'd', 'm', 'd', 'm', 'd', 'm', 'm', 'm']
+    const graphData = lanes.map((lane, i) => ({
+      index: i,
+      col: lane === 'd' ? 1 : 0,
+      color: lane === 'd' ? 1 : 0,
+      up: i ? [{ from: 0, to: 0, color: 0, kind: 'trunk' }, { from: 1, to: 1, color: 1, kind: 'docs' }] : [],
+      down: [{ from: 0, to: 0, color: 0, kind: 'trunk' }, { from: 1, to: 1, color: 1, kind: 'docs' }],
+      width: 2,
+      kind: lane === 'd' ? 'docs' : 'trunk',
+      id: id(i),
+      parents: 1,
+      author: lane === 'd' ? 'pages-bot' : 'Ana Cruz',
+      authorTime: (i < 8 ? noon(0) : noon(1)) - i * 60,
+      subject: lane === 'd' ? `Deploying to gh-pages ${i}` : `Commit ${i}`,
+    }))
+    const refs = [branch('main', { head: true, branchKind: 'trunk' }), branch('gh-pages', { branchKind: 'docs' })]
+    const graphRefs = { [id(0)]: [refs[0]], [id(1)]: [refs[1]] }
+    const prefs = { hide: [], hideKinds: [], showKinds: [], foldableKinds: ['bot', 'docs'], kinds: [] }
+    const scenario = (over: object = {}) => ({ graphData, graphRefs, responses: { Refs: refs, CommitSignatures: [], RepoPreferences: prefs, ...over } })
+    const ready = async (page: Page, over: object = {}) => {
+      await open(page, 'graph', scenario(over))
+      await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '14')
+      await expect(page.getByRole('button', { name: 'Kinds' })).toBeVisible()
+      await page.waitForTimeout(300)
+      await page.locator('.scroller').focus()
+    }
+    const selected = async (page: Page) => ((await events(page, 'select')).at(-1)?.[0] as { index: number } | undefined)?.index
+    const clickAt = async (page: Page, y: number) => {
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.click(box.x + 400, box.y + y)
+      return selected(page)
+    }
+    // Today, top to bottom: the day line (26), main's tip (52), the docs lane's tip (52: it
+    // carries the label, so it stays a row), commit 2 (30), the fold's line (28), commit 4 (30),
+    // commit 7 (30).
+    const FOLD = 26 + 52 + 52 + 30
+    const down = async (page: Page, times = 1) => {
+      for (let i = 0; i < times; i++) await page.keyboard.press('ArrowDown')
+      return selected(page)
+    }
+
+    test("a Docs lane's commits of the day are one line, which a click opens and closes", async ({ page }) => {
+      await ready(page)
+      // Under the fold's line is commit 4: commits 3, 5 and 6 are folded away.
+      expect(await clickAt(page, FOLD + 28 + 15)).toBe(4)
+      expect(await clickAt(page, FOLD + 28 + 30 + 15)).toBe(7)
+      // A click on the line selects nothing, and opens it: its commits take their rows.
+      const before = (await events(page, 'select')).length
+      await clickAt(page, FOLD + 14)
+      expect((await events(page, 'select')).length).toBe(before)
+      expect(await clickAt(page, FOLD + 28 + 15)).toBe(3)
+      expect(await clickAt(page, FOLD + 28 + 30 + 15)).toBe(4)
+      // And closes it again.
+      await clickAt(page, FOLD + 14)
+      expect(await clickAt(page, FOLD + 28 + 30 + 15)).toBe(7)
+    })
+
+    test('the keyboard lands on a fold, opens it with Right and closes it with Left', async ({ page }) => {
+      await ready(page)
+      expect(await clickAt(page, 26 + 52 + 52 + 15)).toBe(2)
+      // Down from commit 2 is the fold's newest commit, then past the rest to commit 4 and 7.
+      expect(await down(page)).toBe(3)
+      expect(await down(page)).toBe(4)
+      expect(await down(page)).toBe(7)
+      await page.keyboard.press('ArrowUp')
+      await page.keyboard.press('ArrowUp')
+      await expect.poll(() => selected(page)).toBe(3)
+      // Open: every commit of the fold is a row to step through.
+      await page.keyboard.press('ArrowRight')
+      expect(await down(page)).toBe(4)
+      expect(await down(page)).toBe(5)
+      expect(await down(page)).toBe(6)
+      // Closed again from inside it, the selected commit still shows, and the rest don't.
+      await page.keyboard.press('ArrowLeft')
+      expect(await down(page)).toBe(7)
+    })
+
+    test('a search match in a fold shows, so the search never lands on something hidden', async ({ page }) => {
+      await ready(page, { SearchGraph: { rows: [5], total: 1 } })
+      await page.getByRole('searchbox', { name: 'Search commits' }).fill('gh-pages 5')
+      await expect.poll(() => calls(page, 'SearchGraph')).toHaveLength(1)
+      await page.waitForTimeout(300)
+      await page.locator('.scroller').focus()
+      expect(await clickAt(page, 26 + 52 + 52 + 15)).toBe(2)
+      expect(await down(page)).toBe(3)
+      expect(await down(page)).toBe(4)
+      // Commit 5 is a match, so it has a row; commit 6 isn't, and stays folded.
+      expect(await down(page)).toBe(5)
+      expect(await down(page)).toBe(7)
+    })
+
+    test('the day counts the commits that are somebody\'s work', async ({ page }) => {
+      await ready(page)
+      expect(await clickAt(page, FOLD + 28 + 30 + 15)).toBe(7)
+      // Into yesterday: its fold's newest, commit 8, comes first.
+      expect(await down(page)).toBe(8)
+      // Four of yesterday's six commits are on main.
+      await expect(page.getByRole('status')).toHaveText(/^Yesterday, .+, 4 commits$/)
+    })
+
+    test('compact folds too', async ({ page }) => {
+      await ready(page)
+      await page.getByRole('button', { name: 'Compact' }).click()
+      await page.waitForTimeout(200)
+      await page.locator('.scroller').focus()
+      // Rows of 30: main's tip, the docs tip, commit 2, the fold's line (28), commit 4, commit 7.
+      expect(await clickAt(page, 2 * 30 + 15)).toBe(2)
+      expect(await clickAt(page, 3 * 30 + 28 + 15)).toBe(4)
+      expect(await clickAt(page, 3 * 30 + 28 + 30 + 15)).toBe(7)
+    })
+
+    test('the Kinds menu folds a lane or shows it in full, for kinds that fold', async ({ page }) => {
+      await ready(page)
+      await page.getByRole('button', { name: 'Kinds' }).click()
+      const fold = page.getByRole('button', { name: 'Fold Docs lanes to one line a day' })
+      await expect(fold).toHaveAttribute('aria-pressed', 'true')
+      await expect(page.getByRole('button', { name: /^Fold Trunk/ })).toHaveCount(0)
+      await fold.click()
+      await expect.poll(() => calls(page, 'SetKindView')).toEqual([['/repo', 'docs', 'show']])
+    })
+
+    test('a lane shown in full has no folds', async ({ page }) => {
+      await ready(page, { RepoPreferences: { ...prefs, showKinds: ['docs'] } })
+      // Where the fold's line was is commit 3, with a row like any other.
+      expect(await clickAt(page, 26 + 52 + 52 + 15)).toBe(2)
+      expect(await down(page)).toBe(3)
+      expect(await down(page)).toBe(4)
+      expect(await down(page)).toBe(5)
+      await page.getByRole('button', { name: 'Kinds' }).click()
+      await expect(page.getByRole('button', { name: 'Fold Docs lanes to one line a day' })).toHaveAttribute('aria-pressed', 'false')
     })
   })
 

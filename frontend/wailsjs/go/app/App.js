@@ -582,8 +582,8 @@ export function SetKeybindings(arg1) {
   return window['go']['app']['App']['SetKeybindings'](arg1);
 }
 
-export function SetKindVisible(arg1, arg2, arg3) {
-  return window['go']['app']['App']['SetKindVisible'](arg1, arg2, arg3);
+export function SetKindView(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SetKindView'](arg1, arg2, arg3);
 }
 
 export function SetPreferences(arg1) {
