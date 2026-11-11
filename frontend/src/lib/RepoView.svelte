@@ -57,6 +57,8 @@
   }
 
   let graph: GraphView
+  /** Counts clicks on a note mark in the graph, each one asking the commit panel for its notes. */
+  let noteAsk = $state(0)
   /** The bar stays on one line: as it narrows, its parts give way in steps. */
   let barWidth = $state(0)
   let barSqueeze = $derived(squeezeFor(barWidth, SHARED_STEPS))
@@ -274,7 +276,7 @@
     <!-- The graph stays mounted while a diff is open, so scroll position and selection
          survive returning to it. -->
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           openMenu(commitMenuItems(row, refs, ctx), x, y)}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
@@ -378,7 +380,7 @@
       onRevert={revertFound}
     />
   {:else if selected}
-    <CommitPanel {path} onMenu={openMenu} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} onReveal={revealCommit} onActions={(x, y) => selected && openMenu(commitMenuItems(selected, graph.refsOf(selected.id), ctx), x, y)} />
+    <CommitPanel {path} onMenu={openMenu} showNotes={noteAsk} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} onReveal={revealCommit} onActions={(x, y) => selected && openMenu(commitMenuItems(selected, graph.refsOf(selected.id), ctx), x, y)} />
   {/if}
     </div>
   {/if}

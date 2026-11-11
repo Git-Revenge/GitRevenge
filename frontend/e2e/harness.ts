@@ -160,7 +160,7 @@ const mounts = {
   async graph() {
     host.style.cssText = 'display:block;height:100vh'
     const { default: GraphView } = await import('../src/lib/graph/GraphView.svelte')
-    mount(GraphView, { target: host, props: { path: '/repo', onSelect: record('select'), onContext: (row: { index: number }) => win.__events.push(['context-row', row.index]), onDrop: record('drop') } })
+    mount(GraphView, { target: host, props: { path: '/repo', onSelect: record('select'), onNote: (row: { index: number }) => win.__events.push(['note', row.index]), onContext: (row: { index: number }) => win.__events.push(['context-row', row.index]), onDrop: record('drop') } })
   },
   async commitMenu() {
     const { default: ContextMenu } = await import('../src/lib/ContextMenu.svelte')

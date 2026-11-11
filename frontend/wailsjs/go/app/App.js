@@ -322,6 +322,10 @@ export function MergedBranches(arg1) {
   return window['go']['app']['App']['MergedBranches'](arg1);
 }
 
+export function NotedCommits(arg1) {
+  return window['go']['app']['App']['NotedCommits'](arg1);
+}
+
 export function OpenGitConfig(arg1) {
   return window['go']['app']['App']['OpenGitConfig'](arg1);
 }

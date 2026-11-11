@@ -437,6 +437,99 @@ test.describe('commit graph', () => {
     })
   })
 
+  // #620: a commit with a git note says so in the graph.
+  test.describe('note marks', () => {
+    const id = (i: number) => String(i).padStart(40, '0')
+    const notes = [
+      { ref: 'refs/notes/commits', text: 'Deployed to staging.\nTwice.' },
+      { ref: 'refs/notes/review', text: 'looks good' },
+    ]
+    const scenario = { graphRows: 5, responses: { Refs: [], CommitSignatures: [], NotedCommits: [id(1)], CommitNotes: notes, SearchGraph: { rows: [1], total: 1 } } }
+    /** The note mark's slot on a row: 28px left of the SHA column, on the subject's line. */
+    const slot = async (page: Page, row: number) => {
+      const box = (await page.locator('.scroller').boundingBox())!
+      return { x: box.x + box.width - 76 - 28, y: box.y + row * 52 + 19, left: box.width - 76 - 28 - 8, top: row * 52 + 19 - 8 }
+    }
+    /** How much ink is in a row's slot. */
+    const inkIn = async (page: Page, row: number) => {
+      const s = await slot(page, row)
+      return page.locator('canvas').evaluate(
+        (el, [x, y]) => {
+          const dpr = window.devicePixelRatio || 1
+          const data = (el as HTMLCanvasElement).getContext('2d')!.getImageData(x * dpr, y * dpr, 16 * dpr, 16 * dpr).data
+          let ink = 0
+          for (let i = 3; i < data.length; i += 4) ink += data[i]
+          return ink
+        },
+        [s.left, s.top],
+      )
+    }
+    const ready = async (page: Page) => {
+      await open(page, 'graph', scenario)
+      await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '5')
+      await expect.poll(() => calls(page, 'NotedCommits')).toContainEqual(['/repo'])
+    }
+
+    test('a commit with a note wears a mark beside the SHA, and one without has none', async ({ page }) => {
+      await ready(page)
+      // Row 0 is selected, so compare two plain rows.
+      await expect.poll(() => inkIn(page, 1)).toBeGreaterThan(0)
+      expect(await inkIn(page, 2)).toBe(0)
+    })
+
+    test('hovering the mark shows the notes, naming a ref that is not the default', async ({ page }) => {
+      await ready(page)
+      await expect.poll(() => inkIn(page, 1)).toBeGreaterThan(0)
+      const s = await slot(page, 1)
+      await page.mouse.move(s.x, s.y)
+      const card = page.locator('.note-card')
+      await expect(card).toContainText('Deployed to staging.')
+      await expect(card).toContainText('looks good')
+      await expect(card.locator('.ref')).toHaveText(['review'])
+      expect(await calls(page, 'CommitNotes')).toContainEqual(['/repo', id(1)])
+      // It never takes the pointer, and goes when the pointer leaves the mark.
+      expect(await card.evaluate((e) => getComputedStyle(e).pointerEvents)).toBe('none')
+      await page.mouse.move(s.x - 200, s.y)
+      await expect(card).toHaveCount(0)
+      // A row with no note has nothing to show.
+      const other = await slot(page, 2)
+      await page.mouse.move(other.x, other.y)
+      await page.waitForTimeout(100)
+      await expect(card).toHaveCount(0)
+    })
+
+    test('clicking the mark selects the commit and asks for its note', async ({ page }) => {
+      await ready(page)
+      await expect.poll(() => inkIn(page, 1)).toBeGreaterThan(0)
+      const s = await slot(page, 1)
+      await page.mouse.click(s.x, s.y)
+      await expect.poll(async () => (await events(page, 'note')).at(-1)?.[0]).toBe(1)
+      // A click elsewhere on the row only selects it.
+      await page.mouse.click(s.x - 300, s.y + 52)
+      await page.waitForTimeout(100)
+      expect((await events(page, 'note')).length).toBe(1)
+    })
+
+    test('the marks follow the notes when the graph reloads', async ({ page }) => {
+      await ready(page)
+      await expect.poll(() => inkIn(page, 1)).toBeGreaterThan(0)
+      await page.evaluate((noted) => {
+        const w = window as unknown as { __respond: (r: object) => void; __emit: (n: string, d: object) => void }
+        w.__respond({ NotedCommits: noted })
+        w.__emit('graph:progress', { path: '/repo', rows: 5, done: true, paused: false, estimate: 5 })
+      }, [id(2)])
+      await expect.poll(() => inkIn(page, 2)).toBeGreaterThan(0)
+      expect(await inkIn(page, 1)).toBe(0)
+    })
+
+    test('has:note is sent to the search as typed', async ({ page }) => {
+      await ready(page)
+      await page.getByRole('searchbox', { name: 'Search commits' }).fill('has:note')
+      await expect.poll(() => calls(page, 'SearchGraph')).toContainEqual(['/repo', 'has:note'])
+      await expect(page.getByText('1 of 1').or(page.getByText(/^1$/))).toBeVisible()
+    })
+  })
+
   // #418: +N didn't say what it was hiding.
   test.describe('hovering over labels', () => {
     const id = '0'.repeat(40)

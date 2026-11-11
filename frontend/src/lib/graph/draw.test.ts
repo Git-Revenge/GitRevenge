@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clip, DATE_COLUMN, middleCut, fitLabelColumn, LABEL_COLUMN, labelColumnNeed, moreLabels, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine, bisectRow } from './draw'
+import { clip, DATE_COLUMN, noteMarkSpan, middleCut, fitLabelColumn, LABEL_COLUMN, labelColumnNeed, moreLabels, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine, bisectRow } from './draw'
 import type { Ref, Row } from './rowCache'
 
 describe('graph geometry', () => {
@@ -58,6 +58,18 @@ describe('columns', () => {
     const longestDate = 'Sep 17, 2024'.length * monoCharWidth
     const sealRadius = 5.5
     expect(DATE_COLUMN - longestDate - (SEAL_OFFSET + sealRadius)).toBeGreaterThanOrEqual(8)
+  })
+
+  // #620: a note's mark has a slot of its own, left of the seal's.
+  it("leaves room for a note's mark after the longest date, clear of the seal", () => {
+    const monoCharWidth = 7.3
+    const longestDate = 'Sep 17, 2024'.length * monoCharWidth
+    const lay = layoutColumns(1200, 100, 'compact')
+    const [from, to] = noteMarkSpan(lay)
+    expect(from - (lay.dateX + longestDate)).toBeGreaterThanOrEqual(8)
+    // The slot ends before the seal's ring begins.
+    expect(to).toBeLessThanOrEqual(lay.shaX - SEAL_OFFSET - 5.5 + 2.5)
+    expect(to - from).toBeGreaterThanOrEqual(16)
   })
 
   it('drops the date before the author as the window narrows', () => {

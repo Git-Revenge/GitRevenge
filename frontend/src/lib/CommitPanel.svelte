@@ -31,7 +31,10 @@
     current,
     onSearch,
     onMenu,
+    showNotes = 0,
   }: {
+    /** Goes up each time the graph's note mark is clicked: the notes come into view. */
+    showNotes?: number
     /** Opens a menu at this position, such as a smart link's. */
     onMenu?: (items: MenuItem[], x: number, y: number) => void
     path: string
@@ -157,6 +160,21 @@
   let noteBusy = $state(false)
   const DEFAULT_NOTES = 'refs/notes/commits'
   let ownNote = $derived(notes.find((n) => n.ref === DEFAULT_NOTES))
+  /** The notes, to bring into view when the graph's note mark asks for them. */
+  let notesEl = $state<HTMLElement>()
+  let notesAsked = 0
+  let notesShown = 0
+  $effect(() => {
+    if (!showNotes) return
+    // The notes are on the Details tab. Going there for a note isn't a choice of tab to keep.
+    if (showNotes !== notesAsked) {
+      notesAsked = showNotes
+      chosenTab = 'details'
+    }
+    if (showNotes === notesShown || !notes.length || !notesEl) return
+    notesShown = showNotes
+    notesEl.scrollIntoView({ block: 'nearest' })
+  })
 
   async function loadNotes(id: string) {
     try {
@@ -466,7 +484,7 @@
               </dd>
             {/if}
             <dt class="meta">Notes</dt>
-            <dd class="notes">
+            <dd class="notes" bind:this={notesEl}>
               {#if notesError}<p class="muted" role="alert">Couldn't read notes: {notesError}</p>{/if}
               {#each notes as n (n.ref)}
                 {#if !(n.ref === DEFAULT_NOTES && noteDraft !== null)}
