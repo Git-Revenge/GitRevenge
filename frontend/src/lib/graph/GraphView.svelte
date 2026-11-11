@@ -12,7 +12,7 @@
   import { DUR, easeInk, fadeUp, labelsFold, labelsUnfold, menuOut, reducedMotion, stagger } from '../ui/motion'
   import KindFilter from './KindFilter.svelte'
   import RefChip from './RefChip.svelte'
-  import { bisectRow, drawRow, sealOf, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
+  import { bisectRow, drawRow, FOLLOWER_H, sealOf, startsRun, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { branchMove, headAway, headLabel, isOwnMove, LANDING, moveAnnouncement, tipsOf, type Tips } from './follow'
   import { loadLabelWidth, nextLabelWidth, REFIT_AFTER_MS, saveLabelWidth } from './labelColumn'
   import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
@@ -227,18 +227,43 @@
    * commit. Every commit's row is the density's height for now; the slots are where a row of
    * another height, or one that isn't a commit, is said.
    */
-  let slotRows: { h: number; lead: SlotRow[]; commit: SlotRow[] } | null = null
+  let slotRows: { h: number; lead: SlotRow[]; commit: SlotRow[]; follower: SlotRow[] } | null = null
   const slots: Slots = {
     get count() {
       return span + leadRows
     },
     rows(s: number) {
-      if (slotRows?.h !== rowH) slotRows = { h: rowH, lead: [{ kind: 'lead', h: rowH }], commit: [{ kind: 'commit', h: rowH }] }
-      return leadRows && s === 0 ? slotRows.lead : slotRows.commit
+      if (slotRows?.h !== rowH) slotRows = { h: rowH, lead: [{ kind: 'lead', h: rowH }], commit: [{ kind: 'commit', h: rowH }], follower: [{ kind: 'commit', h: FOLLOWER_H }] }
+      if (leadRows && s === 0) return slotRows.lead
+      return isFollower(s - leadRows) ? slotRows.follower : slotRows.commit
     },
   }
-  /** Whether every row is one height, so the browser's own scrolling moves through them evenly. */
-  const evenRows = true
+  /** Which commits carry on a run, as worked out from the rows loaded: remembered until the
+   * rows change, since the layout asks about the same commits many times a frame. */
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const followers = new Map<number, boolean>()
+  let followersOf = { version: -1, density: '' }
+  /** Whether commit i takes one line in the timeline: it carries on a run (see startsRun). A row
+   * that isn't loaded is taken to start one, and so are all rows in compact, which has no runs. */
+  function isFollower(i: number): boolean {
+    if (density === 'compact') return false
+    if (followersOf.version !== cache.version || followersOf.density !== density) {
+      followers.clear()
+      followersOf = { version: cache.version, density }
+    }
+    let f = followers.get(i)
+    if (f === undefined) {
+      const row = cache.get(i)
+      f = !!row && !startsRun(row, { prev: cache.get(i - 1), prev2: cache.get(i - 2) }, cache.refsFor(row.id).some((r) => r.head))
+      followers.set(i, f)
+    }
+    return f
+  }
+  /** Whether every row is one height, so the browser's own scrolling moves through them evenly:
+   * true of compact, never of the timeline. */
+  let evenRows = $derived(density === 'compact')
+  /** How tall commit i's row is. */
+  const heightOf = (i: number) => ownHeight(slots, slotOf(i))
   /** A commit's slot, and a slot's commit (-1 for the lead row's). */
   const slotOf = (i: number) => i + leadRows
   const commitOf = (slot: number) => slot - leadRows
@@ -289,6 +314,7 @@
 
   /** Puts the view's top edge at an anchor, kept inside the history. */
   function setAnchor(a: Anchor) {
+    coasting = 0
     anchor = clampToEnd(slots, a, viewHeight())
     placeScroller()
     schedule()
@@ -312,6 +338,7 @@
     // A scroll that isn't ours is the person's, on the scrollbar or the wheel: it ends any
     // glide, and the view goes as far through the slots as the scrollbar is down its track.
     glide = null
+    coasting = 0
     const range = scrollRange()
     anchor = range > 0 ? clampToEnd(slots, anchorAt(slots, (scroller.scrollTop / range) * endPosition()), viewHeight()) : START
     schedule()
@@ -323,8 +350,22 @@
     if ((map.ratio === 1 && evenRows) || e.ctrlKey) return
     e.preventDefault()
     const unit = e.deltaMode === 1 ? rowH : e.deltaMode === 2 ? viewH : 1
-    scrollBy(e.deltaY * unit)
+    const dy = e.deltaY * unit
+    // A wheel's notch is a jump of a hundred px or so, which the browser would have eased; a
+    // touchpad sends many small moves, which are taken as they come.
+    if (Math.abs(dy) < WHEEL_STEP || reducedMotion()) scrollBy(dy)
+    else {
+      glide = null
+      coasting += dy
+      schedule()
+    }
   }
+  /** What's left to scroll of the wheel notches taken so far, eased out over the next frames. */
+  let coasting = 0
+  /** A wheel move this big or bigger is a notch, not a touchpad's stream. */
+  const WHEEL_STEP = 50
+  /** The share of what's left that each frame takes. */
+  const COAST = 0.28
 
   // Keep the scrollbar in step as the history's height changes while loading.
   $effect(() => {
@@ -389,7 +430,7 @@
     select(index)
     const labels = refLabels(cache.refsFor(row.id), remote)
     const height = Math.min(labels.length, EXPANDED_REFS + 1) * CHIP_STEP + EXPAND_PAD * 2
-    const place = Math.round(relY(index) + (rowH - CHIP_STEP) / 2 - EXPAND_PAD)
+    const place = Math.round(relY(index) + (heightOf(index) - CHIP_STEP) / 2 - EXPAND_PAD)
     pinned = { index, top: Math.max(0, Math.min(place, viewH - height)), labels, lane: laneVar(row.color) }
   }
   // Opening the list moves the focus into it, so the next key is on its first label.
@@ -434,7 +475,7 @@
     }
     const labels = refLabels(cache.refsFor(row.id), remote)
     const height = Math.min(labels.length, EXPANDED_REFS + 1) * CHIP_STEP + EXPAND_PAD * 2
-    const place = Math.round(relY(i) + (rowH - CHIP_STEP) / 2 - EXPAND_PAD)
+    const place = Math.round(relY(i) + (heightOf(i) - CHIP_STEP) / 2 - EXPAND_PAD)
     const fitted = Math.max(0, Math.min(place, viewH - height))
     if (expanded?.index === i && expanded.top === fitted) return
     expanded = { index: i, left: span[0] - EXPAND_PAD, top: fitted, labels, lane: laneVar(row.color) }
@@ -483,12 +524,13 @@
     const y = relY(index)
     // A pinned list of labels belongs to the row that has the actions: it goes when they move on.
     if (pinned && (pinned.index !== index || compareAnchors(anchor, paintedAnchor) !== 0)) pinned = null
-    if (index < 0 || !cache.get(index) || y + rowH <= 0 || y >= viewH) {
+    const tall = index < 0 ? rowH : heightOf(index)
+    if (index < 0 || !cache.get(index) || y + tall <= 0 || y >= viewH) {
       if (actions) actions = null
       return
     }
-    const h = Math.min(rowH, ACTIONS_H)
-    const place = Math.round(y + (rowH - h) / 2)
+    const h = Math.min(tall, ACTIONS_H)
+    const place = Math.round(y + (tall - h) / 2)
     // How many labels the row has, for its button that lists them all.
     const labels = refLabels(cache.refsFor(cache.get(index)!.id), remote).length
     if (actions?.index === index && actions.top === place && actions.labels === labels) return
@@ -625,7 +667,7 @@
       if (noteCard) noteCard = null
       return
     }
-    const place = Math.round(relY(i) + rowH)
+    const place = Math.round(relY(i) + heightOf(i))
     if (noteCard?.id === row.id && noteCard.top === place) return
     const id = row.id
     noteCard = { index: i, id, top: place, right: Math.round(columns.width - noteMarkSpan(columns)[1]), notes: noteTexts.get(id) ?? null }
@@ -673,6 +715,16 @@
     frame = 0
     if (!canvas || !scroller) return
     const frameAt = performance.now()
+    if (coasting) {
+      // A wheel notch, eased: a share of what's left each frame, and the last few px at once.
+      const step = Math.abs(coasting) < 3 ? coasting : coasting * COAST
+      const before = anchor
+      anchor = clampToEnd(slots, moveBy(slots, anchor, step), scroller.clientHeight)
+      // At either end there's nowhere left to go.
+      coasting = compareAnchors(anchor, before) === 0 ? 0 : coasting - step
+      placeScroller()
+      if (coasting) schedule()
+    }
     if (glide) {
       // On the way to a commit: ease the view toward it, and keep painting until it's there.
       const p = Math.min(1, (frameAt - glide.start) / DUR.enter)
@@ -798,7 +850,8 @@
       const dim = washes.value(`d${i}`, (matchSet && !matchSet.has(i)) || place?.faded ? 1 : 0, frameAt)
       const isNoted = noted.has(row.id)
       const isArrived = arrived.has(row.id)
-      const extra = isNoted || isArrived ? { ...place?.extra, noted: isNoted, arrived: isArrived } : place?.extra
+      const follows = isFollower(i)
+      const extra = isNoted || isArrived || follows ? { ...place?.extra, noted: isNoted, arrived: isArrived, follower: follows } : place?.extra
       const span = drawRow(ctx, row, cache.refsFor(row.id), y, lay, th, sel, hov, dim, now, sealOf(sigs.get(row.id)), { prev: cache.get(i - 1), prev2: cache.get(i - 2), next: cache.get(i + 1) }, extra)
       if (arriving) ctx.restore()
       if (span) labelSpans.set(i, span)
@@ -812,7 +865,7 @@
         ctx.save()
         ctx.globalAlpha = landWash(t)
         ctx.fillStyle = th.selected
-        ctx.fillRect(0, relY(landing.index), w, rowH)
+        ctx.fillRect(0, relY(landing.index), w, heightOf(landing.index))
         ctx.restore()
         schedule()
       }
@@ -831,7 +884,7 @@
     updateActions()
     // The way back to the checked-out commit shows while that commit is out of view, once the
     // graph has held still, so it doesn't flicker past during a drag.
-    const away = headRow >= 0 && tips ? headAway(relY(headRow), rowH, 0, h) : null
+    const away = headRow >= 0 && tips ? headAway(relY(headRow), heightOf(headRow), 0, h) : null
     if (!away) unseen = 0
     const wanted = away && (settled || goHead) ? { dir: away, label: headLabel(tips!.head, tips!.headCommit), count: unseen } : null
     if (wanted?.dir !== goHead?.dir || wanted?.label !== goHead?.label || wanted?.count !== goHead?.count) goHead = wanted

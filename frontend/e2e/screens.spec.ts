@@ -474,19 +474,36 @@ test.describe('commit graph', () => {
       await ready(page)
       const box = (await page.locator('.scroller').boundingBox())!
       await page.mouse.move(box.x + 300, box.y + 100)
-      await page.mouse.wheel(0, 520)
-      // Ten rows of 52 have gone by, not a ten-thousandth of the history.
-      await expect.poll(() => commitAt(page, 10)).toBe(10)
+      // A row is taken to start a run until it has loaded, so let the first rows arrive.
+      await page.waitForTimeout(400)
+      // The first commit starts a run (52), and the stub's commits after it carry it on (30 each).
+      await page.mouse.wheel(0, 52 + 20 * 30)
+      // A wheel notch is eased over a few frames. Finding the row by clicking it would stop it
+      // part way, so wait for it to finish.
+      const settle = () => page.waitForTimeout(600)
+      await settle()
+      // Twenty-one rows have gone by, not a ten-thousandth of the history.
+      expect(await commitAt(page, 10)).toBe(21)
       // The same from the middle: drag the scrollbar there, then wheel.
       await page.locator('.scroller').evaluate((e) => e.scrollTo(0, (e.scrollHeight - e.clientHeight) / 2))
-      await page.waitForTimeout(150)
+      await page.waitForTimeout(500)
       const middle = (await commitAt(page, 10))!
       expect(Math.abs(middle - rows / 2)).toBeLessThan(rows / 100)
+      // Bring that row's top edge to the view's, so whole rows can be counted from it.
+      await page.keyboard.press('ArrowUp')
+      await page.keyboard.press('ArrowUp')
+      await page.keyboard.press('ArrowDown')
+      const from = (await selected(page))!
+      const at = (await commitAt(page, 10))!
       await page.mouse.move(box.x + 300, box.y + 100)
-      await page.mouse.wheel(0, 520)
-      await expect.poll(() => commitAt(page, 10)).toBe(middle + 10)
-      await page.mouse.wheel(0, -1040)
-      await expect.poll(() => commitAt(page, 10)).toBe(middle - 10)
+      await page.mouse.wheel(0, 600)
+      await settle()
+      expect(await commitAt(page, 10)).toBe(at + 20)
+      await page.mouse.move(box.x + 300, box.y + 100)
+      await page.mouse.wheel(0, -1200)
+      await settle()
+      expect(await commitAt(page, 10)).toBe(at - 20)
+      expect(from).toBeGreaterThan(0)
     })
 
     test('the arrow keys keep the selection in view a row at a time', async ({ page }) => {
@@ -511,6 +528,12 @@ test.describe('commit graph', () => {
     const scenario = (row: number) => ({ graphRows: 400, responses: { CommitSignatures: [], ...at(row) } })
     const button = (page: Page) => page.getByRole('button', { name: /^Go to the checked-out commit/ })
     const scrollTop = (page: Page) => page.locator('.scroller').evaluate((e) => e.scrollTop)
+    /** The commit whose row is at a height in the view, found by clicking it (which selects it). */
+    const commitAt = async (page: Page, y: number) => {
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.click(box.x + 300, box.y + y)
+      return ((await events(page, 'select')).at(-1)?.[0] as { index: number } | undefined)?.index
+    }
     const ready = async (page: Page, row: number) => {
       await open(page, 'graph', scenario(row))
       await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '400')
@@ -568,9 +591,12 @@ test.describe('commit graph', () => {
       await expect(button(page)).toBeVisible()
       await expect(button(page).locator('.arrow')).toHaveClass(/down/)
       await button(page).click()
-      const view = (await page.locator('.scroller').boundingBox())!.height
-      await expect.poll(async () => Math.round(await scrollTop(page))).toBe(Math.round(200 * 52 - view / 3))
       await expect(button(page)).toHaveCount(0)
+      const view = (await page.locator('.scroller').boundingBox())!.height
+      // Its row starts a third of the way down: just under that line is the checked-out commit,
+      // and just over it the commit before.
+      await expect.poll(() => commitAt(page, view / 3 + 8)).toBe(200)
+      expect(await commitAt(page, view / 3 - 8)).toBe(199)
     })
 
     test('a detached HEAD is named by its short SHA', async ({ page }) => {
@@ -583,13 +609,15 @@ test.describe('commit graph', () => {
       await acted(page)
       await reloadAt(page, 150, [150, 151, 152])
       const view = (await page.locator('.scroller').boundingBox())!.height
-      await expect.poll(async () => Math.round(await scrollTop(page))).toBe(Math.round(150 * 52 - view / 3))
       await expect(page.getByRole('status')).toHaveText('main moved to 0000000, 3 new commits')
       // Nothing had been chosen, so the tip is selected.
       await expect.poll(async () => (await events(page, 'select')).at(-1)?.[0]).toMatchObject({ index: 150 })
-      // The three that arrived wear a bar at the right edge; the row above them and the one below don't.
-      const rowMid = (row: number) => Math.round(row * 52 - (150 * 52 - view / 3) + 26)
+      // The tip is a third of the way down. The stub's rows carry no labels, so none is marked as
+      // checked out and every commit here carries on a run: 30 tall. The three that arrived wear
+      // a bar at the right edge; the row above them and the one below don't.
+      const rowMid = (row: number) => Math.round(view / 3 + (row - 150) * 30 + 15)
       await expect.poll(() => barAt(page, rowMid(151))).toBeGreaterThan(0)
+      expect(await barAt(page, rowMid(150))).toBeGreaterThan(0)
       expect(await barAt(page, rowMid(152))).toBeGreaterThan(0)
       expect(await barAt(page, rowMid(149))).toBe(0)
       expect(await barAt(page, rowMid(153))).toBe(0)
@@ -602,15 +630,22 @@ test.describe('commit graph', () => {
     test('a commit the person selected stays selected, and only the view moves', async ({ page }) => {
       await ready(page, 200)
       const box = (await page.locator('.scroller').boundingBox())!
-      await page.mouse.click(box.x + 300, box.y + 3 * 52 + 20)
+      // The fourth row: one that starts a run, then two that carry it on, are above it.
+      await page.mouse.click(box.x + 300, box.y + 52 + 2 * 30 + 15)
       await expect.poll(async () => (await events(page, 'select')).at(-1)?.[0]).toMatchObject({ index: 3 })
       await acted(page)
       await reloadAt(page, 150, [150])
-      await expect.poll(async () => Math.round(await scrollTop(page))).toBe(Math.round(150 * 52 - box.height / 3))
-      await page.waitForTimeout(300)
+      await expect(page.getByRole('status')).toHaveText('main moved to 0000000, 1 new commit')
+      await expect.poll(() => scrollTop(page)).toBeGreaterThan(0)
+      await page.waitForTimeout(400)
+      const moved = await scrollTop(page)
       expect((await events(page, 'select')).at(-1)?.[0]).toMatchObject({ index: 3 })
       // The selection is out of view now, and the view did not go back for it.
-      expect(Math.round(await scrollTop(page))).toBe(Math.round(150 * 52 - box.height / 3))
+      await page.waitForTimeout(200)
+      expect(await scrollTop(page)).toBe(moved)
+      // The view is at the branch's new tip, a third of the way down. (Looked for last, since
+      // finding it by clicking moves the selection.)
+      expect(await commitAt(page, box.height / 3 + 8)).toBe(150)
     })
 
     test('a branch that moved without the person doing anything is not followed', async ({ page }) => {
@@ -634,12 +669,12 @@ test.describe('commit graph', () => {
 
     test('with reduced motion the view jumps', async ({ page }) => {
       await page.emulateMedia({ reducedMotion: 'reduce' })
-      await ready(page, 20)
+      await ready(page, 60)
       await button(page).click()
       // No glide: it is there on the next frame.
       await page.waitForTimeout(50)
       const view = (await page.locator('.scroller').boundingBox())!.height
-      expect(Math.round(await scrollTop(page))).toBe(Math.round(20 * 52 - view / 3))
+      expect(await commitAt(page, view / 3 + 8)).toBe(60)
     })
   })
 
@@ -654,7 +689,10 @@ test.describe('commit graph', () => {
     /** The note mark's slot on a row: 28px left of the SHA column, on the subject's line. */
     const slot = async (page: Page, row: number) => {
       const box = (await page.locator('.scroller').boundingBox())!
-      return { x: box.x + box.width - 76 - 28, y: box.y + row * 52 + 19, left: box.width - 76 - 28 - 8, top: row * 52 + 19 - 8 }
+      // The first row starts a run: two lines, the mark on the first. The stub's other commits
+      // carry it on: one line each, 30 tall.
+      const y = row === 0 ? 19 : 52 + (row - 1) * 30 + 15
+      return { x: box.x + box.width - 76 - 28, y: box.y + y, left: box.width - 76 - 28 - 8, top: y - 8 }
     }
     /** How much ink is in a row's slot. */
     const inkIn = async (page: Page, row: number) => {
