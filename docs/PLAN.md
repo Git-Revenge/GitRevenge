@@ -74,14 +74,18 @@ This document records the decisions from the initial requirements session (2026-
 - Clone and init.
 - Command palette, keyboard shortcuts, and light/dark themes.
 
-**Later (1.1+):**
-- Worktrees.
-- Bisect UI.
+**Added since (milestones 0.7 to 0.11):**
+- Insights for sprint reviews, rendered file previews, and a Git Config editor.
+- Branch care: branch kinds, hidden branches, cleanup after a pull, notes syncing, and stacked branches.
+- Worktrees, and signature verification badges.
+- Linux packages.
+- Ignore rules, smart links, bisect, and previews of a merge or rebase before it runs.
+
+**Later:**
 - Hooks UI.
 - Gitflow.
 - An integrated terminal.
 - A setup UI for partial clone and sparse checkout. The app still works on repos that already use them.
-- Signature verification badges.
 
 ## Performance targets
 
@@ -145,6 +149,13 @@ Two fixes from this run (#78): `git log` starts only from tags HEAD can't reach,
 4. **0.4.0 History rewriting:** interactive rebase, reset, revert, undo/redo, conflict tool.
 5. **0.5.0 Multi-repo & extras:** project groups and dashboard, LFS, submodules, file history and blame, clone and init.
 6. **0.6.0 Polish:** visual design, themes, command palette, shortcuts, word wrap, perf pass, update check, signed releases.
+7. **0.7.0 Insights:** Insights, rendered previews, the Git Config editor, settings.
+8. **0.8.0 UI touch:** one button family and motion, and branch care: kinds, cleanup, notes syncing, stacks.
+9. **0.9.0 Use testing and cleanup:** a new sidebar and fixes from daily use, followed by 0.9.1.
+10. **0.10.0 Linux:** Linux as a first-class platform, with `.deb` and `.rpm` packages.
+11. **0.11.0 Git tools:** ignore rules, smart links, bisect, merge and rebase previews, a rebuilt rebase editor and conflict tool, and a second pass on the graph.
+
+[CHANGELOG.md](../CHANGELOG.md) says what each release changed.
 
 Each feature area has an epic issue. Its tasks are tracked as sub-issues, each sized for one PR.
 
@@ -164,6 +175,7 @@ Each feature area has an epic issue. Its tasks are tracked as sub-issues, each s
 
 - **Builds.** A GitHub Actions workflow is triggered by `v*` tags.
   - Windows: an NSIS installer, unsigned for now.
-  - macOS: a universal `.dmg`, signed and notarized with the maintainer's Apple Developer account.
+  - macOS: a universal `.dmg`, signed and notarized with the maintainer's Apple Developer account. A Homebrew tap (`git-revenge/tap`) follows the latest release.
+  - Linux: a `.deb` for Ubuntu and Debian, and an `.rpm` each for RHEL 9 and RHEL 10. They're unsigned, and there's no apt or dnf repository yet.
 - **Update check.** At startup the app asks the GitHub API for the latest release (no identifiers beyond a User-Agent) and shows a banner with a download link when it's a newer semver version. A dismissed version isn't announced again. The startup check can be turned off from the command palette; "Check for updates" always runs. There is no auto-update.
 - **Audience.** First the maintainer, then an internal team, then open source under Apache-2.0.

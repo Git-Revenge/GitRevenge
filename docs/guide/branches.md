@@ -42,6 +42,9 @@ A merge preview also lists the commits and the number of files coming in, and as
 
 The button says what it will do, such as **Fast-forward main** or **Merge, and resolve 2 conflicts**.
 
+![A merge preview that names one file that will conflict](../img/merge-preview-light.webp#gh-light-mode-only)
+![A merge preview that names one file that will conflict](../img/merge-preview-dark.webp#gh-dark-mode-only)
+
 A rebase preview lists the commits that will be written again, oldest first, and says which commit it would first stop on. Later commits can't be tried until that one is settled, so there may be more. It also offers:
 
 - **Fold the fixups into the commits they name**, when the branch has `fixup!` or `squash!` commits. It's on to begin with.
@@ -111,6 +114,9 @@ See [Resolve a merge conflict](../walkthroughs/resolve-a-conflict.md) for the wh
 ### While a merge or rebase is in progress
 
 A strip at the top stays until the operation is finished. It names the operation and both sides, such as *Rebasing feature/offline-cache onto main*, and says where things stand: which commit a rebase stopped on and how far along it is, or how many of a merge's conflicted files are resolved.
+
+![The strip for a merge in progress, with one file left to resolve](../img/operation-strip-light.webp#gh-light-mode-only)
+![The strip for a merge in progress, with one file left to resolve](../img/operation-strip-dark.webp#gh-dark-mode-only)
 
 - **Resolve N files** opens the first conflicted file in the conflict tool.
 - **Continue** is off while anything is conflicted, and its tooltip names what's left. Once everything is resolved it says what it will do: **Continue with 2 more**, **Finish the rebase** or **Commit the merge**. <kbd>Ctrl</kbd>+<kbd>Enter</kbd> presses it.

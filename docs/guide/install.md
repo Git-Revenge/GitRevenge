@@ -1,12 +1,17 @@
 # Installing
 
-Download the Windows installer, the macOS disk image, or a Linux package from the [latest release](https://github.com/Git-Revenge/GitRevenge/releases/latest).
+Git Revenge is free, and there's nothing to sign up for. Download the Windows installer, the macOS disk image, or a Linux package from the [latest release](https://github.com/Git-Revenge/GitRevenge/releases/latest). Each is under 20 MB.
 
-- **macOS:** the disk image is signed and notarized, so it opens like any other app.
+- **macOS:** the disk image is signed and notarized, so it opens like any other app. With [Homebrew](https://brew.sh), install and update it from the project's tap instead:
+
+  ```sh
+  brew install --cask git-revenge/tap/gitrevenge
+  ```
+
 - **Windows:** the installer isn't signed yet, so SmartScreen warns you before it runs. Choose **More info**, then **Run anyway**.
-- **Linux:** see [Linux](#linux) for which package to use. Linux packages are available from 0.10.0.
+- **Linux:** see [Linux](#linux) for which package to use.
 
-When a new release comes out, the app tells you at startup. You can also check by hand with **Check for updates** in the command palette.
+When a new release comes out, the app tells you at startup. You can also check by hand with **Check for updates** in the command palette. That check is the only request the app makes on its own, and [Settings](settings.md) turns it off.
 
 ## What you need
 
@@ -79,5 +84,6 @@ Settings, project groups, recent repositories and open tabs are kept in one file
 
 - **Windows:** `%APPDATA%\GitRevenge\settings.json`
 - **macOS:** `~/Library/Application Support/GitRevenge/settings.json`
+- **Linux:** `~/.config/GitRevenge/settings.json`, or under `$XDG_CONFIG_HOME` if you set it
 
-Backups of git config files you save in the [Git Config tab](git-config.md) go in a `config-backups` folder beside it. Nothing about your repositories is stored anywhere else. If the file is ever damaged, the app moves it aside as `settings.json.corrupt-<timestamp>` and starts with defaults.
+Backups of git config files you save in the [Git Config tab](git-config.md) go in a `config-backups` folder beside it. A repository's own settings, such as its branch kinds and smart links, are kept in its git config. Nothing about your repositories is stored anywhere else, and nothing is sent anywhere. If the file is ever damaged, the app moves it aside as `settings.json.corrupt-<timestamp>` and starts with defaults.

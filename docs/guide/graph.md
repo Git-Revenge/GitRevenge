@@ -13,15 +13,31 @@ Your **Trunk** branch (`main`, `master` or `develop`) runs straight down the lef
 
 ## Reading the graph
 
-A commit on a branch is tinted with the colour of its line, from the commit to the start of the message, so you can tell which line it's on without tracing it. Trunk and Docs commits have no tint: Trunk is always the left-hand line, and Docs lines are meant to recede. A line is drawn thin and faint where it's idle, and thickens around its commits.
+A line is drawn thin and faint where it's idle, and thickens around its commits. Trunk is always the left-hand line, and Docs lines are drawn faded, since they're meant to recede.
 
-When there's room, branches and tags have their own column to the left of the graph, each joined to its commit by a thin line. A cloud marks a name that's on a remote, and the prefix of your main remote is left off. Your main remote is the one the checked-out branch tracks, else `origin`, else the only remote. A local branch shares a label with the remote branch it tracks when both are on the commit. A branch on several remotes takes one label, with a count beside the cloud, and a branch on just one other remote keeps its name, such as `fork/x`. In a narrow window, labels sit in front of the commit message instead.
+### Days
 
-Labels are ranked so the ones you'd most want to see come first: the checked-out branch, Trunk, Release, tags, Environment, Feature, then the rest. Whatever doesn't fit becomes **+N**. Hover over a commit's labels to expand them and see every branch and tag on it, in full, with each branch's row saying where it lives, such as `local · origin`. The same list is in the commit's details on the right.
+In the timeline, each day has a line of its own above its first commit, with the day's name (**Today**, **Yesterday**, then the date) and a count of its commits, and of the people who made them once there's more than one. The line of the day you're looking at stays at the top of the graph while that day scrolls past. When more than a week went by before a day, its line says so, such as "3 weeks earlier", and after a pull it says how many commits just arrived.
 
-Column headers name what's in each column. In compact rows with enough width, the filter button beside **Author** searches for the selected commit's author, an author carrying on from the row above shows as a ditto mark, and the **When** column holds how long ago each commit was made.
+A commit takes a second line, with its author and time, only when it starts a run: the checked-out commit, a merge, the first commit of a day, a change of author, or a commit made two hours or more after the one before. The commits that carry a run on take one line, with the time at the right, and their circle shrinks from the author's initials to a dot. About twice as many commits fit on screen that way.
 
-The selected commit has a bar in its line's colour at the left edge of its row. In the timeline, the checked-out commit's row carries a handwritten "you're here" after its label when there's room.
+### Branch and tag labels
+
+When there's room, branches and tags have their own column to the left of the graph. The column fits the labels in view. Drag its right edge to set a width, which is kept for the repository, and double-click the edge to fit it again. In a narrow window, labels sit in front of the commit message instead.
+
+A long name is cut in the middle, so `617-watch…cleanup` and `617-watch…ends` stay apart. A commit shows one label and a count of the rest. Hover over them for the full list, or press the label button on the row, where each branch and tag opens its own menu. The same list is in the commit's details on the right.
+
+Labels are ranked so the one you'd most want to see comes first: the checked-out branch, Trunk, Release, tags, Environment, Feature, then the rest.
+
+A cloud marks a name that's on a remote, and the prefix of your main remote is left off. Your main remote is the one the checked-out branch tracks, else `origin`, else the only remote. A local branch shares a label with the remote branch it tracks when both are on the commit. A branch on several remotes takes one label, with a count beside the cloud, and a branch on just one other remote keeps its name, such as `fork/x`.
+
+### Marks on a commit
+
+- The selected commit has a bar in its line's colour at the left edge of its row.
+- The checked-out commit's row carries a handwritten "you're here" after its label, when there's room.
+- A commit with a [git note](history.md#notes) wears a folded-page mark. Hover over the mark to read the note, or click it to open the commit with its notes in view.
+- A signed commit wears a seal; its [signature](history.md#signatures) is in the commit's details.
+- After a pull, or anything else that moves your branch, each commit that arrived wears a teal bar at the right edge until you select something else.
 
 ## Moving around
 
@@ -30,20 +46,39 @@ Jumping to a commit, from a branch in the sidebar, a parent link or a search mat
 - Scroll, or use the arrow keys to move the selection one commit at a time.
 - <kbd>Page Up</kbd> and <kbd>Page Down</kbd> move a page at a time.
 - <kbd>Home</kbd> and <kbd>End</kbd> go to the newest and oldest commits.
+- <kbd>Alt</kbd>+<kbd>Home</kbd> goes back to the commit you have checked out.
+
+### Back to where you are
+
+Whenever the checked-out commit is out of view, a button at the foot of the graph goes back to it. It names the branch, or the short SHA when you aren't on a branch, and points the way. It selects nothing, so the commit you were reading stays in the panel on the right. After a fetch it also counts what's new on the upstream.
+
+The graph follows a branch you move. After a pull, checkout, merge, rebase, reset, cherry-pick or revert, the view goes to the branch's new tip. A commit you had selected stays selected. A fetch, or a change made outside the app, leaves the view where it was.
+
+### The ruler
+
+A ruler stands at the graph's right edge, where a scrollbar would be. Its box is the part of the history in view: drag it, and the month you're passing shows beside it, or press anywhere on the ruler to go there.
+
+![The ruler at the graph's right edge, with ticks for branches, tags and the checked-out commit](../img/graph-ruler-light.webp#gh-light-mode-only)
+![The ruler at the graph's right edge, with ticks for branches, tags and the checked-out commit](../img/graph-ruler-dark.webp#gh-dark-mode-only)
+
+Ticks mark the checked-out commit, branches, tags, commits with notes and search matches, and a faint line marks each month. Point at a tick to see what's there. On a very long history, a hatched foot is the part that hasn't been read yet.
+
+### The panel on the right
 
 Drag the left edge of the panel on the right to resize it, or use the arrow keys on it, and double-click the edge to reset it. Git Revenge remembers the width for each repository. Once it's wide enough, the panel lays out in two columns. To give the graph the room, hide the panel with the button at the right end of the toolbar, or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd>.
 
-Selecting a commit shows it on the right. The top of the panel has its subject, author, a button to copy its SHA, a link to its parent, and an **Actions** menu. Tabs under that show the **Message**, the **Files** it changed with their line counts, its **Trailers** such as `Co-authored-by` and `Closes`, grouped by what they're for with long `Cc` lists collapsed (`#14` links to the issue on your repository's host, and **Grouped** switches to the trailers as written), and **Details** such as [notes](history.md#notes) and its [signature](history.md#signatures). The tab you pick stays picked as you move between commits. Once the panel is wide enough, the files stay beside the other tabs.
+Selecting a commit shows it on the right. The top of the panel has its subject, author, a button to copy its SHA, a link to its parent, and an **Actions** menu. Tabs under that show the **Message**, the **Files** it changed with their line counts, its **Trailers** such as `Co-authored-by` and `Closes`, grouped by what they're for with long `Cc` lists collapsed (**Grouped** switches to the trailers as written), and **Details** such as [notes](history.md#notes) and its [signature](history.md#signatures). The tab you pick stays picked as you move between commits. Once the panel is wide enough, the files stay beside the other tabs.
+
+Ticket keys and web addresses in a message or trailer are links when a [smart link](settings.md#links) matches them.
 
 ![A selected commit, with its message, trailers, author, a git note and the files it changed](../img/commit-details-light.webp#gh-light-mode-only)
 ![A selected commit, with its message, trailers, author, a git note and the files it changed](../img/commit-details-dark.webp#gh-dark-mode-only)
 
-
 ## Searching
 
-Press <kbd>Ctrl</kbd>+<kbd>F</kbd> to search. You can search by commit message, author or SHA. You can also search for a trailer, such as `Co-authored-by: Sam` or `Closes: #12`.
+Press <kbd>Ctrl</kbd>+<kbd>F</kbd> to search. You can search by commit message, author or SHA. You can also search for a trailer, such as `Co-authored-by: Sam` or `Closes: #12`, and `has:note` finds the commits that have a git note.
 
-<kbd>Enter</kbd> goes to the next match and <kbd>Shift</kbd>+<kbd>Enter</kbd> to the previous one. Matches further back than what's loaded are found too; the graph loads up to them. [Find a commit](../walkthroughs/find-a-commit.md) shows it in action.
+<kbd>Enter</kbd> goes to the next match and <kbd>Shift</kbd>+<kbd>Enter</kbd> to the previous one. Matches further back than what's loaded are found too; the graph loads up to them. Each match has a tick on the [ruler](#the-ruler). [Find a commit](../walkthroughs/find-a-commit.md) shows it in action.
 
 ## Branches and tags
 
@@ -70,7 +105,13 @@ A [kind](branch-care.md#branch-kinds)'s icon marks a folder, or a branch on its 
 
 ## Filtering by kind
 
-When a repository has branches of any [kind](branch-care.md#branch-kinds), the bar above the graph has a **Kinds** dropdown with a checkbox for each one. Clear a box to hide every branch of that kind, and the button says how many kinds are hidden. Docs lines are drawn faded either way. Other branches can be hidden too; see [hiding branches](branch-care.md#hiding-branches).
+When a repository has branches of any [kind](branch-care.md#branch-kinds), the bar above the graph has a **Kinds** dropdown with a checkbox for each one. Clear a box to hide every branch of that kind, and the button says how many kinds are hidden. Other branches can be hidden too; see [hiding branches](branch-care.md#hiding-branches).
+
+### Folded lanes
+
+Bot and Docs lines are mostly noise: a dependency bot's branches, or a published site rebuilt on every merge. In the timeline, each such line's commits of a day take one line, such as "11 Docs commits". Click the line, or press <kbd>→</kbd> on it, to see the commits, and <kbd>←</kbd> to close it again. The line's tip, the selected commit and search matches always show.
+
+**Fold**, beside Bot or Docs in the **Kinds** menu, chooses between one line a day and every commit. The choice is kept in the repository's git config, as `gitrevenge.showKind`. The counts on the day lines leave folded commits out.
 
 ## Focusing on a branch
 
@@ -82,9 +123,11 @@ Only one focus exists at a time, and choosing another replaces it. The bar above
 
 ## Two layouts
 
-The default **timeline** layout gives each commit two lines: the subject, then who made it and when. The first commit of each day names the day (**Today**, **Yesterday**, then the date) under a dashed line; the commits below it in the same day show only the author and time; and when the same author's previous commit on that line is just above, the line is just the time, faded, and the commit's circle shrinks from the author's initials to a dot. **Compact rows** fits one commit per line, so you see more history at once. Switch between them with the pair of icons in the bar above the graph, where the one in use is raised, or in [Settings](settings.md).
+The default **timeline** layout is the one described above: a line for each day, and a second line for a commit that starts a run. **Compact rows** fits one commit per line with no day lines, under column headings, so you see more history at once. In compact rows with enough width, the filter button beside **Author** searches for the selected commit's author, an author carrying on from the row above shows as a ditto mark, and the **When** column holds how long ago each commit was made.
 
-The graph's commit count, **Kinds**, the layout switch and the search share that bar with Undo, Redo, Fetch, Pull and Push. In a narrow window they take a line of their own, and while a file is open they step aside for the file's own header.
+Switch between them with the pair of icons in the bar above the graph, where the one in use is raised, or in [Settings](settings.md).
+
+The graph's commit count, **Kinds**, the layout switch and the search share that bar with Undo, Redo, Fetch, Pull and Push, and the bar stays on one line at every width. As it narrows, the commit count moves into the search field ("Search 411 commits"), then the search becomes an icon that opens the field over the bar, then Undo and Redo lose their words, then Fetch, Pull and Push. In a very narrow panel the layout switch goes too; Settings and the command palette still have it. While a file is open, the bar steps aside for the file's own header.
 
 ## Right-click menus
 

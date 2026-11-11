@@ -14,6 +14,7 @@ Your changes are one list, by filename under their folders, with line counts. A 
 - A list of five or more files gets a filter, and **Tree** switches between folders listed by their whole path and a tree whose folders open and close. The commit panel's **Files** tab has the same tools.
 - The arrow keys move through the list, <kbd>Space</kbd> ticks a file and <kbd>Enter</kbd> opens it. With a diff open, <kbd>Alt</kbd>+<kbd>↓</kbd> and <kbd>Alt</kbd>+<kbd>↑</kbd> move to the next and previous file, here and in a commit's **Files** tab.
 - Hover over a file for its discard button. Conflicts come first, under **Fix these first**.
+- Right-click a file or a folder's heading to [ignore it](ignoring.md). **Ignored**, above the list, shows the files git is leaving out and the rule behind each.
 - Open a file to stage part of it. In the **Unified** diff, each hunk has a **Stage hunk** button, and you can select individual lines and stage just those. Staged changes can be unstaged the same way.
 
 ![A unified diff with Stage hunk and Discard hunk buttons](../img/diff-unified-light.webp#gh-light-mode-only)

@@ -355,7 +355,8 @@ export function recall(id, maxAgeMs = 15 * 60_000) {
 }
 EOF
 commit priya "wip" 2
-sed -i.bak 's/15 \* 60_000/30 * 60_000/' src/cache.js && rm src/cache.js.bak
+# The fixup changes a line of the commit it names, not of "wip", so folding it in applies cleanly.
+sed -i.bak 's/^  cache.set(id/  if (reading) cache.set(id/' src/cache.js && rm src/cache.js.bak
 commit priya "fixup! Cache the last reading from each station" 1
 cat > src/readings.js <<'EOF'
 import { stations } from './stations.js'
@@ -467,6 +468,8 @@ cat > "$out/work.gitconfig" <<EOF
 [user]
 	email = maya@harbour-works.example
 EOF
+# Its own global ignore file too, or the Ignore rules tab would show yours, path and all.
+printf '.DS_Store\nThumbs.db\n*.swp\n' > "$out/gitignore"
 cat > "$out/gitconfig" <<EOF
 [user]
 	name = Maya Okafor
@@ -475,6 +478,7 @@ cat > "$out/gitconfig" <<EOF
 	defaultBranch = main
 [core]
 	editor = code --wait
+	excludesFile = $(win "$out")/gitignore
 [push]
 	autoSetupRemote = true
 [fetch]
