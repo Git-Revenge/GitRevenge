@@ -166,6 +166,8 @@ export interface Theme {
   link: string
   /** The teal of a bisect's range and the commit under test. */
   teal: string
+  /** The sepia of a note's mark. */
+  note: string
 }
 
 // Icons drawn on the canvas, built once each from the same paths as the Icon component.
@@ -259,6 +261,27 @@ function drawSeal(ctx: CanvasRenderingContext2D, cx: number, cy: number, seal: S
   ctx.restore()
 }
 
+/** A folded page: this commit has a git note. Its shape says so, not only its colour. */
+function drawNoteMark(ctx: CanvasRenderingContext2D, cx: number, cy: number, color: string) {
+  ctx.save()
+  ctx.strokeStyle = color
+  ctx.lineWidth = 1.5
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.beginPath()
+  ctx.moveTo(cx - 4.5, cy - 6)
+  ctx.lineTo(cx + 4.5, cy - 6)
+  ctx.lineTo(cx + 4.5, cy + 2)
+  ctx.lineTo(cx + 0.5, cy + 6)
+  ctx.lineTo(cx - 4.5, cy + 6)
+  ctx.closePath()
+  ctx.moveTo(cx + 4.5, cy + 2)
+  ctx.lineTo(cx + 0.5, cy + 2)
+  ctx.lineTo(cx + 0.5, cy + 6)
+  ctx.stroke()
+  ctx.restore()
+}
+
 export interface Layout {
   width: number
   graphW: number
@@ -302,11 +325,23 @@ export function refColumnWidth(width: number, wanted = LABEL_COLUMN.default): nu
 const LABEL_LEFT = 8
 const LABEL_RIGHT = 8
 
-/** Compact's date column: the longest date, `Sep 17, 2024`, then room for a signature's seal,
- * which sits at the column's right-hand end. */
-export const DATE_COLUMN = 120
+/** Compact's date column: the longest date, `Sep 17, 2024`, then room for the two marks, a
+ * note's and a signature's seal, which sit at the column's right-hand end. */
+export const DATE_COLUMN = 136
 /** How far left of the SHA a seal's centre sits. */
 export const SEAL_OFFSET = 12
+/** How far left of the SHA a note mark's centre sits: a slot of its own, left of the seal's, so
+ * marks line up down the column whether or not a commit is signed. */
+export const NOTE_OFFSET = 28
+/** Half the width of the note mark's slot, for pointing at it. */
+const NOTE_REACH = 9
+/** What the marks take from the end of the subject when they have no date column to sit in. */
+const MARKS_W = NOTE_OFFSET + NOTE_REACH + 1
+
+/** Where a row's note mark is, from its left edge to its right, for hovering over it. */
+export function noteMarkSpan(lay: Pick<Layout, 'shaX'>): [start: number, end: number] {
+  return [lay.shaX - NOTE_OFFSET - NOTE_REACH, lay.shaX - NOTE_OFFSET + NOTE_REACH]
+}
 
 export function layoutColumns(width: number, graphW: number, density: Density, firstLane = 0, remote = 'origin', labelW = LABEL_COLUMN.default): Layout {
   const compact = density === 'compact'
@@ -425,6 +460,8 @@ export interface RowExtra {
   /** A handwritten note in the label column, in place of "you're here". */
   note?: string
   noteColor?: string
+  /** The commit has a git note: a folded-page mark beside the seal. */
+  noted?: boolean
 }
 
 /** How strong the wash is on a row still in question during a bisect. */
@@ -705,6 +742,7 @@ export function drawRow(
   ctx.fillStyle = theme.muted
   ctx.fillText(row.id.slice(0, 7), lay.shaX, line1)
   if (seal) drawSeal(ctx, lay.shaX - SEAL_OFFSET, line1, seal, theme)
+  if (extra.noted) drawNoteMark(ctx, lay.shaX - NOTE_OFFSET, line1, theme.note)
   if (lay.dateW) {
     setFont(ctx, `12px ${MONO}`)
     ctx.fillStyle = theme.muted
@@ -717,12 +755,14 @@ export function drawRow(
     setFont(ctx, `13px ${SERIF}`)
     ctx.fillStyle = theme.muted
     if (ditto) ctx.globalAlpha *= 0.6
-    ctx.fillText(ditto ? DITTO : clip(ctx, row.author, lay.authorW - 16), lay.authorX, line1)
+    // Without a date column the marks sit at the end of this one.
+    ctx.fillText(ditto ? DITTO : clip(ctx, row.author, lay.authorW - (lay.dateW ? 16 : MARKS_W)), lay.authorX, line1)
     if (ditto) ctx.globalAlpha /= 0.6
   }
 
   let left = lay.textX
-  const subjectRight = (lay.authorW ? lay.authorX : lay.dateW ? lay.dateX : lay.shaX) - 22
+  // The subject stops short of the next column, or of the marks when the SHA is next.
+  const subjectRight = lay.authorW ? lay.authorX - 22 : lay.dateW ? lay.dateX - 22 : lay.shaX - MARKS_W
   if (!lay.refW && refs.length) {
     left = drawLabels(ctx, refs, left, line1, Math.min(subjectRight - left, (subjectRight - left) * 0.6), color, theme, comfortable, lay.remote)
     labelSpan = [lay.textX, left - LABEL_TRAIL]

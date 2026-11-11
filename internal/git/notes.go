@@ -43,6 +43,33 @@ func (r *Repo) Notes(ctx context.Context, commit string) ([]Note, error) {
 	return notes, nil
 }
 
+// NotedCommits lists every commit that has a note in any notes ref, each once. It asks each
+// ref for its whole list in one call, so the cost follows the number of notes refs, not the
+// number of commits.
+func (r *Repo) NotedCommits(ctx context.Context) ([]string, error) {
+	out, err := r.ReadString(ctx, "for-each-ref", "--format=%(refname)", "refs/notes/")
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	ids := []string{}
+	for _, ref := range strings.Fields(out) {
+		list, err := r.ReadString(ctx, "notes", "--ref="+ref, "list")
+		if err != nil {
+			return nil, err
+		}
+		// Each line is the note's own object, then the object it's attached to.
+		for line := range strings.Lines(list) {
+			_, id, ok := strings.Cut(strings.TrimSpace(line), " ")
+			if ok && !seen[id] {
+				seen[id] = true
+				ids = append(ids, id)
+			}
+		}
+	}
+	return ids, nil
+}
+
 // SetNote adds or replaces the commit's note in ref, or removes it when text is empty.
 func (r *Repo) SetNote(ctx context.Context, ref, commit, text string) error {
 	if !strings.HasPrefix(ref, "refs/notes/") {

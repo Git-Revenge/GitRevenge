@@ -168,6 +168,8 @@ export function MarkBranchKind(arg1:string,arg2:string,arg3:string):Promise<void
 
 export function MergedBranches(arg1:string):Promise<Record<string, string>>;
 
+export function NotedCommits(arg1:string):Promise<Array<string>>;
+
 export function OpenGitConfig(arg1:string):Promise<app.ConfigDoc>;
 
 export function OpenMergeTool(arg1:string,arg2:string):Promise<void>;

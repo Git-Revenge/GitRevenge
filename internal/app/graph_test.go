@@ -2,6 +2,7 @@ package app
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -187,5 +188,37 @@ func TestWorktreeBindings(t *testing.T) {
 	}
 	if _, err := a.RemoveWorktree(tab.Path, list[2].Path, false); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSearchGraphForNotes(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	shas := fx.Linear(3)
+	fx.Git("notes", "add", "-m", "deployed", shas[0])
+	fx.Git("notes", "--ref=review", "add", "-m", "looks good", shas[2])
+	tab, err := a.OpenRepo(fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	noted, err := a.NotedCommits(tab.Path)
+	if err != nil || len(noted) != 2 {
+		t.Fatalf("NotedCommits = %v, %v", noted, err)
+	}
+	for _, q := range []string{"has:note", " HAS:Notes "} {
+		res, err := a.SearchGraph(tab.Path, q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		first, _ := a.CommitRow(tab.Path, shas[0])
+		last, _ := a.CommitRow(tab.Path, shas[2])
+		if res.Total != 2 || !slices.Contains(res.Rows, first) || !slices.Contains(res.Rows, last) {
+			t.Fatalf("search %q = %+v, want rows %d and %d", q, res, first, last)
+		}
+	}
+	// Anything else that starts the same is a text search.
+	if res, _ := a.SearchGraph(tab.Path, "has:nothing"); res.Total != 0 {
+		t.Fatalf("text search = %+v", res)
 	}
 }

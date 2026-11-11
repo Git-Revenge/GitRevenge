@@ -3,7 +3,7 @@
   import { errorText } from '../errors'
   import { onMount, tick, untrack, type Snippet } from 'svelte'
   import { ALONE_STEPS, searchPlaceholder, SQUEEZE, squeezeFor } from '../barSqueeze'
-  import { CommitRow, CommitSignatures, GraphFocus, GraphRows, Refs, RepoPreferences, SearchGraph, SetGraphFocus, SetKindVisible } from '../../../wailsjs/go/app/App.js'
+  import { CommitNotes, CommitRow, CommitSignatures, GraphFocus, GraphRows, NotedCommits, Refs, RepoPreferences, SearchGraph, SetGraphFocus, SetKindVisible } from '../../../wailsjs/go/app/App.js'
   import { session } from '../session.svelte'
   import { ClipboardSetText, EventsOn } from '../../../wailsjs/runtime/runtime.js'
   import { theme as colorTheme } from '../theme.svelte'
@@ -12,7 +12,7 @@
   import { DUR, easeInk, fadeUp, labelsFold, labelsUnfold, menuOut, reducedMotion, stagger } from '../ui/motion'
   import KindFilter from './KindFilter.svelte'
   import RefChip from './RefChip.svelte'
-  import { bisectRow, drawRow, sealOf, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
+  import { bisectRow, drawRow, sealOf, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { loadLabelWidth, nextLabelWidth, REFIT_AFTER_MS, saveLabelWidth } from './labelColumn'
   import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
   import { scrollMap, topAfterScroll, toScroll, type ScrollMap } from './scrollMap'
@@ -25,6 +25,7 @@
     onContext,
     onDrop,
     onSelectedRefs,
+    onNote,
     lead,
     toolsHost,
     squeeze,
@@ -48,6 +49,8 @@
     onContext?: (row: Row, refs: Ref[], x: number, y: number) => void
     /** A row dragged onto another row. */
     onDrop?: (source: Row, sourceRefs: Ref[], target: Row, targetRefs: Ref[], x: number, y: number) => void
+    /** A click on a commit's note mark, after the commit is selected. */
+    onNote?: (row: Row) => void
     /** auto is true for the automatic selection of HEAD when the graph first loads. */
     onSelect?: (row: Row | undefined, auto: boolean) => void
     /** Labels for the selected commit's refs, whenever they change. They can load after the selection. */
@@ -462,7 +465,57 @@
       kinds: Object.fromEntries(Object.entries(KINDS).map(([k, info]) => [k, token(info.token)])),
       link: token('--link'),
       teal: token('--accent-a'),
+      note: token('--accent-c'),
     }
+  }
+
+  // The commits with a git note, in any notes ref: one listing when the repository opens and
+  // after every reload, since a notes ref changing reloads the graph. A plain set on purpose:
+  // the canvas repaints through schedule(), not reactivity.
+  let noted = new Set<string>()
+  /** Notes read for the hover card, by commit, until the next listing. */
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const noteTexts = new Map<string, { ref: string; text: string }[]>()
+  async function loadNoted() {
+    // The marks are decoration: without an answer there are just none.
+    const ids = await NotedCommits(path).catch(() => [])
+    noted = new Set(ids ?? [])
+    noteTexts.clear()
+    schedule()
+  }
+
+  /** The note mark under the pointer, with its commit's notes once they're read. */
+  let noteCard = $state<{ index: number; id: string; top: number; right: number; notes: { ref: string; text: string }[] | null } | null>(null)
+
+  /** Whether a point in the graph is on the row's note mark. */
+  function onNoteMark(i: number, x: number): boolean {
+    const row = cache.get(i)
+    if (!row || !columns || !noted.has(row.id)) return false
+    const [from, to] = noteMarkSpan(columns)
+    return x >= from && x <= to
+  }
+
+  /** Shows the notes of the commit whose mark the pointer is on, and hides them otherwise. */
+  function updateNoteCard() {
+    const rect = scroller?.getBoundingClientRect()
+    const i = pointer && rect && !drag?.active ? rowAtY(pointer.y - rect.top + top) : -1
+    const x = pointer && rect ? pointer.x - rect.left : -1
+    const row = cache.get(i)
+    if (!row || !columns || !onNoteMark(i, x)) {
+      if (noteCard) noteCard = null
+      return
+    }
+    const place = Math.round(rowY(i) - top + rowH)
+    if (noteCard?.id === row.id && noteCard.top === place) return
+    const id = row.id
+    noteCard = { index: i, id, top: place, right: Math.round(columns.width - noteMarkSpan(columns)[1]), notes: noteTexts.get(id) ?? null }
+    if (noteTexts.has(id)) return
+    void CommitNotes(path, id)
+      .catch(() => [])
+      .then((notes) => {
+        noteTexts.set(id, notes ?? [])
+        if (noteCard?.id === id) noteCard = { ...noteCard, notes: notes ?? [] }
+      })
   }
 
   // Signature status of rows that have been on screen, fetched a screen at a time. Plain
@@ -606,7 +659,8 @@
       // During a bisect a commit wears its answer, and fades once it's out of the running.
       const place = bisectView ? bisectRow(row.id, bisectView, { bad: th.bad }) : null
       const dim = washes.value(`d${i}`, (matchSet && !matchSet.has(i)) || place?.faded ? 1 : 0, frameAt)
-      const span = drawRow(ctx, row, cache.refsFor(row.id), y, lay, th, sel, hov, dim, now, sealOf(sigs.get(row.id)), { prev: cache.get(i - 1), prev2: cache.get(i - 2), next: cache.get(i + 1) }, place?.extra)
+      const extra = noted.has(row.id) ? { ...place?.extra, noted: true } : place?.extra
+      const span = drawRow(ctx, row, cache.refsFor(row.id), y, lay, th, sel, hov, dim, now, sealOf(sigs.get(row.id)), { prev: cache.get(i - 1), prev2: cache.get(i - 2), next: cache.get(i + 1) }, extra)
       if (arriving) ctx.restore()
       if (span) labelSpans.set(i, span)
     }
@@ -634,6 +688,7 @@
     })
     if (washes.busy(frameAt)) schedule()
     updateExpanded()
+    updateNoteCard()
     updateActions()
     paintedTop = top
     // Lanes scrolled out on the left fade in from the edge, so the cut doesn't look like the end.
@@ -865,9 +920,11 @@
     document.fonts.addEventListener('loadingdone', schedule)
     void loadKinds()
     void loadFocus()
+    void loadNoted()
     const off = EventsOn('graph:progress', (p: GraphProgress) => {
       if (p.path !== path) return
       if (p.done) void loadKinds()
+      if (p.done) void loadNoted()
       cache.setTotal(p.rows, !p.done, p.paused, p.estimate)
       if (p.refsReady) cache.invalidate() // labels arrived after the first rows
       if (p.reset || p.done) widest = 1
@@ -953,7 +1010,7 @@
         }}
         type="search"
         placeholder={searchPlaceholder(level, total, loading)}
-        title="Search subjects, authors and SHAs, or a trailer such as Co-authored-by: name or Closes: #12"
+        title="Search subjects, authors and SHAs, a trailer such as Co-authored-by: name or Closes: #12, or has:note for commits with a note"
         aria-label="Search commits"
       />
       {#if query.trim()}
@@ -1019,7 +1076,11 @@
       }}
       onclick={(e) => {
         const i = rowAt(e)
-        if (i >= 0) select(i)
+        if (i < 0) return
+        select(i)
+        // A click on the note mark also asks for the note itself.
+        const row = cache.get(i)
+        if (row && onNoteMark(i, e.clientX - scroller.getBoundingClientRect().left)) onNote?.(row)
       }}
       onmousedown={(e) => {
         if (e.button !== 0 || !onDrop) return
@@ -1042,6 +1103,7 @@
         }
         pointer = { x: e.clientX, y: e.clientY }
         updateExpanded()
+        updateNoteCard()
       }}
       onmouseup={(e) => {
         const d = drag
@@ -1069,6 +1131,7 @@
         // Moving onto the row's actions keeps the row hovered, so the card stays put.
         if (!(e.relatedTarget instanceof Node && actionsEl?.contains(e.relatedTarget))) hovered = -1
         updateExpanded()
+        updateNoteCard()
         schedule()
       }}
     >
@@ -1124,6 +1187,25 @@
     {/if}
     <!-- Hover only, and it never takes the pointer: the commit panel has the same list for the
          keyboard and screen readers, and the row underneath keeps working. -->
+    <!-- The notes of the commit whose mark the pointer is on. Hover only, and it never takes the
+         pointer: the commit panel has the notes for the keyboard and screen readers, and a click on
+         the mark goes there. -->
+    {#if noteCard}
+      <div class="note-card" aria-hidden="true" style:top="{Math.min(noteCard.top, Math.max(0, viewH - 120))}px" style:right="{noteCard.right}px" in:fadeUp>
+        {#if noteCard.notes === null}
+          <p class="quiet">Reading the note…</p>
+        {:else if noteCard.notes.length === 0}
+          <p class="quiet">The note is gone.</p>
+        {:else}
+          {#each noteCard.notes as n (n.ref)}
+            <div class="one">
+              {#if n.ref !== 'refs/notes/commits'}<span class="ref">{n.ref.replace(/^refs\/notes\//, '')}</span>{/if}
+              <p>{n.text}</p>
+            </div>
+          {/each}
+        {/if}
+      </div>
+    {/if}
     <!-- The same list, asked for from the row's label button: here each label is a button that
          opens its own menu, and Escape closes the list. Tab reaches it after the row's actions. -->
     {#if pinned}
@@ -1414,6 +1496,51 @@
 
   .ref-expand.pinned {
     pointer-events: auto;
+  }
+
+  .note-card {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-sizing: border-box;
+    width: max-content;
+    max-width: min(360px, calc(100% - 16px));
+    padding: 8px 10px;
+    border: 1px solid var(--paper-edge);
+    border-radius: var(--r-md);
+    background: var(--paper);
+    box-shadow: var(--shadow);
+    pointer-events: none;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .note-card p {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    /* The first lines say what the note is; the commit panel has all of it. */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+    line-clamp: 5;
+    overflow: hidden;
+  }
+
+  .note-card .quiet {
+    color: var(--ink-mute);
+    font-style: italic;
+  }
+
+  .note-card .ref {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
   }
 
   .label-button {

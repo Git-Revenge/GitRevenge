@@ -125,7 +125,8 @@ func (a *App) emitGraphProgress(path string, p session.GraphProgress) {
 const maxSearchRows = 10000
 
 // SearchGraph finds commits whose subject or author contains query, or whose ID starts
-// with it. A query like "Co-authored-by: ada" or "Closes: #12" searches trailers instead.
+// with it. A query like "Co-authored-by: ada" or "Closes: #12" searches trailers instead,
+// and "has:note" finds the commits with a git note.
 // It searches the whole history, so it first reads the rest of it.
 func (a *App) SearchGraph(path, query string) (graph.SearchResult, error) {
 	r, err := a.openRepo(path)
@@ -138,6 +139,13 @@ func (a *App) SearchGraph(path, query string) (graph.SearchResult, error) {
 	}
 	if g == nil {
 		return graph.SearchResult{Rows: []int{}}, nil
+	}
+	if isNotesQuery(query) {
+		ids, err := r.Git.NotedCommits(context.Background())
+		if err != nil {
+			return graph.SearchResult{}, err
+		}
+		return rowsOf(g, ids, maxSearchRows), nil
 	}
 	if q, ok := git.ParseTrailerQuery(query); ok {
 		ctx, done := a.searches.start(path)
