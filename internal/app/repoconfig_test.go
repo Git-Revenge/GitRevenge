@@ -71,7 +71,7 @@ func TestRepoSettingsAreWrittenToGitConfig(t *testing.T) {
 		t.Errorf("gitrevenge.syncNotes = %q, want unset", got)
 	}
 
-	if err := a.SetKindVisible(path, "bot", false); err != nil {
+	if err := a.SetKindView(path, "bot", "hide"); err != nil {
 		t.Fatal(err)
 	}
 	if got := localConfig(t, fx, "gitrevenge.hideKind"); got != "bot" {

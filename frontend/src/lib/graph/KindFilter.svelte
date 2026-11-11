@@ -1,6 +1,6 @@
 <script lang="ts">
   // The graph header's Kinds filter: a checkbox for each kind of branch in the repository.
-  import type { KindFilterRow } from '../branchKinds'
+  import type { KindFilterRow, KindView } from '../branchKinds'
   import Icon from '../ui/Icon.svelte'
 
   let {
@@ -11,7 +11,8 @@
     rows: KindFilterRow[]
     /** No room for the word: the button is its icon, and still named Kinds. */
     iconOnly?: boolean
-    onToggle: (kind: string, visible: boolean) => void
+    /** Shows a kind in full, folds its lanes to a line a day, or hides it. */
+    onToggle: (kind: string, view: KindView) => void
   } = $props()
 
   let open = $state(false)
@@ -55,11 +56,24 @@
   {#if open}
     <div class="popover" role="group" aria-label="Kinds of branch to show">
       {#each rows as r (r.kind)}
-        <label>
-          <input type="checkbox" checked={!r.hidden} onchange={(e) => onToggle(r.kind, e.currentTarget.checked)} />
-          <span class="icon" style:color="var({r.token})"><Icon name={r.icon} size={14} /></span>
-          {r.label}
-        </label>
+        <div class="row">
+          <label>
+            <input type="checkbox" checked={!r.hidden} onchange={(e) => onToggle(r.kind, e.currentTarget.checked ? (r.foldable ? 'fold' : 'show') : 'hide')} />
+            <span class="icon" style:color="var({r.token})"><Icon name={r.icon} size={14} /></span>
+            {r.label}
+          </label>
+          {#if r.foldable}
+            <button
+              class="btn sm quiet fold"
+              class:pressed={r.folded && !r.hidden}
+              aria-pressed={r.folded && !r.hidden}
+              aria-label="Fold {r.label} lanes to one line a day"
+              title={r.folded ? `${r.label} lanes take one line a day. Press to show every commit.` : `Every ${r.label} commit shows. Press to fold each lane to one line a day.`}
+              disabled={r.hidden}
+              onclick={() => onToggle(r.kind, r.folded ? 'show' : 'fold')}>Fold</button
+            >
+          {/if}
+        </div>
       {/each}
     </div>
   {/if}
@@ -92,7 +106,26 @@
     animation: drop-in var(--dur-base) var(--ease-ink);
   }
 
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .fold {
+    min-width: 0;
+    height: 24px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .fold.pressed {
+    background: var(--paper-deep);
+    color: var(--ink);
+  }
+
   label {
+    flex: 1;
     display: flex;
     align-items: center;
     gap: 8px;

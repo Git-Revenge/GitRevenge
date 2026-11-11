@@ -80,6 +80,7 @@ func TestSaveAndLoad(t *testing.T) {
 		Kinds:         map[string][]string{"release": {"release/*", "hotfix/*"}, "docs": {}},
 		Hide:          []string{"wip/*", "spike/*"},
 		HideKinds:     []string{"bot"},
+		ShowKinds:     []string{"docs"},
 		CleanupOnPull: true,
 		SyncNotes:     true,
 		StackParents:  map[string]string{"feature/b": "feature/a", "feature/c.d": ""},

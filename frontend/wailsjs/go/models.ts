@@ -1148,6 +1148,8 @@ export namespace app {
 	    kinds: KindPatterns[];
 	    hide: string[];
 	    hideKinds: string[];
+	    showKinds: string[];
+	    foldableKinds: string[];
 	    cleanupOnPull: boolean;
 	    syncNotes: boolean;
 	
@@ -1160,6 +1162,8 @@ export namespace app {
 	        this.kinds = this.convertValues(source["kinds"], KindPatterns);
 	        this.hide = source["hide"];
 	        this.hideKinds = source["hideKinds"];
+	        this.showKinds = source["showKinds"];
+	        this.foldableKinds = source["foldableKinds"];
 	        this.cleanupOnPull = source["cleanupOnPull"];
 	        this.syncNotes = source["syncNotes"];
 	    }

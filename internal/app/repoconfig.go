@@ -28,6 +28,7 @@ func toRepoConfig(rs settings.RepoSettings, thresholds *[4]int) repoconfig.Setti
 	c := repoconfig.Settings{
 		Hide:          slices.Clone(rs.Hide),
 		HideKinds:     slices.Clone(rs.HideKinds),
+		ShowKinds:     slices.Clone(rs.ShowKinds),
 		CleanupOnPull: rs.CleanupOnPull,
 		SyncNotes:     rs.SyncNotes,
 		StackParents:  maps.Clone(rs.StackParents),
@@ -38,6 +39,9 @@ func toRepoConfig(rs settings.RepoSettings, thresholds *[4]int) repoconfig.Setti
 	}
 	if len(c.HideKinds) == 0 {
 		c.HideKinds = nil
+	}
+	if len(c.ShowKinds) == 0 {
+		c.ShowKinds = nil
 	}
 	if len(c.StackParents) == 0 {
 		c.StackParents = nil
@@ -57,6 +61,7 @@ func fromRepoConfig(root string, c repoconfig.Settings) settings.RepoSettings {
 		Path:          root,
 		Hide:          slices.Clone(c.Hide),
 		HideKinds:     slices.Clone(c.HideKinds),
+		ShowKinds:     slices.Clone(c.ShowKinds),
 		CleanupOnPull: c.CleanupOnPull,
 		SyncNotes:     c.SyncNotes,
 		StackParents:  maps.Clone(c.StackParents),

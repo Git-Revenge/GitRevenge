@@ -28,8 +28,13 @@ type RepoPreferences struct {
 	Kinds []KindPatterns `json:"kinds"`
 	// Hide lists patterns of branches to leave out of the sidebar and the graph.
 	Hide []string `json:"hide"`
-	// HideKinds lists kinds whose branches are hidden (the graph's Docs and Bots toggles).
-	HideKinds     []string `json:"hideKinds"`
+	// HideKinds lists kinds whose branches are hidden (the graph's Kinds menu).
+	HideKinds []string `json:"hideKinds"`
+	// ShowKinds lists the kinds shown in full among those whose lanes otherwise fold to a line
+	// a day (see FoldableKinds).
+	ShowKinds []string `json:"showKinds"`
+	// FoldableKinds are the kinds whose lanes can fold: machine commits, not somebody's work.
+	FoldableKinds []string `json:"foldableKinds"`
 	CleanupOnPull bool     `json:"cleanupOnPull"`
 	SyncNotes     bool     `json:"syncNotes"`
 }
@@ -42,7 +47,7 @@ func (a *App) RepoPreferences(path string) (RepoPreferences, error) {
 		return RepoPreferences{}, err
 	}
 	rs := m.Settings().Get().Repo(path)
-	out := RepoPreferences{Hide: nonNil(rs.Hide), HideKinds: nonNil(rs.HideKinds), CleanupOnPull: rs.CleanupOnPull, SyncNotes: rs.SyncNotes}
+	out := RepoPreferences{Hide: nonNil(rs.Hide), HideKinds: nonNil(rs.HideKinds), ShowKinds: nonNil(rs.ShowKinds), FoldableKinds: slices.Clone(foldableKinds), CleanupOnPull: rs.CleanupOnPull, SyncNotes: rs.SyncNotes}
 	for _, k := range branchkind.Order {
 		kp := KindPatterns{Kind: string(k), Defaults: nonNil(branchkind.Defaults[k])}
 		if p, ok := rs.Kinds[string(k)]; ok {
@@ -101,8 +106,10 @@ func (a *App) SetRepoPreferences(path string, p RepoPreferences) error {
 		return err
 	}
 	err = a.updateRepoSettings(m, path, func(cur *settings.RepoSettings) {
-		// Stack parents aren't part of these preferences: they stay as they are.
+		// Stack parents, and which folding kinds are shown in full, aren't part of these
+		// preferences: they stay as they are.
 		rs.StackParents = cur.StackParents
+		rs.ShowKinds = cur.ShowKinds
 		*cur = rs
 	})
 	if err != nil {
@@ -210,12 +217,35 @@ func (a *App) MarkBranchKind(path, name, kind string) error {
 	return nil
 }
 
-// SetKindVisible shows or hides every branch of a kind in the repository at path, as the
-// graph's Kinds filter does.
-func (a *App) SetKindVisible(path, kind string, visible bool) error {
+// foldableKinds are the kinds whose lanes the graph folds to one line a day: commits a
+// machine made, not somebody's work. Folding goes by the lane's kind, never by guessing from
+// an author's name.
+var foldableKinds = []string{string(branchkind.Bot), string(branchkind.Docs)}
+
+// How the graph shows a kind's branches, as its Kinds menu offers.
+const (
+	kindShown  = "show"
+	kindFolded = "fold"
+	kindHidden = "hide"
+)
+
+// SetKindView sets how the graph shows every branch of a kind in the repository at path:
+// "show" in full, "hide", or "fold", which is how Bot and Docs lanes show unless told
+// otherwise: one line a day for each. Other kinds don't fold.
+func (a *App) SetKindView(path, kind, view string) error {
 	path = a.repoKey(path)
 	if !branchkind.Valid(branchkind.Kind(kind)) {
 		return userError("Unknown branch kind " + kind + ".")
+	}
+	folds := slices.Contains(foldableKinds, kind)
+	switch view {
+	case kindShown, kindHidden:
+	case kindFolded:
+		if !folds {
+			return userError("Only Bot and Docs lanes fold.")
+		}
+	default:
+		return userError("Unknown way to show a kind: " + view + ".")
 	}
 	m, err := a.sessions()
 	if err != nil {
@@ -223,8 +253,13 @@ func (a *App) SetKindVisible(path, kind string, visible bool) error {
 	}
 	err = a.updateRepoSettings(m, path, func(rs *settings.RepoSettings) {
 		rs.HideKinds = slices.DeleteFunc(rs.HideKinds, func(k string) bool { return k == kind })
-		if !visible {
+		rs.ShowKinds = slices.DeleteFunc(rs.ShowKinds, func(k string) bool { return k == kind })
+		switch {
+		case view == kindHidden:
 			rs.HideKinds = append(rs.HideKinds, kind)
+		case view == kindShown && folds:
+			// Folding is what these kinds do when nothing is said, so showing is what's stored.
+			rs.ShowKinds = append(rs.ShowKinds, kind)
 		}
 	})
 	if err != nil {

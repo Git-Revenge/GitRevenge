@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CONFIRM_DELETE, CONFIRM_FORCE_PUSH, kindFilterRows, kindInfo, kindWarning } from './branchKinds'
+import { CONFIRM_DELETE, CONFIRM_FORCE_PUSH, foldingKinds, kindFilterRows, kindInfo, kindWarning } from './branchKinds'
 
 describe('kindFilterRows', () => {
   it('lists the kinds the repository has, in the usual order', () => {
@@ -18,6 +18,29 @@ describe('kindFilterRows', () => {
 
   it('ignores a kind it does not know', () => {
     expect(kindFilterRows([{ branchKind: 'nightly' }], ['nightly'])).toEqual([])
+  })
+
+  // #624: Bot and Docs lanes fold to a line a day unless they're shown in full.
+  it('says which kinds can fold, and which do', () => {
+    const refs = [{ branchKind: 'trunk' }, { branchKind: 'docs' }, { branchKind: 'bot' }]
+    const rows = kindFilterRows(refs, [], ['bot'], ['bot', 'docs'])
+    expect(rows.map((r) => [r.kind, r.foldable, r.folded])).toEqual([
+      ['trunk', false, false],
+      ['docs', true, true],
+      ['bot', true, false],
+    ])
+  })
+
+  it('folds nothing when told of no kinds that can', () => {
+    expect(kindFilterRows([{ branchKind: 'docs' }], []).every((r) => !r.foldable && !r.folded)).toBe(true)
+  })
+})
+
+describe('foldingKinds', () => {
+  it('is the kinds that can fold, less those shown in full', () => {
+    expect([...foldingKinds(['bot', 'docs'], [])]).toEqual(['bot', 'docs'])
+    expect([...foldingKinds(['bot', 'docs'], ['docs'])]).toEqual(['bot'])
+    expect(foldingKinds([], ['docs']).size).toBe(0)
   })
 })
 

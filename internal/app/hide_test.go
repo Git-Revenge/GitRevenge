@@ -1,6 +1,7 @@
 package app
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -165,7 +166,7 @@ func TestKindToggleAndLaneKinds(t *testing.T) {
 		t.Fatalf("row kinds = %v", kinds)
 	}
 
-	if err := a.SetKindVisible(tab.Path, "docs", false); err != nil {
+	if err := a.SetKindView(tab.Path, "docs", "hide"); err != nil {
 		t.Fatal(err)
 	}
 	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
@@ -180,7 +181,37 @@ func TestKindToggleAndLaneKinds(t *testing.T) {
 	if len(p.HideKinds) != 1 || p.HideKinds[0] != "docs" {
 		t.Fatalf("hideKinds = %v", p.HideKinds)
 	}
-	if err := a.SetKindVisible(tab.Path, "nightly", true); err == nil {
+	if err := a.SetKindView(tab.Path, "nightly", "show"); err == nil {
 		t.Fatal("accepted an unknown kind")
+	}
+	// Docs lanes fold unless they're shown in full; showing is what gets stored, and it
+	// takes the kind out of hiding.
+	if p.ShowKinds == nil || len(p.ShowKinds) != 0 || !slices.Contains(p.FoldableKinds, "docs") || !slices.Contains(p.FoldableKinds, "bot") {
+		t.Fatalf("show = %v, foldable = %v", p.ShowKinds, p.FoldableKinds)
+	}
+	if err := a.SetKindView(tab.Path, "docs", "show"); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := a.RepoPreferences(tab.Path); len(p.HideKinds) != 0 || !slices.Equal(p.ShowKinds, []string{"docs"}) {
+		t.Fatalf("after show: hide = %v, show = %v", p.HideKinds, p.ShowKinds)
+	}
+	if err := a.SetKindView(tab.Path, "docs", "fold"); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := a.RepoPreferences(tab.Path); len(p.HideKinds) != 0 || len(p.ShowKinds) != 0 {
+		t.Fatalf("after fold: hide = %v, show = %v", p.HideKinds, p.ShowKinds)
+	}
+	// Kinds that are somebody's work don't fold, and showing them stores nothing.
+	if err := a.SetKindView(tab.Path, "release", "fold"); err == nil {
+		t.Fatal("folded a Release lane")
+	}
+	if err := a.SetKindView(tab.Path, "release", "show"); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := a.RepoPreferences(tab.Path); len(p.ShowKinds) != 0 {
+		t.Fatalf("showing a kind that doesn't fold stored %v", p.ShowKinds)
+	}
+	if err := a.SetKindView(tab.Path, "docs", "sideways"); err == nil {
+		t.Fatal("accepted an unknown view")
 	}
 }
