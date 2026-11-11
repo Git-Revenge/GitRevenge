@@ -4,7 +4,7 @@
   import { errorText } from '../errors'
   import { onMount, tick, untrack, type Snippet } from 'svelte'
   import { ALONE_STEPS, searchPlaceholder, SQUEEZE, squeezeFor } from '../barSqueeze'
-  import { ArrivedCommits, CommitNotes, CommitRow, CommitSignatures, GraphFocus, HeadCommit, OwnMoveAge, GraphRows, NotedCommits, Refs, RepoPreferences, SearchGraph, SetGraphFocus, SetKindView } from '../../../wailsjs/go/app/App.js'
+  import { ArrivedCommits, CommitNotes, CommitRow, CommitSignatures, GraphFocus, HeadCommit, OwnMoveAge, GraphRows, NotedCommits, Refs, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView } from '../../../wailsjs/go/app/App.js'
   import { session } from '../session.svelte'
   import { ClipboardSetText, EventsOn } from '../../../wailsjs/runtime/runtime.js'
   import { theme as colorTheme } from '../theme.svelte'
@@ -18,6 +18,7 @@
   import { loadLabelWidth, nextLabelWidth, REFIT_AFTER_MS, saveLabelWidth } from './labelColumn'
   import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
   import { anchorAt, anchorFor, anchorForBottom, clampToEnd, compareAnchors, distance, endAnchor, layout, moveBy, ownHeight, position, rowAt as viewRowAt, START, yOf, type Anchor, type SlotRow, type Slots, type ViewRow } from './rows'
+  import { boxFor, monthAt, monthLabel, percentThrough, placeTicks, positionFor, RULER_W, tickAt, tickSummary, unreadFrom, type MonthMark, type Tick } from './ruler'
   import { scrollMap } from './scrollMap'
   import { Washes, landWash } from './tween'
   import type { BisectMarks } from '../bisect.svelte'
@@ -106,6 +107,160 @@
   let unseen = 0
   /** The button that goes to the checked-out commit, while that commit is out of view. */
   let goHead = $state<{ dir: 'up' | 'down'; label: string; count: number } | null>(null)
+
+  // The ruler: the scrollbar, with the history marked on it (see ruler.ts).
+  /** The rows' id, which the ruler says it scrolls. One per graph: several can be open in tabs. */
+  const gridId = `graph-rows-${Math.random().toString(36).slice(2, 8)}`
+  let rulerEl = $state<HTMLDivElement>()
+  let rulerCanvas = $state<HTMLCanvasElement>()
+  /** Where the branches, tags, notes and months are among the rows read so far. */
+  let marks: { loaded: number; months: MonthMark[]; tips: number[]; tags: number[]; notes: number[] } = { loaded: 0, months: [], tips: [], tags: [], notes: [] }
+  let marksAt = 0
+  async function loadMarks() {
+    marksAt = performance.now()
+    // The marks are decoration: without an answer the ruler is a plain scrollbar.
+    const m = await RulerMarks(path).catch(() => null)
+    if (!m) return
+    marks = { loaded: m.loaded, months: m.months ?? [], tips: m.tips ?? [], tags: m.tags ?? [], notes: m.notes ?? [] }
+    ticksFor = null
+    schedule()
+  }
+  /** The box that shows what's in view, how far through the history that is, and what a
+   * screen reader hears of it. */
+  let box = $state({ top: 0, height: 0 })
+  let through = $state(0)
+  let throughText = $state('')
+  /** The month under the box while it's dragged, and what the tick under the pointer is. */
+  let dragMonth = $state('')
+  let rulerTitle = $state('')
+  /** The ticks as last placed, and what they were placed from. */
+  let ticks: Tick[] = []
+  let ticksFor: { count: number; height: number; head: number; matches: number[]; marks: typeof marks } | null = null
+  /** How many slots show, as last painted. */
+  let visibleSlots = 1
+  /** A drag of the box: how far into the box it was grabbed. */
+  let rulerDrag: { grab: number } | null = null
+
+  /** Puts the view where a box with its top edge at `top` would show. */
+  function rulerTo(top: number) {
+    const height = viewHeight()
+    glide = null
+    // At the foot of its travel the box means the very end: the last row at the bottom of the
+    // view, however tall the rows there turn out to be once they're read.
+    if (top >= height - box.height - 0.5) setAnchor(endAnchor(slots, height))
+    else setAnchor(anchorAt(slots, positionFor(top, visibleSlots, slots.count, height)))
+    const when = monthAt(marks.months, Math.max(0, commitOf(anchor.index)))
+    dragMonth = when === null ? '' : monthLabel(when)
+  }
+  function rulerDown(e: PointerEvent) {
+    if (e.button !== 0 || !rulerEl) return
+    const y = e.clientY - rulerEl.getBoundingClientRect().top
+    // On the box: drag it from where it was taken. Off it: the box comes to the pointer, and
+    // the drag carries on from its middle.
+    const onBox = y >= box.top && y <= box.top + box.height
+    rulerDrag = { grab: onBox ? y - box.top : box.height / 2 }
+    rulerEl.setPointerCapture(e.pointerId)
+    if (!onBox) rulerTo(y - rulerDrag.grab)
+    e.preventDefault()
+  }
+  function rulerMove(e: PointerEvent) {
+    if (!rulerEl) return
+    const y = e.clientY - rulerEl.getBoundingClientRect().top
+    if (rulerDrag) {
+      rulerTo(y - rulerDrag.grab)
+      return
+    }
+    const tick = tickAt(ticks, y)
+    const title = tick ? tickSummary(tick) : ''
+    if (title !== rulerTitle) rulerTitle = title
+  }
+  function rulerUp() {
+    rulerDrag = null
+    dragMonth = ''
+  }
+
+  /** Paints the ruler's track: the part of the history not read yet, the months, the ticks. */
+  function drawRuler(h: number, th: Theme) {
+    const count = slots.count
+    const first = viewRows[0]?.slot ?? anchor.index
+    const last = viewRows[viewRows.length - 1]?.slot ?? first
+    visibleSlots = Math.max(1, last - first + 1)
+    const at = position(slots, anchor)
+    const next = boxFor(at, visibleSlots, count, h)
+    if (Math.abs(next.top - box.top) > 0.25 || Math.abs(next.height - box.height) > 0.25) box = next
+    const pct = percentThrough(at, visibleSlots, count)
+    if (pct !== through) through = pct
+    const text = span ? `Commit ${(Math.max(0, commitOf(first)) + 1).toLocaleString()} of ${loading && estimate > total ? 'about ' : ''}${span.toLocaleString()}` : ''
+    if (text !== throughText) throughText = text
+    if (!rulerCanvas) return
+    const dpr = window.devicePixelRatio || 1
+    if (rulerCanvas.width !== Math.round(RULER_W * dpr) || rulerCanvas.height !== Math.round(h * dpr)) {
+      rulerCanvas.width = Math.round(RULER_W * dpr)
+      rulerCanvas.height = Math.round(h * dpr)
+      rulerCanvas.style.width = `${RULER_W}px`
+      rulerCanvas.style.height = `${h}px`
+    }
+    const ctx = rulerCanvas.getContext('2d')!
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, RULER_W, h)
+    // The rows not read yet: a hatched stretch at the foot. Going there reads them.
+    const unread = unreadFrom(slotOf(total), count, h)
+    if (unread !== null) {
+      ctx.save()
+      ctx.beginPath()
+      ctx.rect(0, unread, RULER_W, h - unread)
+      ctx.clip()
+      ctx.strokeStyle = th.muted
+      ctx.globalAlpha = 0.28
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      for (let y = unread - RULER_W; y < h; y += 5) {
+        ctx.moveTo(0, y + RULER_W)
+        ctx.lineTo(RULER_W, y)
+      }
+      ctx.stroke()
+      ctx.restore()
+    }
+    // A faint line where each month begins.
+    ctx.fillStyle = th.muted
+    ctx.globalAlpha = 0.22
+    for (const m of marks.months) {
+      if (!m.row) continue
+      ctx.fillRect(1, Math.round((slotOf(m.row) / Math.max(1, count)) * h), RULER_W - 1, 1)
+    }
+    ctx.globalAlpha = 1
+    const head = headRow >= 0 ? slotOf(headRow) : -1
+    if (!ticksFor || ticksFor.count !== count || ticksFor.height !== h || ticksFor.head !== head || ticksFor.matches !== matches || ticksFor.marks !== marks) {
+      ticks = placeTicks({ head, tips: marks.tips.map(slotOf), tags: marks.tags.map(slotOf), notes: marks.notes.map(slotOf), matches: matches.map(slotOf) }, count, h)
+      ticksFor = { count, height: h, head, matches, marks }
+    }
+    // Each kind is a different length and place as well as a colour.
+    for (const t of ticks) {
+      const y = Math.round(t.y)
+      if (t.tips) {
+        ctx.fillStyle = th.soft
+        ctx.fillRect(3, y, 6, 2)
+      }
+      if (t.tags) {
+        ctx.fillStyle = th.note
+        ctx.fillRect(3, y, 9, 2)
+      }
+      if (t.notes) {
+        ctx.fillStyle = th.teal
+        ctx.fillRect(9, y - 1, 4, 4)
+      }
+      if (t.matches) {
+        ctx.fillStyle = th.link
+        ctx.beginPath()
+        ctx.arc(RULER_W / 2 + 0.5, y + 1, 2, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      if (t.head) {
+        ctx.fillStyle = th.link
+        ctx.fillRect(1, y - 1, RULER_W - 1, 4)
+      }
+    }
+  }
   /** What a screen reader hears when the view follows a branch. */
   let announce = $state('')
 
@@ -872,7 +1027,7 @@
     const place = Math.round(relY(i) + heightOf(i))
     if (noteCard?.id === row.id && noteCard.top === place) return
     const id = row.id
-    noteCard = { index: i, id, top: place, right: Math.round(columns.width - noteMarkSpan(columns)[1]), notes: noteTexts.get(id) ?? null }
+    noteCard = { index: i, id, top: place, right: Math.round(columns.width - noteMarkSpan(columns)[1]) + RULER_W, notes: noteTexts.get(id) ?? null }
     if (noteTexts.has(id)) return
     void CommitNotes(path, id)
       .catch(() => [])
@@ -938,7 +1093,8 @@
       else schedule()
     }
     const dpr = window.devicePixelRatio || 1
-    const w = scroller.clientWidth
+    // The rows stop where the ruler begins.
+    const w = Math.max(0, scroller.clientWidth - RULER_W)
     const h = scroller.clientHeight
     // Hidden while a file is open. Coming back resizes it, which draws it again.
     if (!w || !h) return
@@ -1126,6 +1282,7 @@
     if (!away) unseen = 0
     const wanted = away && (settled || goHead) ? { dir: away, label: headLabel(tips!.head, tips!.headCommit), count: unseen } : null
     if (wanted?.dir !== goHead?.dir || wanted?.label !== goHead?.label || wanted?.count !== goHead?.count) goHead = wanted
+    drawRuler(h, th)
     paintedAnchor = anchor
     // Lanes scrolled out on the left fade in from the edge, so the cut doesn't look like the end.
     if (firstLane > 0) {
@@ -1417,11 +1574,14 @@
     void document.fonts.ready.then(schedule)
     document.fonts.addEventListener('loadingdone', schedule)
     void readTips().then((t) => (tips = t))
+    void loadMarks()
     void loadFocus()
     void loadNoted()
     const off = EventsOn('graph:progress', (p: GraphProgress) => {
       if (p.path !== path) return
       if (p.done) void loadNoted()
+      // The ruler's marks follow the history as it's read, a couple of seconds apart at most.
+      if (p.done || performance.now() - marksAt > 2000) void loadMarks()
       cache.setTotal(p.rows, !p.done, p.paused, p.estimate)
       if (p.refsReady) cache.invalidate() // labels arrived after the first rows
       if (p.reset || p.done) widest = 1
@@ -1553,6 +1713,7 @@
     <div
       class="scroller"
       bind:this={scroller}
+      id={gridId}
       tabindex="0"
       role="grid"
       aria-label="Commit history"
@@ -1643,6 +1804,32 @@
       }}
     >
       <div class="spacer" style:height="{map.spacer}px"></div>
+    </div>
+    <!-- The ruler: the scrollbar, with the history marked on it. Its box can be dragged, and a
+         press anywhere on it goes there. It isn't a Tab stop: the graph's own keys scroll, and
+         everything a tick points at is reachable another way. -->
+    <div
+      class="ruler"
+      bind:this={rulerEl}
+      role="scrollbar"
+      tabindex="-1"
+      aria-controls={gridId}
+      aria-label="Position in the history"
+      aria-orientation="vertical"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow={through}
+      aria-valuetext={throughText}
+      title={rulerTitle}
+      onpointerdown={rulerDown}
+      onpointermove={rulerMove}
+      onpointerup={rulerUp}
+      onpointercancel={rulerUp}
+      onwheel={(e) => scrollBy(e.deltaY)}
+    >
+      <canvas bind:this={rulerCanvas}></canvas>
+      <div class="ruler-box" class:dragging={!!dragMonth} style:top="{box.top}px" style:height="{box.height}px"></div>
+      {#if dragMonth}<span class="ruler-when" style:top="{box.top + box.height / 2}px">{dragMonth}</span>{/if}
     </div>
     <!-- The hovered row's actions, or the selected row's while the graph has focus: copy the
          SHA, and the same menu right-click opens. Nothing here changes the repository on one
@@ -1995,6 +2182,63 @@
     overflow-y: auto;
     overflow-x: hidden;
     outline: none;
+    /* The ruler is the scrollbar. The scroll area stays for the wheel and the keyboard. */
+    scrollbar-width: none;
+  }
+
+  .scroller::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ruler {
+    position: absolute;
+    z-index: 3;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 14px;
+    box-sizing: border-box;
+    border-left: 1px solid var(--hairline);
+    background: var(--paper-warm);
+    touch-action: none;
+    cursor: default;
+  }
+
+  .ruler canvas {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .ruler-box {
+    position: absolute;
+    left: 1px;
+    right: 0;
+    box-sizing: border-box;
+    border: 1px solid var(--ink-mute);
+    border-radius: var(--r-xs, 3px);
+    background: var(--wash-hover);
+    pointer-events: none;
+  }
+
+  .ruler:hover .ruler-box,
+  .ruler-box.dragging {
+    border-color: var(--ink);
+  }
+
+  /* The month under the box, beside it while it's dragged. */
+  .ruler-when {
+    position: absolute;
+    right: 20px;
+    transform: translateY(-50%);
+    padding: 2px 8px;
+    border-radius: var(--r-sm);
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    white-space: nowrap;
+    pointer-events: none;
   }
 
   .spacer {
@@ -2170,7 +2414,8 @@
   .row-actions {
     position: absolute;
     z-index: 2;
-    right: 8px;
+    /* Clear of the ruler. */
+    right: 22px;
     display: flex;
     gap: 2px;
     padding: 2px;

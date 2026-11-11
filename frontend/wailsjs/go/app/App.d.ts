@@ -264,6 +264,8 @@ export function RestoreSession():Promise<app.SessionState>;
 
 export function RestoreStack(arg1:string,arg2:Array<string>,arg3:Record<string, string>):Promise<void>;
 
+export function RulerMarks(arg1:string):Promise<app.RulerMarks>;
+
 export function RunOperationAction(arg1:string,arg2:string):Promise<void>;
 
 export function SaveFile(arg1:string,arg2:string,arg3:string):Promise<string>;

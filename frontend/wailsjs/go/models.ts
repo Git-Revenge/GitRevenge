@@ -1234,6 +1234,44 @@ export namespace app {
 	        this.head = source["head"];
 	    }
 	}
+	export class RulerMarks {
+	    loaded: number;
+	    months: graph.MonthMark[];
+	    tips: number[];
+	    tags: number[];
+	    notes: number[];
+	
+	    static createFrom(source: any = {}) {
+	        return new RulerMarks(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loaded = source["loaded"];
+	        this.months = this.convertValues(source["months"], graph.MonthMark);
+	        this.tips = source["tips"];
+	        this.tags = source["tags"];
+	        this.notes = source["notes"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class SessionState {
 	    tabs: RepoTab[];
 	    active: string;
@@ -2502,6 +2540,20 @@ export namespace gitconfig {
 
 export namespace graph {
 	
+	export class MonthMark {
+	    row: number;
+	    time: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MonthMark(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.row = source["row"];
+	        this.time = source["time"];
+	    }
+	}
 	export class Seg {
 	    from: number;
 	    to: number;
