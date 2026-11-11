@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clip, DATE_COLUMN, noteMarkSpan, middleCut, fitLabelColumn, LABEL_COLUMN, labelColumnNeed, moreLabels, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine, bisectRow, startsRun, RUN_PAUSE } from './draw'
+import { clip, DATE_COLUMN, noteMarkSpan, middleCut, fitLabelColumn, LABEL_COLUMN, labelColumnNeed, moreLabels, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine, bisectRow, startsRun, RUN_PAUSE, dayLineLabel, dayLineSpoken, gapLabel, dayCountLabel } from './draw'
 import type { Ref, Row } from './rowCache'
 
 describe('graph geometry', () => {
@@ -452,28 +452,56 @@ describe('dayLabel', () => {
 })
 
 describe('metaLine', () => {
-  const now = new Date(2026, 9, 29, 12).getTime() / 1000
-  const day = (d: number, h: number) => new Date(2026, 9, d, h).getTime() / 1000
-  const row = (author: string, authorTime: number, col = 0, parents = 1): Row => ({ index: 0, col, color: 0, up: [], down: [], width: 1, id: 'x', parents, author, authorTime, subject: 's' })
+  it('says who and when, and leaves the day to the day line', () => {
+    const at = new Date(2026, 9, 29, 9).getTime() / 1000
+    const m = metaLine({ author: 'Ana', authorTime: at })
+    expect(m).toMatch(/^Ana · /)
+    expect(m).not.toMatch(/Today|Yesterday|Oct/)
+  })
+})
 
-  it('names the day, author and time on the first row of a day, without a divider when nothing is above', () => {
-    const m = metaLine(row('Ana', day(29, 9)), {}, now)
-    expect(m.text).toMatch(/^Today · Ana · /)
-    expect(m.divider).toBe(false)
+// #623: the day is a line of its own.
+describe('the day line', () => {
+  const now = new Date(2026, 10, 10, 12).getTime() / 1000
+  const day = (y: number, m: number, d: number, h = 9) => new Date(y, m - 1, d, h).getTime() / 1000
+
+  it('names today and yesterday with their dates, and other days by weekday', () => {
+    expect(dayLineLabel(day(2026, 11, 10), now)).toMatch(/^Today · \S+ 10$|^Today · 10 \S+$/)
+    expect(dayLineLabel(day(2026, 11, 9), now)).toMatch(/^Yesterday · /)
+    expect(dayLineLabel(day(2026, 11, 2), now)).toBe(dayLabel(day(2026, 11, 2), now))
+    expect(dayLineLabel(day(2026, 11, 2), now)).not.toMatch(/Today|Yesterday/)
   })
 
-  it('draws the divider when the loaded row above is from another day', () => {
-    const m = metaLine(row('Ana', day(28, 18)), { prev: row('Ana', day(29, 9)) }, now)
-    expect(m.text).toMatch(/^Yesterday · Ana · /)
-    expect(m.divider).toBe(true)
+  it('says the day in full for a screen reader', () => {
+    expect(dayLineSpoken(day(2026, 11, 9), now)).toMatch(/^Yesterday, /)
+    expect(dayLineSpoken(day(2026, 11, 9), now)).toMatch(/November/)
+    expect(dayLineSpoken(day(2026, 11, 2), now)).not.toMatch(/Yesterday|2026/)
+    expect(dayLineSpoken(day(2024, 3, 4), now)).toMatch(/2024/)
   })
 
-  it('drops the day inside it, and always says who: only a commit that starts a run has this line', () => {
-    const prev = row('Ana', day(29, 10))
-    const other = metaLine(row('Ben', day(29, 9)), { prev }, now)
-    expect(other.text).toMatch(/^Ben · /)
-    expect(other.divider).toBe(false)
-    expect(metaLine(row('Ana', day(29, 9)), { prev }, now).text).toMatch(/^Ana · /)
+  it('says nothing of a gap of a week or less', () => {
+    expect(gapLabel(day(2026, 11, 10), day(2026, 11, 9))).toBe('')
+    expect(gapLabel(day(2026, 11, 10), day(2026, 11, 3))).toBe('')
+  })
+
+  it('says a longer gap in weeks, then months, then years', () => {
+    expect(gapLabel(day(2026, 11, 10), day(2026, 11, 2))).toBe('1 week earlier')
+    expect(gapLabel(day(2026, 11, 10), day(2026, 10, 30))).toBe('2 weeks earlier')
+    expect(gapLabel(day(2026, 11, 10), day(2026, 10, 20))).toBe('3 weeks earlier')
+    expect(gapLabel(day(2026, 11, 10), day(2026, 8, 10))).toBe('3 months earlier')
+    expect(gapLabel(day(2026, 11, 10), day(2024, 11, 10))).toBe('2 years earlier')
+  })
+
+  it('counts the commits, and the people once there is more than one', () => {
+    expect(dayCountLabel(41, 1, true)).toBe('41 commits')
+    expect(dayCountLabel(1, 1, true)).toBe('1 commit')
+    expect(dayCountLabel(31, 6, true)).toBe('31 commits · 6 people')
+  })
+
+  it("marks a count that runs on past what's loaded", () => {
+    expect(dayCountLabel(41, 1, false)).toBe('41+ commits')
+    expect(dayCountLabel(1, 1, false)).toBe('1+ commits')
+    expect(dayCountLabel(200, 3, false)).toBe('200+ commits · 3 people')
   })
 })
 

@@ -115,23 +115,149 @@ export function timeLabel(unixSeconds: number): string {
   return timeFmt.format(new Date(unixSeconds * 1000))
 }
 
-/** What the second line says under a commit that starts a run, given its neighbours. */
-export interface MetaLine {
-  text: string
-  /** The row starts a new day after a loaded row, so it draws the day's hairline. */
-  divider: boolean
+/** The second line of a timeline row, which only a commit that starts a run has (see
+ * `startsRun`): who and when. The day is on the day line above. */
+export function metaLine(row: Pick<Row, 'author' | 'authorTime'>): string {
+  return `${row.author} · ${timeLabel(row.authorTime)}`
 }
 
-/** The second line of a timeline row, which only a commit that starts a run has (see
- * `startsRun`): who and when. The first row of a day names the day too. A row whose previous
- * row isn't loaded yet names its day, to be safe, but draws no divider. */
-export function metaLine(row: Pick<Row, 'author' | 'authorTime'>, near: Near, nowSeconds: number): MetaLine {
-  const prev = near.prev
-  const newDay = !prev || !sameDay(prev.authorTime, row.authorTime)
-  const time = timeLabel(row.authorTime)
-  if (newDay) return { text: `${dayLabel(row.authorTime, nowSeconds)} · ${row.author} · ${time}`, divider: !!prev }
-  return { text: `${row.author} · ${time}`, divider: false }
+/** How tall the timeline's day line is. */
+export const DAY_H = 26
+
+const monthDay = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
+const longDay = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+const longDayYear = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+
+/** A day as its line names it: "Today · Nov 10", "Yesterday · Nov 9", then "Mon, Nov 2" (with
+ * the year once it isn't this year's). */
+export function dayLineLabel(unixSeconds: number, nowSeconds: number): string {
+  const name = dayLabel(unixSeconds, nowSeconds)
+  return name === 'Today' || name === 'Yesterday' ? `${name} · ${monthDay.format(new Date(unixSeconds * 1000))}` : name
 }
+
+/** A day in full, for a screen reader: "Yesterday, Monday, November 9". */
+export function dayLineSpoken(unixSeconds: number, nowSeconds: number): string {
+  const d = new Date(unixSeconds * 1000)
+  const full = (d.getFullYear() === new Date(nowSeconds * 1000).getFullYear() ? longDay : longDayYear).format(d)
+  const name = dayLabel(unixSeconds, nowSeconds)
+  return name === 'Today' || name === 'Yesterday' ? `${name}, ${full}` : full
+}
+
+/** What a day line says about a long silence before it: nothing for a week or less, then
+ * "1 week earlier", "3 weeks earlier", "3 months earlier", "2 years earlier". `newer` is the day
+ * above. */
+export function gapLabel(newerSeconds: number, olderSeconds: number): string {
+  const days = Math.floor((newerSeconds - olderSeconds) / 86400)
+  if (days <= 7) return ''
+  if (days < 11) return '1 week earlier'
+  if (days < 60) return `${Math.round(days / 7)} weeks earlier`
+  if (days < 730) return `${Math.round(days / 30.4)} months earlier`
+  return `${Math.round(days / 365.25)} years earlier`
+}
+
+/** A day's commits as its line counts them: "41 commits", "1 commit", with the people once
+ * there's more than one ("31 commits · 6 people"), and a plus when the day runs on past what's
+ * loaded ("41+ commits"). */
+export function dayCountLabel(commits: number, people: number, complete: boolean): string {
+  const n = `${commits.toLocaleString()}${complete ? '' : '+'} ${commits === 1 && complete ? 'commit' : 'commits'}`
+  return people > 1 ? `${n} · ${people.toLocaleString()} people` : n
+}
+
+/** A day line, the row above a day's first commit. */
+export interface DayLine {
+  /** The day, as dayLineLabel says it, with any gap after it. */
+  label: string
+  /** The count at the right. */
+  count: string
+  /** Something that just happened in this day, such as "3 new just now", said before the count. */
+  news?: string
+  /** Pinned under the bar while its day scrolls past: it sits on a ground of its own. */
+  stuck?: boolean
+}
+
+/** Draws a day line with its top edge at y. `below` is the commit under it, whose lanes run on
+ * through the line so the graph isn't cut every day; a stuck line covers them instead. */
+export function drawDayLine(ctx: CanvasRenderingContext2D, day: DayLine, y: number, lay: Layout, theme: Theme, below?: Row, near: Near = {}) {
+  const mid = y + DAY_H / 2
+  ctx.save()
+  if (day.stuck) {
+    ctx.fillStyle = theme.deep
+    ctx.fillRect(0, y, lay.width, DAY_H)
+    ctx.fillStyle = theme.bg
+    ctx.globalAlpha = 0.55
+    ctx.fillRect(0, y, lay.width, DAY_H)
+    ctx.globalAlpha = 1
+  } else if (below) {
+    // The lanes that reach the commit below pass through, drawn as they are at its top edge.
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(lay.refW, y, lay.graphW, DAY_H)
+    ctx.clip()
+    ctx.lineCap = 'butt'
+    for (const s of below.up) {
+      const x = lay.refW + laneX(s.from - lay.firstLane, lay.m)
+      const active = s.kind === 'trunk' || laneActive(s.from, below, near)
+      ctx.globalAlpha = (s.kind === 'docs' ? MUTED : 1) * (active ? 1 : QUIET_ALPHA)
+      ctx.lineWidth = active ? LINE_WIDTH : QUIET_WIDTH
+      ctx.strokeStyle = laneColor(s.color)
+      ctx.beginPath()
+      ctx.moveTo(x, y)
+      ctx.lineTo(x, y + DAY_H)
+      ctx.stroke()
+    }
+    ctx.restore()
+  }
+  ctx.textBaseline = 'middle'
+  // The count, and anything new, at the right.
+  let right = lay.width - 14
+  setFont(ctx, `13px ${SERIF}`)
+  ctx.textAlign = 'right'
+  ctx.fillStyle = theme.faint
+  ctx.fillText(day.count, right, mid)
+  right -= ctx.measureText(day.count).width
+  if (day.news) {
+    const news = `${day.news} · `
+    ctx.fillStyle = theme.teal
+    ctx.fillText(news, right, mid)
+    right -= ctx.measureText(news).width
+  }
+  // The day, in the app's small capitals.
+  ctx.textAlign = 'left'
+  setFont(ctx, `12px ${MONO}`, '0.08em')
+  ctx.fillStyle = theme.faint
+  const label = clip(ctx, day.label.toUpperCase(), Math.max(0, right - 24 - DAY_LEFT))
+  const labelW = ctx.measureText(label).width
+  if (!day.stuck && DAY_LEFT + labelW > lay.refW) {
+    // The day's name runs past the label column: it's kept clear of the lanes passing through.
+    ctx.fillStyle = theme.bg
+    ctx.fillRect(lay.refW, y + 4, DAY_LEFT + labelW + 6 - lay.refW, DAY_H - 8)
+    ctx.fillStyle = theme.faint
+  }
+  ctx.fillText(label, DAY_LEFT, mid + 0.5)
+  const left = DAY_LEFT + labelW + 10
+  ctx.letterSpacing = '0px'
+  // A dashed hairline between the two.
+  if (right - 10 > left) {
+    ctx.globalAlpha = 0.45
+    ctx.strokeStyle = theme.muted
+    ctx.lineWidth = 1
+    ctx.setLineDash([3, 3])
+    ctx.beginPath()
+    ctx.moveTo(left, Math.round(mid) + 0.5)
+    ctx.lineTo(right - 10, Math.round(mid) + 0.5)
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.globalAlpha = 1
+  }
+  if (day.stuck) {
+    ctx.fillStyle = theme.edge
+    ctx.fillRect(0, y + DAY_H - 1, lay.width, 1)
+  }
+  ctx.restore()
+}
+
+/** Where a day line's text starts. */
+const DAY_LEFT = 10
 
 /** How tall a timeline row is for a commit that carries on a run: one line. */
 export const FOLLOWER_H = 30
@@ -146,7 +272,7 @@ export const RUN_PAUSE = 2 * 60 * 60
  *
  * - it's the checked-out commit, so "you're here" is never a thin row;
  * - it's a merge, or the commit above it on its lane is;
- * - it's the first row of its day;
+ * - it's the first row of its day, under the day line;
  * - the commit above it on its lane (within two rows) is someone else's, or there isn't one;
  * - that commit is two hours or more away: the same person, another sitting.
  *
@@ -192,6 +318,8 @@ export interface Theme {
   teal: string
   /** The sepia of a note's mark. */
   note: string
+  /** The hairline under a day line that has stuck to the top. */
+  edge: string
 }
 
 // Icons drawn on the canvas, built once each from the same paths as the Icon component.
@@ -821,23 +949,9 @@ export function drawRow(
   ctx.fillText(clip(ctx, row.subject, subjectRight - left), left, line1)
 
   if (tall) {
-    const meta = metaLine(row, near, nowSeconds)
-    if (meta.divider) {
-      // The day changes here: a dashed hairline along the row's top edge, from the message on.
-      ctx.save()
-      ctx.globalAlpha *= 0.45
-      ctx.strokeStyle = theme.muted
-      ctx.lineWidth = 1
-      ctx.setLineDash([3, 3])
-      ctx.beginPath()
-      ctx.moveTo(lay.textX, y + 0.5)
-      ctx.lineTo(lay.width - 14, y + 0.5)
-      ctx.stroke()
-      ctx.restore()
-    }
     setFont(ctx, `12px ${MONO}`, '0.08em')
     ctx.fillStyle = theme.muted
-    ctx.fillText(clip(ctx, meta.text.toUpperCase(), lay.width - 14 - lay.textX), lay.textX, y + 37)
+    ctx.fillText(clip(ctx, metaLine(row).toUpperCase(), lay.width - 14 - lay.textX), lay.textX, y + 37)
     ctx.letterSpacing = '0px'
   }
   ctx.restore()

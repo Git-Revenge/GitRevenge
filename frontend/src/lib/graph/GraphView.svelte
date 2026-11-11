@@ -12,7 +12,7 @@
   import { DUR, easeInk, fadeUp, labelsFold, labelsUnfold, menuOut, reducedMotion, stagger } from '../ui/motion'
   import KindFilter from './KindFilter.svelte'
   import RefChip from './RefChip.svelte'
-  import { bisectRow, drawRow, FOLLOWER_H, sealOf, startsRun, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
+  import { bisectRow, DAY_H, dayCountLabel, dayLineLabel, dayLineSpoken, drawDayLine, drawRow, FOLLOWER_H, gapLabel, sameDay, sealOf, startsRun, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { branchMove, headAway, headLabel, isOwnMove, LANDING, moveAnnouncement, tipsOf, type Tips } from './follow'
   import { loadLabelWidth, nextLabelWidth, REFIT_AFTER_MS, saveLabelWidth } from './labelColumn'
   import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
@@ -227,30 +227,51 @@
    * commit. Every commit's row is the density's height for now; the slots are where a row of
    * another height, or one that isn't a commit, is said.
    */
-  let slotRows: { h: number; lead: SlotRow[]; commit: SlotRow[]; follower: SlotRow[] } | null = null
+  let slotRows: { h: number; lead: SlotRow[]; rows: SlotRow[][] } | null = null
   const slots: Slots = {
     get count() {
       return span + leadRows
     },
     rows(s: number) {
-      if (slotRows?.h !== rowH) slotRows = { h: rowH, lead: [{ kind: 'lead', h: rowH }], commit: [{ kind: 'commit', h: rowH }], follower: [{ kind: 'commit', h: FOLLOWER_H }] }
+      if (slotRows?.h !== rowH) {
+        const day: SlotRow = { kind: 'day', h: DAY_H }
+        const starter: SlotRow = { kind: 'commit', h: rowH }
+        const follower: SlotRow = { kind: 'commit', h: FOLLOWER_H }
+        // By whether the commit carries on a run, then whether it's the first of its day.
+        slotRows = { h: rowH, lead: [{ kind: 'lead', h: rowH }], rows: [[starter], [day, starter], [follower], [day, follower]] }
+      }
       if (leadRows && s === 0) return slotRows.lead
-      return isFollower(s - leadRows) ? slotRows.follower : slotRows.commit
+      const i = s - leadRows
+      return slotRows.rows[(isFollower(i) ? 2 : 0) + (startsDay(i) ? 1 : 0)]
     },
   }
-  /** Which commits carry on a run, as worked out from the rows loaded: remembered until the
-   * rows change, since the layout asks about the same commits many times a frame. */
-  // eslint-disable-next-line svelte/prefer-svelte-reactivity
-  const followers = new Map<number, boolean>()
-  let followersOf = { version: -1, density: '' }
+  /** What's been worked out from the rows loaded, remembered until they change: the layout asks
+   * about the same commits many times a frame. */
+  const known = {
+    version: -1,
+    density: '',
+    arrived: null as Set<string> | null,
+    followers: new Map<number, boolean>(),
+    days: new Map<number, boolean>(),
+    dayStarts: new Map<number, number>(),
+    dayInfo: new Map<number, { commits: number; people: number; complete: boolean; arrived: number }>(),
+  }
+  function fresh() {
+    if (known.version === cache.version && known.density === density && known.arrived === arrived) return known
+    known.version = cache.version
+    known.density = density
+    known.arrived = arrived
+    known.followers.clear()
+    known.days.clear()
+    known.dayStarts.clear()
+    known.dayInfo.clear()
+    return known
+  }
   /** Whether commit i takes one line in the timeline: it carries on a run (see startsRun). A row
    * that isn't loaded is taken to start one, and so are all rows in compact, which has no runs. */
   function isFollower(i: number): boolean {
     if (density === 'compact') return false
-    if (followersOf.version !== cache.version || followersOf.density !== density) {
-      followers.clear()
-      followersOf = { version: cache.version, density }
-    }
+    const { followers } = fresh()
     let f = followers.get(i)
     if (f === undefined) {
       const row = cache.get(i)
@@ -259,6 +280,86 @@
     }
     return f
   }
+  /** Whether commit i is the first of its day in the timeline, and so has the day's line above
+   * it. Compact has no day lines: its When column dates every row. */
+  function startsDay(i: number): boolean {
+    if (density === 'compact') return false
+    const { days } = fresh()
+    let d = days.get(i)
+    if (d === undefined) {
+      const row = cache.get(i)
+      const above = cache.get(i - 1)
+      d = !!row && (i === 0 || (!!above && !sameDay(above.authorTime, row.authorTime)))
+      days.set(i, d)
+    }
+    return d
+  }
+  /** How far a day is followed through the rows before giving up on counting it. */
+  const DAY_SCAN = 5000
+  /** The first commit of commit i's day, or -1 when it's above what's loaded. */
+  function dayStartOf(i: number): number {
+    const { dayStarts } = fresh()
+    const had = dayStarts.get(i)
+    if (had !== undefined) return had
+    let at = i
+    let start = -1
+    for (let n = 0; n < DAY_SCAN && at >= 0 && cache.get(at); n++, at--) {
+      const seen = dayStarts.get(at)
+      if (seen !== undefined) {
+        start = seen
+        break
+      }
+      if (startsDay(at)) {
+        start = at
+        break
+      }
+    }
+    for (let k = i; k > at && k >= 0; k--) dayStarts.set(k, start)
+    dayStarts.set(i, start)
+    return start
+  }
+  /** What the day beginning at commit i holds, as far as it's loaded. */
+  function dayInfoOf(i: number) {
+    const { dayInfo } = fresh()
+    let info = dayInfo.get(i)
+    if (info) return info
+    const first = cache.get(i)
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+    const people = new Set<string>()
+    let commits = 0
+    let came = 0
+    let complete = true
+    for (let k = i; first && k < span; k++) {
+      const row = cache.get(k)
+      if (!row || commits >= DAY_SCAN) {
+        complete = false
+        break
+      }
+      if (!sameDay(first.authorTime, row.authorTime)) break
+      commits++
+      people.add(row.author)
+      if (arrived.has(row.id)) came++
+    }
+    info = { commits, people: people.size, complete, arrived: came }
+    dayInfo.set(i, info)
+    return info
+  }
+  /** What the line above commit i says: the day, a long gap before it, what's new and the count. */
+  function dayLineOf(i: number, now: number, stuck = false) {
+    const row = cache.get(i)
+    if (!row) return null
+    const above = cache.get(i - 1)
+    const gap = above ? gapLabel(above.authorTime, row.authorTime) : ''
+    const info = dayInfoOf(i)
+    return {
+      label: dayLineLabel(row.authorTime, now) + (gap ? ` · ${gap}` : ''),
+      count: dayCountLabel(info.commits, info.people, info.complete),
+      news: info.arrived ? `${info.arrived.toLocaleString()} new just now` : undefined,
+      stuck,
+    }
+  }
+  /** How much of the view's top the stuck day line covers, as last painted. */
+  let stuckH = 0
   /** Whether every row is one height, so the browser's own scrolling moves through them evenly:
    * true of compact, never of the timeline. */
   let evenRows = $derived(density === 'compact')
@@ -284,6 +385,8 @@
   }
   /** The commit whose row is at a height in the view, or -1. */
   function commitAtY(y: number): number {
+    // The stuck day line covers the row under it.
+    if (y < stuckH) return -1
     const r = viewRowAt(viewRows, y)
     return r?.kind === 'commit' ? commitOf(r.slot) : -1
   }
@@ -628,6 +731,7 @@
       link: token('--link'),
       teal: token('--accent-a'),
       note: token('--accent-c'),
+      edge: token('--paper-edge'),
     }
   }
 
@@ -856,6 +960,32 @@
       if (arriving) ctx.restore()
       if (span) labelSpans.set(i, span)
     }
+    // The day lines: each in its place above its day's first commit, and the day of whatever
+    // is at the top of the view pinned there, until the next day's line pushes it out.
+    let nextStuck = 0
+    if (density !== 'compact') {
+      for (const r of viewRows) {
+        if (r.kind !== 'day') continue
+        const i = commitOf(r.slot)
+        const line = dayLineOf(i, now)
+        const below = cache.get(i)
+        if (line && below) drawDayLine(ctx, line, r.y, lay, th, below, { prev: cache.get(i - 1), next: cache.get(i + 1) })
+      }
+      const topRow = viewRows.find((r) => r.kind !== 'lead' || r.y + r.h > 0)
+      if (topRow && topRow.kind !== 'lead' && !(topRow.kind === 'day' && topRow.y >= 0)) {
+        const at = commitOf(topRow.slot)
+        const start = topRow.kind === 'day' ? at : dayStartOf(at)
+        const line = start >= 0 ? dayLineOf(start, now, true) : null
+        if (line) {
+          // The next day's line, arriving at the top, pushes this one up and out.
+          const next = viewRows.find((r) => r.kind === 'day' && commitOf(r.slot) > start && r.y > 0)
+          const y = next && next.y < DAY_H ? next.y - DAY_H : 0
+          drawDayLine(ctx, line, y, lay, th)
+          nextStuck = y + DAY_H
+        }
+      }
+    }
+    stuckH = nextStuck
     if (landing) {
       // The row just jumped to: a second wash over its selection, held then fading, so the eye
       // finds it and is then left alone.
@@ -1004,6 +1134,8 @@
   /** Whether the person has picked a commit themselves, as against the selection the graph
    * starts with. */
   let chosen = false
+  /** When the selected commit was made, for telling when the selection moves into another day. */
+  let selectedTime = 0
 
   function select(i: number, auto = false, keepView = false) {
     if (!auto) {
@@ -1018,14 +1150,24 @@
     // The first selection can land before the first draw has measured the view.
     const height = viewHeight()
     const slot = slotOf(selected)
+    // In the timeline the day line pinned at the top covers that much of the view.
+    const inset = density === 'compact' ? 0 : DAY_H
     if (glide || keepView) {
       // Nothing: a glide is centring it, or the view is going somewhere else on purpose.
-    } else if (y < 0) {
+    } else if (y < inset) {
       // The first commit brings the lead row back with it.
       if (selected === 0) toStart()
-      else setAnchor(anchorFor(slots, slot, height, 0))
+      else setAnchor(anchorFor(slots, slot, height, height ? inset / height : 0))
     } else if (y + ownHeight(slots, slot) > height) setAnchor(anchorForBottom(slots, slot, height))
     const row = cache.get(selected)
+    // Moving the selection into another day says which, as a heading would.
+    if (!auto && row && density !== 'compact' && selectedTime && !sameDay(selectedTime, row.authorTime)) {
+      const start = dayStartOf(selected)
+      const info = start >= 0 ? dayInfoOf(start) : null
+      const now = Date.now() / 1000
+      announce = dayLineSpoken(row.authorTime, now) + (info ? `, ${dayCountLabel(info.commits, info.people, info.complete)}` : '')
+    }
+    if (row) selectedTime = row.authorTime
     selectedId = row?.id ?? ''
     onSelect?.(row, auto)
     // A row far from anything loaded, such as the last after End, isn't there to report yet:
