@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { branchMove, headAway, headLabel, isOwnMove, LANDING, landingTop, moveAnnouncement, OWN_MOVE_MS, tipsOf, type Tips } from './follow'
+import { branchMove, headAway, headLabel, isOwnMove, LANDING, moveAnnouncement, OWN_MOVE_MS, tipsOf, type Tips } from './follow'
 
 const A = 'a'.repeat(40)
 const B = 'b'.repeat(40)
@@ -75,15 +75,9 @@ describe('isOwnMove', () => {
   })
 })
 
-describe('landingTop', () => {
-  it('puts the row a third of the way down the view', () => {
+describe('LANDING', () => {
+  it('is a third of the way down the view', () => {
     expect(LANDING).toBeCloseTo(1 / 3)
-    expect(landingTop(3000, 600, 100_000)).toBe(2800)
-  })
-
-  it('stays within the history', () => {
-    expect(landingTop(52, 600, 100_000)).toBe(0)
-    expect(landingTop(99_900, 600, 99_500)).toBe(99_500)
   })
 })
 

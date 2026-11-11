@@ -437,6 +437,73 @@ test.describe('commit graph', () => {
     })
   })
 
+  // #621: the view is placed by the row at its top edge, not by a height added up from the first
+  // commit, so it has to behave the same at the far end of a history too long to measure.
+  test.describe('a very long history', () => {
+    const rows = 1_500_000
+    const scenario = { graphRows: rows, responses: { CommitSignatures: [], Refs: [] } }
+    const ready = async (page: Page) => {
+      await open(page, 'graph', scenario)
+      await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', String(rows))
+      await page.locator('.scroller').focus()
+    }
+    const selected = async (page: Page) => ((await events(page, 'select')).at(-1)?.[0] as { index: number } | undefined)?.index
+    /** The commit whose row is at a height in the view, found by clicking it. */
+    const commitAt = async (page: Page, y: number) => {
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.click(box.x + 300, box.y + y)
+      return selected(page)
+    }
+    const scrollState = (page: Page) => page.locator('.scroller').evaluate((e) => ({ top: e.scrollTop, max: e.scrollHeight - e.clientHeight, view: e.clientHeight }))
+
+    test('End goes to the last commit, at the bottom of the view, and Home comes back', async ({ page }) => {
+      await ready(page)
+      await page.keyboard.press('End')
+      await expect.poll(() => selected(page)).toBe(rows - 1)
+      const { top, max, view } = await scrollState(page)
+      expect(Math.abs(top - max)).toBeLessThanOrEqual(1)
+      // The last row's bottom edge is the view's: the row a little above the bottom is the last commit.
+      expect(await commitAt(page, view - 10)).toBe(rows - 1)
+      await page.keyboard.press('Home')
+      await expect.poll(() => selected(page)).toBe(0)
+      expect((await scrollState(page)).top).toBe(0)
+      expect(await commitAt(page, 10)).toBe(0)
+    })
+
+    test('the wheel moves through rows at its usual speed, wherever it is', async ({ page }) => {
+      await ready(page)
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.move(box.x + 300, box.y + 100)
+      await page.mouse.wheel(0, 520)
+      // Ten rows of 52 have gone by, not a ten-thousandth of the history.
+      await expect.poll(() => commitAt(page, 10)).toBe(10)
+      // The same from the middle: drag the scrollbar there, then wheel.
+      await page.locator('.scroller').evaluate((e) => e.scrollTo(0, (e.scrollHeight - e.clientHeight) / 2))
+      await page.waitForTimeout(150)
+      const middle = (await commitAt(page, 10))!
+      expect(Math.abs(middle - rows / 2)).toBeLessThan(rows / 100)
+      await page.mouse.move(box.x + 300, box.y + 100)
+      await page.mouse.wheel(0, 520)
+      await expect.poll(() => commitAt(page, 10)).toBe(middle + 10)
+      await page.mouse.wheel(0, -1040)
+      await expect.poll(() => commitAt(page, 10)).toBe(middle - 10)
+    })
+
+    test('the arrow keys keep the selection in view a row at a time', async ({ page }) => {
+      await ready(page)
+      await page.locator('.scroller').evaluate((e) => e.scrollTo(0, (e.scrollHeight - e.clientHeight) / 2))
+      await page.waitForTimeout(150)
+      const { view } = await scrollState(page)
+      const bottom = (await commitAt(page, view - 60))!
+      for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowDown')
+      await expect.poll(() => selected(page)).toBe(bottom + 4)
+      // The selection went past the bottom edge, and the view followed it by just enough.
+      await page.keyboard.press('ArrowUp')
+      await expect.poll(() => selected(page)).toBe(bottom + 3)
+      expect(await commitAt(page, view - 60)).toBe(bottom + 3)
+    })
+  })
+
   // #619: a way back to the checked-out commit, and the view follows a branch you move.
   test.describe('the checked-out commit', () => {
     const id = (i: number) => String(i).padStart(40, '0')
@@ -1566,6 +1633,31 @@ test.describe('before the first load has answered', () => {
       await expect(page.locator('.scroller')).toBeHidden()
       await expect(search).toBeHidden()
       await expect(fetch).toBeVisible()
+    })
+
+    // #621: the row above the first commit is a row like any other to the layout.
+    test('the working tree row scrolls away with the history and comes back with the first commit', async ({ page }) => {
+      await page.setViewportSize({ width: 1600, height: 500 })
+      await open(page, 'repoView', { ...dirty([one]), graphRows: 300 })
+      await expect(bar(page)).toContainText('1 file changed')
+      const scroller = page.locator('.scroller')
+      const top = (await scroller.boundingBox())!.y
+      expect((await bar(page).boundingBox())!.y).toBe(top)
+      // Half a row down: the row is half out of the top edge, still there.
+      const box = (await scroller.boundingBox())!
+      await page.mouse.move(box.x + 300, box.y + 200)
+      await page.mouse.wheel(0, 26)
+      await expect.poll(async () => Math.round((await bar(page).boundingBox())!.y - top)).toBe(-26)
+      // Further, it's gone; End and Home bring it back with the first commit.
+      await page.mouse.wheel(0, 2000)
+      await expect(bar(page)).toHaveCount(0)
+      await scroller.focus()
+      await page.keyboard.press('End')
+      await expect.poll(() => scroller.evaluate((e) => Math.abs(e.scrollTop - (e.scrollHeight - e.clientHeight)) <= 1)).toBe(true)
+      // 300 commits and the row above them, at 52 each.
+      expect(await scroller.evaluate((e) => e.scrollHeight)).toBe(301 * 52)
+      await page.keyboard.press('Home')
+      await expect.poll(async () => (await bar(page).boundingBox())?.y).toBe(top)
     })
 
     // #626: the bar stays on one line, giving way in a fixed order as it narrows.

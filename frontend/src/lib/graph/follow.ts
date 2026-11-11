@@ -55,11 +55,6 @@ export function branchMove(before: Tips | null, after: Tips): Move | null {
  * context and the commits it brought are below it. */
 export const LANDING = 1 / 3
 
-/** The scroll position that puts a row `share` of the way down the view, within what's there. */
-export function landingTop(rowY: number, viewH: number, maxTop: number, share = LANDING): number {
-  return Math.max(0, Math.min(maxTop, rowY - viewH * share))
-}
-
 /** Which way the checked-out commit is from the view: null when any of its row is showing. */
 export function headAway(rowY: number, rowH: number, top: number, viewH: number): 'up' | 'down' | null {
   if (rowY + rowH <= top) return 'up'

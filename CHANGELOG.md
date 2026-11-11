@@ -50,6 +50,7 @@ Git tools: everyday git chores without leaving the app.
 
 ### Fixed
 
+- Pressing End in a long history shows the last commit in the commit panel once it has loaded; the panel used to stay empty. (#621, #634)
 - Tab from the graph reaches the selected row's actions; the card used to go as the focus left the graph. (#625, #629)
 - A link in a commit's subject is rose like the links in its message and trailers, not the browser's blue. (#582)
 - An ignored file's menu opens on right-click (or the Menu key) only; a plain click no longer opens it. (#583)
