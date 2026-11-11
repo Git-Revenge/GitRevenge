@@ -514,9 +514,9 @@ test.describe('commit graph', () => {
       await expect(page.locator('.ruler-when')).toHaveText(/\d{4}/)
       await page.mouse.up()
       await expect(page.locator('.ruler-when')).toHaveCount(0)
-      const now = Number(await ruler(page).getAttribute('aria-valuenow'))
-      expect(now).toBeGreaterThan(55)
-      expect(now).toBeLessThan(95)
+      const now = () => ruler(page).getAttribute('aria-valuenow').then(Number)
+      await expect.poll(now).toBeGreaterThan(55)
+      expect(await now()).toBeLessThan(95)
       // The view really is there: the commit at the top is well into the history.
       const top = (await topCommit(page))!
       expect(top).toBeGreaterThan(500)
@@ -527,11 +527,14 @@ test.describe('commit graph', () => {
       await ready(page)
       const r = (await ruler(page).boundingBox())!
       await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2)
-      const now = Number(await ruler(page).getAttribute('aria-valuenow'))
-      expect(now).toBeGreaterThan(40)
-      expect(now).toBeLessThan(60)
-      const b = await boxOf(page)
-      expect(Math.abs(b.y + b.height / 2 - (r.y + r.height / 2))).toBeLessThan(3)
+      // The box and what the ruler says follow on the next paint.
+      const now = () => ruler(page).getAttribute('aria-valuenow').then(Number)
+      await expect.poll(now).toBeGreaterThan(40)
+      expect(await now()).toBeLessThan(60)
+      await expect.poll(async () => {
+        const b = await boxOf(page)
+        return Math.abs(b.y + b.height / 2 - (r.y + r.height / 2))
+      }).toBeLessThan(3)
     })
 
     test('a tick says what is there when the pointer is on it', async ({ page }) => {
