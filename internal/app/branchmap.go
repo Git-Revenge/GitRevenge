@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
 )
@@ -89,11 +90,13 @@ func (a *App) BranchMap(path string) (BranchMap, error) {
 		}
 		return strconv.Atoi(strings.TrimSpace(s))
 	}
-	all, err := count(trunk.Name)
-	if err != nil {
-		return out, err
-	}
-	out.Trunk = MapNode{Name: trunk.Short, Kind: mapTrunk, Commit: trunk.Commit, Commits: all, Updated: trunk.Updated, Head: trunk.Head, BranchKind: trunk.BranchKind}
+	// Every count is its own git call, and none depends on another: they run side by side.
+	var jobs []func() error
+	out.Trunk = MapNode{Name: trunk.Short, Kind: mapTrunk, Commit: trunk.Commit, Updated: trunk.Updated, Head: trunk.Head, BranchKind: trunk.BranchKind}
+	jobs = append(jobs, func() (err error) {
+		out.Trunk.Commits, err = count(trunk.Name)
+		return err
+	})
 
 	branches := mapBranches(refs, trunk)
 	out.Branches = len(branches) + 1
@@ -104,46 +107,78 @@ func (a *App) BranchMap(path string) (BranchMap, error) {
 		branches = branches[:maxMapBranches]
 	}
 	shown := map[string]bool{}
-	for _, b := range branches {
-		ahead, err := count(trunk.Name + ".." + b.Name)
-		if err != nil {
-			return out, err
-		}
+	branchNodes := make([]MapNode, len(branches))
+	for i, b := range branches {
 		kind := mapBranch
 		if b.Kind == git.RemoteBranch {
 			kind = mapRemote
 		}
 		shown[b.Name] = true
-		out.Nodes = append(out.Nodes, MapNode{Name: b.Short, Kind: kind, Commit: b.Commit, Commits: ahead, Updated: b.Updated, Head: b.Head, BranchKind: b.BranchKind})
+		branchNodes[i] = MapNode{Name: b.Short, Kind: kind, Commit: b.Commit, Updated: b.Updated, Head: b.Head, BranchKind: b.BranchKind}
+		jobs = append(jobs, func() (err error) {
+			branchNodes[i].Commits, err = count(trunk.Name + ".." + b.Name)
+			return err
+		})
 	}
 
 	tags := mapTagsOf(refs)
 	out.Tags = len(tags)
+	tagNodes := make([]MapNode, min(len(tags), maxMapTags+1))
 	for i, t := range tags {
 		if i == maxMapTags {
 			// Everything older folds into one node, as big as the history up to its newest.
-			n, err := count(t.Name)
-			if err != nil {
-				return out, err
-			}
-			out.Nodes = append(out.Nodes, MapNode{Name: strconv.Itoa(len(tags)-i) + " older tags", Kind: mapTags, Commit: t.Commit, Commits: n, Updated: t.Updated, Tags: len(tags) - i})
+			tagNodes[i] = MapNode{Name: strconv.Itoa(len(tags)-i) + " older tags", Kind: mapTags, Commit: t.Commit, Updated: t.Updated, Tags: len(tags) - i}
+			jobs = append(jobs, func() (err error) {
+				tagNodes[i].Commits, err = count(t.Name)
+				return err
+			})
 			break
 		}
 		rng := t.Name
 		if i+1 < len(tags) {
 			rng = tags[i+1].Name + ".." + t.Name
 		}
-		n, err := count(rng)
-		if err != nil {
-			return out, err
-		}
-		parent, err := a.mapTagParent(ctx, r.Git, trunk, t, refs, shown)
-		if err != nil {
-			return out, err
-		}
-		out.Nodes = append(out.Nodes, MapNode{Name: t.Short, Kind: mapTag, Commit: t.Commit, Commits: n, Updated: t.Updated, Parent: parent})
+		tagNodes[i] = MapNode{Name: t.Short, Kind: mapTag, Commit: t.Commit, Updated: t.Updated}
+		jobs = append(jobs, func() (err error) {
+			tagNodes[i].Commits, err = count(rng)
+			return err
+		}, func() (err error) {
+			tagNodes[i].Parent, err = mapTagParent(ctx, r.Git, trunk, t, refs, shown)
+			return err
+		})
 	}
+	if err := runMapJobs(jobs); err != nil {
+		return BranchMap{Nodes: []MapNode{}}, err
+	}
+	out.Nodes = append(append(out.Nodes, branchNodes...), tagNodes...)
 	return out, nil
+}
+
+// mapWorkers is how many git calls the Map view runs at once.
+const mapWorkers = 8
+
+// runMapJobs runs the jobs a few at a time and returns the first error, if any. Each job
+// writes only its own result.
+func runMapJobs(jobs []func() error) error {
+	var (
+		wg    sync.WaitGroup
+		once  sync.Once
+		first error
+		slots = make(chan struct{}, mapWorkers)
+	)
+	for _, job := range jobs {
+		wg.Add(1)
+		slots <- struct{}{}
+		go func() {
+			defer wg.Done()
+			defer func() { <-slots }()
+			if err := job(); err != nil {
+				once.Do(func() { first = err })
+			}
+		}()
+	}
+	wg.Wait()
+	return first
 }
 
 // mapTrunkOf picks the branch in the middle: the local Trunk branch, else the checked-out
@@ -237,7 +272,7 @@ func mapTagsOf(refs []git.Ref) []git.Ref {
 
 // mapTagParent says which node a tag hangs off: "" (the trunk) when the trunk holds its
 // commit, else the first shown branch that does, local before remote.
-func (a *App) mapTagParent(ctx context.Context, g *git.Repo, trunk, tag git.Ref, refs []git.Ref, shown map[string]bool) (string, error) {
+func mapTagParent(ctx context.Context, g *git.Repo, trunk, tag git.Ref, refs []git.Ref, shown map[string]bool) (string, error) {
 	s, err := g.ReadString(ctx, "rev-list", "--count", trunk.Name+".."+tag.Commit, "--")
 	if err != nil {
 		return "", err

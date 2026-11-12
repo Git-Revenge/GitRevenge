@@ -62,6 +62,29 @@ test.describe('the Horizontal view', () => {
     await expect(day).toContainText('6 commits')
   })
 
+  // #657: a one-commit day is one column wide, and cut its name part way.
+  test('a day too narrow for its name says just the day, whole', async ({ page }) => {
+    const daily = rows.map((r, i) => ({ ...r, authorTime: noon - i * DAY }))
+    await open(page, 'graph', { ...scenario({ view: 'horizontal', experimental: ['horizontal'] }), graphData: daily })
+    await expect(commit(page, 0)).toBeVisible()
+    const names = await page.locator('.day .meta').allInnerTexts()
+    expect(names.length).toBeGreaterThan(5)
+    for (const name of names) expect(name).toMatch(/^\d{1,2}$/)
+    // The whole name is still there to point at.
+    await expect(page.locator('.day').nth(1)).toHaveAttribute('title', /Nov 10/)
+    // And a line marks where each day ends.
+    expect(await page.locator('.daycut').count()).toBeGreaterThan(5)
+  })
+
+  // #657: in a narrow panel the strip dropped the subject and kept who and when.
+  test('a narrow panel keeps the selected commit’s subject under the lanes', async ({ page }) => {
+    await page.setViewportSize({ width: 300, height: 600 })
+    await open(page, 'graph', scenario({ view: 'horizontal', experimental: ['horizontal'] }))
+    await commit(page, 1).click({ position: { x: 20, y: 300 } })
+    const subject = (await page.locator('.detail .what').boundingBox())!
+    expect(subject.width).toBeGreaterThan(120)
+  })
+
   test('shows a branch and a tag over the commits they point at', async ({ page }) => {
     await open(page, 'graph', scenario({ view: 'horizontal', experimental: ['horizontal'] }))
     await expect(commit(page, 0).locator('.labels')).toContainText('main')

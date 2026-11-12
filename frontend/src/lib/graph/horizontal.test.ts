@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampOffset, COL, colAt, colX, dayCount, daySpans, LABEL_MAX, labelPlaces, LANE, lanePitch, laneY, LEAN_REACH, maxOffset, offsetForThumb, offsetToShow, segPath, subjectLength, THUMB_MIN, thumbFor, visibleRange, WORDS, wordsHeight } from './horizontal'
+import { clampOffset, COL, colAt, colX, dayBandText, dayCount, daySpans, LABEL_MAX, labelPlaces, LANE, lanePitch, laneY, LEAN_REACH, maxOffset, offsetForThumb, offsetToShow, segPath, subjectLength, THUMB_MIN, thumbFor, visibleRange, WORDS, wordsHeight } from './horizontal'
 
 const DAY = 24 * 60 * 60
 // Noon, so a few hours either way stay in the same day in any time zone.
@@ -183,5 +183,25 @@ describe('labels', () => {
     expect(p.get(0)!.room).toBe(2 * COL - 6)
     expect(p.get(1)!.room).toBe(2 * COL - 6)
     expect(p.get(3)!.room).toBe(LABEL_MAX)
+  })
+})
+
+describe('the day band', () => {
+  const time = Math.floor(new Date(2026, 10, 3, 12).getTime() / 1000)
+  const full = 'Tue, Nov 3'
+
+  it('says the day and its count when there is room for both', () => {
+    expect(dayBandText(full, '14 commits', time, 400)).toEqual({ label: full, count: '14 commits' })
+  })
+
+  it('drops the count before it shortens the name', () => {
+    expect(dayBandText(full, '14 commits', time, 132)).toEqual({ label: full, count: '' })
+  })
+
+  it('never cuts a name part way: a narrow day says the date, a one-commit day the day', () => {
+    const two = dayBandText(full, '2 commits', time, 2 * COL)
+    expect(two.count).toBe('')
+    expect(two.label).toMatch(/^(Nov 3|3)$/)
+    expect(dayBandText(full, '1 commit', time, COL)).toEqual({ label: '3', count: '' })
   })
 })

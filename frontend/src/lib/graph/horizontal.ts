@@ -186,3 +186,23 @@ export function labelPlaces(columns: number[]): Map<number, { row: 0 | 1; room: 
   }
   return out
 }
+
+const monthDay = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
+const dayOnly = new Intl.DateTimeFormat(undefined, { day: 'numeric' })
+/** About how wide the day band's letters and its count's are, and the band's padding. */
+const BAND = { letter: 8.4, digit: 6.6, pad: 20, gap: 8 }
+
+/**
+ * What a day says in a band this wide: its full name and its count when both fit, then the
+ * name alone, then the month and day ("Nov 3"), then just the day ("3"). A name is never cut
+ * part way: a one-commit day is 44px, which holds two digits.
+ */
+export function dayBandText(full: string, count: string, time: number, width: number): { label: string; count: string } {
+  const room = width - BAND.pad
+  const wide = (text: string) => text.length * BAND.letter
+  if (count && wide(full) + BAND.gap + count.length * BAND.digit <= room) return { label: full, count }
+  if (wide(full) <= room) return { label: full, count: '' }
+  const date = new Date(time * 1000)
+  const short = monthDay.format(date)
+  return { label: wide(short) <= room ? short : dayOnly.format(date), count: '' }
+}
