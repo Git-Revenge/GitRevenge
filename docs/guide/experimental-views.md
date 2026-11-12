@@ -37,8 +37,10 @@ Click a node for its card: what it is, how many commits, when it last moved, and
 
 - **Rings.** Rings round the trunk mark time, and each is named along whichever side is clearest of nodes. Zoom with the **+** and **−** buttons in the bottom right, the <kbd>+</kbd> and <kbd>−</kbd> keys, or the wheel: all the way in, the map is one week with a ring a day; out, the rings become weeks, then months, then years. The map opens at the zoom that fits most of the repository, and remembers the zoom you choose for each one. What's older than the last ring isn't drawn: a tally past it says how many, and zooming out brings them in.
 - **Names.** In a crowd there isn't room for every name. The checked-out branch, nodes you've pinned and local branches are named first, then the rest by size, and a name that would cover another is left off. Hover over a node, or move to it with <kbd>Tab</kbd>, to see its name.
-- **Pins.** Drag a node to put it somewhere else. It stays there for that repository, and the rest make room for it. Its card has **Let it go back to its place**.
-- **Groups.** A repository with hundreds of remote branches would bury the map. Remote-only branches that share the first part of their name (`dependabot/`, `release/`) become one node when there are three or more. Click a group, then **Show its branches**: they stand round it, and only then are their commits counted.
+- **Pins.** Drag a node to put it somewhere else. It stays there for that repository, and the rest make room for it. Double-click it, or choose **Let it go back to its place** on its card, to let it go.
+- **Groups.** A repository with hundreds of remote branches would bury the map. Remote-only branches that share the first part of their name (`dependabot/`, `release/`) become one node when there are three or more. Double-click a group, or click it and choose **Show its branches**: they stand round it, and only then are their commits counted.
 - **All, Local, Remote.** The switch in the top left shows every branch, only your local ones, or only those that are on the remote alone. The choice is kept for each repository.
 
 The bar above the graph says what the map holds, such as "8 branches · 13 tags".
+
+The walkthrough [Find your way round a busy repository](../walkthroughs/busy-repository.md) uses the Map to pick a branch and focus the timeline on it.

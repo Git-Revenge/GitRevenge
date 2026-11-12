@@ -86,4 +86,21 @@ Settings, project groups, recent repositories and open tabs are kept in one file
 - **macOS:** `~/Library/Application Support/GitRevenge/settings.json`
 - **Linux:** `~/.config/GitRevenge/settings.json`, or under `$XDG_CONFIG_HOME` if you set it
 
-Backups of git config files you save in the [Git Config tab](git-config.md) go in a `config-backups` folder beside it. A repository's own settings, such as its branch kinds and smart links, are kept in its git config. Nothing about your repositories is stored anywhere else, and nothing is sent anywhere. If the file is ever damaged, the app moves it aside as `settings.json.corrupt-<timestamp>` and starts with defaults.
+Backups of git config files you save in the [Git Config tab](git-config.md) go in a `config-backups` folder beside it. A repository's own settings, such as its branch kinds and smart links, are kept in its git config. Nothing about your repositories is stored anywhere else, and nothing is sent anywhere; see [what leaves your machine](#what-leaves-your-machine). If the file is ever damaged, the app moves it aside as `settings.json.corrupt-<timestamp>` and starts with defaults.
+
+## What leaves your machine
+
+Git Revenge is local-first. It makes one request of its own, and everything else that reaches the network is something you asked for.
+
+| What | Where it goes | When |
+|---|---|---|
+| The update check | GitHub's releases API, for the latest version number | At startup, and when you choose **Check for updates**. Turn it off in [Settings](settings.md). |
+| Fetch, pull, push and clone | Your remotes, through your own `git`, credential helpers and SSH agent | When you ask for one |
+| A link | Your web browser | When you click a link, such as a [smart link](settings.md#links) or one in a commit message. The app only builds the address |
+
+Everything else stays on your machine, including the parts that could easily have reached out:
+
+- **Rendered previews** fetch nothing. A Markdown or notebook image from the web is shown as a link, an HTML page runs in a sandbox with no network, a GeoJSON file is drawn without map tiles, and audio, video and PDFs are read from the repository.
+- **The Map and Insights** are worked out from the repository alone, with no hosting service's API.
+- **No telemetry.** The app keeps no usage statistics and sends no crash reports.
+- **The docs site** loads its fonts from itself, not from a font service.

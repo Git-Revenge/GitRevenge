@@ -8,7 +8,7 @@ Git Revenge is a free desktop git client for Windows, macOS and Linux. It's buil
 ## What you're getting
 
 - **It's free.** There's no paid tier and no licence to buy, for private repositories or for work. The source is [on GitHub](https://github.com/Git-Revenge/GitRevenge) under Apache-2.0.
-- **It's private.** There are no accounts, no telemetry, no cloud features and no AI. The only request the app makes on its own is a check for a newer release at startup, and you can switch that off in [Settings](settings.md).
+- **It's private.** There are no accounts, no telemetry, no cloud features and no AI. The only request the app makes on its own is a check for a newer release at startup, and you can switch that off in [Settings](settings.md). [What leaves your machine](install.md#what-leaves-your-machine) has the whole list.
 - **It's fast on big repositories.** The graph loads history just ahead of where you're looking, so a repository with a million commits still opens and scrolls quickly.
 - **It's your git.** Anything you do in a terminal shows up in the app within a second, and anything you do in the app is an ordinary git command you could have typed.
 

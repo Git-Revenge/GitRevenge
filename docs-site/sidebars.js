@@ -26,6 +26,7 @@ const sidebars = {
         { type: 'doc', id: 'walkthroughs/find-a-commit', label: 'Find a commit' },
         { type: 'doc', id: 'walkthroughs/find-what-broke', label: 'Find what broke it' },
         { type: 'doc', id: 'walkthroughs/several-repositories', label: 'Several repositories' },
+        { type: 'doc', id: 'walkthroughs/busy-repository', label: 'A busy repository' },
       ],
     },
     {
