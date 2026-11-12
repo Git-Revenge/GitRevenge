@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bandOf, BRANCH_R, branchRadius, CROWD, DEFAULT_SCALE, KEY, keyShows, ZOOM, layout, nameWaits, pinKey, restLength, ringNameAngle, ringsFor, scales, SCALES, TAG_SIDE, tagSide, TRUNK_R, trunkRadius, WIP_R, wipPlace, zoomBy, type MapNode } from './mapLayout'
+import { bandOf, BRANCH_R, branchRadius, DEFAULT_SCALE, KEY, keyShows, ZOOM, fittingScale, layout, pinKey, widestScale, restLength, ringNameAngle, ringsFor, scales, SCALES, TAG_SIDE, tagSide, TRUNK_R, trunkRadius, WIP_R, wipPlace, zoomBy, type MapNode } from './mapLayout'
 
 const DAY = 24 * 60 * 60
 const NOW = 1_794_480_000
@@ -134,7 +134,7 @@ describe('layout', () => {
     node('gh-pages', { kind: 'remote', commits: 65, updated: NOW }),
     node('topic', { commits: 1, updated: NOW - DAY }),
     node('release/v0.7', { commits: 56, updated: NOW - 13 * DAY }),
-    node('release/v0.6', { commits: 9, updated: NOW - 30 * DAY }),
+    node('release/v0.6', { commits: 9, updated: NOW - 13.5 * DAY }),
     node('merged', { commits: 0, updated: NOW - 9 * DAY }),
     node('v0.11.0', { kind: 'tag', commits: 58, updated: NOW - DAY }),
     node('v0.7.0', { kind: 'tag', commits: 47, updated: NOW - 13 * DAY, parent: 'release/v0.7' }),
@@ -233,11 +233,79 @@ describe('layout', () => {
   })
 })
 
-describe('names', () => {
-  it('all show until the map is crowded, then only this week’s', () => {
-    expect(nameWaits({ band: 2 }, CROWD)).toBe(false)
-    expect(nameWaits({ band: 0 }, CROWD + 1)).toBe(false)
-    expect(nameWaits({ band: 1 }, CROWD + 1)).toBe(true)
+describe('a busy map', () => {
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y)
+
+  it('leaves out what is older than the last ring, and counts it', () => {
+    const nodes = [node('new', { updated: NOW - DAY }), node('old', { updated: NOW - 40 * DAY }), node('older', { updated: NOW - 400 * DAY })]
+    const close = layout(trunk, nodes, 1000, 640, NOW)
+    expect(close.nodes.map((n) => n.name)).toEqual(['new'])
+    expect(close.older).toBe(2)
+    const wide = layout(trunk, nodes, 1000, 640, NOW, SCALES[2])
+    expect(wide.nodes.map((n) => n.name).sort()).toEqual(['new', 'old'])
+    expect(wide.older).toBe(1)
+  })
+
+  it('always shows the checked-out branch and a pinned node, however old', () => {
+    const nodes = [node('mine', { updated: NOW - 300 * DAY, head: true }), node('kept', { updated: NOW - 300 * DAY }), node('gone', { updated: NOW - 300 * DAY })]
+    const out = layout(trunk, nodes, 1000, 640, NOW, SCALES[DEFAULT_SCALE], new Map([['branch:kept', { x: 800, y: 100 }]]))
+    expect(out.nodes.map((n) => n.name).sort()).toEqual(['kept', 'mine'])
+    expect(out.older).toBe(1)
+  })
+
+  it('hangs a tag off the trunk when the branch that holds it is out of sight', () => {
+    const nodes = [node('release', { updated: NOW - 60 * DAY }), node('v1', { kind: 'tag', updated: NOW - DAY, parent: 'release' })]
+    const out = layout(trunk, nodes, 1000, 640, NOW)
+    expect(out.nodes.map((n) => n.name)).toEqual(['v1'])
+    expect(Number.isFinite(out.nodes[0].x)).toBe(true)
+  })
+
+  it('zooms out no further than the oldest node needs', () => {
+    expect(widestScale([node('a', { updated: NOW - 3 * DAY })], NOW)).toBe(1)
+    expect(widestScale([node('a', { updated: NOW - 10 * DAY })], NOW)).toBe(1)
+    expect(widestScale([node('a', { updated: NOW - 40 * DAY })], NOW)).toBe(2)
+    expect(widestScale([node('a', { updated: NOW - 300 * DAY })], NOW)).toBe(4)
+    expect(widestScale([node('a', { updated: NOW - 9000 * DAY })], NOW)).toBe(SCALES.length - 1)
+    expect(zoomBy(1, 1, 2)).toBe(2)
+    expect(zoomBy(2, 1, 2)).toBe(2)
+  })
+
+  it('opens at the closest level that holds most of the nodes, and no closer than two weeks', () => {
+    const recent = Array.from({ length: 10 }, (_, i) => node(`r${i}`, { updated: NOW - DAY }))
+    expect(fittingScale(recent, NOW)).toBe(DEFAULT_SCALE)
+    const old = Array.from({ length: 10 }, (_, i) => node(`o${i}`, { updated: NOW - 100 * DAY }))
+    expect(fittingScale([...recent.slice(0, 3), ...old], NOW)).toBe(3)
+    // Mostly recent, with one very old branch: it opens close, and the old one is counted.
+    expect(fittingScale([...recent, node('ancient', { updated: NOW - 2000 * DAY })], NOW)).toBe(DEFAULT_SCALE)
+    expect(fittingScale([], NOW)).toBe(DEFAULT_SCALE)
+  })
+
+  it('names every node when there is room', () => {
+    const nodes = [node('a', { commits: 9 }), node('b', { commits: 4, updated: NOW - 3 * DAY }), node('c', { commits: 1, updated: NOW - 9 * DAY })]
+    expect(layout(trunk, nodes, 1000, 640, NOW).nodes.every((n) => n.named)).toBe(true)
+  })
+
+  it('in a crowd, gives names to what needs them most and never lets two run together', () => {
+    const many = [
+      node('mine', { head: true, commits: 2, updated: NOW - 2 * DAY }),
+      ...Array.from({ length: 50 }, (_, i) => node(`origin/feature/SC2-${25000 + i}-a-long-branch-name`, { kind: 'remote', commits: 1 + (i % 9), updated: NOW - (i % 6) * DAY })),
+      node('local-work', { commits: 1, updated: NOW - 5 * DAY }),
+    ]
+    const out = layout(trunk, many, 1200, 760, NOW, SCALES[0])
+    const named = out.nodes.filter((n) => n.named)
+    expect(out.nodes.find((n) => n.name === 'mine')!.named).toBe(true)
+    expect(named.length).toBeGreaterThan(3)
+    expect(named.length).toBeLessThan(out.nodes.length)
+    // No two names overlap: their boxes are apart one way or the other.
+    const box = (n: (typeof named)[number]) => ({ x: n.x, y: n.above ? n.y - n.r - 27 : n.y + n.r + 27, hw: Math.min(190, Math.max(64, n.name.length * 7.3)) / 2 + 5, hh: 21 })
+    for (const a of named)
+      for (const b of named) {
+        if (a === b || a.head || b.head) continue
+        const A = box(a)
+        const B = box(b)
+        expect(Math.abs(A.x - B.x) >= A.hw + B.hw || Math.abs(A.y - B.y) >= A.hh + B.hh).toBe(true)
+      }
+    for (const n of out.nodes) expect(dist(n, out.trunk)).toBeGreaterThan(out.trunk.r)
   })
 })
 
