@@ -113,3 +113,57 @@ test.describe('HTML pages', () => {
     await expect(page.locator('.html .note')).toContainText('Shown without 4 parts that would run or load something and 1 picture from the web.')
   })
 })
+
+// #158: a notebook shows its cells and stored outputs, and nothing in it runs.
+test.describe('Jupyter notebooks', () => {
+  const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+  const frame = '<div><style scoped>.dataframe { color: red }</style><table class="dataframe"><thead><tr><th></th><th>name</th><th>score</th></tr></thead><tbody><tr><th>0</th><td>Ana</td><td>3</td></tr><tr><th>1</th><td>Bo</td><td>5</td></tr></tbody></table></div>'
+  const book = {
+    nbformat: 4,
+    nbformat_minor: 5,
+    metadata: { language_info: { name: 'python' } },
+    cells: [
+      { cell_type: 'markdown', source: ['# Scores\n', 'A *short* look, with $x^2$ and a plot: ![plot](attachment:p.png)'], attachments: { 'p.png': { 'image/png': PIXEL } } },
+      { cell_type: 'code', execution_count: 1, source: 'df = load()\ndf', outputs: [{ output_type: 'execute_result', execution_count: 1, data: { 'text/html': frame, 'text/plain': '  name  score\n0  Ana      3' } }] },
+      { cell_type: 'code', execution_count: 2, source: 'print("hi")', outputs: [{ output_type: 'stream', name: 'stdout', text: 'hi\n' }] },
+      { cell_type: 'code', execution_count: 3, source: 'plot()', outputs: [{ output_type: 'display_data', data: { 'image/png': PIXEL, 'text/plain': '<Figure>' } }] },
+      { cell_type: 'code', execution_count: 4, source: '1/0', outputs: [{ output_type: 'error', ename: 'ZeroDivisionError', evalue: 'division by zero', traceback: ['\u001b[0;31mZeroDivisionError\u001b[0m: division by zero'] }] },
+      { cell_type: 'code', execution_count: 5, source: 'widget()', outputs: [{ output_type: 'display_data', data: { 'application/javascript': 'window.ran = true', 'application/vnd.jupyter.widget-view+json': {} } }] },
+      { cell_type: 'code', execution_count: 6, source: 'html()', outputs: [{ output_type: 'display_data', data: { 'text/html': '<script>window.ran = true</script><p>a page</p>', 'text/plain': '<IPython.core.display.HTML object>' } }] },
+    ],
+  }
+
+  test('renders its Markdown, code and stored outputs, in order', async ({ page }) => {
+    await open(page, 'markdownPreview', { responses: { File: { path: 'analysis/scores.ipynb', text: JSON.stringify(book) } } })
+    await expect(page.locator('.notebook .facts')).toContainText('7 cells · Python · as last saved')
+    await expect(page.getByRole('heading', { name: 'Scores' })).toBeVisible()
+    await expect(page.locator('.notebook em')).toHaveText('short')
+    // The cell's attached picture.
+    await expect(page.locator('.cell.md img')).toHaveAttribute('src', `data:image/png;base64,${PIXEL}`)
+    // A DataFrame is a real table, read out of its HTML, with none of the HTML's styles.
+    const table = page.locator('.out-table table')
+    await expect(table.locator('thead th')).toHaveText(['', 'name', 'score'])
+    await expect(table.locator('tbody tr').nth(1)).toHaveText(/1\s*Bo\s*5/)
+    await expect(page.locator('.notebook style')).toHaveCount(0)
+    await expect(page.locator('.out').filter({ hasText: 'hi' })).toBeVisible()
+    await expect(page.locator('.out-img')).toHaveAttribute('src', `data:image/png;base64,${PIXEL}`)
+    const error = page.getByRole('group', { name: 'Error: ZeroDivisionError' })
+    await expect(error).toContainText('ZeroDivisionError: division by zero')
+    await expect(error).not.toContainText('[0;31m')
+    await expect(page.locator('.prompt').first()).toHaveText('In [1]')
+  })
+
+  test('never runs a script from an output', async ({ page }) => {
+    await open(page, 'markdownPreview', { responses: { File: { path: 'analysis/scores.ipynb', text: JSON.stringify(book) } } })
+    await expect(page.getByText('An interactive output, which only runs in Jupyter.')).toBeVisible()
+    // An HTML output that isn't a table shows as the text stored beside it.
+    await expect(page.locator('.out').filter({ hasText: '<IPython.core.display.HTML object>' })).toBeVisible()
+    expect(await page.evaluate(() => (window as unknown as { ran?: boolean }).ran)).toBeUndefined()
+    await expect(page.locator('.notebook script')).toHaveCount(0)
+  })
+
+  test('says so when the file isn’t a notebook it can read', async ({ page }) => {
+    await open(page, 'markdownPreview', { responses: { File: { path: 'broken.ipynb', text: '{"cells": ' } } })
+    await expect(page.getByRole('alert')).toHaveText("This isn't valid JSON, so it can't be read as a notebook.")
+  })
+})
