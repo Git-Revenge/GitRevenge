@@ -7,7 +7,8 @@
   import { errorText } from '../errors'
   import Loading from '../ui/Loading.svelte'
   import { laneVar, relativeTime } from './draw'
-  import { DEFAULT_SCALE, keyShows, layout, nameWaits, SCALES, zoomBy, type MapNode, type Placed } from './mapLayout'
+  import Icon from '../ui/Icon.svelte'
+  import { DEFAULT_SCALE, keyShows, layout, nameWaits, SCALES, WIP_R, wipPlace, zoomBy, type MapNode, type Placed } from './mapLayout'
 
   let {
     path,
@@ -15,6 +16,7 @@
     onShow,
     onMenu,
     onSummary,
+    wip,
   }: {
     path: string
     /** Changes when the branches or tags may have: after a reload of the graph. */
@@ -25,6 +27,9 @@
     onMenu?: (node: MapNode, x: number, y: number) => void
     /** What the map holds, for the bar: "8 branches · 13 tags". */
     onSummary?: (text: string) => void
+    /** The working tree: how many files have changed (null until known), whether its panel is
+     * showing, and how to show it. It's drawn against the checked-out branch. */
+    wip?: { changes: number | null; active: boolean; open: () => void }
   } = $props()
 
   interface Data {
@@ -117,6 +122,15 @@
     return tags.length ? tags.reduce((a, b) => (b.updated < a.updated ? b : a)).name : ''
   })
 
+  /** The working tree's mark sits against whatever is checked out; with a detached HEAD, or a
+   * checked-out branch that isn't shown, against the trunk. */
+  let wipAt = $derived.by(() => {
+    if (!wip || !placed) return null
+    const head = placed.trunk.head ? placed.trunk : (placed.nodes.find((n) => n.head) ?? placed.trunk)
+    return { ...wipPlace(head, placed.trunk, width, height), on: head.name }
+  })
+  let wipText = $derived(!wip ? '' : wip.changes ? `${plural(wip.changes, 'file')} changed` : wip.changes === 0 ? 'Working tree, clean' : 'Working tree')
+
   /** A branch wears its kind's colour, or else one of the lanes', the same one each time. */
   function colorOf(n: MapNode): string {
     if (n.kind === 'trunk') return laneVar(0)
@@ -142,7 +156,7 @@
     if (n.kind === 'trunk') return `${plural(n.commits, 'commit')}. ${moved}`
     if (n.kind === 'tags') return `${plural(n.tags ?? 0, 'tag')} older than the ones shown, with ${plural(n.commits, 'commit')} up to the newest of them.`
     if (n.kind === 'tag') return `${plural(n.commits, 'commit')} ${n.name === firstTag ? 'up to it' : 'since the tag before it'}${n.parent ? `, on ${n.parent}` : ''}. ${moved}`
-    const where = n.kind === 'remote' ? 'Only on the remote. ' : ''
+    const where = (n.kind === 'remote' ? 'Only on the remote. ' : '') + (n.stacked && n.parent ? `Stacked on ${n.parent}. ` : '') + (n.worktree ? `Checked out in the worktree at ${n.worktree}. ` : '')
     const own = n.commits ? `${plural(n.commits, 'commit')} that ${n.commits === 1 ? "isn't" : "aren't"} in ${trunk}.` : `Nothing ${trunk} doesn't have: it's merged, or hasn't started.`
     return `${where}${own} ${moved}`
   }
@@ -200,6 +214,7 @@
         <b>{n.name}</b><span>{plural(n.commits, 'commit')}</span>{#if n.head}<i>you’re here</i>{/if}
       {/if}
     </span>
+    {#if n.worktree}<span class="badge" title="Checked out in the worktree at {n.worktree}"><Icon name="worktree" size={12} /></span>{/if}
     {#if n.kind !== 'trunk'}
       <span class="name" class:above={n.above}><b>{n.name}</b><small>{sizeLine(n)}</small>{#if n.head}<i>you’re here</i>{/if}</span>
     {/if}
@@ -231,7 +246,7 @@
       {/each}
       {#each placed.nodes as n (keyOf(n))}
         {@const from = holderOf(n) ?? placed.trunk}
-        <line class:tagline={n.kind === 'tag' || n.kind === 'tags'} x1={from.x} y1={from.y} x2={n.x} y2={n.y} stroke={colorOf(n)} />
+        <line class:tagline={n.kind === 'tag' || n.kind === 'tags'} class:stackline={n.stacked} x1={from.x} y1={from.y} x2={n.x} y2={n.y} stroke={colorOf(n)} />
       {/each}
     </svg>
     <!-- A narrow panel has no room for the rings' names or the key: the nodes come first. -->
@@ -251,6 +266,13 @@
     </div>
 
     {#if keyShows(width, height)}
+    {#if wip && wipAt}
+      <!-- What isn't a commit yet, against the branch it would be committed to. -->
+      <button class="wip" class:dirty={!!wip.changes} class:picked={wip.active} aria-pressed={wip.active} aria-label="{wipText}. The working tree, on {wipAt.on}." title="{wipText}, on {wipAt.on}" style:left="{wipAt.x}px" style:top="{wipAt.y}px" style:--size="{WIP_R * 2}px" onclick={() => wip.open()}>
+        {#if wip.changes}<span>{wip.changes > 99 ? '99+' : wip.changes}</span>{/if}
+      </button>
+    {/if}
+
     <div class="zoom" role="group" aria-label="Zoom">
       <button class="btn sm quiet icon" aria-label="Zoom in" title="Zoom in: the rings mark less time (+)" disabled={zoom === 0} onclick={() => zoomTo(zoomBy(zoom, -1))}>+</button>
       <span class="span" aria-live="polite">{scale.name}</span>
@@ -299,6 +321,12 @@
   line {
     stroke-width: 1.75;
     stroke-opacity: 0.5;
+  }
+
+  /* A stack's links are heavier: they're what the stack is. */
+  line.stackline {
+    stroke-width: 2.5;
+    stroke-opacity: 0.7;
   }
 
   line.tagline {
@@ -505,6 +533,58 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .badge {
+    position: absolute;
+    left: calc(50% + var(--reach) * 0.7 - 2px);
+    top: calc(50% - var(--reach) * 0.7 - 14px);
+    display: inline-flex;
+    padding: 2px;
+    border-radius: 50%;
+    background: var(--paper);
+    box-shadow: 0 0 0 1px var(--paper-edge);
+    color: var(--ink-soft);
+    pointer-events: none;
+  }
+
+  /* The working tree: a dashed ring, as in the timeline, with how many files have changed. */
+  .wip {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--size);
+    height: var(--size);
+    box-sizing: border-box;
+    padding: 0;
+    border: 1.5px dashed var(--link);
+    border-radius: 50%;
+    background: var(--paper);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--link-hover);
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+  }
+
+  /* A bigger press target than the mark. */
+  .wip::before {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+  }
+
+  .wip.dirty {
+    background: color-mix(in srgb, var(--link) 16%, var(--paper));
+  }
+
+  .wip:focus-visible,
+  .wip.picked {
+    outline: 2px solid var(--link);
+    outline-offset: 3px;
   }
 
   .zoom {

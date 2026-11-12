@@ -11,8 +11,12 @@ export interface MapNode {
   commits: number
   /** When it last moved, in Unix seconds. */
   updated: number
-  /** The branch node it hangs off, or '' for the trunk. */
+  /** The branch node it hangs off, or '' for the trunk: the branch that holds a tag, or the
+   * one a stacked branch is stacked on. */
   parent: string
+  stacked?: boolean
+  /** The folder of the other worktree the branch is checked out in. */
+  worktree?: string
   head: boolean
   branchKind?: string
   /** How many tags a fold holds. */
@@ -292,3 +296,17 @@ export function layout(trunk: MapNode, nodes: MapNode[], width: number, height: 
 export function nameWaits(node: Pick<Placed, 'band'>, total: number): boolean {
   return total > CROWD && node.band > 0
 }
+
+/** Where the working tree's mark goes: touching the checked-out node, on the side away from
+ * the trunk (up and to the left of the trunk itself), and kept on the stage. */
+export function wipPlace(head: Pick<Placed, 'x' | 'y' | 'r'>, hub: Pick<Placed, 'x' | 'y'>, width: number, height: number): { x: number; y: number } {
+  const dx = head.x - hub.x
+  const dy = head.y - hub.y
+  const d = Math.hypot(dx, dy)
+  const ux = d < 1 ? -Math.SQRT1_2 : dx / d
+  const uy = d < 1 ? -Math.SQRT1_2 : dy / d
+  const reach = head.r + WIP_R + 3
+  return { x: Math.min(width - WIP_R - 4, Math.max(WIP_R + 4, head.x + ux * reach)), y: Math.min(height - WIP_R - 4, Math.max(WIP_R + 4, head.y + uy * reach)) }
+}
+/** The working tree mark's radius. */
+export const WIP_R = 11
