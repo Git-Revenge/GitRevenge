@@ -9,6 +9,7 @@
   import { session } from './session.svelte'
   import { prefs } from './prefs.svelte'
   import { theme } from './theme.svelte'
+  import { EXPERIMENTS } from './graph/views'
   import Icon from './ui/Icon.svelte'
   import InkButton from './ui/InkButton.svelte'
   import Modal from './ui/Modal.svelte'
@@ -119,6 +120,8 @@
       theme.mode = p.theme as typeof theme.mode
       theme.density = p.graphDensity === 'compact' ? 'compact' : 'comfortable'
       theme.experimental = p.experimentalViews ?? []
+      // A view switched off stops showing: the graph goes back to its rows.
+      if (!theme.experimental.includes(theme.savedView)) theme.savedView = ''
       update.checksOn = p.updateChecks
       prefs.zoom = p.zoom
       prefs.cloneDir = p.cloneDir
@@ -171,6 +174,26 @@
           <span>Zoom: {p.zoom}%</span>
           <input type="range" min="80" max="150" step="5" bind:value={p.zoom} aria-valuetext="{p.zoom} percent" />
         </label>
+      </fieldset>
+
+      <fieldset>
+        <legend class="meta">Experimental views</legend>
+        {#each EXPERIMENTS as x (x.id)}
+          <label class="check">
+            <input
+              type="checkbox"
+              checked={(p.experimentalViews ?? []).includes(x.id)}
+              onchange={(e) => {
+                if (!p) return
+                const rest = (p.experimentalViews ?? []).filter((v) => v !== x.id)
+                p.experimentalViews = e.currentTarget.checked ? [...rest, x.id] : rest
+              }}
+            />
+            {x.label}
+          </label>
+          <p class="hint">{x.about}</p>
+        {/each}
+        <p class="hint">Off until you ask. A view you switch on joins the graph's view menu; the graph still opens in Timeline. These can change or go away between versions.</p>
       </fieldset>
 
       <fieldset>
