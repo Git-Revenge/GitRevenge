@@ -105,7 +105,7 @@ async function reset(page, open = ['tidewater'], { clean = false, branch } = {})
     }
     // The sidebar remembers its panel, filter and sort for each repository, and a diff the
     // layout it was last shown in.
-    for (const key of Object.keys(localStorage)) if (key.startsWith('gitrevenge.sidebar:')) localStorage.removeItem(key)
+    for (const key of Object.keys(localStorage)) if (/^gitrevenge\.(sidebar|rightPanel):/.test(key)) localStorage.removeItem(key)
     localStorage.removeItem('gitrevenge.diffLayout')
     localStorage.removeItem('gitrevenge.renderPreviews')
   }, DEMO)
@@ -500,6 +500,9 @@ scenes.geojson = (page) =>
     // A feature picked from the list, so its properties show.
     const pick = await p.$(byText('Gull Point', 'button'))
     if (pick) await pick.click()
+    await sleep(300)
+    // Its properties are under the list: scroll down so the shapes and the properties both show.
+    await p.evaluate(() => document.querySelector('.body.code-ground')?.scrollTo(0, 1e6))
     await park(p)
   })
 
@@ -528,6 +531,13 @@ scenes.map = (page) =>
   stills(page, 'view-map', async (p) => {
     await reset(p, ['tidewater'], { clean: true })
     await experiment(p, 'map')
+    // The map wants the room: the panel on the right is hidden, and the next reset brings it back.
+    await p.keyboard.down('Control')
+    await p.keyboard.down('Alt')
+    await p.keyboard.press('b')
+    await p.keyboard.up('Alt')
+    await p.keyboard.up('Control')
+    await sleep(2500)
     await park(p)
   })
 

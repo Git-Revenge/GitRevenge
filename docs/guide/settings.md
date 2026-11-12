@@ -104,7 +104,7 @@ On macOS, read <kbd>⌘</kbd> wherever this page says <kbd>Ctrl</kbd>. Press <kb
 | Start page | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> |
 | Filter the sidebar | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> |
 
-In the sidebar's list, the keys are different: see [the commit graph](graph.md#branches-and-tags). The [interactive rebase editor](branches.md#interactive-rebase) has a letter for each choice.
+In the sidebar's list, the keys are different: see [the commit graph](graph.md#branches-and-tags). In the Horizontal view, <kbd>←</kbd> and <kbd>→</kbd> take the place of <kbd>↑</kbd> and <kbd>↓</kbd>, and in the Map, <kbd>+</kbd> and <kbd>−</kbd> zoom; see [experimental views](experimental-views.md). The [interactive rebase editor](branches.md#interactive-rebase) has a letter for each choice.
 
 ### Changing them
 
