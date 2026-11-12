@@ -559,7 +559,7 @@ scenes.rowMarks = (page) =>
     async (p) => {
       const card = await (await p.waitForSelector('.row-actions', { visible: true })).boundingBox()
       const s = await (await p.$('.scroller')).boundingBox()
-      return { x: s.x, y: Math.max(s.y, card.y - 150), width: s.width, height: 300 }
+      return { x: s.x, y: Math.max(s.y, card.y - 110), width: s.width, height: 234 }
     },
   )
 
