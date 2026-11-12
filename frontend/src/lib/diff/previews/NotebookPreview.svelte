@@ -110,6 +110,8 @@
 
 <style>
   .notebook {
+    box-sizing: border-box;
+    width: 100%;
     display: flex;
     flex-direction: column;
     gap: 14px;
@@ -206,8 +208,10 @@
     font-size: 12.5px;
   }
 
+  /* A plot keeps the size it was saved at, up to the column's width. */
   .out-img {
     display: block;
+    align-self: flex-start;
     max-width: 100%;
     height: auto;
     background: #fff;
