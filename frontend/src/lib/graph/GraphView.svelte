@@ -529,6 +529,19 @@
   /** Whether commit i is folded out of sight. The selected commit and search matches always
    * show, so nothing is ever landed on that can't be seen. */
   const isHidden = (i: number) => foldedAway(foldOf(i), openFolds, i === selected, matchRows.has(i))
+  /** The folding, as the Horizontal view asks about it: a fold there is a column, not a line. */
+  const horizontalFolds = {
+    of: (i: number) => {
+      const fold = foldOf(i)
+      return fold ? { key: fold.key, head: fold.head, count: fold.count, kind: fold.kind, open: openFolds.has(fold.key), label: foldLabel(fold.count, kindInfo(fold.kind)?.label ?? fold.kind) } : null
+    },
+    hidden: (i: number) => isHidden(i),
+    step: (i: number, by: number) => stepCommits(i, by),
+    toggle: (i: number) => {
+      const fold = foldOf(i)
+      if (fold) toggleFold(fold)
+    },
+  }
   /** Whether the keyboard can land on commit i: it shows, or it's the newest of a closed fold,
    * which is how the fold is reached. Landing there shows it, under its fold's line. */
   const canSelect = (i: number) => !isHidden(i) || foldOf(i)?.head === i
@@ -2056,6 +2069,7 @@
       dimmed={(i: number) => !!matchSet && !matchSet.has(i)}
       ruler={() => ({ ...marks, matches })}
       {wip}
+      folds={horizontalFolds}
       onSelect={(i: number) => select(i)}
       onContext={onContext}
     />

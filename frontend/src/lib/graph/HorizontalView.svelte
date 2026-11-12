@@ -12,16 +12,18 @@
   import RefChip from './RefChip.svelte'
   import { dayLineLabel, formatTime, initials, laneVar, refLabels, startsRun, type RefLabel } from './draw'
   import {
+    anchorAt,
+    anchorOffset,
+    anchorToShow,
     BAR_H,
     CHIP_MIN,
     chipRooms,
-    clampOffset,
     COL,
-    colAt,
     DAY_BAND,
     dayBandText,
     dayCount,
-    daySpans,
+    dayStretches,
+    LABEL_MAX,
     LANE,
     lanesAtEdge,
     laneScrollToShow,
@@ -30,15 +32,19 @@
     LEAN,
     maxLaneScroll,
     mergedName,
+    moveAnchor,
     namesWidth,
+    nextShown,
     offsetForThumb,
-    offsetToShow,
+    placeColumns,
     segPath,
+    settle,
+    spotAt,
     subjectLength,
     TAGS_H,
     thumbFor,
-    visibleRange,
     wordsHeight,
+    type Anchor,
   } from './horizontal'
   import type { Ref, Row, RowCache } from './rowCache'
   import { placeTicks, rowToY, tickAt, tickSummary, unreadFrom, type MonthMark } from './ruler'
@@ -54,6 +60,7 @@
     dimmed,
     ruler,
     wip,
+    folds,
     onSelect,
     onContext,
   }: {
@@ -77,13 +84,24 @@
      * files have changed (null until known), whether its panel is the one showing, and how
      * to show it. Without it the first column is the newest commit. */
     wip?: { changes: number | null; active: boolean; open: () => void }
+    /** The timeline's folding, which applies here too: a folded lane's commits of a day are one
+     * column. `of` is the fold a commit is in, `hidden` whether it's folded out of sight, `step`
+     * the commit so many shown commits on, and `toggle` opens or closes a fold. */
+    folds?: {
+      of: (i: number) => { key: string; head: number; count: number; kind: string; open: boolean; label: string } | null
+      hidden: (i: number) => boolean
+      step: (i: number, by: number) => number
+      toggle: (i: number) => void
+    }
     onSelect: (i: number) => void
     onContext?: (row: Row, refs: Ref[], x: number, y: number) => void
   } = $props()
 
-  /** The working tree's column, when there is one: every commit sits that much further right. */
+  /** The working tree's column, when there is one: it comes before commit 0, as column -1. */
   let lead = $derived(wip ? 1 : 0)
-  let pad = $derived(lead * COL)
+  /** Whether commit i has a column: it isn't folded away, or it's the newest of its fold, which
+   * is where the fold's own column goes. */
+  const shown = (i: number) => !folds || !folds.hidden(i) || folds.of(i)?.head === i
 
   const id = `graph-across-${Math.random().toString(36).slice(2, 8)}`
   let field = $state<HTMLDivElement>()
@@ -92,28 +110,41 @@
   let bodyW = $state(0)
   let width = $state(0)
   let height = $state(0)
-  /** How far the view has scrolled from the newest commit, in px, and how far down the lanes. */
-  let offset = $state(0)
+  /** Where the view's left edge is (see Anchor), and how far down the lanes have scrolled. */
+  let anchor = $state<Anchor>({ i: -1, dx: 0 })
   let laneScroll = $state(0)
   let namesW = $derived(namesWidth(bodyW))
 
-  let range = $derived(visibleRange(offset - pad, width, count))
+  /** The columns in view, and a few either side, with where each sits. */
+  let spots = $derived.by(() => {
+    void tick
+    return placeColumns(anchor, width, count, shown, lead)
+  })
   /** The commits to draw, with what the drawing needs of each. */
   let cols = $derived.by(() => {
     void tick
     const checkedOut = headRow()
-    const out: { i: number; row: Row | undefined; refs: Ref[]; starts: boolean; head: boolean }[] = []
-    for (let i = range.first; i < range.last; i++) {
-      const row = cache.get(i)
+    const out: { i: number; x: number; row: Row | undefined; refs: Ref[]; starts: boolean; head: boolean; fold: ReturnType<NonNullable<typeof folds>['of']> }[] = []
+    for (const s of spots) {
+      if (s.i < 0) continue
+      const row = cache.get(s.i)
       const refs = row ? cache.refsFor(row.id) : []
-      const head = i === checkedOut || refs.some((r) => r.head)
-      out.push({ i, row, refs, head, starts: !!row && startsRun(row, { prev: cache.get(i - 1), prev2: cache.get(i - 2) }, head) })
+      const head = s.i === checkedOut || refs.some((r) => r.head)
+      // A run is judged against the columns beside it, which aren't always the commits before.
+      const before = nextShown(s.i, -1, count, shown)
+      const before2 = before === null ? null : nextShown(before, -1, count, shown)
+      const near = { prev: before === null ? undefined : cache.get(before), prev2: before2 === null ? undefined : cache.get(before2) }
+      out.push({ i: s.i, x: s.x, row, refs, head, starts: !!row && startsRun(row, near, head), fold: folds?.of(s.i) ?? null })
     }
     return out
   })
+  /** The working tree's column, when it's in view. */
+  let wipSpot = $derived(spots.find((s) => s.i < 0))
   $effect(() => {
     void tick
-    cache.ensure(range.first, range.last + 60)
+    const first = Math.max(0, spots[0]?.i ?? 0)
+    const last = Math.max(first, spots[spots.length - 1]?.i ?? 0)
+    cache.ensure(first, last + 60)
   })
 
   let mainRemote = $derived.by(() => {
@@ -128,17 +159,11 @@
   let extent = $derived(lanesExtent(lanes))
   const pitch = LANE.max
   let subjectMax = $derived(subjectLength(words))
-  /** The svg's own x for commit i: it starts at the first drawn column. */
-  const sx = (i: number) => (i - range.first) * COL + COL / 2
-
   let days = $derived.by(() => {
     void tick
     const now = Date.now() / 1000
-    return daySpans(
-      cols.map((c) => c.row),
-      range.first,
-    ).map((d) => {
-      const n = dayCount((i) => cache.get(i), d.start, count)
+    return dayStretches(spots, (i) => cache.get(i)?.authorTime).map((d) => {
+      const n = dayCount((i) => cache.get(i), d.first, count)
       return { ...d, label: dayLineLabel(d.time, now), count: n === null ? '' : `${n.toLocaleString()} ${n === 1 ? 'commit' : 'commits'}` }
     })
   })
@@ -163,7 +188,7 @@
     lanesAtEdge(
       cols
         // A column half off the left edge still counts as the edge.
-        .filter((c) => c.i >= Math.floor((offset - pad) / COL))
+        .filter((c) => c.x > -COL)
         .map((c) => c.row),
     ),
   )
@@ -216,14 +241,15 @@
    * of the lane named on its row. They go in the row over the lanes, above their commit. */
   let marks = $derived.by(() => {
     void namesTick
-    const out: { i: number; labels: RefLabel[]; color: number }[] = []
+    const out: { i: number; x: number; labels: RefLabel[]; color: number }[] = []
     for (const c of cols) {
       if (!c.row || !c.refs.length) continue
       const named = edge.get(c.row.col)?.color === c.row.color && laneNames.get(c.row.color)?.commit === c.row.id
-      if (!named) out.push({ i: c.i, labels: refLabels(c.refs, mainRemote), color: c.row.color })
+      if (!named) out.push({ i: c.i, x: c.x, labels: refLabels(c.refs, mainRemote), color: c.row.color })
     }
-    const rooms = chipRooms(out.map((m) => m.i))
-    return out.map((m) => ({ ...m, room: rooms.get(m.i) ?? 0 }))
+    // A chip has the room up to the next one, by where they're placed.
+    const rooms = chipRooms(out.map((m) => Math.round(m.x / COL)))
+    return out.map((m) => ({ ...m, room: rooms.get(Math.round(m.x / COL)) ?? LABEL_MAX }))
   })
 
   let chosen = $derived.by(() => {
@@ -234,23 +260,26 @@
   // Keeps the selected commit in view: when it changes, and when the view is first measured.
   // It goes on following it while the history's length or the view's width settles (End lands
   // on an estimate first), until the person scrolls somewhere themselves.
-  let shown = -1
+  let followed = -1
   let following = false
   $effect(() => {
     if (selected < 0 || !width) return
-    if (selected !== shown) {
-      shown = selected
+    if (selected !== followed) {
+      followed = selected
       following = true
     }
     if (!following) return
-    // In columns, so the newest commit brings the working tree's column into view with it.
-    const next = offsetToShow(
-      untrack(() => offset),
+    const at = untrack(() => anchor)
+    const next = anchorToShow(
+      at,
+      untrack(() => spots),
       width,
-      selected + lead,
-      count + lead,
+      selected,
+      count,
+      shown,
+      lead,
     )
-    if (next !== untrack(() => offset)) offset = next
+    if (next.i !== at.i || next.dx !== at.dx) anchor = next
     // Its lane comes into view too, when the lanes scroll.
     const lane = chosen?.col
     if (lane !== undefined && lanesView > 0) {
@@ -263,10 +292,11 @@
       if (down !== untrack(() => laneScroll)) laneScroll = down
     }
   })
-  // A history that got shorter, or a narrower view, can leave the offset past the end.
+  // A history that got shorter, or a fold that closed, can leave the anchor on nothing.
   $effect(() => {
-    const next = clampOffset(offset, width, count + lead)
-    if (width && next !== offset) offset = next
+    void tick
+    const next = settle(anchor, count, shown, lead)
+    if (next.i !== anchor.i || next.dx !== anchor.dx) anchor = next
   })
   $effect(() => {
     const next = Math.min(maxLaneScroll(lanes, lanesView), Math.max(0, laneScroll))
@@ -289,31 +319,33 @@
     if (!d) return
     e.preventDefault()
     following = false
-    offset = clampOffset(offset + lines(e, d), width, count + lead)
+    anchor = moveAnchor(anchor, lines(e, d), count, shown, lead)
   }
 
   function onKey(e: KeyboardEvent) {
     const page = Math.max(1, Math.floor(width / COL) - 1)
     const at = Math.max(0, selected)
+    // Folded commits are stepped over, as they are in the timeline.
+    const step = (by: number) => (folds ? folds.step(at, by) : at + by)
     // Right is older, as Down is in the timeline.
-    const moves: Record<string, number> = { ArrowRight: at + 1, ArrowLeft: at - 1, PageDown: at + page, PageUp: at - page, Home: 0, End: count - 1 }
+    const moves: Record<string, () => number> = { ArrowRight: () => step(1), ArrowLeft: () => step(-1), PageDown: () => step(page), PageUp: () => step(-page), Home: () => 0, End: () => count - 1 }
     if (!(e.key in moves) || !count) return
     e.preventDefault()
     // Left of the newest commit is the working tree; from there, Right comes back.
     if (wip && e.key === 'ArrowLeft' && selected <= 0 && !wip.active) {
-      offset = 0
+      anchor = { i: -1, dx: 0 }
       wip.open()
       return
     }
     if (wip?.active && e.key === 'ArrowRight') return onSelect(at)
-    onSelect(Math.min(count - 1, Math.max(0, moves[e.key])))
+    onSelect(Math.min(count - 1, Math.max(0, moves[e.key]())))
   }
 
   /** The column under the pointer: a commit's row, -1 for none, or 'wip' for the working tree. */
   function columnAt(e: MouseEvent): number | 'wip' {
     if (!field) return -1
-    const k = colAt(e.clientX - field.getBoundingClientRect().left, offset, count + lead)
-    return k < 0 ? -1 : k < lead ? 'wip' : k - lead
+    const spot = spotAt(spots, e.clientX - field.getBoundingClientRect().left)
+    return !spot ? -1 : spot.i < 0 ? 'wip' : spot.i
   }
 
   /** The lane the working tree sits on: the checked-out commit's, when that's in view. */
@@ -331,7 +363,7 @@
   // The scrollbar: a thumb to drag, and a press anywhere on the track goes there.
   let track = $state<HTMLDivElement>()
   let trackW = $state(0)
-  let thumb = $derived(thumbFor(offset, width, count + lead, trackW))
+  let thumb = $derived(thumbFor(anchorOffset(anchor, lead), width, count + lead, trackW))
   let drag: { grab: number } | null = null
   // The scrollbar is a ruler, as the timeline's is: its length stands for the whole history,
   // and ticks along it show where things are among the commits read so far.
@@ -354,7 +386,7 @@
   function barTo(clientX: number) {
     if (!track || !drag) return
     following = false
-    offset = offsetForThumb(clientX - track.getBoundingClientRect().left - drag.grab, width, count + lead, trackW)
+    anchor = anchorAt(offsetForThumb(clientX - track.getBoundingClientRect().left - drag.grab, width, count + lead, trackW), count, shown, lead)
   }
   function barDown(e: PointerEvent) {
     if (e.button !== 0 || !track) return
@@ -414,11 +446,13 @@
       role="listbox"
       aria-orientation="horizontal"
       aria-label="Commit history, newest first"
-      aria-activedescendant={wip?.active ? `${id}-wip` : selected >= range.first && selected < range.last ? `${id}-${selected}` : undefined}
+      aria-activedescendant={wip?.active ? `${id}-wip` : cols.some((c) => c.i === selected) ? `${id}-${selected}` : undefined}
       onkeydown={onKey}
       onclick={(e) => {
         const i = columnAt(e)
         if (i === 'wip') wip?.open()
+        // A fold's own column opens it; any other is a commit to choose.
+        else if (i >= 0 && folds?.hidden(i)) folds.toggle(i)
         else if (i >= 0) onSelect(i)
       }}
       oncontextmenu={(e) => {
@@ -432,49 +466,58 @@
       }}
     >
       <div class="days" style:height="{DAY_BAND}px">
-        {#each days as d (d.start)}
-          {@const left = pad + d.start * COL - offset}
-          {@const w = (d.end - d.start) * COL}
-          {@const seen = Math.max(0, w + Math.min(0, left))}
+        {#each days as d (d.first)}
+          {@const seen = Math.max(0, d.width + Math.min(0, d.x))}
           {@const says = dayBandText(d.label, d.count, d.time, seen)}
           <!-- The day's name stays at the left edge while its day scrolls under it. -->
-          <div class="day" title={d.count ? `${d.label} · ${d.count}` : d.label} style:left="{Math.max(0, left)}px" style:width="{seen}px">
+          <div class="day" title={d.count ? `${d.label} · ${d.count}` : d.label} style:left="{Math.max(0, d.x)}px" style:width="{seen}px">
             <span class="meta">{says.label}</span>{#if says.count}<span class="count">{says.count}</span>{/if}
           </div>
         {/each}
       </div>
-      <div class="track" style:top="{DAY_BAND}px" style:transform="translateX({-offset}px)">
+      <div class="track" style:top="{DAY_BAND}px">
         <!-- A faint line where each day ends and the one before it begins. -->
-        {#each days as d (d.start)}
-          {#if d.start > 0}<span class="daycut" style:left="{pad + d.start * COL}px"></span>{/if}
+        {#each days as d (d.first)}
+          {#if d.first > 0}<span class="daycut" style:left="{d.x}px"></span>{/if}
         {/each}
-        {#if wip}
+        {#if wip && wipSpot}
           <!-- What isn't a commit yet: always the first column, before the newest commit. -->
-          <div class="col wip" class:selected={wip.active} id="{id}-wip" role="option" aria-selected={wip.active} aria-label="{wipText}. The working tree." style:left="0" style:width="{COL}px">
+          <div class="col wip" class:selected={wip.active} id="{id}-wip" role="option" aria-selected={wip.active} aria-label="{wipText}. The working tree." style:left="{wipSpot.x}px" style:width="{COL}px">
             <span class="subject" style:top="{words - 22}px" style:max-width="{subjectMax}px" style:transform="rotate(-{LEAN}deg)">{wipText}</span>
           </div>
         {/if}
         {#each cols as c (c.i)}
           {@const names = c.refs.length ? refLabels(c.refs, mainRemote) : []}
+          {@const folded = !!c.fold && !c.fold.open && c.i !== selected && !!folds?.hidden(c.i)}
           <div
             class="col"
             class:selected={c.i === selected}
             class:dimmed={c.i !== selected && dimmed?.(c.i)}
             class:waiting={!c.row}
+            class:fold={folded}
             id="{id}-{c.i}"
             role="option"
             aria-selected={c.i === selected}
-            aria-label={c.row ? `${c.row.subject}, ${c.row.author}, ${formatTime(c.row.authorTime)}${names.length ? `, ${names.map((l) => l.text).join(', ')}` : ''}` : 'Loading'}
-            style:left="{pad + c.i * COL}px"
+            aria-label={folded && c.fold ? `${c.fold.label}, folded. Click to show them.` : c.row ? `${c.row.subject}, ${c.row.author}, ${formatTime(c.row.authorTime)}${names.length ? `, ${names.map((l) => l.text).join(', ')}` : ''}` : 'Loading'}
+            title={folded && c.fold ? `${c.fold.label}. Click to show them.` : undefined}
+            style:left="{c.x}px"
             style:width="{COL}px"
           >
-            {#if c.row}
+            {#if folded && c.fold}
+              <span class="subject quiet" style:top="{words - 22}px" style:max-width="{subjectMax}px" style:transform="rotate(-{LEAN}deg)">{c.fold.label}</span>
+            {:else if c.row}
               <span class="subject" style:top="{words - 22}px" style:max-width="{subjectMax}px" style:transform="rotate(-{LEAN}deg)">{c.row.subject}</span>
             {/if}
           </div>
         {/each}
+        <!-- An open fold can be closed again from over its newest commit. -->
+        {#each cols as c (c.i)}
+          {#if c.fold?.open && c.fold.head === c.i}
+            <button class="refold" style:left="{c.x + 3}px" style:top="{words + 3}px" title="Fold these {c.fold.label} into one column again" aria-label="Fold {c.fold.label} again" onclick={(e) => (e.stopPropagation(), folds?.toggle(c.i))}>fold</button>
+          {/if}
+        {/each}
         {#each marks as m (m.i)}
-          <span class="mark" class:bare={m.room < CHIP_MIN} style:left="{pad + m.i * COL + 3}px" style:top="{words}px" style:height="{TAGS_H}px" style:max-width="{Math.max(COL - 6, m.room)}px" title={m.labels.map((l) => l.text).join(', ')}>
+          <span class="mark" class:bare={m.room < CHIP_MIN} style:left="{m.x + 3}px" style:top="{words}px" style:height="{TAGS_H}px" style:max-width="{Math.max(COL - 6, m.room)}px" title={m.labels.map((l) => l.text).join(', ')}>
             {#if m.room < CHIP_MIN}
               <i class:diamond={m.labels[0].ref.kind === 'tag'} style:--lane={laneVar(m.color)}></i>
             {:else}
@@ -486,15 +529,15 @@
       <!-- The lanes scroll both ways, inside their own window: sideways with the commits, and
            up and down when there are more than fit. -->
       <div class="lanebox" style:top="{DAY_BAND + words + TAGS_H}px">
-        {#if wip}
+        {#if wip && wipSpot}
           <!-- The working tree's node: dashed, as in the timeline, and joined to the checked-out
                commit when that's the newest. -->
-          <span class="wip-node" class:dirty={!!wip.changes} class:joined={wipJoins} style:--lane={laneVar(0)} style:transform="translate({COL / 2 - offset}px, {laneY(wipLane, pitch) - laneScroll}px)"></span>
+          <span class="wip-node" class:dirty={!!wip.changes} class:joined={wipJoins} style:--lane={laneVar(0)} style:transform="translate({wipSpot.x + COL / 2}px, {laneY(wipLane, pitch) - laneScroll}px)"></span>
         {/if}
-        <svg class="lanes" aria-hidden="true" style:transform="translate({pad + range.first * COL - offset}px, {-laneScroll}px)" width={cols.length * COL} height={extent}>
+        <svg class="lanes" aria-hidden="true" style:transform="translateY({-laneScroll}px)" {width} height={extent}>
           {#each cols as c (c.i)}
             {#if c.row}
-              {@const cx = sx(c.i)}
+              {@const cx = c.x + COL / 2}
               <g class:muted={c.row.kind === 'docs'} class:dimmed={c.i !== selected && dimmed?.(c.i)}>
                 {#each c.row.up as s, n (n)}<path d={segPath(s, cx, 'up', pitch)} stroke={laneVar(s.color)} />{/each}
                 {#each c.row.down as s, n (n)}<path d={segPath(s, cx, 'down', pitch)} stroke={laneVar(s.color)} />{/each}
@@ -503,12 +546,16 @@
           {/each}
           {#each cols as c (c.i)}
             {#if c.row}
-              {@const cx = sx(c.i)}
+              {@const cx = c.x + COL / 2}
               {@const cy = laneY(c.row.col, pitch)}
               {@const color = laneVar(c.row.color)}
               <g class:muted={c.row.kind === 'docs'} class:dimmed={c.i !== selected && dimmed?.(c.i)}>
                 {#if c.head}<circle class="halo" {cx} {cy} r="16" fill={color} />{/if}
-                {#if c.row.parents > 1}
+                {#if c.fold && !c.fold.open && c.i !== selected && folds?.hidden(c.i)}
+                  <!-- A fold: how many commits are in it, where the newest's node would be. -->
+                  <rect class="foldpill" x={cx - 13} y={cy - 9} width="26" height="18" rx="9" stroke={color} />
+                  <text x={cx} y={cy} dy="0.36em">{c.fold.count > 99 ? '99+' : c.fold.count}</text>
+                {:else if c.row.parents > 1}
                   <circle class="cut" {cx} {cy} r="9" />
                   <circle {cx} {cy} r="7.5" fill={color} />
                   <circle class="hole" {cx} {cy} r="3.5" />
@@ -845,8 +892,37 @@
     font-weight: 500;
   }
 
-  .col.wip .subject {
+  .col.wip .subject,
+  .subject.quiet {
     font-style: italic;
+  }
+
+  .subject.quiet {
+    color: var(--ink-mute);
+  }
+
+  .col.fold {
+    cursor: pointer;
+  }
+
+  .refold {
+    position: absolute;
+    z-index: 2;
+    height: 20px;
+    padding: 0 7px;
+    border: none;
+    border-radius: 10px;
+    background: var(--paper-deep);
+    font-family: var(--font-serif);
+    font-size: 12.5px;
+    font-style: italic;
+    color: var(--ink-soft);
+    cursor: pointer;
+  }
+
+  .lanes .foldpill {
+    fill: var(--paper);
+    stroke-width: 1.5;
   }
 
   /* A dashed ring on the checked-out lane; filled a little when there's something to commit. */
