@@ -125,6 +125,26 @@ describe('layout', () => {
     expect(find('v0.11.0').size).toBeGreaterThan(find('v0.7.0').size)
   })
 
+  it('gives names room: more between nodes side by side than one above the other', () => {
+    for (const a of out.nodes)
+      for (const b of out.nodes) {
+        if (a === b) continue
+        const dx = Math.abs(a.x - b.x)
+        const dy = Math.abs(a.y - b.y)
+        // On much the same level, they're at least a short name apart.
+        if (dy < 20) expect(dx).toBeGreaterThan(64)
+      }
+  })
+
+  it('puts a name over a node that sits above the trunk, and under one below it', () => {
+    for (const n of out.nodes) {
+      if (n.parent) continue
+      if (n.y < out.trunk.y - 30) expect(n.above).toBe(true)
+      if (n.y > out.trunk.y) expect(n.above).toBe(false)
+    }
+    expect(out.nodes.some((n) => n.above)).toBe(true)
+  })
+
   it('comes out the same every time', () => {
     expect(layout(trunk, nodes, W, H, NOW)).toEqual(out)
   })

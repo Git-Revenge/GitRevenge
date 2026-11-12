@@ -28,6 +28,8 @@ export interface Placed extends MapNode {
   size: number
   /** 0 moved this week, 1 the week before, 2 longer ago. */
   band: 0 | 1 | 2
+  /** The name goes over the node, not under it: the side away from the trunk. */
+  above: boolean
 }
 
 export interface Rings {
@@ -49,6 +51,10 @@ const BRANCH_K = 4
 const TAG_K = 4.5
 /** Room kept between two nodes for the names under them. */
 const GAP = 34
+/** About how wide a name is drawn: 12px mono, cut at the width the view cuts it. */
+export function nameWidth(name: string): number {
+  return Math.min(190, Math.max(64, name.length * 7.3)) + 10
+}
 /** The two lines of words under a node, and the key in the stage's bottom left corner. */
 const NAME_H = 46
 export const KEY = { width: 200, height: 124 }
@@ -121,12 +127,12 @@ const STEPS = 260
 export function layout(trunk: MapNode, nodes: MapNode[], width: number, height: number, now: number): { trunk: Placed; nodes: Placed[]; rings: Rings } {
   const rings = ringsFor(width, height)
   const k = scales(nodes)
-  const hub: Placed = { ...trunk, x: rings.cx, y: rings.cy, r: trunkRadius(trunk.commits, k.branch), size: 0, band: 0 }
+  const hub: Placed = { ...trunk, x: rings.cx, y: rings.cy, r: trunkRadius(trunk.commits, k.branch), size: 0, band: 0, above: false }
   hub.size = hub.r * 2
 
   const placed: Placed[] = nodes.map((n) => {
     const size = n.kind === 'tags' ? TAG_SIDE.max : isTag(n) ? tagSide(n.commits, k.tag) : branchRadius(n.commits, k.branch) * 2
-    return { ...n, x: 0, y: 0, size, r: isTag(n) ? (size * Math.SQRT2) / 2 : size / 2, band: bandOf(n.updated, now) }
+    return { ...n, x: 0, y: 0, size, r: isTag(n) ? (size * Math.SQRT2) / 2 : size / 2, band: bandOf(n.updated, now), above: false }
   })
   const byName = new Map(placed.filter((p) => !isTag(p)).map((p) => [p.name, p]))
   const holder = (p: Placed) => (p.parent ? byName.get(p.parent) : undefined)
@@ -152,9 +158,44 @@ export function layout(trunk: MapNode, nodes: MapNode[], width: number, height: 
 
   const keepOn = (p: Placed) => {
     p.x = Math.min(width - p.r - 56, Math.max(p.r + 56, p.x))
-    p.y = Math.min(height - p.r - NAME_H, Math.max(p.r + 10, p.y))
+    // Room for the name on either side: it goes whichever way is away from the trunk.
+    p.y = Math.min(height - p.r - NAME_H, Math.max(p.r + NAME_H, p.y))
     // The key sits in the bottom left corner.
     if (p.y > height - KEY.height - p.r && p.x < KEY.width + p.r) p.x = KEY.width + p.r
+  }
+  // A node takes up its shape and the name beside it: a box as wide as the name, reaching out
+  // on the side the name is on. In a crowd the names that wait take no room.
+  const crowded = placed.length > CROWD
+  const isAbove = (p: Placed) => p.y < hub.y - 24 && !holder(p)
+  const boxOf = (p: Placed) => {
+    const named = !(crowded && p.band > 0)
+    const hw = Math.max(p.r, named ? nameWidth(p.name) / 2 : 0) + 5
+    const hh = p.r + (named ? NAME_H / 2 : 0) + 3
+    return { x: p.x, y: p.y + (named ? (isAbove(p) ? -NAME_H / 2 : NAME_H / 2) : 0), hw, hh }
+  }
+  const trunkBox = { ...hub, name: '' }
+  /** Moves two overlapping boxes apart along whichever way is shorter. `fixed` holds b still. */
+  const part = (a: Placed, b: Placed, salt: number, fixed: boolean) => {
+    const ba = boxOf(a)
+    const bb = fixed ? { x: b.x, y: b.y, hw: b.r + 4, hh: b.r + 4 } : boxOf(b)
+    const dx = bb.x - ba.x
+    const dy = bb.y - ba.y
+    const ox = ba.hw + bb.hw - Math.abs(dx)
+    const oy = ba.hh + bb.hh - Math.abs(dy)
+    if (ox <= 0 || oy <= 0) return
+    // Two boxes on one spot part by which two they are.
+    const sx = dx === 0 ? (salt % 2 ? 1 : -1) : Math.sign(dx)
+    const sy = dy === 0 ? (salt % 2 ? 1 : -1) : Math.sign(dy)
+    const share = fixed ? 1 : 0.5
+    if (ox < oy) {
+      const push = Math.min(ox, 30) * share
+      a.x -= sx * push
+      if (!fixed) b.x += sx * push
+    } else {
+      const push = Math.min(oy, 30) * share
+      a.y -= sy * push
+      if (!fixed) b.y += sy * push
+    }
   }
   for (let step = 0; step < STEPS; step++) {
     for (const p of order) {
@@ -168,8 +209,8 @@ export function layout(trunk: MapNode, nodes: MapNode[], width: number, height: 
     }
     for (let i = 0; i < order.length; i++) {
       const a = order[i]
-      // The trunk doesn't give way.
-      const off = hub.r + a.r + GAP
+      // The trunk doesn't give way: not to a node, and not to a node's name.
+      const off = hub.r + a.r + GAP + 12
       const hx = a.x - hub.x
       const hy = a.y - hub.y
       const hd = Math.hypot(hx, hy) || 1
@@ -177,25 +218,13 @@ export function layout(trunk: MapNode, nodes: MapNode[], width: number, height: 
         a.x = hub.x + (hx / hd) * off
         a.y = hub.y + (hy / hd) * off
       }
-      for (let j = i + 1; j < order.length; j++) {
-        const b = order[j]
-        const dx = b.x - a.x
-        const dy = b.y - a.y
-        const d = Math.hypot(dx, dy) || 0.01
-        const apart = a.r + b.r + GAP
-        if (d >= apart) continue
-        const push = (apart - d) / 2
-        // Two nodes on one spot part along a line that depends on which two they are.
-        const ux = d < 0.02 ? Math.cos(i + j) : dx / d
-        const uy = d < 0.02 ? Math.sin(i + j) : dy / d
-        a.x -= ux * push
-        a.y -= uy * push
-        b.x += ux * push
-        b.y += uy * push
-      }
+      part(a, trunkBox, i, true)
+      for (let j = i + 1; j < order.length; j++) part(a, order[j], i + j, false)
     }
     for (const p of order) keepOn(p)
   }
+  // A node above the trunk wears its name on top, so the name doesn't run across the trunk.
+  for (const p of placed) p.above = isAbove(p)
   return { trunk: hub, nodes: placed, rings }
 }
 

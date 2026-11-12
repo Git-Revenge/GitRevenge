@@ -157,7 +157,7 @@
       {/if}
     </span>
     {#if n.kind !== 'trunk'}
-      <span class="name"><b>{n.name}</b><small>{sizeLine(n)}</small>{#if n.head}<i>you’re here</i>{/if}</span>
+      <span class="name" class:above={n.above}><b>{n.name}</b><small>{sizeLine(n)}</small>{#if n.head}<i>you’re here</i>{/if}</span>
     {/if}
   </button>
   {#if picked === key}
@@ -377,6 +377,12 @@
     transform: translateX(-50%);
     white-space: nowrap;
     pointer-events: none;
+  }
+
+  .name.above {
+    top: auto;
+    bottom: calc(50% + var(--reach) + 4px);
+    flex-direction: column-reverse;
   }
 
   .name b {
