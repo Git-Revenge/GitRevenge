@@ -42,30 +42,6 @@ export function clampOffset(offset: number, width: number, count: number): numbe
   return Math.min(maxOffset(width, count), Math.max(0, offset))
 }
 
-/** The columns to draw, first to last (exclusive): what's in view, the few to the left whose
- * subjects lean into it, and one to the right. */
-export function visibleRange(offset: number, width: number, count: number): { first: number; last: number } {
-  const first = Math.max(0, Math.floor(offset / COL) - LEAN_REACH)
-  const last = Math.min(count, Math.ceil((offset + width) / COL) + 1)
-  return { first, last: Math.max(first, last) }
-}
-
-/** The column under a point x px from the view's left edge, or -1 past the end. */
-export function colAt(x: number, offset: number, count: number): number {
-  const i = Math.floor((x + offset) / COL)
-  return i >= 0 && i < count ? i : -1
-}
-
-/** Where to scroll so column i is in view with a column to spare either side; the offset as it
- * is when the column already shows. */
-export function offsetToShow(offset: number, width: number, i: number, count: number): number {
-  const left = i * COL - COL
-  const right = (i + 2) * COL
-  if (left < offset) return clampOffset(left, width, count)
-  if (right > offset + width) return clampOffset(right - width, width, count)
-  return clampOffset(offset, width, count)
-}
-
 /** How tall the subjects' band is in a view this tall with this many lanes: the lanes come
  * first, and the words take what's left, within their limits. */
 export function wordsHeight(height: number, lanes: number): number {
@@ -121,33 +97,6 @@ export function segPath(seg: Pick<Seg, 'from' | 'to'>, cx: number, side: 'up' | 
   const r = Math.min(ELBOW, Math.abs(to - from), COL / 2)
   if (side === 'up') return `M${edge} ${from}H${cx - r}Q${cx} ${from} ${cx} ${from + dir * r}V${to}`
   return `M${cx} ${from}V${to - dir * r}Q${cx} ${to} ${cx + r} ${to}H${edge}`
-}
-
-/** A run of columns made on one day: `start` to `end` (exclusive), and when its first was made. */
-export interface DaySpan {
-  start: number
-  end: number
-  time: number
-}
-
-/** The days among rows[0..], whose first row is commit `first`. Rows not read yet end a day:
- * what day they belong to isn't known. */
-export function daySpans(rows: (Pick<Row, 'authorTime'> | undefined)[], first: number): DaySpan[] {
-  const out: DaySpan[] = []
-  let open: DaySpan | null = null
-  rows.forEach((row, k) => {
-    const i = first + k
-    if (!row) {
-      open = null
-      return
-    }
-    if (open && sameDay(open.time, row.authorTime)) open.end = i + 1
-    else {
-      open = { start: i, end: i + 1, time: row.authorTime }
-      out.push(open)
-    }
-  })
-  return out
 }
 
 /** How many commits a day has, counting outwards from one of them through the rows read so
@@ -262,4 +211,131 @@ export function mergedName(subject: string): string {
   const request = /^Merged? (?:in )?(\S+) (?:into|\(pull request)/.exec(subject)
   if (request) return request[1].replace(/^'|'$/g, '')
   return ''
+}
+
+// Columns that aren't all there. A folded lane's commits of a day show as one column, and the
+// rest take no room, so a commit's place can't be worked out from its number. The view is
+// placed by an anchor instead, as the timeline's rows are: the column at its left edge and how
+// far into it the view has scrolled. Everything else is found by walking from there.
+
+/** Where the view's left edge is: `dx` px into column `i`. A lead column (the working tree)
+ * comes before commit 0, as -1. */
+export interface Anchor {
+  i: number
+  dx: number
+}
+
+/** A column as placed in the view: commit `i` (or a lead column, below 0) with its left edge
+ * at `x`, from the view's. */
+export interface Spot {
+  i: number
+  x: number
+}
+
+/** How many columns a walk will step over before giving up on finding one that shows. */
+const SKIP_LIMIT = 20000
+
+/** The next column that shows after `i` in direction `dir`, or null at the end. Lead columns
+ * always show. */
+export function nextShown(i: number, dir: 1 | -1, count: number, shown: (i: number) => boolean, lead = 0): number | null {
+  for (let j = i + dir, n = 0; j >= -lead && j < count && n < SKIP_LIMIT; j += dir, n++) if (j < 0 || shown(j)) return j
+  return null
+}
+
+/** An anchor that names a real column: one that exists and shows, with an offset inside it. */
+export function settle(a: Anchor, count: number, shown: (i: number) => boolean, lead = 0): Anchor {
+  if (count + lead <= 0) return { i: -lead, dx: 0 }
+  let i = Math.min(count - 1, Math.max(-lead, Math.round(a.i)))
+  if (i >= 0 && !shown(i)) i = nextShown(i, 1, count, shown, lead) ?? nextShown(i, -1, count, shown, lead) ?? i
+  return { i, dx: i === a.i ? Math.min(COL - 0.001, Math.max(0, a.dx)) : 0 }
+}
+
+/** The anchor `dx` px further right (or left, when negative), stopping at either end. */
+export function moveAnchor(a: Anchor, dx: number, count: number, shown: (i: number) => boolean, lead = 0): Anchor {
+  let { i, dx: off } = settle(a, count, shown, lead)
+  off += dx
+  while (off >= COL) {
+    const next = nextShown(i, 1, count, shown, lead)
+    if (next === null) return { i, dx: 0 }
+    i = next
+    off -= COL
+  }
+  while (off < 0) {
+    const prev = nextShown(i, -1, count, shown, lead)
+    if (prev === null) return { i, dx: 0 }
+    i = prev
+    off += COL
+  }
+  return { i, dx: off }
+}
+
+/** The columns to draw in a view `width` wide: those in it, `reach` to the left whose subjects
+ * lean into it, and one past the right edge. */
+export function placeColumns(a: Anchor, width: number, count: number, shown: (i: number) => boolean, lead = 0, reach = LEAN_REACH): Spot[] {
+  const at = settle(a, count, shown, lead)
+  const out: Spot[] = []
+  let x = 0 - at.dx
+  for (let i: number | null = at.i; i !== null && x < width + COL; i = nextShown(i, 1, count, shown, lead)) {
+    out.push({ i, x })
+    x += COL
+  }
+  let bx = 0 - at.dx
+  let j = nextShown(at.i, -1, count, shown, lead)
+  for (let k = 0; j !== null && k < reach; k++) {
+    bx -= COL
+    out.unshift({ i: j, x: bx })
+    j = nextShown(j, -1, count, shown, lead)
+  }
+  return out
+}
+
+/** The anchor that brings column `target` into view with a column to spare either side; the
+ * anchor as it is when it already shows so. `spots` is what's placed now. */
+export function anchorToShow(a: Anchor, spots: readonly Spot[], width: number, target: number, count: number, shown: (i: number) => boolean, lead = 0): Anchor {
+  const spot = spots.find((s) => s.i === target)
+  if (spot) {
+    if (spot.x < COL && nextShown(target, -1, count, shown, lead) !== null) return moveAnchor(a, spot.x - COL, count, shown, lead)
+    if (spot.x < 0) return moveAnchor(a, spot.x, count, shown, lead)
+    if (spot.x + 2 * COL > width) return moveAnchor(a, spot.x + 2 * COL - width, count, shown, lead)
+    return a
+  }
+  // Somewhere else altogether: one column in from the left edge.
+  return { i: nextShown(target, -1, count, shown, lead) ?? target, dx: 0 }
+}
+
+/** The anchor as a distance in px along every column there is, shown or not: what the
+ * scrollbar's thumb is placed by, since nothing knows how many columns are folded away. */
+export function anchorOffset(a: Anchor, lead = 0): number {
+  return (a.i + lead) * COL + a.dx
+}
+
+/** And back: the anchor for such a distance. */
+export function anchorAt(offset: number, count: number, shown: (i: number) => boolean, lead = 0): Anchor {
+  const k = Math.floor(Math.max(0, offset) / COL)
+  return settle({ i: k - lead, dx: Math.max(0, offset) - k * COL }, count, shown, lead)
+}
+
+/** The placed column under a point `x` px from the view's left edge, or undefined. */
+export function spotAt(spots: readonly Spot[], x: number): Spot | undefined {
+  return spots.find((s) => x >= s.x && x < s.x + COL)
+}
+
+/** The runs of placed commits made on one day, as stretches of the view: where each starts
+ * and how wide it is. `time(i)` is when commit i was made, or undefined when it isn't read. */
+export function dayStretches(spots: readonly Spot[], time: (i: number) => number | undefined): { first: number; x: number; width: number; time: number }[] {
+  const out: { first: number; x: number; width: number; time: number }[] = []
+  let open: { first: number; x: number; width: number; time: number } | null = null
+  for (const s of spots) {
+    const t = s.i < 0 ? undefined : time(s.i)
+    if (t === undefined) {
+      open = null
+      continue
+    }
+    if (open && sameDay(open.time, t)) open.width += COL
+    else {
+      open = { first: s.i, x: s.x, width: COL, time: t }
+      out.push(open)
+    }
+  }
+  return out
 }

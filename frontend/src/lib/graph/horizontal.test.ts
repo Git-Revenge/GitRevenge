@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chipRooms, clampOffset, COL, colAt, colX, dayBandText, dayCount, daySpans, LABEL_MAX, LANE, lanesAt, lanesAtEdge, laneScrollToShow, lanesExtent, laneY, LEAN_REACH, maxLaneScroll, maxOffset, mergedName, namesWidth, NAMES, offsetForThumb, offsetToShow, segPath, subjectLength, THUMB_MIN, thumbFor, visibleRange, WORDS, wordsHeight } from './horizontal'
+import { anchorAt, anchorOffset, anchorToShow, chipRooms, clampOffset, dayStretches, moveAnchor, nextShown, placeColumns, settle, spotAt, COL, colX, dayBandText, dayCount, LABEL_MAX, LANE, lanesAt, lanesAtEdge, laneScrollToShow, lanesExtent, laneY, maxLaneScroll, maxOffset, mergedName, namesWidth, NAMES, offsetForThumb, segPath, subjectLength, THUMB_MIN, thumbFor, WORDS, wordsHeight } from './horizontal'
 
 const DAY = 24 * 60 * 60
 // Noon, so a few hours either way stay in the same day in any time zone.
@@ -12,12 +12,6 @@ describe('columns', () => {
     expect(colX(3)).toBe(3 * COL + COL / 2)
   })
 
-  it('finds the column under a point, and none past the end', () => {
-    expect(colAt(10, 0, 5)).toBe(0)
-    expect(colAt(10, COL * 2, 5)).toBe(2)
-    expect(colAt(COL * 5 + 1, 0, 5)).toBe(-1)
-  })
-
   it('scrolls no further than the last column at the right edge', () => {
     expect(maxOffset(400, 100)).toBe(100 * COL - 400)
     expect(maxOffset(400, 3)).toBe(0)
@@ -25,30 +19,6 @@ describe('columns', () => {
     expect(clampOffset(1e9, 400, 100)).toBe(100 * COL - 400)
   })
 
-  it('draws what shows, the columns whose subjects lean in, and one beyond', () => {
-    expect(visibleRange(0, 440, 100)).toEqual({ first: 0, last: 11 })
-    const r = visibleRange(COL * 20, 440, 100)
-    expect(r.first).toBe(20 - LEAN_REACH)
-    expect(r.last).toBe(31)
-    expect(visibleRange(0, 440, 3)).toEqual({ first: 0, last: 3 })
-    expect(visibleRange(0, 440, 0)).toEqual({ first: 0, last: 0 })
-  })
-})
-
-describe('offsetToShow', () => {
-  it('leaves the view alone when the column already shows with room to spare', () => {
-    expect(offsetToShow(COL * 10, 440, 14, 100)).toBe(COL * 10)
-  })
-
-  it('brings a column off the left back with one column before it', () => {
-    expect(offsetToShow(COL * 10, 440, 8, 100)).toBe(COL * 7)
-    expect(offsetToShow(COL * 10, 440, 0, 100)).toBe(0)
-  })
-
-  it('brings a column off the right back with one column after it', () => {
-    expect(offsetToShow(0, 440, 20, 100)).toBe(22 * COL - 440)
-    expect(offsetToShow(0, 440, 99, 100)).toBe(maxOffset(440, 100))
-  })
 })
 
 describe('bands', () => {
@@ -116,24 +86,6 @@ describe('segPath', () => {
 })
 
 describe('days', () => {
-  it('groups neighbouring commits made on the same day', () => {
-    const rows = [at(0), at(0, 1), at(1), at(1, 2), at(1, 3), at(4)]
-    expect(daySpans(rows, 10).map((d) => [d.start, d.end])).toEqual([
-      [10, 12],
-      [12, 15],
-      [15, 16],
-    ])
-    expect(daySpans(rows, 10)[1].time).toBe(rows[2].authorTime)
-  })
-
-  it('ends a day at a row that isn’t read yet', () => {
-    const rows = [at(0), undefined, at(0, 1)]
-    expect(daySpans(rows, 0).map((d) => [d.start, d.end])).toEqual([
-      [0, 1],
-      [2, 3],
-    ])
-  })
-
   it('counts a whole day outwards from any of its commits', () => {
     const rows = [at(0), at(1), at(1, 1), at(1, 2), at(2)]
     const get = (i: number) => rows[i]
@@ -254,5 +206,94 @@ describe('a merged lane\u2019s name', () => {
   it('is nothing when the subject does not say', () => {
     expect(mergedName('feat: a ruler in place of the scrollbar (#638)')).toBe('')
     expect(mergedName('')).toBe('')
+  })
+})
+
+describe('columns that fold away', () => {
+  const all = () => true
+  // Commits 3 to 6 are folded away.
+  const folded = (i: number) => i < 3 || i > 6
+
+  it('steps over what doesn\u2019t show, and stops at the ends', () => {
+    expect(nextShown(2, 1, 20, folded)).toBe(7)
+    expect(nextShown(7, -1, 20, folded)).toBe(2)
+    expect(nextShown(19, 1, 20, all)).toBeNull()
+    expect(nextShown(0, -1, 20, all)).toBeNull()
+    // A lead column sits before commit 0 and always shows.
+    expect(nextShown(0, -1, 20, all, 1)).toBe(-1)
+    expect(nextShown(-1, -1, 20, all, 1)).toBeNull()
+  })
+
+  it('places columns side by side, with nothing for a folded commit', () => {
+    const spots = placeColumns({ i: 0, dx: 0 }, 6 * COL, 20, folded, 0, 0)
+    expect(spots.map((s) => s.i)).toEqual([0, 1, 2, 7, 8, 9, 10])
+    expect(spots.map((s) => s.x)).toEqual([0, 1, 2, 3, 4, 5, 6].map((k) => k * COL))
+  })
+
+  it('draws a few columns off the left edge, for their leaning subjects', () => {
+    const spots = placeColumns({ i: 8, dx: 10 }, 3 * COL, 20, folded, 0, 3)
+    expect(spots.map((s) => s.i)).toEqual([1, 2, 7, 8, 9, 10, 11, 12])
+    expect(spots.find((s) => s.i === 8)!.x).toBe(-10)
+    expect(spots.find((s) => s.i === 7)!.x).toBe(-10 - COL)
+  })
+
+  it('starts with the lead column when there is one', () => {
+    expect(placeColumns({ i: -1, dx: 0 }, 3 * COL, 20, all, 1, 0).map((s) => s.i)).toEqual([-1, 0, 1, 2])
+  })
+
+  it('scrolls across shown columns only', () => {
+    expect(moveAnchor({ i: 2, dx: 0 }, COL, 20, folded)).toEqual({ i: 7, dx: 0 })
+    expect(moveAnchor({ i: 7, dx: 0 }, -COL - 10, 20, folded)).toEqual({ i: 1, dx: COL - 10 })
+    expect(moveAnchor({ i: 0, dx: 0 }, -500, 20, all)).toEqual({ i: 0, dx: 0 })
+    expect(moveAnchor({ i: 18, dx: 0 }, 500, 20, all)).toEqual({ i: 19, dx: 0 })
+    expect(moveAnchor({ i: 0, dx: 0 }, -COL, 20, all, 1)).toEqual({ i: -1, dx: 0 })
+  })
+
+  it('settles an anchor on a column that shows', () => {
+    expect(settle({ i: 4, dx: 12 }, 20, folded)).toEqual({ i: 7, dx: 0 })
+    expect(settle({ i: 99, dx: 0 }, 20, all)).toEqual({ i: 19, dx: 0 })
+    expect(settle({ i: -5, dx: 0 }, 20, all, 1)).toEqual({ i: -1, dx: 0 })
+  })
+
+  it('leaves the view alone for a column that shows with room to spare', () => {
+    const a = { i: 0, dx: 0 }
+    const spots = placeColumns(a, 10 * COL, 50, all)
+    expect(anchorToShow(a, spots, 10 * COL, 4, 50, all)).toBe(a)
+  })
+
+  it('brings a column at the right edge in, and one far away to the left edge', () => {
+    const a = { i: 0, dx: 0 }
+    const spots = placeColumns(a, 10 * COL, 50, all)
+    const near = anchorToShow(a, spots, 10 * COL, 9, 50, all)
+    expect(placeColumns(near, 10 * COL, 50, all).find((s) => s.i === 9)!.x + 2 * COL).toBeLessThanOrEqual(10 * COL)
+    expect(anchorToShow(a, spots, 10 * COL, 40, 50, all)).toEqual({ i: 39, dx: 0 })
+    // The newest commit brings the lead column with it.
+    const far = { i: 30, dx: 0 }
+    expect(anchorToShow(far, placeColumns(far, 10 * COL, 50, all, 1), 10 * COL, 0, 50, all, 1)).toEqual({ i: -1, dx: 0 })
+  })
+
+  it('turns an anchor into a distance for the scrollbar and back', () => {
+    expect(anchorOffset({ i: 5, dx: 10 })).toBe(5 * COL + 10)
+    expect(anchorOffset({ i: -1, dx: 0 }, 1)).toBe(0)
+    expect(anchorAt(5 * COL + 10, 20, all)).toEqual({ i: 5, dx: 10 })
+    expect(anchorAt(4 * COL, 20, folded)).toEqual({ i: 7, dx: 0 })
+    expect(anchorAt(0, 20, all, 1)).toEqual({ i: -1, dx: 0 })
+  })
+
+  it('finds the column under a point', () => {
+    const spots = placeColumns({ i: 0, dx: 0 }, 6 * COL, 20, folded, 0, 0)
+    expect(spotAt(spots, COL * 3 + 5)!.i).toBe(7)
+    expect(spotAt(spots, -5)).toBeUndefined()
+  })
+
+  it('groups placed commits by day, across a fold', () => {
+    const noon = Math.floor(new Date(2026, 10, 11, 12).getTime() / 1000)
+    const time = (i: number) => (i < 8 ? noon : noon - 86400)
+    const spots = placeColumns({ i: 0, dx: 0 }, 6 * COL, 20, folded, 0, 0)
+    const days = dayStretches(spots, time)
+    expect(days.map((d) => [d.first, d.x, d.width])).toEqual([
+      [0, 0, 4 * COL],
+      [8, 4 * COL, 3 * COL],
+    ])
   })
 })

@@ -182,6 +182,89 @@ test.describe('the Horizontal view', () => {
     expect((await commit(page, 0).boundingBox())!.x).toBeLessThan(200)
   })
 
+  // #673: a folded lane's commits of a day are one column.
+  test('folds a Docs lane to one column a day, which a click opens and a button closes', async ({ page }) => {
+    const at = (daysAgo: number) => {
+      const d = new Date()
+      d.setHours(12, 0, 0, 0)
+      d.setDate(d.getDate() - daysAgo)
+      return Math.floor(d.getTime() / 1000)
+    }
+    // Newest first. The docs lane's tip (1) carries the label, so it stays a column of its own;
+    // 3, 5 and 6 are the rest of today's deploys.
+    const lanes = ['m', 'd', 'm', 'd', 'm', 'd', 'd', 'm', 'd', 'm', 'd', 'm', 'm', 'm']
+    const graphData = lanes.map((lane, i) => ({
+      index: i,
+      col: lane === 'd' ? 1 : 0,
+      color: lane === 'd' ? 1 : 0,
+      up: i ? [{ from: 0, to: 0, color: 0, kind: 'trunk' }, { from: 1, to: 1, color: 1, kind: 'docs' }] : [],
+      down: [{ from: 0, to: 0, color: 0, kind: 'trunk' }, { from: 1, to: 1, color: 1, kind: 'docs' }],
+      width: 2,
+      kind: lane === 'd' ? 'docs' : 'trunk',
+      id: id(i),
+      parents: 1,
+      author: lane === 'd' ? 'pages-bot' : 'Ana Cruz',
+      authorTime: (i < 8 ? at(0) : at(1)) - i * 60,
+      subject: lane === 'd' ? `Deploying to gh-pages ${i}` : `Commit number ${i}`,
+    }))
+    const refs = [branch('main', { head: true, branchKind: 'trunk' }), branch('gh-pages', { branchKind: 'docs' })]
+    const prefs = { hide: [], hideKinds: [], showKinds: [], foldableKinds: ['bot', 'docs'], kinds: [] }
+    await open(page, 'graph', {
+      graphData,
+      graphRefs: { [id(0)]: [refs[0]], [id(1)]: [refs[1]] },
+      responses: { Refs: refs, CommitSignatures: [], RepoPreferences: prefs, GraphViews: { view: 'horizontal', experimental: ['horizontal'] }, HeadCommit: { branch: 'main', commit: id(0) } },
+    })
+    const deploy = (i: number) => page.getByRole('option', { name: new RegExp(`^Deploying to gh-pages ${i},`) })
+    const fold = page.getByRole('option', { name: /^3 Docs commits, folded/ })
+    await expect(fold).toBeVisible()
+    await expect(deploy(1)).toBeVisible()
+    await expect(deploy(5)).toHaveCount(0)
+    await expect(deploy(6)).toHaveCount(0)
+    // The fold sits between commits 2 and 4, and 7 comes straight after 4.
+    const x = async (name: RegExp) => (await page.getByRole('option', { name }).boundingBox())!.x
+    expect((await x(/^Commit number 4,/)) - (await x(/^3 Docs commits/))).toBe(44)
+    expect((await x(/^Commit number 7,/)) - (await x(/^Commit number 4,/))).toBe(44)
+    // A click opens it without choosing anything: its commits take their columns.
+    const before = (await events(page, 'select')).length
+    await fold.click({ position: { x: 20, y: 300 } })
+    await expect(deploy(5)).toBeVisible()
+    await expect(deploy(6)).toBeVisible()
+    expect((await events(page, 'select')).length).toBe(before)
+    // And the button over its newest commit folds it again.
+    await page.getByRole('button', { name: 'Fold 3 Docs commits again' }).click()
+    await expect(deploy(5)).toHaveCount(0)
+    await expect(fold).toBeVisible()
+  })
+
+  test('Right steps over a fold’s hidden commits', async ({ page }) => {
+    const lanes = ['m', 'd', 'm', 'd', 'm', 'd', 'd', 'm', 'm']
+    const day = Math.floor(new Date(2026, 10, 11, 12).getTime() / 1000)
+    const graphData = lanes.map((lane, i) => ({
+      index: i,
+      col: lane === 'd' ? 1 : 0,
+      color: lane === 'd' ? 1 : 0,
+      up: i ? [{ from: 0, to: 0, color: 0, kind: 'trunk' }, { from: 1, to: 1, color: 1, kind: 'docs' }] : [],
+      down: [{ from: 0, to: 0, color: 0, kind: 'trunk' }, { from: 1, to: 1, color: 1, kind: 'docs' }],
+      width: 2,
+      kind: lane === 'd' ? 'docs' : 'trunk',
+      id: id(i),
+      parents: 1,
+      author: 'Ana Cruz',
+      authorTime: day - i * 60,
+      subject: `Commit number ${i}`,
+    }))
+    const refs = [branch('main', { head: true, branchKind: 'trunk' }), branch('gh-pages', { branchKind: 'docs' })]
+    await open(page, 'graph', {
+      graphData,
+      graphRefs: { [id(0)]: [refs[0]], [id(1)]: [refs[1]] },
+      responses: { Refs: refs, CommitSignatures: [], RepoPreferences: { hide: [], hideKinds: [], showKinds: [], foldableKinds: ['docs'], kinds: [] }, GraphViews: { view: 'horizontal', experimental: ['horizontal'] } },
+    })
+    await commit(page, 4).click({ position: { x: 20, y: 300 } })
+    await page.keyboard.press('ArrowRight')
+    // 5 and 6 are folded away: the next commit to land on is 7.
+    await expect(commit(page, 7)).toHaveAttribute('aria-selected', 'true')
+  })
+
   // #663: the scrollbar is marked as the timeline's ruler is.
   test('marks the scrollbar where the checked-out commit, a tag and a note are', async ({ page }) => {
     const marks = { loaded: 120, months: [{ row: 0, time: noon }, { row: 60, time: noon - 10 * DAY }], tips: [0], tags: [4, 90], notes: [30] }
