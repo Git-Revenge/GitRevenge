@@ -490,7 +490,15 @@
                 {#if !(n.ref === DEFAULT_NOTES && noteDraft !== null)}
                   <div class="note">
                     {#if n.ref !== DEFAULT_NOTES}<span class="meta note-ref">{n.ref.replace(/^refs\/notes\//, '')}</span>{/if}
-                    <p>{n.text}</p>
+                    <!-- A note is prose about the commit, as its message is: it's rendered as
+                         markdown the same way, with web addresses and the repository's smart
+                         links as links, and it follows the message's Raw switch. A note is often
+                         a line or two, so a single line break in one stays a line break. -->
+                    {#if raw}
+                      <p class="as-written">{#each linker.parts(n.text, 'message') as part, k (k)}{#if part.href}<a href={part.href} title={linkTitle(part)} class:smart={!!part.rule} onclick={(e) => openLink(e, part.href!)} oncontextmenu={(e) => linkMenu(e, part)}>{part.text}</a>{:else}{part.text}{/if}{/each}</p>
+                    {:else}
+                      <div class="rendered"><Markdown text={n.text} {linker} onLinkMenu={linkMenu} breaks /></div>
+                    {/if}
                   </div>
                 {/if}
               {/each}
@@ -959,9 +967,13 @@
     flex-shrink: 0;
   }
 
-  .notes .note p {
+  .notes .note .as-written {
     margin: 0 0 6px;
     white-space: pre-wrap;
+  }
+
+  .notes .note .rendered {
+    margin: 0 0 6px;
   }
 
   .note-ref {
