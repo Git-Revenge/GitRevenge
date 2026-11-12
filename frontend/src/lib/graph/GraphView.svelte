@@ -12,8 +12,9 @@
   import Icon from '../ui/Icon.svelte'
   import { DUR, easeInk, fadeUp, labelsFold, labelsUnfold, menuOut, reducedMotion, stagger } from '../ui/motion'
   import KindFilter from './KindFilter.svelte'
+  import HorizontalView from './HorizontalView.svelte'
   import ViewMenu from './ViewMenu.svelte'
-  import { menuViews } from './views'
+  import { isRows, menuViews } from './views'
   import RefChip from './RefChip.svelte'
   import { bisectRow, DAY_H, dayCountLabel, dayLineLabel, dayLineSpoken, drawDayLine, drawFoldLine, drawRow, FOLD_H, FOLLOWER_H, gapLabel, sameDay, sealOf, startsRun, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { branchMove, headAway, headLabel, isOwnMove, LANDING, moveAnnouncement, tipsOf, type Tips } from './follow'
@@ -340,6 +341,11 @@
   const MAX_GRAPH_SHARE = 0.4
 
   let density = $derived(colorTheme.density)
+  /** Whether the graph shows as its rows. An experimental view covers them instead: the rows
+   * stay underneath, holding the selection and the search, and take no input meanwhile. */
+  let rowsView = $derived(isRows(colorTheme.view))
+  /** Goes up whenever the rows may have changed, for a view that reads them from the cache. */
+  let rowsTick = $state(0)
   let rowH = $derived(METRICS[density].rowH)
 
   let scroller: HTMLDivElement
@@ -1070,8 +1076,20 @@
     if (!frame) frame = requestAnimationFrame(draw)
   }
 
+  // An experimental view repaints from the same nudges the canvas does, a frame later.
+  let nudged = false
+  function nudge() {
+    if (nudged) return
+    nudged = true
+    requestAnimationFrame(() => {
+      nudged = false
+      rowsTick++
+    })
+  }
+
   function draw() {
     frame = 0
+    if (!rowsView) nudge()
     if (!canvas || !scroller) return
     const frameAt = performance.now()
     if (coasting) {
@@ -1679,7 +1697,7 @@
     </span>
   </div>
   <!-- Compact is a table, so its columns are named. The timeline has one column of words. -->
-  {#if columns?.refW && density === 'compact'}
+  {#if columns?.refW && density === 'compact' && rowsView}
     <div class="columns">
       <span style:left="12px">Branch / tag</span>
       {#if columns.graphW >= 56}<span style:left="{columns.refW + columns.m.pad}px">Graph</span>{/if}
@@ -1694,7 +1712,8 @@
       <span style:left="{columns.shaX}px">SHA</span>
     </div>
   {/if}
-  <div class="viewport">
+  <div class="stage">
+  <div class="viewport" inert={!rowsView}>
     <canvas bind:this={canvas}></canvas>
     <!-- The caller's row above the first commit. It's real DOM, so it keeps its own semantics and
          focus, placed where row zero is and scrolled with the history. It comes before the grid,
@@ -1978,6 +1997,20 @@
       </div>
     {/each}
   </div>
+  {#if colorTheme.view === 'horizontal'}
+    <HorizontalView
+      {cache}
+      tick={rowsTick}
+      count={span}
+      {selected}
+      headRow={() => headRow}
+      remote={() => remote}
+      dimmed={(i) => !!matchSet && !matchSet.has(i)}
+      onSelect={(i) => select(i)}
+      onContext={onContext}
+    />
+  {/if}
+  </div>
 </div>
 
 <style>
@@ -2148,6 +2181,15 @@
 
   /* The canvas paints the visible rows; the transparent scroller above it provides the
      native scrollbar and input, with a spacer as tall as all rows. */
+  /* The rows, and whichever experimental view covers them. */
+  .stage {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+
   .viewport {
     position: relative;
     flex: 1;

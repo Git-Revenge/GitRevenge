@@ -266,6 +266,10 @@ const mounts = {
     const { default: WorktreesDialog } = await import('../src/lib/WorktreesDialog.svelte')
     mount(WorktreesDialog, { target: host, props: { path: '/r', onClose: () => {} } })
   },
+  async settings() {
+    const { default: SettingsDialog } = await import('../src/lib/SettingsDialog.svelte')
+    mount(SettingsDialog, { target: host, props: { onClose: record('close') } })
+  },
   async about() {
     const { default: AboutDialog } = await import('../src/lib/about/AboutDialog.svelte')
     mount(AboutDialog, { target: host, props: { version: '0.11.0', onClose: record('close') } })
@@ -323,6 +327,9 @@ const mounts = {
 switch (new URLSearchParams(location.search).get('mount')) {
   case 'about':
     await mounts.about()
+    break
+  case 'settings':
+    await mounts.settings()
     break
   case 'errorBanner':
     await mounts.errorBanner()

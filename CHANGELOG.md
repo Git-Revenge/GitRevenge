@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Horizontal**, an experimental view of the graph with time running across: a column for each commit and a row for each lane, newest on the left. Subjects lean above their columns, a band across the top names each day, and the selected commit's subject, author and time show in full under the lanes. Left and Right move the selection and the wheel scrolls sideways. It's off until you switch it on under **Settings › Experimental views**; then it's in the graph's view menu. The graph still opens in Timeline. Not there yet: folded Bot and Docs lanes, dragging one commit onto another, and the working tree's row. (#651)
+
 ### Changed
 
 - The graph's two-icon switch between Timeline and Compact is now a menu: one button in the bar shows the current view and opens the list. It takes less room, and it's where experimental views will go. Swapping the two takes one more click than before; the command palette's command still does it in one. (#650)

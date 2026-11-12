@@ -117,6 +117,9 @@ export const ICONS = {
   // The graph's timeline density: commits on a line beside their text.
   timeline: [c(6, 7, 2.5), c(6, 17, 2.5), 'M6 9.5v5M11 6h9M11 8.5h6M11 16h9M11 18.5h6'],
 
+  // The graph's experimental views: commits along a line that runs across.
+  across: ['M3 9h18', c(8, 9, 2.25), c(16, 9, 2.25), 'M8 11.25c0 5 4 4.75 8 4.75h5'],
+
   // File status: an outline plus a mark, so shape tells them apart
   'st-added': [rr(4, 4, 16, 16, 3), 'M12 8.5v7M8.5 12h7'],
   'st-modified': [rr(4, 4, 16, 16, 3), c(12, 12, 2.25)],
