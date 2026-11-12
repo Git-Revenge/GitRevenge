@@ -53,7 +53,15 @@ export async function sandboxedPage(text: string, path: string, loadImage: (file
       const file = resolveInRepo(path, src)
       const data = file && el.tagName === 'IMG' ? await loadImage(file).catch(() => '') : ''
       if (data) el.setAttribute(attr, data)
-      else {
+      else if (el.tagName === 'IMG') {
+        // A picture that can't be shown becomes its words, not a broken-image icon.
+        if (!file) remote++
+        const words = doc.createElement('span')
+        words.textContent = `[${el.getAttribute('alt') || src.split('/').pop() || 'picture'}]`
+        words.setAttribute('title', file ? `${file}, which isn't in the repository at this version` : `${src}, which isn't fetched`)
+        if (el.id) words.id = el.id
+        el.replaceWith(words)
+      } else {
         if (!file) remote++
         el.removeAttribute(attr)
       }

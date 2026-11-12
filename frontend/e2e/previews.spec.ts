@@ -106,7 +106,10 @@ test.describe('HTML pages', () => {
     await open(page, 'markdownPreview', scenario)
     const inside = page.frameLocator('iframe')
     await expect(inside.locator('#local')).toHaveAttribute('src', PIXEL)
-    await expect(inside.locator('#far')).not.toHaveAttribute('src', /./)
+    // One on the web becomes its alt text, with what it was in the tooltip.
+    await expect(inside.locator('#far')).toHaveText('[a tracker]')
+    await expect(inside.locator('#far')).toHaveAttribute('title', "https://example.com/track.gif, which isn't fetched")
+    await expect(inside.locator('img#far')).toHaveCount(0)
     await expect(page.locator('.html .note')).toContainText('Shown without 4 parts that would run or load something and 1 picture from the web.')
   })
 })
