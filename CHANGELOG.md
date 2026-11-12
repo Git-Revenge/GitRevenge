@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Changed
 
+- Three touches to the graph's rows. The selected commit's wash thins away across the row, where it was a flat block. A lane line that leaves a commit at full strength now fades into the quiet line below it, where it stopped at a flat edge. And each row has a hairline under it in its lane's colour, from under the commit's node out across the message, thinning to nothing. (#670)
 - The graph's two-icon switch between Timeline and Compact is now a menu: one button in the bar shows the current view and opens the list. It takes less room, and it's where experimental views will go. Swapping the two takes one more click than before; the command palette's command still does it in one. (#650)
 - Rendered previews use newer libraries: Mermaid 12.3.0 for diagrams, PDF.js 6.5.438 for PDFs and marked 18.1.3 for Markdown. (#643)
 - The documentation site no longer loads its fonts from Google, so reading the docs sends nothing to a third party. (#645, #646)

@@ -646,6 +646,59 @@ export function laneActive(col: number, row: Row, near: Near): boolean {
   return col === row.col || (near.prev?.col === col && near.next?.col === col)
 }
 
+/** The hairline under a row: how strong it starts, and how far across what's right of the node
+ * it reaches before it's gone. */
+const UNDERLINE = { alpha: 0.42, reach: 0.72 }
+
+/** How far a quiet line carries a full line's weight in from the row's edge, in px. */
+const LINE_FADE = 14
+
+/** Whether the lane reaches this row's top edge at full strength: the row above has its commit
+ * on it, or sends a line down into it. */
+export function strongAbove(col: number, near: Near): boolean {
+  const prev = near.prev
+  return !!prev && (prev.col === col || prev.down.some((s) => s.to === col && s.from !== s.to))
+}
+
+/** The same for the bottom edge: the row below has its commit on the lane, or takes a line up
+ * from it. */
+export function strongBelow(col: number, near: Near): boolean {
+  const next = near.next
+  return !!next && (next.col === col || next.up.some((s) => s.from === col && s.from !== s.to))
+}
+
+/** A colour at a share of its own opacity, for a canvas, which wants plain colours: "rgb(a)"
+ * and hex are understood; anything else comes back as it was. */
+export function thinned(color: string, share: number): string {
+  const c = color.trim()
+  const fn = /^rgba?\(([^)]+)\)$/i.exec(c)
+  if (fn) {
+    const parts = fn[1].split(/[\s,/]+/).filter(Boolean)
+    if (parts.length < 3) return color
+    const alpha = parts[3] === undefined ? 1 : parts[3].endsWith('%') ? parseFloat(parts[3]) / 100 : parseFloat(parts[3])
+    return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${+(alpha * share).toFixed(4)})`
+  }
+  const hex = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(c)
+  if (hex) {
+    const n = parseInt(hex[1], 16)
+    const alpha = hex[2] === undefined ? 1 : parseInt(hex[2], 16) / 255
+    return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${+(alpha * share).toFixed(4)})`
+  }
+  return color
+}
+
+/** The selected row's wash: the colour as it is up to `from`, then thinning to the right, so
+ * the row reads as lit from its start, not as a block. It's still there at the far edge. */
+export function selectionWash(ctx: Pick<CanvasRenderingContext2D, 'createLinearGradient'>, color: string, from: number, width: number): CanvasGradient {
+  const g = ctx.createLinearGradient(0, 0, width, 0)
+  const start = width > 0 ? Math.min(0.9, Math.max(0, from / width)) : 0
+  g.addColorStop(0, color)
+  g.addColorStop(start, color)
+  // The gradient would reach nothing well past the row's end: at the end it's about a third.
+  g.addColorStop(1, thinned(color, 0.34))
+  return g
+}
+
 /** Whether this commit continues its author's run on the lane: their previous commit is on the
  * same lane, within two rows. Merges break a run. */
 export function repeatsAuthor(row: Row, near: Near): boolean {
@@ -813,7 +866,9 @@ export function drawRow(
     ctx.globalAlpha = base
   }
   washOver(() => {
-    ctx.fillStyle = wash
+    // The selection is at full strength over the labels and the lanes, where nodes and lines
+    // are cut out of it in the same colour, and thins away across the words.
+    ctx.fillStyle = sel > 0 ? selectionWash(ctx, wash, lay.textX, lay.width) : wash
     ctx.fillRect(0, y, lay.width, h)
   })
   if (sel > 0) {
@@ -857,6 +912,19 @@ export function drawRow(
   // A row with no labels still gets its note, from the column's edge.
   if (lay.refW && !refs.length && extra.note) drawNote(ctx, extra.note, extra.noteColor ?? theme.teal, 0, mid, lay.refW)
 
+  // A hairline under the row in its lane's colour, from under the commit's node out across the
+  // words, thinning to nothing: it ties a message to its lane without a band behind the row.
+  const clear = thinned(color, 0)
+  if (clear !== color) {
+    const from = Math.min(x, graphRight)
+    const to = from + (lay.width - from) * UNDERLINE.reach
+    const line = ctx.createLinearGradient(from, 0, to, 0)
+    line.addColorStop(0, thinned(color, UNDERLINE.alpha))
+    line.addColorStop(1, clear)
+    ctx.fillStyle = line
+    ctx.fillRect(from, y + h - 1, to - from, 1)
+  }
+
   // Lanes, clipped to the graph column so wide graphs don't run under the text.
   ctx.save()
   ctx.beginPath()
@@ -866,7 +934,7 @@ export function drawRow(
   ctx.lineJoin = 'round'
   // Docs lanes (a published site, not code) draw muted.
   const strength = (s: Seg) => before * (s.kind === 'docs' ? MUTED : 1)
-  const straight = (s: Seg, y1: number, y2: number) => {
+  const straight = (s: Seg, y1: number, y2: number, strongEnd: number | null) => {
     const sx = lx(s.from)
     if (sx < graphLeft || sx > graphRight) return
     const active = s.kind === 'trunk' || laneActive(s.from, row, near)
@@ -876,6 +944,20 @@ export function drawRow(
     ctx.beginPath()
     ctx.moveTo(sx, y1)
     ctx.lineTo(sx, y2)
+    ctx.stroke()
+    // A quiet line that meets a full one at the row's edge takes up its weight there and lets
+    // it go over a few pixels, so the full line doesn't stop at a flat edge.
+    if (active || strongEnd === null) return
+    const into = strongEnd === y1 ? Math.min(y2, y1 + LINE_FADE) : Math.max(y1, y2 - LINE_FADE)
+    const fade = ctx.createLinearGradient(0, strongEnd, 0, into)
+    fade.addColorStop(0, laneColor(s.color))
+    fade.addColorStop(1, 'transparent')
+    ctx.globalAlpha = strength(s)
+    ctx.lineWidth = LINE_WIDTH
+    ctx.strokeStyle = fade
+    ctx.beginPath()
+    ctx.moveTo(sx, strongEnd)
+    ctx.lineTo(sx, into)
     ctx.stroke()
   }
   // A halo in the row's background lets a line pass over the lanes it crosses.
@@ -896,8 +978,8 @@ export function drawRow(
     washOver(() => stroke(e, HALO_WIDTH, wash))
     stroke(e, LINE_WIDTH, laneColor(s.color))
   }
-  for (const s of row.up) if (s.from === s.to) straight(s, y, mid)
-  for (const s of row.down) if (s.from === s.to) straight(s, mid, y + h)
+  for (const s of row.up) if (s.from === s.to) straight(s, y, mid, strongAbove(s.from, near) ? y : null)
+  for (const s of row.down) if (s.from === s.to) straight(s, mid, y + h, strongBelow(s.from, near) ? y + h : null)
   for (const s of row.up) if (s.from !== s.to) link(s, y, mid, false)
   for (const s of row.down) if (s.from !== s.to) link(s, mid, y + h, true)
   ctx.globalAlpha = before
