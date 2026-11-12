@@ -177,6 +177,10 @@
   <div class="body code-ground">
     {#if !contents}
       <Loading />
+    {:else if contents.kind === 'large' && previewer?.binary && previewer.large && contents.new.exists}
+      {#key target.file + (target.commit ?? '') + target.mode}
+        <previewer.component path={target.file} text="" {loadImage} openFile={openRelated} {loadData} />
+      {/key}
     {:else if contents.kind === 'large'}
       <div class="notice">
         <p>

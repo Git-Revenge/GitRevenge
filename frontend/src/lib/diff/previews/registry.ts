@@ -1,5 +1,7 @@
 import type { Component } from 'svelte'
 import CsvPreview from './CsvPreview.svelte'
+import MediaPreview from './MediaPreview.svelte'
+import { mediaOf } from './media'
 import MarkdownPreview from './MarkdownPreview.svelte'
 import MermaidPreview from './MermaidPreview.svelte'
 import PdfPreview from './PdfPreview.svelte'
@@ -25,6 +27,9 @@ export interface Previewer {
   component: Component<PreviewProps>
   /** Reads the file's bytes (loadData) instead of its text, and shows for binary files. */
   binary?: boolean
+  /** Shows without asking for a file over the text size limit: it reads the bytes itself, up
+   * to the preview limit, and a big file is the usual case (audio, video). */
+  large?: boolean
 }
 
 /**
@@ -39,6 +44,7 @@ export const PREVIEWERS: Previewer[] = [
   { id: 'tex', matches: (p) => /\.(tex|latex)$/i.test(p), component: TexPreview },
   { id: 'mermaid', matches: (p) => /\.(mmd|mermaid)$/i.test(p), component: MermaidPreview },
   { id: 'pdf', matches: (p) => /\.pdf$/i.test(p), component: PdfPreview, binary: true },
+  { id: 'media', matches: (p) => mediaOf(p) !== null, component: MediaPreview, binary: true, large: true },
 ]
 
 export function previewerFor(path: string): Previewer | undefined {

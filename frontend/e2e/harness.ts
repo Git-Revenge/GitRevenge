@@ -204,9 +204,11 @@ const mounts = {
   },
   async markdownPreview() {
     const { previewerFor } = await import('../src/lib/diff/previews/registry')
-    const { path, text } = scenario.responses?.File as { path: string; text: string }
+    const { path, text, data } = scenario.responses?.File as { path: string; text: string; data?: string }
     const component = previewerFor(path)!.component
-    mount(component, { target: host, props: { path, text, loadImage: async () => '', openFile: record('openFile') } })
+    // A binary previewer reads the file's bytes, given here as base64.
+    const loadData = async () => data ?? ''
+    mount(component, { target: host, props: { path, text, loadImage: async () => '', openFile: record('openFile'), loadData } })
   },
   async upstreamDialog() {
     const { default: Dialog } = await import('../src/lib/Dialog.svelte')
