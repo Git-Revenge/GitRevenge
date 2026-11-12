@@ -40,6 +40,7 @@
     wordsHeight,
   } from './horizontal'
   import type { Ref, Row, RowCache } from './rowCache'
+  import { placeTicks, rowToY, tickAt, tickSummary, unreadFrom, type MonthMark } from './ruler'
 
   let {
     path,
@@ -50,6 +51,7 @@
     headRow,
     remote,
     dimmed,
+    ruler,
     onSelect,
     onContext,
   }: {
@@ -67,6 +69,8 @@
     remote: () => string
     /** Whether a commit fades back, as one that doesn't match the search does. */
     dimmed?: (i: number) => boolean
+    /** What the timeline's ruler marks, by row: the scrollbar here carries the same. */
+    ruler?: () => { loaded: number; months: MonthMark[]; tips: number[]; tags: number[]; notes: number[]; matches: number[] }
     onSelect: (i: number) => void
     onContext?: (row: Row, refs: Ref[], x: number, y: number) => void
   } = $props()
@@ -290,6 +294,24 @@
   let trackW = $state(0)
   let thumb = $derived(thumbFor(offset, width, count, trackW))
   let drag: { grab: number } | null = null
+  // The scrollbar is a ruler, as the timeline's is: its length stands for the whole history,
+  // and ticks along it show where things are among the commits read so far.
+  let rule = $derived.by(() => {
+    void tick
+    const r = ruler?.()
+    return r ? { ...r, head: headRow() } : null
+  })
+  let ticks = $derived(rule ? placeTicks({ head: rule.head, tips: rule.tips, tags: rule.tags, notes: rule.notes, matches: rule.matches }, count, trackW) : [])
+  let unread = $derived(rule ? unreadFrom(rule.loaded, count, trackW) : null)
+  /** What the tick under the pointer is. */
+  let barTitle = $state('')
+  function barOver(e: PointerEvent) {
+    if (drag) return barTo(e.clientX)
+    if (!track) return
+    const t = tickAt(ticks, e.clientX - track.getBoundingClientRect().left)
+    const title = t ? tickSummary(t) : ''
+    if (title !== barTitle) barTitle = title
+  }
   function barTo(clientX: number) {
     if (!track || !drag) return
     following = false
@@ -454,7 +476,22 @@
   </div>
 
   <!-- A pointer's scrollbar: the keyboard moves the selection, and the view follows it. -->
-  <div class="bar" bind:this={track} bind:clientWidth={trackW} style:height="{BAR_H}px" style:margin-left="{namesW}px" aria-hidden="true" onpointerdown={barDown} onpointermove={(e) => barTo(e.clientX)} onpointerup={() => (drag = null)} onpointercancel={() => (drag = null)}>
+  <div class="bar" bind:this={track} bind:clientWidth={trackW} style:height="{BAR_H}px" style:margin-left="{namesW}px" aria-hidden="true" title={barTitle || undefined} onpointerdown={barDown} onpointermove={barOver} onpointerup={() => (drag = null)} onpointercancel={() => (drag = null)}>
+    <!-- The commits not read yet: a hatched stretch at the far end. Going there reads them. -->
+    {#if unread !== null}<span class="unread" style:left="{unread}px"></span>{/if}
+    {#each rule?.months ?? [] as m (m.row)}
+      {#if m.row}<i class="month" style:left="{Math.round(rowToY(m.row, count, trackW))}px"></i>{/if}
+    {/each}
+    <!-- Each kind is a different length and place as well as a colour. -->
+    {#each ticks as t (t.y)}
+      <span class="tick" style:left="{Math.round(t.y)}px">
+        {#if t.tips}<i class="tips"></i>{/if}
+        {#if t.tags}<i class="tags"></i>{/if}
+        {#if t.notes}<i class="notes"></i>{/if}
+        {#if t.matches}<i class="matches"></i>{/if}
+        {#if t.head}<i class="head"></i>{/if}
+      </span>
+    {/each}
     <span class="thumb" style:left="{thumb.left}px" style:width="{thumb.width}px"></span>
   </div>
 
@@ -824,6 +861,74 @@
     border-top: 1px solid var(--hairline);
     background: var(--paper-warm);
     touch-action: none;
+  }
+
+  .unread {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    opacity: 0.28;
+    background: repeating-linear-gradient(-45deg, var(--ink-mute) 0 1px, transparent 1px 5px);
+  }
+
+  .month {
+    position: absolute;
+    top: 1px;
+    bottom: 0;
+    width: 1px;
+    background: var(--ink-mute);
+    opacity: 0.22;
+  }
+
+  .tick {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 0;
+  }
+
+  .tick i {
+    position: absolute;
+    left: 0;
+    width: 2px;
+  }
+
+  .tick .tips {
+    top: 3px;
+    height: 6px;
+    background: var(--ink-soft);
+  }
+
+  .tick .tags {
+    top: 3px;
+    height: 9px;
+    background: var(--accent-c);
+  }
+
+  .tick .notes {
+    left: -1px;
+    top: 9px;
+    width: 4px;
+    height: 4px;
+    background: var(--accent-a);
+  }
+
+  .tick .matches {
+    left: -1px;
+    top: 5px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--link);
+  }
+
+  .tick .head {
+    left: -1px;
+    top: 1px;
+    bottom: 0;
+    width: 4px;
+    background: var(--link);
   }
 
   .thumb {
