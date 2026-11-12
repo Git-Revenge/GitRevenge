@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 ### Changed
 
 - Rendered previews use newer libraries: Mermaid 12.3.0 for diagrams, PDF.js 6.5.438 for PDFs and marked 18.1.3 for Markdown. (#643)
+- The documentation site no longer loads its fonts from Google, so reading the docs sends nothing to a third party. (#645, #646)
 
 ## [0.11.0] - 2026-11-11
 
