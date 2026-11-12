@@ -2,17 +2,15 @@
  * Git Revenge — Docusaurus Theme (shared with risadams/Janus and risadams/docker-registry.helm)
  * "Ink & Agency" — Fraunces + Crimson Pro + Caveat + JetBrains Mono
  *
- * Drop this file into docs-site/src/css/custom.css
- * and add the Google Fonts import below to docusaurus.config.js:
- *
- *   headTags: [{
- *     tagName: 'link',
- *     attributes: {
- *       rel: 'stylesheet',
- *       href: 'https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Caveat:wght@400;600;700&family=JetBrains+Mono:wght@400;500&family=Crimson+Pro:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap'
- *     }
- *   }]
+ * The fonts ship with the site (the @fontsource-variable packages), so a visitor's browser
+ * never asks a third party for them.
  */
+@import '@fontsource-variable/fraunces/full.css';
+@import '@fontsource-variable/fraunces/full-italic.css';
+@import '@fontsource-variable/crimson-pro/wght.css';
+@import '@fontsource-variable/crimson-pro/wght-italic.css';
+@import '@fontsource-variable/caveat/index.css';
+@import '@fontsource-variable/jetbrains-mono/index.css';
 
 /* ─── Ink & Agency Palette ──────────────────────────── */
 :root {
@@ -44,15 +42,15 @@
   --ifm-background-surface-color: var(--dr-vellum);
 
   /* Typography */
-  --ifm-font-family-base:     'Crimson Pro', Georgia, 'Times New Roman', serif;
-  --ifm-heading-font-family:  'Fraunces', Georgia, 'Times New Roman', serif;
+  --ifm-font-family-base:     'Crimson Pro Variable', Georgia, 'Times New Roman', serif;
+  --ifm-heading-font-family:  'Fraunces Variable', Georgia, 'Times New Roman', serif;
   --ifm-font-color-base:      var(--dr-ink);
   --ifm-font-color-secondary: var(--dr-muted);
   --ifm-font-size-base:       17px;
   --ifm-line-height-base:     1.7;
 
   /* Code */
-  --ifm-font-family-monospace:  'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --ifm-font-family-monospace:  'JetBrains Mono Variable', 'Fira Code', 'Cascadia Code', monospace;
   --ifm-code-font-size:         13px;
   --ifm-code-background:        var(--dr-parchment);
   --ifm-code-color:             var(--dr-plum);
@@ -185,7 +183,7 @@ h3 { font-size: 1.45rem; }
 }
 
 .navbar__link {
-  font-family: 'Crimson Pro', Georgia, serif;
+  font-family: 'Crimson Pro Variable', Georgia, serif;
   font-size: 1rem;
   transition: color var(--ifm-transition-fast);
 }
@@ -197,7 +195,7 @@ h3 { font-size: 1.45rem; }
 
 /* Version badge in navbar */
 .navbar__item .badge {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono Variable', monospace;
   font-size: 0.7rem;
   letter-spacing: 0.04em;
   background: var(--dr-parchment);
@@ -218,7 +216,7 @@ h3 { font-size: 1.45rem; }
 }
 
 .menu__link {
-  font-family: 'Crimson Pro', Georgia, serif;
+  font-family: 'Crimson Pro Variable', Georgia, serif;
   font-size: 0.96rem;
   transition: color var(--ifm-transition-fast), background var(--ifm-transition-fast);
 }
@@ -243,7 +241,7 @@ h3 { font-size: 1.45rem; }
 /* Category labels in Caveat style */
 .menu__list-item-collapsible > .menu__link,
 .menu__list > .menu__list-item--collapsed > .menu__link {
-  font-family: 'Caveat', cursive;
+  font-family: 'Caveat Variable', cursive;
   font-size: 1.2rem;
   color: var(--dr-faint);
   letter-spacing: 0.02em;
@@ -315,7 +313,7 @@ hr {
 
 /* Code block header */
 div[class^="codeBlockTitle"] {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono Variable', monospace;
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -365,7 +363,7 @@ div[class^="codeBlockTitle"] {
 
 /* ─── Tabs ──────────────────────────────────────────── */
 .tabs__item {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono Variable', monospace;
   font-size: 0.75rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -378,7 +376,7 @@ div[class^="codeBlockTitle"] {
 
 /* ─── TOC ───────────────────────────────────────────── */
 .table-of-contents {
-  font-family: 'Crimson Pro', Georgia, serif;
+  font-family: 'Crimson Pro Variable', Georgia, serif;
   font-size: 0.88rem;
 }
 
@@ -406,14 +404,14 @@ div[class^="codeBlockTitle"] {
 }
 
 .pagination-nav__sublabel {
-  font-family: 'Crimson Pro', Georgia, serif;
+  font-family: 'Crimson Pro Variable', Georgia, serif;
   font-size: 0.82rem;
   color: var(--dr-faint);
 }
 
 /* ─── Breadcrumbs ───────────────────────────────────── */
 .breadcrumbs__link {
-  font-family: 'Crimson Pro', Georgia, serif;
+  font-family: 'Crimson Pro Variable', Georgia, serif;
   font-size: 0.88rem;
   border-radius: 2px !important;
 }
@@ -425,7 +423,7 @@ div[class^="codeBlockTitle"] {
 
 /* ─── Navbar version badge ───────────────────────────── */
 .navbar-version-badge {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono Variable', monospace;
   font-size: 0.7rem;
   letter-spacing: 0.04em;
   background: var(--dr-parchment);
@@ -481,7 +479,7 @@ div[class^="codeBlockTitle"] {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-family: 'Crimson Pro', Georgia, serif;
+  font-family: 'Crimson Pro Variable', Georgia, serif;
   font-style: italic;
   font-size: 0.875rem;
   color: var(--dr-muted);
@@ -494,7 +492,7 @@ div[class^="codeBlockTitle"] {
 .footer-bar__links {
   display: flex;
   gap: 22px;
-  font-family: 'Crimson Pro', Georgia, serif;
+  font-family: 'Crimson Pro Variable', Georgia, serif;
   font-size: 0.875rem;
 }
 
@@ -509,7 +507,7 @@ div[class^="codeBlockTitle"] {
 }
 
 .footer-bar__copy {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono Variable', monospace;
   font-size: 0.68rem;
   color: var(--dr-faint);
   letter-spacing: 0.04em;
@@ -518,7 +516,7 @@ div[class^="codeBlockTitle"] {
 
 /* ─── Search (Algolia DocSearch) ────────────────────── */
 .DocSearch-Button {
-  font-family: 'Crimson Pro', Georgia, serif;
+  font-family: 'Crimson Pro Variable', Georgia, serif;
   font-size: 0.9rem;
   background: var(--dr-vellum) !important;
   border: 1px solid rgba(26, 22, 20, 0.12) !important;
@@ -532,12 +530,12 @@ div[class^="codeBlockTitle"] {
 }
 
 .DocSearch-Button-Placeholder {
-  font-family: 'Crimson Pro', Georgia, serif;
+  font-family: 'Crimson Pro Variable', Georgia, serif;
 }
 
 /* ─── Badges / tags ─────────────────────────────────── */
 .badge {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono Variable', monospace;
   font-size: 0.68rem;
   letter-spacing: 0.05em;
   border-radius: 2px;
@@ -636,7 +634,7 @@ details summary {
 }
 
 .hero__subtitle {
-  font-family: 'Crimson Pro', Georgia, serif;
+  font-family: 'Crimson Pro Variable', Georgia, serif;
   font-style: italic;
   font-size: 1.25rem;
   color: var(--dr-muted);
@@ -705,7 +703,7 @@ details summary {
 }
 
 .hero-eyebrow {
-  font-family: 'Caveat', cursive;
+  font-family: 'Caveat Variable', cursive;
   font-size: 1.6rem;
   color: var(--dr-rose);
   display: inline-block;
@@ -715,7 +713,7 @@ details summary {
 }
 
 .hero-title {
-  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+  font-family: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
   font-size: 5.75rem;
   font-weight: 500;
   letter-spacing: -0.035em;
@@ -738,7 +736,7 @@ details summary {
 }
 
 .hero-subtitle {
-  font-family: 'Crimson Pro', Georgia, serif;
+  font-family: 'Crimson Pro Variable', Georgia, serif;
   font-size: 1.2rem;
   color: #3a322c;
   max-width: 580px;
@@ -772,7 +770,7 @@ details summary {
   border: 1px solid var(--dr-rose);
   color: #ffffff !important;
   padding: 0.7rem 2rem;
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Fraunces Variable', Georgia, serif;
   font-size: 1.05rem;
   font-weight: 500;
   border-radius: 2px;
@@ -792,7 +790,7 @@ details summary {
   border: 1.5px solid rgba(26, 22, 20, 0.25);
   color: var(--dr-ink) !important;
   padding: 0.7rem 2rem;
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Fraunces Variable', Georgia, serif;
   font-size: 1.05rem;
   font-weight: 500;
   border-radius: 2px;
@@ -835,7 +833,7 @@ details summary {
 }
 
 .quick-install-label {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono Variable', monospace;
   font-size: 0.68rem;
   letter-spacing: 0.10em;
   text-transform: uppercase;
@@ -844,7 +842,7 @@ details summary {
 }
 
 .quick-install-pre {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: 'JetBrains Mono Variable', 'Fira Code', monospace;
   font-size: 0.82rem;
   line-height: 1.75;
   color: #f0e6d2;
@@ -872,7 +870,7 @@ details summary {
 }
 
 .features-eyebrow {
-  font-family: 'Caveat', cursive;
+  font-family: 'Caveat Variable', cursive;
   font-size: 1.5rem;
   color: var(--dr-navy);
   display: inline-block;
@@ -882,7 +880,7 @@ details summary {
 }
 
 .features-heading {
-  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+  font-family: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
   font-size: 2.75rem;
   font-weight: 400;
   letter-spacing: -0.02em;
@@ -904,7 +902,7 @@ details summary {
 }
 
 .features-subtitle {
-  font-family: 'Crimson Pro', Georgia, serif;
+  font-family: 'Crimson Pro Variable', Georgia, serif;
   font-style: italic;
   font-size: 1.1rem;
   color: var(--dr-muted);
@@ -941,7 +939,7 @@ details summary {
 }
 
 .feature-card-title {
-  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+  font-family: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
   font-size: 1.25rem;
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -954,7 +952,7 @@ details summary {
 }
 
 .feature-card-body {
-  font-family: 'Crimson Pro', Georgia, serif;
+  font-family: 'Crimson Pro Variable', Georgia, serif;
   font-size: 0.96rem;
   color: #3a322c;
   line-height: 1.6;
@@ -978,7 +976,7 @@ details summary {
 }
 
 .doc-links-heading {
-  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+  font-family: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
   font-size: 2.25rem;
   font-weight: 400;
   letter-spacing: -0.02em;
@@ -1025,7 +1023,7 @@ details summary {
 .doc-card--amber { border-bottom: 3px solid var(--dr-amber); }
 
 .doc-card-title {
-  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+  font-family: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
   font-size: 1rem;
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -1038,7 +1036,7 @@ details summary {
 }
 
 .doc-card-desc {
-  font-family: 'Crimson Pro', Georgia, serif;
+  font-family: 'Crimson Pro Variable', Georgia, serif;
   font-size: 0.875rem;
   line-height: 1.5;
   color: var(--dr-muted);
