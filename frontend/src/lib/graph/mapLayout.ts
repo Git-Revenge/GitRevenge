@@ -26,18 +26,51 @@ export interface Placed extends MapNode {
   r: number
   /** What's drawn: a branch's diameter, a tag's side. */
   size: number
-  /** 0 moved this week, 1 the week before, 2 longer ago. */
-  band: 0 | 1 | 2
+  /** Which ring it sits within, counting out from the trunk: 0 is the innermost, and one more
+   * than the last ring is older than all of them. */
+  band: number
   /** The name goes over the node, not under it: the side away from the trunk. */
   above: boolean
+}
+
+/** One ring: how old something is at it, in days, and what it's called. */
+export interface RingMark {
+  days: number
+  name: string
+}
+
+/** A zoom level: what the rings mean. */
+export interface Scale {
+  /** What the whole map spans at this zoom, for the control that changes it. */
+  name: string
+  rings: RingMark[]
+}
+
+/**
+ * The zoom levels, closest first. Zoomed all the way in the map is one week and each ring is a
+ * day; it goes no closer. Zooming out, the rings become weeks, then months, then years.
+ */
+export const SCALES: Scale[] = [
+  { name: 'A week, day by day', rings: [1, 2, 3, 4, 5, 6, 7].map((d) => ({ days: d, name: d === 1 ? 'today' : d === 7 ? '1 week' : `${d} days` })) },
+  { name: 'Two weeks', rings: [{ days: 7, name: 'this week' }, { days: 14, name: 'last week' }] },
+  { name: 'Two months', rings: [{ days: 7, name: '1 week' }, { days: 14, name: '2 weeks' }, { days: 30, name: '1 month' }, { days: 61, name: '2 months' }] },
+  { name: 'Six months', rings: [{ days: 30, name: '1 month' }, { days: 61, name: '2 months' }, { days: 91, name: '3 months' }, { days: 183, name: '6 months' }] },
+  { name: 'Two years', rings: [{ days: 91, name: '3 months' }, { days: 183, name: '6 months' }, { days: 365, name: '1 year' }, { days: 730, name: '2 years' }] },
+  { name: 'Ten years', rings: [{ days: 365, name: '1 year' }, { days: 730, name: '2 years' }, { days: 1826, name: '5 years' }, { days: 3652, name: '10 years' }] },
+]
+/** The zoom the map opens at: this week and last. */
+export const DEFAULT_SCALE = 1
+
+/** The zoom level one step in (-1) or out (+1) from `level`, within the levels there are. */
+export function zoomBy(level: number, step: number): number {
+  return Math.min(SCALES.length - 1, Math.max(0, Math.round(level) + step))
 }
 
 export interface Rings {
   cx: number
   cy: number
-  /** The radius of the one-week ring and of the two-week ring. */
-  week: number
-  fortnight: number
+  /** Each ring, innermost first: its radius and what it marks. */
+  marks: (RingMark & { r: number })[]
   /** As far out as a node sits. */
   edge: number
 }
@@ -95,17 +128,27 @@ export function trunkRadius(commits: number, k: number): number {
   return Math.min(TRUNK_R.max, Math.max(TRUNK_R.min, k * Math.sqrt(commits)))
 }
 
-/** Which ring a node sits within, by when it last moved. */
-export function bandOf(updated: number, now: number): 0 | 1 | 2 {
+/** Which ring a node sits within, by when it last moved: 0 for the innermost, and the number
+ * of rings for something older than all of them. */
+export function bandOf(updated: number, now: number, scale: Scale = SCALES[DEFAULT_SCALE]): number {
   const days = (now - updated) / DAY
-  return days <= 7 ? 0 : days <= 14 ? 1 : 2
+  const at = scale.rings.findIndex((ring) => days <= ring.days)
+  return at < 0 ? scale.rings.length : at
 }
 
-/** The rings for a stage this size. The two-week ring touches the top and bottom; what's older
- * goes out to the sides, where a wide window has the room. */
-export function ringsFor(width: number, height: number): Rings {
-  const fortnight = Math.max(150, height / 2 - 6)
-  return { cx: width / 2, cy: height / 2, week: fortnight * 0.67, fortnight, edge: Math.max(fortnight + 50, width / 2 - 70) }
+/** The rings for a stage this size at this zoom, evenly spaced. The outermost touches the top
+ * and bottom; what's older goes out to the sides, where a wide window has the room. */
+export function ringsFor(width: number, height: number, scale: Scale = SCALES[DEFAULT_SCALE]): Rings {
+  const outer = Math.max(150, height / 2 - 6)
+  // The first ring clears the trunk at its biggest, with room for a node between.
+  const inner = Math.min(outer * 0.42, TRUNK_R.max + 24)
+  const n = scale.rings.length
+  return {
+    cx: width / 2,
+    cy: height / 2,
+    marks: scale.rings.map((ring, k) => ({ ...ring, r: inner + ((outer - inner) * (k + 1)) / n })),
+    edge: Math.max(outer + 50, width / 2 - 70),
+  }
 }
 
 /** How far from the trunk's centre a node wants to sit: nearer the newer, and always inside
@@ -113,10 +156,21 @@ export function ringsFor(width: number, height: number): Rings {
 export function restLength(updated: number, now: number, rings: Rings, trunkR: number, r: number): number {
   const days = Math.max(0, (now - updated) / DAY)
   const near = trunkR + r + GAP + 4
-  if (days <= 7) return lerp(near, Math.max(near, rings.week - r - 14), days / 7)
-  if (days <= 14) return lerp(rings.week + r + 14, Math.max(rings.week + r + 14, rings.fortnight - r - 14), (days - 7) / 7)
-  // A year out is as far as it goes; the months in between bunch up, as they do in memory.
-  return lerp(rings.fortnight + r + 22, Math.max(rings.fortnight + r + 22, rings.edge), Math.log(days / 14) / Math.log(26))
+  let from = 0
+  let inside = near
+  for (const ring of rings.marks) {
+    if (days <= ring.days) {
+      // A ring too tight for the node lets it sit on the line.
+      const out = Math.max(inside, ring.r - r - 12)
+      return lerp(inside, out, (days - from) / Math.max(1e-9, ring.days - from))
+    }
+    from = ring.days
+    inside = Math.max(near, ring.r + r + 12)
+  }
+  // Older than the last ring: just outside it, and further the older, up to ten times as old.
+  const last = rings.marks[rings.marks.length - 1]
+  const start = Math.max(near, (last?.r ?? 0) + r + 22)
+  return lerp(start, Math.max(start, rings.edge), Math.log(days / (last?.days ?? 1)) / Math.log(10))
 }
 
 /** The golden angle: successive nodes land as far round from each other as they can. */
@@ -128,15 +182,15 @@ const STEPS = 260
  * rest length from what it hangs off (the trunk, or the branch that holds a tag), pushed off
  * any node it would overlap, and kept on the stage.
  */
-export function layout(trunk: MapNode, nodes: MapNode[], width: number, height: number, now: number): { trunk: Placed; nodes: Placed[]; rings: Rings } {
-  const rings = ringsFor(width, height)
+export function layout(trunk: MapNode, nodes: MapNode[], width: number, height: number, now: number, scale: Scale = SCALES[DEFAULT_SCALE]): { trunk: Placed; nodes: Placed[]; rings: Rings } {
+  const rings = ringsFor(width, height, scale)
   const k = scales(nodes)
   const hub: Placed = { ...trunk, x: rings.cx, y: rings.cy, r: trunkRadius(trunk.commits, k.branch), size: 0, band: 0, above: false }
   hub.size = hub.r * 2
 
   const placed: Placed[] = nodes.map((n) => {
     const size = n.kind === 'tags' ? TAG_SIDE.max : isTag(n) ? tagSide(n.commits, k.tag) : branchRadius(n.commits, k.branch) * 2
-    return { ...n, x: 0, y: 0, size, r: isTag(n) ? (size * Math.SQRT2) / 2 : size / 2, band: bandOf(n.updated, now), above: false }
+    return { ...n, x: 0, y: 0, size, r: isTag(n) ? (size * Math.SQRT2) / 2 : size / 2, band: bandOf(n.updated, now, scale), above: false }
   })
   const byName = new Map(placed.filter((p) => !isTag(p)).map((p) => [p.name, p]))
   const holder = (p: Placed) => (p.parent ? byName.get(p.parent) : undefined)

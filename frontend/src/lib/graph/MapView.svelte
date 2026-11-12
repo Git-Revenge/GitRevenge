@@ -7,7 +7,7 @@
   import { errorText } from '../errors'
   import Loading from '../ui/Loading.svelte'
   import { laneVar, relativeTime } from './draw'
-  import { keyShows, layout, nameWaits, type MapNode, type Placed } from './mapLayout'
+  import { DEFAULT_SCALE, keyShows, layout, nameWaits, SCALES, zoomBy, type MapNode, type Placed } from './mapLayout'
 
   let {
     path,
@@ -66,7 +66,45 @@
     void data
     return Date.now() / 1000
   })
-  let placed = $derived(data && data.trunk.name && width > 0 && height > 0 ? layout(data.trunk, data.nodes, width, height, now) : null)
+  // Zoom: what the rings mean. All the way in, the map is one week and each ring a day; out,
+  // the rings become weeks, then months, then years. The level is kept between visits.
+  const ZOOM_KEY = 'graph.map.zoom'
+  function savedZoom(): number {
+    try {
+      const n = Number(localStorage.getItem(ZOOM_KEY) ?? DEFAULT_SCALE)
+      return Number.isInteger(n) ? zoomBy(n, 0) : DEFAULT_SCALE
+    } catch {
+      return DEFAULT_SCALE
+    }
+  }
+  let zoom = $state(savedZoom())
+  let scale = $derived(SCALES[zoom])
+  function zoomTo(level: number) {
+    if (level === zoom) return
+    zoom = level
+    try {
+      localStorage.setItem(ZOOM_KEY, String(level))
+    } catch {
+      // The level just isn't kept.
+    }
+  }
+  /** The wheel zooms a step for each notch: there's nothing here to scroll. */
+  let wheeled = 0
+  function onWheel(e: WheelEvent) {
+    if (!e.deltaY) return
+    e.preventDefault()
+    wheeled += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY
+    if (Math.abs(wheeled) < 80) return
+    zoomTo(zoomBy(zoom, wheeled > 0 ? 1 : -1))
+    wheeled = 0
+  }
+  $effect(() => {
+    // Not passive: the wheel is taken.
+    stage?.addEventListener('wheel', onWheel, { passive: false })
+    return () => stage?.removeEventListener('wheel', onWheel)
+  })
+
+  let placed = $derived(data && data.trunk.name && width > 0 && height > 0 ? layout(data.trunk, data.nodes, width, height, now, scale) : null)
   let crowd = $derived(placed ? placed.nodes.length : 0)
   /** Tab order: the trunk, then the rest, newest first. */
   let ordered = $derived(placed ? [...placed.nodes].sort((a, b) => b.updated - a.updated || a.name.localeCompare(b.name)) : [])
@@ -120,6 +158,12 @@
   }
 
   function onKey(e: KeyboardEvent) {
+    // Plus and minus zoom, as they do a map.
+    if (e.key === '+' || e.key === '=' || e.key === '-') {
+      e.preventDefault()
+      zoomTo(zoomBy(zoom, e.key === '-' ? 1 : -1))
+      return
+    }
     if (e.key !== 'Escape' || !picked) return
     // Only the card closes, not the screen behind it.
     e.stopPropagation()
@@ -182,8 +226,9 @@
     <p class="note">No branches yet. Make a first commit and the map has something to draw.</p>
   {:else if placed}
     <svg class="under" aria-hidden="true" {width} {height}>
-      <circle class="ring" cx={placed.rings.cx} cy={placed.rings.cy} r={placed.rings.week} />
-      <circle class="ring" cx={placed.rings.cx} cy={placed.rings.cy} r={placed.rings.fortnight} />
+      {#each placed.rings.marks as ring (ring.days)}
+        <circle class="ring" cx={placed.rings.cx} cy={placed.rings.cy} r={ring.r} />
+      {/each}
       {#each placed.nodes as n (keyOf(n))}
         {@const from = holderOf(n) ?? placed.trunk}
         <line class:tagline={n.kind === 'tag' || n.kind === 'tags'} x1={from.x} y1={from.y} x2={n.x} y2={n.y} stroke={colorOf(n)} />
@@ -191,9 +236,11 @@
     </svg>
     <!-- A narrow panel has no room for the rings' names or the key: the nodes come first. -->
     {#if keyShows(width, height)}
-    <span class="ringname" style:left="{placed.rings.cx + placed.rings.week * 0.64}px" style:top="{placed.rings.cy - placed.rings.week * 0.77 - 22}px">this week</span>
-    <span class="ringname" style:left="{placed.rings.cx + placed.rings.fortnight * 0.5}px" style:top="{Math.max(2, placed.rings.cy - placed.rings.fortnight * 0.866 - 22)}px">last week</span>
-    <span class="ringname" style:left="{Math.min(width - 60, placed.rings.cx + placed.rings.fortnight + 34)}px" style:top="30px">older</span>
+    <!-- Each ring's name sits on it, up and to the right; what's past the last is "older". -->
+    {#each placed.rings.marks as ring (ring.days)}
+      <span class="ringname" style:left="{placed.rings.cx + ring.r * 0.64 + 4}px" style:top="{Math.max(2, placed.rings.cy - ring.r * 0.77 - 20)}px">{ring.name}</span>
+    {/each}
+    <span class="ringname" style:left="{Math.min(width - 60, placed.rings.cx + placed.rings.marks[placed.rings.marks.length - 1].r + 34)}px" style:top="30px">older</span>
     {/if}
 
     <div class="nodes" role="group" aria-label="Branches and tags around {data.trunk.name}">
@@ -204,6 +251,12 @@
     </div>
 
     {#if keyShows(width, height)}
+    <div class="zoom" role="group" aria-label="Zoom">
+      <button class="btn sm quiet icon" aria-label="Zoom in" title="Zoom in: the rings mark less time (+)" disabled={zoom === 0} onclick={() => zoomTo(zoomBy(zoom, -1))}>+</button>
+      <span class="span" aria-live="polite">{scale.name}</span>
+      <button class="btn sm quiet icon" aria-label="Zoom out" title="Zoom out: the rings mark more time (-)" disabled={zoom === SCALES.length - 1} onclick={() => zoomTo(zoomBy(zoom, 1))}>−</button>
+    </div>
+
     <div class="legend">
       <div><i class="k-branch"></i>Local branch</div>
       <div><i class="k-remote"></i>Only on the remote</div>
@@ -452,6 +505,33 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .zoom {
+    position: absolute;
+    right: 12px;
+    bottom: 10px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px;
+    border-radius: var(--r-md);
+    background: color-mix(in srgb, var(--paper-deep) 90%, transparent);
+  }
+
+  .zoom .btn {
+    font-size: 16px;
+    line-height: 1;
+  }
+
+  .zoom .span {
+    min-width: 120px;
+    padding: 0 4px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--ink-soft);
+    white-space: nowrap;
   }
 
   .legend {

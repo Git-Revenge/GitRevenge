@@ -144,10 +144,56 @@ test.describe('the Map view', () => {
     await open(page, 'graph', scenario())
     await expect(page.locator('.legend')).toBeVisible()
     await expect(page.locator('.ringname')).toHaveCount(3)
+    await expect(page.getByRole('group', { name: 'Zoom' })).toBeVisible()
     await page.setViewportSize({ width: 400, height: 700 })
     await expect(page.locator('.legend')).toHaveCount(0)
     await expect(page.locator('.ringname')).toHaveCount(0)
     await expect(nodeOf(page, 'main')).toBeVisible()
+  })
+
+  // #661: zoom changes what the rings mean.
+  test('zooms out to months and in to a week of days, and no closer', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 700 })
+    await open(page, 'graph', scenario())
+    const names = page.locator('.ringname')
+    await expect(names).toHaveText(['this week', 'last week', 'older'])
+    await page.getByRole('button', { name: 'Zoom out' }).click()
+    await expect(names).toHaveText(['1 week', '2 weeks', '1 month', '2 months', 'older'])
+    await expect(page.getByRole('group', { name: 'Zoom' })).toContainText('Two months')
+    await page.getByRole('button', { name: 'Zoom in' }).click()
+    await page.getByRole('button', { name: 'Zoom in' }).click()
+    await expect(names).toHaveText(['today', '2 days', '3 days', '4 days', '5 days', '6 days', '1 week', 'older'])
+    await expect(page.getByRole('button', { name: 'Zoom in' })).toBeDisabled()
+    // The level is kept for the next visit.
+    expect(await page.evaluate(() => localStorage.getItem('graph.map.zoom'))).toBe('0')
+  })
+
+  test('a month-old branch comes inside the rings when zoomed out', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 700 })
+    await open(page, 'graph', scenario())
+    const far = async () => {
+      const main = (await nodeOf(page, 'main').boundingBox())!
+      const n = (await nodeOf(page, 'release/v0.6').boundingBox())!
+      return Math.hypot(n.x + n.width / 2 - main.x - main.width / 2, n.y + n.height / 2 - main.y - main.height / 2)
+    }
+    const before = await far()
+    await page.getByRole('button', { name: 'Zoom out' }).click()
+    await page.getByRole('button', { name: 'Zoom out' }).click()
+    await expect.poll(far).toBeLessThan(before)
+  })
+
+  test('the wheel and the plus and minus keys zoom too', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 700 })
+    await open(page, 'graph', scenario())
+    await page.locator('.map').hover({ position: { x: 900, y: 200 } })
+    await page.mouse.wheel(0, 120)
+    await expect(page.getByRole('group', { name: 'Zoom' })).toContainText('Two months')
+    await nodeOf(page, 'main').focus()
+    await page.keyboard.press('+')
+    await expect(page.getByRole('group', { name: 'Zoom' })).toContainText('Two weeks')
+    await page.keyboard.press('-')
+    await page.keyboard.press('-')
+    await expect(page.getByRole('group', { name: 'Zoom' })).toContainText('Six months')
   })
 
   test('says so when the repository has no branch to draw', async ({ page }) => {
