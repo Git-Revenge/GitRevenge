@@ -85,10 +85,55 @@ test.describe('the Horizontal view', () => {
     expect(subject.width).toBeGreaterThan(120)
   })
 
-  test('shows a branch and a tag over the commits they point at', async ({ page }) => {
+  // #659: the pinned column names each lane; tags have a row of their own.
+  test('names the lane in the pinned column, and puts a tag in the row over its commit', async ({ page }) => {
     await open(page, 'graph', scenario({ view: 'horizontal', experimental: ['horizontal'] }))
-    await expect(commit(page, 0).locator('.labels')).toContainText('main')
-    await expect(page.getByRole('option', { name: /^Commit number 4,.*v1\.0/ }).locator('.labels')).toContainText('v1.0')
+    const names = page.getByRole('list', { name: 'Branches, by lane' })
+    await expect(names.getByRole('listitem')).toHaveCount(1)
+    await expect(names.getByRole('listitem').first()).toContainText('main')
+    await expect(names).toContainText('you’re here')
+    // main is said once, by the column: not again over its commit.
+    await expect(page.locator('.mark')).toHaveCount(1)
+    await expect(page.locator('.mark')).toContainText('v1.0')
+    const mark = (await page.locator('.mark').boundingBox())!
+    const column = (await commit(page, 4).boundingBox())!
+    expect(mark.x).toBeGreaterThanOrEqual(column.x)
+    expect(mark.x).toBeLessThan(column.x + column.width)
+  })
+
+  test('keeps the lane’s name pinned when its tip has scrolled away', async ({ page }) => {
+    await open(page, 'graph', scenario({ view: 'horizontal', experimental: ['horizontal'] }))
+    const names = page.getByRole('list', { name: 'Branches, by lane' })
+    await expect(names).toContainText('main')
+    await view(page).hover({ position: { x: 300, y: 300 } })
+    await page.mouse.wheel(0, 1760)
+    await expect(commit(page, 0)).not.toBeInViewport()
+    await expect(names.getByRole('listitem').first()).toContainText('main')
+    const box = (await names.boundingBox())!
+    expect(box.x).toBeLessThan(5)
+  })
+
+  test('names a second lane, and scrolls the lanes when there are more than fit', async ({ page }) => {
+    await page.setViewportSize({ width: 1000, height: 420 })
+    // Twelve lanes side by side for the first rows: a tip on each, all joining main at row 12.
+    const wide = rows.map((r, i) => {
+      if (i >= 12) return { ...r, width: 1 }
+      const pass = Array.from({ length: i }, (_, k) => ({ from: k + 1, to: k + 1, color: k + 1 }))
+      const keep = [{ from: 0, to: 0, color: 0 }, ...pass]
+      const own = i === 0 ? [] : [{ from: i, to: i, color: i }]
+      return i === 0 ? { ...r, width: 12 } : { ...r, col: i, color: i, width: 12, up: keep, down: [...keep, ...own] }
+    })
+    const refs = { ...graphRefs, [id(3)]: [branch('topic-three')], [id(11)]: [branch('topic-eleven')] }
+    await open(page, 'graph', { ...scenario({ view: 'horizontal', experimental: ['horizontal'] }), graphData: wide, graphRefs: refs })
+    const names = page.getByRole('list', { name: 'Branches, by lane' })
+    await expect(names).toContainText('topic-three')
+    // The lanes run past the bottom: the column says so, and the wheel over it brings them up.
+    await expect(names).toContainText('more below')
+    await expect(names.getByText('topic-eleven')).not.toBeInViewport()
+    await names.hover()
+    await page.mouse.wheel(0, 400)
+    await expect(names.getByText('topic-eleven')).toBeInViewport()
+    await expect(names).toContainText('more above')
   })
 
   test('a click selects a commit and shows its subject in full below', async ({ page }) => {

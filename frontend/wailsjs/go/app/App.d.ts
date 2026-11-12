@@ -166,6 +166,8 @@ export function LFSAction(arg1:string,arg2:string,arg3:Array<string>):Promise<vo
 
 export function LFSLocks(arg1:string):Promise<Array<git.LFSLock>>;
 
+export function LaneNames(arg1:string,arg2:Array<number>):Promise<Array<app.LaneName>>;
+
 export function LastCommitMessage(arg1:string):Promise<string>;
 
 export function LinkRules(arg1:string):Promise<links.Config>;

@@ -2,13 +2,47 @@
   // An experimental view of the graph with time running across: a column per commit, lanes as
   // rows, newest on the left. It reads the same rows as the timeline, through the timeline's
   // own cache, and hands selection back to it, so the two stay on the same commit.
+  //
+  // A pinned column on the left names each lane: the branch whose tip started it, even once
+  // that tip has scrolled away. Lanes are reused from one branch to the next, so the names
+  // are of the lanes at the view's left edge and change as it scrolls.
   import { onMount, untrack } from 'svelte'
+  import { LaneNames } from '../../../wailsjs/go/app/App.js'
+  import Icon from '../ui/Icon.svelte'
   import RefChip from './RefChip.svelte'
-  import { dayLineLabel, formatTime, initials, laneVar, refLabels, startsRun } from './draw'
-  import { BAR_H, clampOffset, COL, colAt, DAY_BAND, dayBandText, dayCount, daySpans, LABEL_ROW, labelPlaces, LABELS_H, lanePitch, laneY, LEAN, offsetForThumb, offsetToShow, segPath, subjectLength, thumbFor, visibleRange, wordsHeight } from './horizontal'
+  import { dayLineLabel, formatTime, initials, laneVar, refLabels, startsRun, type RefLabel } from './draw'
+  import {
+    BAR_H,
+    CHIP_MIN,
+    chipRooms,
+    clampOffset,
+    COL,
+    colAt,
+    DAY_BAND,
+    dayBandText,
+    dayCount,
+    daySpans,
+    LANE,
+    lanesAtEdge,
+    laneScrollToShow,
+    lanesExtent,
+    laneY,
+    LEAN,
+    maxLaneScroll,
+    namesWidth,
+    offsetForThumb,
+    offsetToShow,
+    segPath,
+    subjectLength,
+    TAGS_H,
+    thumbFor,
+    visibleRange,
+    wordsHeight,
+  } from './horizontal'
   import type { Ref, Row, RowCache } from './rowCache'
 
   let {
+    path,
     cache,
     tick,
     count,
@@ -19,6 +53,7 @@
     onSelect,
     onContext,
   }: {
+    path: string
     /** The timeline's rows. It isn't reactive: `tick` says when to read it again. */
     cache: RowCache
     /** Changes whenever the rows, the labels or the checked-out commit may have. */
@@ -38,10 +73,15 @@
 
   const id = `graph-across-${Math.random().toString(36).slice(2, 8)}`
   let field = $state<HTMLDivElement>()
+  let namesEl = $state<HTMLDivElement>()
+  /** The whole view's width, which the pinned column takes a share of, and the plot's own. */
+  let bodyW = $state(0)
   let width = $state(0)
   let height = $state(0)
-  /** How far the view has scrolled from the newest commit, in px. */
+  /** How far the view has scrolled from the newest commit, in px, and how far down the lanes. */
   let offset = $state(0)
+  let laneScroll = $state(0)
+  let namesW = $derived(namesWidth(bodyW))
 
   let range = $derived(visibleRange(offset, width, count))
   /** The commits to draw, with what the drawing needs of each. */
@@ -69,10 +109,10 @@
 
   let lanes = $derived(Math.max(1, ...cols.map((c) => c.row?.width ?? 1)))
   let words = $derived(wordsHeight(height, lanes))
-  let lanesH = $derived(Math.max(0, height - DAY_BAND - words - LABELS_H))
-  let pitch = $derived(lanePitch(lanes, lanesH))
-  /** A commit that starts a run shows its author's initials when the lanes leave room. */
-  let roomy = $derived(pitch >= 24)
+  /** The room the lanes have, and how tall they are all together: past that, they scroll. */
+  let lanesView = $derived(Math.max(0, height - DAY_BAND - words - TAGS_H))
+  let extent = $derived(lanesExtent(lanes))
+  const pitch = LANE.max
   let subjectMax = $derived(subjectLength(words))
   /** The svg's own x for commit i: it starts at the first drawn column. */
   const sx = (i: number) => (i - range.first) * COL + COL / 2
@@ -89,8 +129,84 @@
     })
   })
 
-  /** Which row each labelled commit's labels sit on, and how wide they can be. */
-  let places = $derived(labelPlaces(cols.filter((c) => c.refs.length).map((c) => c.i)))
+  // Which branch each lane is. A lane's colour number names it; the backend says which commit
+  // started each, and the refs on it. Asked once per lane, until the graph is read afresh.
+  interface LaneName {
+    commit: string
+    refs: Ref[]
+  }
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- namesTick says when it changed
+  let laneNames = new Map<number, LaneName>()
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, never rendered
+  let asked = new Set<number>()
+  let namesEpoch = -1
+  let namesTick = $state(0)
+
+  /** The lane on each row at the view's left edge, or the first to turn up further right. */
+  let edge = $derived(
+    lanesAtEdge(
+      cols
+        // A column half off the left edge still counts as the edge.
+        .filter((c) => c.i >= Math.floor(offset / COL))
+        .map((c) => c.row),
+    ),
+  )
+  $effect(() => {
+    void tick
+    if (cache.epoch !== namesEpoch) {
+      namesEpoch = cache.epoch
+      laneNames = new Map()
+      asked = new Set()
+    }
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- local to this run
+    const want = new Set<number>()
+    for (const c of cols) if (c.row) want.add(c.row.color)
+    for (const e of edge.values()) want.add(e.color)
+    const need = [...want].filter((c) => !asked.has(c))
+    if (!need.length) return
+    for (const c of need) asked.add(c)
+    const epoch = namesEpoch
+    // The names are a convenience: without an answer the column is blank, as for a lane no
+    // branch started.
+    LaneNames(path, need)
+      .then((res) => {
+        if (epoch !== namesEpoch) return
+        for (const n of res ?? []) {
+          if (n.row >= 0) laneNames.set(n.color, { commit: n.commit, refs: (n.refs ?? []) as unknown as Ref[] })
+          // A lane whose start isn't read yet is asked about again when more has been.
+          else setTimeout(() => asked.delete(n.color), 1500)
+        }
+        namesTick++
+      })
+      .catch(() => {})
+  })
+
+  /** What the pinned column says, lane by lane from the top. */
+  let laneRows = $derived.by(() => {
+    void namesTick
+    return [...edge]
+      .sort((a, b) => a[0] - b[0])
+      .map(([lane, e]) => {
+        const refs = laneNames.get(e.color)?.refs ?? []
+        return { lane, color: e.color, later: e.later, labels: refs.length ? refLabels(refs, mainRemote) : [] }
+      })
+  })
+  let above = $derived(laneRows.filter((r) => laneY(r.lane, pitch) - laneScroll < 6).length)
+  let below = $derived(laneRows.filter((r) => laneY(r.lane, pitch) - laneScroll > lanesView - 6).length)
+
+  /** The labels the pinned column doesn't say: tags, and a branch whose commit isn't the start
+   * of the lane named on its row. They go in the row over the lanes, above their commit. */
+  let marks = $derived.by(() => {
+    void namesTick
+    const out: { i: number; labels: RefLabel[]; color: number }[] = []
+    for (const c of cols) {
+      if (!c.row || !c.refs.length) continue
+      const named = edge.get(c.row.col)?.color === c.row.color && laneNames.get(c.row.color)?.commit === c.row.id
+      if (!named) out.push({ i: c.i, labels: refLabels(c.refs, mainRemote), color: c.row.color })
+    }
+    const rooms = chipRooms(out.map((m) => m.i))
+    return out.map((m) => ({ ...m, room: rooms.get(m.i) ?? 0 }))
+  })
 
   let chosen = $derived.by(() => {
     void tick
@@ -116,20 +232,45 @@
       count,
     )
     if (next !== untrack(() => offset)) offset = next
+    // Its lane comes into view too, when the lanes scroll.
+    const lane = chosen?.col
+    if (lane !== undefined && lanesView > 0) {
+      const down = laneScrollToShow(
+        untrack(() => laneScroll),
+        lane,
+        lanes,
+        lanesView,
+      )
+      if (down !== untrack(() => laneScroll)) laneScroll = down
+    }
   })
   // A history that got shorter, or a narrower view, can leave the offset past the end.
   $effect(() => {
     const next = clampOffset(offset, width, count)
     if (width && next !== offset) offset = next
   })
+  $effect(() => {
+    const next = Math.min(maxLaneScroll(lanes, lanesView), Math.max(0, laneScroll))
+    if (next !== laneScroll) laneScroll = next
+  })
 
+  const lines = (e: WheelEvent, d: number) => d * (e.deltaMode === 1 ? COL : 1)
+  function scrollLanes(e: WheelEvent) {
+    const max = maxLaneScroll(lanes, lanesView)
+    if (!max || !e.deltaY) return
+    e.preventDefault()
+    following = false
+    laneScroll = Math.min(max, Math.max(0, laneScroll + lines(e, e.deltaY)))
+  }
   function onWheel(e: WheelEvent) {
-    // The wheel scrolls sideways here: there's nowhere to go up or down.
+    // With Shift the wheel scrolls the lanes, when there are more than fit.
+    if (e.shiftKey) return scrollLanes(e)
+    // Otherwise it scrolls sideways: time runs across.
     const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
     if (!d) return
     e.preventDefault()
     following = false
-    offset = clampOffset(offset + d * (e.deltaMode === 1 ? COL : 1), width, count)
+    offset = clampOffset(offset + lines(e, d), width, count)
   }
 
   function onKey(e: KeyboardEvent) {
@@ -167,115 +308,153 @@
   onMount(() => {
     // Not passive: the wheel is taken, so the page behind doesn't scroll instead.
     field?.addEventListener('wheel', onWheel, { passive: false })
-    return () => field?.removeEventListener('wheel', onWheel)
+    namesEl?.addEventListener('wheel', scrollLanes, { passive: false })
+    return () => {
+      field?.removeEventListener('wheel', onWheel)
+      namesEl?.removeEventListener('wheel', scrollLanes)
+    }
   })
 </script>
 
 <div class="across">
-  <div
-    class="plot"
-    bind:this={field}
-    bind:clientWidth={width}
-    bind:clientHeight={height}
-    tabindex="0"
-    role="listbox"
-    aria-orientation="horizontal"
-    aria-label="Commit history, newest first"
-    aria-activedescendant={selected >= range.first && selected < range.last ? `${id}-${selected}` : undefined}
-    onkeydown={onKey}
-    onclick={(e) => {
-      const i = columnAt(e)
-      if (i >= 0) onSelect(i)
-    }}
-    oncontextmenu={(e) => {
-      const i = columnAt(e)
-      const row = i >= 0 ? cache.get(i) : undefined
-      if (!row || !onContext) return
-      e.preventDefault()
-      onSelect(i)
-      onContext(row, cache.refsFor(row.id), e.clientX, e.clientY)
-    }}
-  >
-    <div class="days" style:height="{DAY_BAND}px">
-      {#each days as d (d.start)}
-        {@const left = d.start * COL - offset}
-        {@const w = (d.end - d.start) * COL}
-        <!-- The day's name stays at the left edge while its day scrolls under it. -->
-        {@const seen = Math.max(0, w + Math.min(0, left))}
-        {@const says = dayBandText(d.label, d.count, d.time, seen)}
-        <div class="day" title={d.count ? `${d.label} · ${d.count}` : d.label} style:left="{Math.max(0, left)}px" style:width="{seen}px">
-          <span class="meta">{says.label}</span>{#if says.count}<span class="count">{says.count}</span>{/if}
-        </div>
-      {/each}
-    </div>
-    <div class="track" style:top="{DAY_BAND}px" style:transform="translateX({-offset}px)">
-      <!-- A faint line where each day ends and the one before it begins. -->
-      {#each days as d (d.start)}
-        {#if d.start > 0}<span class="daycut" style:left="{d.start * COL}px"></span>{/if}
-      {/each}
-      {#each cols as c (c.i)}
-        {@const labels = c.refs.length ? refLabels(c.refs, mainRemote) : []}
-        <div
-          class="col"
-          class:selected={c.i === selected}
-          class:dimmed={c.i !== selected && dimmed?.(c.i)}
-          class:waiting={!c.row}
-          id="{id}-{c.i}"
-          role="option"
-          aria-selected={c.i === selected}
-          aria-label={c.row ? `${c.row.subject}, ${c.row.author}, ${formatTime(c.row.authorTime)}${labels.length ? `, ${labels.map((l) => l.text).join(', ')}` : ''}` : 'Loading'}
-          style:left="{c.i * COL}px"
-          style:width="{COL}px"
-        >
-          {#if c.row}
-            <span class="subject" style:top="{words - 22}px" style:max-width="{subjectMax}px" style:transform="rotate(-{LEAN}deg)">{c.row.subject}</span>
-            {@const place = places.get(c.i)}
-            {#if labels.length && place}
-              <span class="labels" style:top="{words + 2 + place.row * LABEL_ROW}px" style:height="{LABEL_ROW}px" style:max-width="{place.room}px">
-                <RefChip label={labels[0]} lane={laneVar(c.row.color)} />{#if labels.length > 1}<span class="more" title={labels.slice(1).map((l) => l.text).join(', ')}>+{labels.length - 1}</span>{/if}
-              </span>
+  <div class="body" bind:clientWidth={bodyW}>
+    <!-- The pinned column: what each band of the plot is, and which branch each lane is. -->
+    <div class="names" style:width="{namesW}px" bind:this={namesEl}>
+      <div class="cell top" style:height="{DAY_BAND}px"><span class="meta">Branch</span></div>
+      <div class="cell" style:height="{words}px"><span class="hand">newest on the left</span></div>
+      <div class="cell" style:height="{TAGS_H}px" title="Tags, and branches that sit on another branch's lane"><span class="meta">Tags</span></div>
+      <div class="lane-names" role="list" aria-label="Branches, by lane">
+        {#each laneRows as r (r.lane)}
+          {@const first = r.labels[0]}
+          <div class="lane-name" class:later={r.later} role="listitem" style:top="{laneY(r.lane, pitch) - laneScroll - pitch / 2}px" style:height="{pitch}px">
+            {#if first}
+              {#if first.ref.stackParent}<span class="stacked" title="Stacked on {first.ref.stackParent}{first.ref.stackSize ? `: ${first.ref.stackDepth} of ${first.ref.stackSize}` : ''}"><Icon name="stack" size={12} /><span class="visually-hidden">Stacked on {first.ref.stackParent}</span></span>{/if}
+              <span class="one" title={r.labels.map((l) => l.text).join(', ') + (r.later ? ' (starts further right)' : '')}><RefChip label={first} lane={laneVar(r.color)} /></span>
+              {#if r.labels.length > 1}<span class="more">+{r.labels.length - 1}</span>{/if}
+              {#if first.ref.head && namesW > 150}<span class="here">you’re here</span>{/if}
+            {:else}
+              <!-- A lane no branch started: a merged branch whose name is gone. -->
+              <span class="nameless" style:--lane={laneVar(r.color)} title="No branch points at this lane's first commit: it was merged in, and its name is gone"></span>
             {/if}
-          {/if}
-        </div>
-      {/each}
-      <svg class="lanes" aria-hidden="true" style:left="{range.first * COL}px" style:top="{words + LABELS_H}px" width={cols.length * COL} height={lanesH}>
-        {#each cols as c (c.i)}
-          {#if c.row}
-            {@const cx = sx(c.i)}
-            <g class:muted={c.row.kind === 'docs'} class:dimmed={c.i !== selected && dimmed?.(c.i)}>
-              {#each c.row.up as s, n (n)}<path d={segPath(s, cx, 'up', pitch)} stroke={laneVar(s.color)} />{/each}
-              {#each c.row.down as s, n (n)}<path d={segPath(s, cx, 'down', pitch)} stroke={laneVar(s.color)} />{/each}
-            </g>
-          {/if}
+          </div>
+        {/each}
+        {#if above}<span class="hint up">{above} more above</span>{/if}
+        {#if below}<span class="hint down">{below} more below</span>{/if}
+      </div>
+    </div>
+
+    <div
+      class="plot"
+      bind:this={field}
+      bind:clientWidth={width}
+      bind:clientHeight={height}
+      tabindex="0"
+      role="listbox"
+      aria-orientation="horizontal"
+      aria-label="Commit history, newest first"
+      aria-activedescendant={selected >= range.first && selected < range.last ? `${id}-${selected}` : undefined}
+      onkeydown={onKey}
+      onclick={(e) => {
+        const i = columnAt(e)
+        if (i >= 0) onSelect(i)
+      }}
+      oncontextmenu={(e) => {
+        const i = columnAt(e)
+        const row = i >= 0 ? cache.get(i) : undefined
+        if (!row || !onContext) return
+        e.preventDefault()
+        onSelect(i)
+        onContext(row, cache.refsFor(row.id), e.clientX, e.clientY)
+      }}
+    >
+      <div class="days" style:height="{DAY_BAND}px">
+        {#each days as d (d.start)}
+          {@const left = d.start * COL - offset}
+          {@const w = (d.end - d.start) * COL}
+          {@const seen = Math.max(0, w + Math.min(0, left))}
+          {@const says = dayBandText(d.label, d.count, d.time, seen)}
+          <!-- The day's name stays at the left edge while its day scrolls under it. -->
+          <div class="day" title={d.count ? `${d.label} · ${d.count}` : d.label} style:left="{Math.max(0, left)}px" style:width="{seen}px">
+            <span class="meta">{says.label}</span>{#if says.count}<span class="count">{says.count}</span>{/if}
+          </div>
+        {/each}
+      </div>
+      <div class="track" style:top="{DAY_BAND}px" style:transform="translateX({-offset}px)">
+        <!-- A faint line where each day ends and the one before it begins. -->
+        {#each days as d (d.start)}
+          {#if d.start > 0}<span class="daycut" style:left="{d.start * COL}px"></span>{/if}
         {/each}
         {#each cols as c (c.i)}
-          {#if c.row}
-            {@const cx = sx(c.i)}
-            {@const cy = laneY(c.row.col, pitch)}
-            {@const color = laneVar(c.row.color)}
-            <g class:muted={c.row.kind === 'docs'} class:dimmed={c.i !== selected && dimmed?.(c.i)}>
-              {#if c.head}<circle class="halo" {cx} {cy} r={roomy ? 16 : 9} fill={color} />{/if}
-              {#if c.row.parents > 1}
-                <circle class="cut" {cx} {cy} r="9" />
-                <circle {cx} {cy} r="7.5" fill={color} />
-                <circle class="hole" {cx} {cy} r="3.5" />
-              {:else if c.starts && roomy}
-                <circle {cx} {cy} r="12" fill={color} />
-                <circle class="face" {cx} {cy} r="9.75" />
-                <text x={cx} y={cy} dy="0.36em">{initials(c.row.author)}</text>
-              {:else}
-                <circle class="cut" {cx} {cy} r="8" />
-                <circle {cx} {cy} r="5" fill={color} />
-              {/if}
-            </g>
-          {/if}
+          {@const names = c.refs.length ? refLabels(c.refs, mainRemote) : []}
+          <div
+            class="col"
+            class:selected={c.i === selected}
+            class:dimmed={c.i !== selected && dimmed?.(c.i)}
+            class:waiting={!c.row}
+            id="{id}-{c.i}"
+            role="option"
+            aria-selected={c.i === selected}
+            aria-label={c.row ? `${c.row.subject}, ${c.row.author}, ${formatTime(c.row.authorTime)}${names.length ? `, ${names.map((l) => l.text).join(', ')}` : ''}` : 'Loading'}
+            style:left="{c.i * COL}px"
+            style:width="{COL}px"
+          >
+            {#if c.row}
+              <span class="subject" style:top="{words - 22}px" style:max-width="{subjectMax}px" style:transform="rotate(-{LEAN}deg)">{c.row.subject}</span>
+            {/if}
+          </div>
         {/each}
-      </svg>
+        {#each marks as m (m.i)}
+          <span class="mark" class:bare={m.room < CHIP_MIN} style:left="{m.i * COL + 3}px" style:top="{words}px" style:height="{TAGS_H}px" style:max-width="{Math.max(COL - 6, m.room)}px" title={m.labels.map((l) => l.text).join(', ')}>
+            {#if m.room < CHIP_MIN}
+              <i class:diamond={m.labels[0].ref.kind === 'tag'} style:--lane={laneVar(m.color)}></i>
+            {:else}
+              <RefChip label={m.labels[0]} lane={laneVar(m.color)} />{#if m.labels.length > 1}<span class="more">+{m.labels.length - 1}</span>{/if}
+            {/if}
+          </span>
+        {/each}
+      </div>
+      <!-- The lanes scroll both ways, inside their own window: sideways with the commits, and
+           up and down when there are more than fit. -->
+      <div class="lanebox" style:top="{DAY_BAND + words + TAGS_H}px">
+        <svg class="lanes" aria-hidden="true" style:transform="translate({range.first * COL - offset}px, {-laneScroll}px)" width={cols.length * COL} height={extent}>
+          {#each cols as c (c.i)}
+            {#if c.row}
+              {@const cx = sx(c.i)}
+              <g class:muted={c.row.kind === 'docs'} class:dimmed={c.i !== selected && dimmed?.(c.i)}>
+                {#each c.row.up as s, n (n)}<path d={segPath(s, cx, 'up', pitch)} stroke={laneVar(s.color)} />{/each}
+                {#each c.row.down as s, n (n)}<path d={segPath(s, cx, 'down', pitch)} stroke={laneVar(s.color)} />{/each}
+              </g>
+            {/if}
+          {/each}
+          {#each cols as c (c.i)}
+            {#if c.row}
+              {@const cx = sx(c.i)}
+              {@const cy = laneY(c.row.col, pitch)}
+              {@const color = laneVar(c.row.color)}
+              <g class:muted={c.row.kind === 'docs'} class:dimmed={c.i !== selected && dimmed?.(c.i)}>
+                {#if c.head}<circle class="halo" {cx} {cy} r="16" fill={color} />{/if}
+                {#if c.row.parents > 1}
+                  <circle class="cut" {cx} {cy} r="9" />
+                  <circle {cx} {cy} r="7.5" fill={color} />
+                  <circle class="hole" {cx} {cy} r="3.5" />
+                {:else if c.starts}
+                  <circle {cx} {cy} r="12" fill={color} />
+                  <circle class="face" {cx} {cy} r="9.75" />
+                  <text x={cx} y={cy} dy="0.36em">{initials(c.row.author)}</text>
+                {:else}
+                  <circle class="cut" {cx} {cy} r="8" />
+                  <circle {cx} {cy} r="5" fill={color} />
+                {/if}
+              </g>
+            {/if}
+          {/each}
+        </svg>
+      </div>
     </div>
   </div>
 
   <!-- A pointer's scrollbar: the keyboard moves the selection, and the view follows it. -->
-  <div class="bar" bind:this={track} bind:clientWidth={trackW} style:height="{BAR_H}px" aria-hidden="true" onpointerdown={barDown} onpointermove={(e) => barTo(e.clientX)} onpointerup={() => (drag = null)} onpointercancel={() => (drag = null)}>
+  <div class="bar" bind:this={track} bind:clientWidth={trackW} style:height="{BAR_H}px" style:margin-left="{namesW}px" aria-hidden="true" onpointerdown={barDown} onpointermove={(e) => barTo(e.clientX)} onpointerup={() => (drag = null)} onpointercancel={() => (drag = null)}>
     <span class="thumb" style:left="{thumb.left}px" style:width="{thumb.width}px"></span>
   </div>
 
@@ -301,10 +480,151 @@
     background: var(--paper);
   }
 
-  .plot {
+  .body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .names {
+    display: flex;
+    flex-direction: column;
+    flex: none;
+    box-sizing: border-box;
+    border-right: 1px solid var(--paper-edge);
+    background: var(--paper);
+  }
+
+  .cell {
+    display: flex;
+    align-items: flex-end;
+    flex: none;
+    box-sizing: border-box;
+    padding: 0 10px 6px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .cell.top {
+    align-items: center;
+    padding-bottom: 0;
+    background: var(--paper-warm);
+    border-bottom: 1px solid var(--paper-edge);
+  }
+
+  .cell .meta {
+    color: var(--ink-faint);
+  }
+
+  .cell .hand,
+  .here {
+    font-family: var(--font-hand);
+    font-size: 18px;
+    line-height: 1;
+    color: var(--accent-a);
+    transform: rotate(-2deg);
+    white-space: nowrap;
+  }
+
+  .here {
+    flex: none;
+    color: var(--link);
+  }
+
+  .lane-names {
     position: relative;
     flex: 1;
     min-height: 0;
+    overflow: hidden;
+  }
+
+  .lane-name {
+    position: absolute;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    box-sizing: border-box;
+    padding: 0 8px 0 10px;
+    white-space: nowrap;
+  }
+
+  /* A lane that only starts further right in the view: its row is empty at the left edge. */
+  .lane-name.later {
+    opacity: 0.62;
+  }
+
+  .one {
+    display: inline-flex;
+    min-width: 0;
+  }
+
+  .one :global(.chip),
+  .mark :global(.chip) {
+    min-width: 0;
+    min-height: 20px;
+    padding-top: 1px;
+    padding-bottom: 1px;
+    overflow: hidden;
+  }
+
+  .one :global(.name),
+  .mark :global(.name) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    overflow-wrap: normal;
+    white-space: nowrap;
+  }
+
+  /* Where else a branch is (local, origin) is in its menu and the sidebar. */
+  .one :global(.places),
+  .mark :global(.places) {
+    display: none;
+  }
+
+  .stacked {
+    display: inline-flex;
+    flex: none;
+    color: var(--ink-mute);
+  }
+
+  .nameless {
+    width: 14px;
+    border-top: 1.75px dashed var(--lane);
+    opacity: 0.6;
+  }
+
+  .more {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-mute);
+  }
+
+  .hint {
+    position: absolute;
+    left: 0;
+    right: 0;
+    padding: 2px 10px;
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    font-size: 12.5px;
+    font-style: italic;
+    color: var(--ink-mute);
+  }
+
+  .hint.up {
+    top: 0;
+  }
+
+  .hint.down {
+    bottom: 0;
+  }
+
+  .plot {
+    position: relative;
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     outline: none;
     cursor: default;
@@ -418,14 +738,12 @@
   }
 
   .col.dimmed .subject,
-  .col.dimmed .labels,
   g.dimmed {
     opacity: 0.3;
   }
 
-  .labels {
+  .mark {
     position: absolute;
-    left: 3px;
     z-index: 1;
     display: flex;
     align-items: center;
@@ -434,32 +752,37 @@
     white-space: nowrap;
   }
 
-  .labels :global(.chip) {
-    min-width: 0;
+  /* No room for the name: a mark of its own shape, named on hover. */
+  .mark.bare {
+    width: 38px;
+    justify-content: center;
+  }
+
+  .mark i {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--lane);
+  }
+
+  .mark i.diamond {
+    border-radius: 2px;
+    background: var(--lane-4);
+    transform: rotate(45deg);
+  }
+
+  .lanebox {
+    position: absolute;
+    inset: 0;
     overflow: hidden;
-  }
-
-  .labels :global(.name) {
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  /* Where else a branch is (local, origin) is in its menu and the sidebar: a column is too
-     narrow to say it here. */
-  .labels :global(.places) {
-    display: none;
-  }
-
-  .more {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--ink-mute);
+    pointer-events: none;
   }
 
   .lanes {
     position: absolute;
+    left: 0;
+    top: 0;
     overflow: visible;
-    pointer-events: none;
   }
 
   .lanes path {

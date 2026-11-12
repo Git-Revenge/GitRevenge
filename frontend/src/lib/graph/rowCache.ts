@@ -106,6 +106,12 @@ export class RowCache {
     private onError?: (error: unknown) => void,
   ) {}
 
+  /** Goes up each time everything cached is dropped: what was worked out from the old graph
+   * (which branch a lane is, say) no longer holds. */
+  get epoch(): number {
+    return this.generation
+  }
+
   get(i: number): Row | undefined {
     return this.chunks.get(Math.floor(i / CHUNK))?.[i % CHUNK]
   }

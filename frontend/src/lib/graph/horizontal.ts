@@ -9,15 +9,16 @@ export const COL = 44
 export const DAY_BAND = 26
 /** The band the subjects lean in, at its tallest and shortest. */
 export const WORDS = { max: 200, min: 64 }
-/** The band of branch and tag labels, between the subjects and the lanes: two rows, so labels
- * on neighbouring commits don't squeeze each other down to a letter. */
-export const LABEL_ROW = 26
-export const LABELS_H = LABEL_ROW * 2 + 4
-/** The widest a label gets, and how many columns one wants clear to its right to read well. */
+/** The row of tags, between the subjects and the lanes, and the widest a chip in it gets. */
+export const TAGS_H = 28
 export const LABEL_MAX = 220
-const LABEL_WANT = 3
-/** A lane's height, at its roomiest and tightest, and the space above the first lane. */
-export const LANE = { max: 26, min: 12, pad: 20 }
+/** A tag with less room than this before the next one is a mark alone, named on hover. */
+export const CHIP_MIN = 56
+/** The pinned column of lane names, at its widest, and the share of a narrow view it takes. */
+export const NAMES = { max: 184, share: 0.34 }
+/** A lane's height, and the space above the first lane and below the last. Lanes keep their
+ * height however many there are: past what fits, they scroll. */
+export const LANE = { max: 26, pad: 20 }
 /** How far the subjects lean back from the horizontal, in degrees. */
 export const LEAN = 40
 /** How many columns to the right a leaning subject reaches, so the columns just off the left
@@ -68,8 +69,9 @@ export function offsetToShow(offset: number, width: number, i: number, count: nu
 /** How tall the subjects' band is in a view this tall with this many lanes: the lanes come
  * first, and the words take what's left, within their limits. */
 export function wordsHeight(height: number, lanes: number): number {
-  const lanesWant = LANE.pad * 2 + lanes * LANE.max
-  return Math.min(WORDS.max, Math.max(WORDS.min, height - DAY_BAND - LABELS_H - lanesWant))
+  // A history with many lanes scrolls them: the words don't give up everything for it.
+  const lanesWant = LANE.pad * 2 + Math.min(lanes, 6) * LANE.max
+  return Math.min(WORDS.max, Math.max(WORDS.min, height - DAY_BAND - TAGS_H - lanesWant))
 }
 
 /** How long a leaning subject can be before it leaves the top of its band. */
@@ -77,10 +79,24 @@ export function subjectLength(words: number): number {
   return Math.max(40, Math.floor((words - 12) / Math.sin((LEAN * Math.PI) / 180)))
 }
 
-/** A lane's height when this many share this much room. */
-export function lanePitch(lanes: number, height: number): number {
-  const room = (height - LANE.pad * 2) / Math.max(1, lanes)
-  return Math.min(LANE.max, Math.max(LANE.min, Math.floor(room)))
+/** How tall the lanes are, all of them. */
+export function lanesExtent(lanes: number): number {
+  return LANE.pad * 2 + Math.max(0, lanes - 1) * LANE.max
+}
+
+/** How far down the lanes can scroll in a view this tall. */
+export function maxLaneScroll(lanes: number, view: number): number {
+  return Math.max(0, lanesExtent(lanes) - view)
+}
+
+/** Where to scroll the lanes so this one shows, with its neighbours' worth of room; the scroll
+ * as it is when it already does. */
+export function laneScrollToShow(scroll: number, lane: number, lanes: number, view: number): number {
+  const y = laneY(lane, LANE.max)
+  let next = scroll
+  if (y - LANE.max < next) next = y - LANE.max
+  else if (y + LANE.max > next + view) next = y + LANE.max - view
+  return Math.min(maxLaneScroll(lanes, view), Math.max(0, next))
 }
 
 /** The y of a lane's line, from the top of the lanes. */
@@ -166,25 +182,49 @@ export function offsetForThumb(left: number, width: number, count: number, track
   return clampOffset((left / (track - w)) * maxOffset(width, count), width, count)
 }
 
+/** The lanes that run through a commit's column: the one its node is on, and those passing
+ * straight by. Lane number to the lane's colour number, which names the lane. */
+export function lanesAt(row: Pick<Row, 'col' | 'color' | 'up' | 'down'>): Map<number, number> {
+  const out = new Map<number, number>()
+  for (const s of [...row.up, ...row.down]) if (s.from === s.to) out.set(s.from, s.color)
+  out.set(row.col, row.color)
+  return out
+}
+
+/** A lane as the pinned column names it: its colour, and whether it only starts further right
+ * in the view, with nothing on its row at the left edge. */
+export interface LaneAtEdge {
+  color: number
+  later: boolean
+}
+
 /**
- * Where each labelled commit's labels go, given the labelled columns in order: which of the two
- * rows, and how wide they can be before running into the next labels on that row. A label takes
- * the lower row, nearer its commit, unless the last one there is too close; then the upper row,
- * and when both are close, whichever has more room.
+ * What the pinned column says for each lane row, from the rows in view, left edge first: the
+ * lane on that row at the left edge, or, for a row that's empty there, the first lane to turn
+ * up on it further right.
  */
-export function labelPlaces(columns: number[]): Map<number, { row: 0 | 1; room: number }> {
-  const out = new Map<number, { row: 0 | 1; room: number }>()
-  // The last labelled column on each row: row 1 is the lower one, next to the lanes.
-  const last: [number, number] = [-Infinity, -Infinity]
-  for (const c of columns) {
-    const row: 0 | 1 = c - last[1] >= LABEL_WANT ? 1 : c - last[0] >= LABEL_WANT ? 0 : c - last[1] >= c - last[0] ? 1 : 0
-    const before = last[row]
-    const prev = out.get(before)
-    if (prev) prev.room = Math.min(LABEL_MAX, (c - before) * COL - 6)
-    out.set(c, { row, room: LABEL_MAX })
-    last[row] = c
+export function lanesAtEdge(rows: (Pick<Row, 'col' | 'color' | 'up' | 'down'> | undefined)[]): Map<number, LaneAtEdge> {
+  const out = new Map<number, LaneAtEdge>()
+  let edge = true
+  for (const row of rows) {
+    if (!row) continue
+    for (const [lane, color] of lanesAt(row)) if (!out.has(lane)) out.set(lane, { color, later: !edge })
+    edge = false
   }
   return out
+}
+
+/** How wide each chip in the tags row can be, given the columns that have one, in order: up
+ * to the next chip. */
+export function chipRooms(columns: number[]): Map<number, number> {
+  const out = new Map<number, number>()
+  columns.forEach((c, k) => out.set(c, k + 1 < columns.length ? Math.min(LABEL_MAX, (columns[k + 1] - c) * COL - 6) : LABEL_MAX))
+  return out
+}
+
+/** The pinned column's width in a view this wide. */
+export function namesWidth(width: number): number {
+  return Math.round(Math.min(NAMES.max, Math.max(96, width * NAMES.share)))
 }
 
 const monthDay = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })

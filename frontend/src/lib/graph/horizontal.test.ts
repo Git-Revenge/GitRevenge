@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampOffset, COL, colAt, colX, dayBandText, dayCount, daySpans, LABEL_MAX, labelPlaces, LANE, lanePitch, laneY, LEAN_REACH, maxOffset, offsetForThumb, offsetToShow, segPath, subjectLength, THUMB_MIN, thumbFor, visibleRange, WORDS, wordsHeight } from './horizontal'
+import { chipRooms, clampOffset, COL, colAt, colX, dayBandText, dayCount, daySpans, LABEL_MAX, LANE, lanesAt, lanesAtEdge, laneScrollToShow, lanesExtent, laneY, LEAN_REACH, maxLaneScroll, maxOffset, namesWidth, NAMES, offsetForThumb, offsetToShow, segPath, subjectLength, THUMB_MIN, thumbFor, visibleRange, WORDS, wordsHeight } from './horizontal'
 
 const DAY = 24 * 60 * 60
 // Noon, so a few hours either way stay in the same day in any time zone.
@@ -65,12 +65,22 @@ describe('bands', () => {
     expect(subjectLength(WORDS.max)).toBeGreaterThan(200)
   })
 
-  it('packs lanes closer when many share the room, down to a floor', () => {
-    expect(lanePitch(2, 300)).toBe(LANE.max)
-    expect(lanePitch(12, 240)).toBe(Math.floor((240 - LANE.pad * 2) / 12))
-    expect(lanePitch(80, 240)).toBe(LANE.min)
-    expect(laneY(0, 26)).toBe(LANE.pad)
-    expect(laneY(2, 26)).toBe(LANE.pad + 52)
+  it('keeps lanes one height, and scrolls them when there are more than fit', () => {
+    expect(laneY(0, LANE.max)).toBe(LANE.pad)
+    expect(laneY(2, LANE.max)).toBe(LANE.pad + 2 * LANE.max)
+    expect(lanesExtent(1)).toBe(LANE.pad * 2)
+    expect(lanesExtent(5)).toBe(LANE.pad * 2 + 4 * LANE.max)
+    expect(maxLaneScroll(3, 400)).toBe(0)
+    expect(maxLaneScroll(40, 300)).toBe(lanesExtent(40) - 300)
+  })
+
+  it('scrolls the lanes to a lane out of sight, and not at all to one that shows', () => {
+    expect(laneScrollToShow(0, 2, 40, 300)).toBe(0)
+    const down = laneScrollToShow(0, 30, 40, 300)
+    expect(laneY(30, LANE.max) - down).toBeLessThan(300)
+    expect(laneY(30, LANE.max) - down).toBeGreaterThan(0)
+    expect(laneScrollToShow(down, 0, 40, 300)).toBe(0)
+    expect(laneScrollToShow(0, 39, 40, 300)).toBe(maxLaneScroll(40, 300))
   })
 })
 
@@ -164,25 +174,41 @@ describe('the scrollbar', () => {
   })
 })
 
-describe('labels', () => {
-  it('sits a label on the lower row, by its commit, with all the room it wants', () => {
-    expect(labelPlaces([4]).get(4)).toEqual({ row: 1, room: LABEL_MAX })
+describe('lane names', () => {
+  const pass = (lane: number, color: number) => ({ from: lane, to: lane, color })
+  // Commit on lane 0 (colour 0), with lane 2 (colour 7) passing by.
+  const first = { col: 0, color: 0, up: [pass(0, 0), pass(2, 7)], down: [pass(0, 0), pass(2, 7)] }
+  // Further right, a commit on lane 1 (colour 4): a lane that isn't at the left edge.
+  const second = { col: 1, color: 4, up: [pass(0, 0), pass(2, 7)], down: [pass(0, 0), pass(2, 7), { from: 1, to: 0, color: 4 }] }
+
+  it('reads the lanes through a column: its own and the ones passing by', () => {
+    expect([...lanesAt(first)]).toEqual([
+      [0, 0],
+      [2, 7],
+    ])
+    // A line that changes lane isn't a lane of this column.
+    expect(lanesAt(second).get(1)).toBe(4)
+    expect(lanesAt(second).size).toBe(3)
   })
 
-  it('keeps labels far enough apart on one row, each as wide as the gap to the next', () => {
-    const p = labelPlaces([0, 5, 20])
-    expect([...p.values()].map((v) => v.row)).toEqual([1, 1, 1])
-    expect(p.get(0)!.room).toBe(5 * COL - 6)
-    expect(p.get(5)!.room).toBe(LABEL_MAX)
+  it('names each row by the lane at the left edge, or the first to turn up further right', () => {
+    const rows = lanesAtEdge([first, undefined, second])
+    expect(rows.get(0)).toEqual({ color: 0, later: false })
+    expect(rows.get(2)).toEqual({ color: 7, later: false })
+    expect(rows.get(1)).toEqual({ color: 4, later: true })
   })
 
-  it('lifts a label to the upper row when the commit before it has labels too', () => {
-    const p = labelPlaces([0, 1, 2, 3])
-    expect([...p.values()].map((v) => v.row)).toEqual([1, 0, 1, 0])
-    // Each has two columns before the next label on its own row, not one.
-    expect(p.get(0)!.room).toBe(2 * COL - 6)
-    expect(p.get(1)!.room).toBe(2 * COL - 6)
-    expect(p.get(3)!.room).toBe(LABEL_MAX)
+  it('gives a tag chip the room up to the next one', () => {
+    const rooms = chipRooms([2, 3, 10])
+    expect(rooms.get(2)).toBe(COL - 6)
+    expect(rooms.get(3)).toBe(LABEL_MAX)
+    expect(rooms.get(10)).toBe(LABEL_MAX)
+  })
+
+  it('narrows the pinned column in a narrow view, within limits', () => {
+    expect(namesWidth(1200)).toBe(NAMES.max)
+    expect(namesWidth(400)).toBe(136)
+    expect(namesWidth(200)).toBe(96)
   })
 })
 

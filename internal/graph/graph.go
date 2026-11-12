@@ -147,6 +147,11 @@ type Graph struct {
 
 	nodeCol   []uint16
 	nodeColor []uint16
+	// laneStart[c] is the row whose commit started the lane of colour c: a lane keeps its
+	// colour from the commit that starts it down its first parents, and no two lanes share
+	// one, so a colour names a lane. -1 for the first Trunk's lane, which Pin gives colour 0
+	// before any row exists.
+	laneStart []int32
 
 	cur         state
 	cfg         layout       // pinned lanes and tip kinds, fixed before the first Add
@@ -195,6 +200,7 @@ func (g *Graph) Pin(ids []string) {
 		g.cfg.pins = p
 		// Colour 0 is the first Trunk's; other lanes start from the next one.
 		g.cur.nextColor = 1
+		g.laneStart = []int32{-1}
 	}
 }
 
@@ -291,10 +297,53 @@ func (g *Graph) Add(c git.LogCommit) error {
 	g.times = append(g.times, c.AuthorTime)
 	g.subjects = append(g.subjects, c.Subject)
 
+	before := g.cur.nextColor
 	col, color := step(&g.cur, &g.cfg, id, ps, base, nil)
+	for range g.cur.nextColor - before {
+		g.laneStart = append(g.laneStart, int32(row))
+	}
 	g.nodeCol = append(g.nodeCol, uint16(min(col, 0xffff)))
 	g.nodeColor = append(g.nodeColor, uint16(color%0x10000))
 	return nil
+}
+
+// LaneStart returns the row of the commit that started the lane with the given colour (a
+// Row's or Seg's Color), and whether that commit is the lane's own tip: a lane starts at a
+// branch tip nothing above points to, or at a merge, which opens one for each parent after
+// its first. ok is false for a colour no lane has, or a Trunk lane whose tip isn't read yet.
+func (g *Graph) LaneStart(color int) (row int, tip, ok bool) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	if color < 0 || color >= len(g.laneStart) {
+		return 0, false, false
+	}
+	at := g.laneStart[color]
+	if at < 0 {
+		// The first Trunk's lane: it starts at that Trunk's tip, wherever that is.
+		if g.cfg.pins == nil {
+			return 0, false, false
+		}
+		for id, col := range g.cfg.pins.tips {
+			if col != 0 {
+				continue
+			}
+			if r, found := g.index[id]; found {
+				return int(r), true, true
+			}
+		}
+		return 0, false, false
+	}
+	return int(at), int(g.nodeColor[at]) == color%0x10000, true
+}
+
+// ID returns the full ID of the commit at row, or "" past the end.
+func (g *Graph) ID(row int) string {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	if row < 0 || row >= len(g.ids) {
+		return ""
+	}
+	return hex.EncodeToString(g.ids[row][:g.hashLen])
 }
 
 // Len returns the number of rows laid out so far.

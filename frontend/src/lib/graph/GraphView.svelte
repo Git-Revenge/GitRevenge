@@ -2042,6 +2042,7 @@
   {#if colorTheme.view === 'horizontal'}
     <Lazy
       load={() => import('./HorizontalView.svelte')}
+      {path}
       {cache}
       tick={rowsTick}
       count={span}

@@ -208,3 +208,45 @@ func rowsOf(g *graph.Graph, ids []string, limit int) graph.SearchResult {
 	}
 	return res
 }
+
+// maxLaneNames caps how many lanes one LaneNames call names: a view shows a few dozen.
+const maxLaneNames = 400
+
+// LaneName says who a lane of the graph belongs to.
+type LaneName struct {
+	// Color is the lane's colour number, as rows and their lines carry it: it names the lane.
+	Color int `json:"color"`
+	// Row and Commit are the commit that started the lane; Row is -1 when that isn't known
+	// (a Trunk whose tip isn't read yet, or a colour no lane has).
+	Row    int    `json:"row"`
+	Commit string `json:"commit"`
+	// Refs are the branches and tags on that commit, when it's the lane's own tip. A lane a
+	// merge opened has none: the branch it was is gone, or was never here.
+	Refs []git.Ref `json:"refs"`
+}
+
+// LaneNames says which commit started each of the given lanes of the graph at path, and the
+// refs on it, for a view that names its lanes. Lanes are given by colour number.
+func (a *App) LaneNames(path string, colors []int) ([]LaneName, error) {
+	out := []LaneName{}
+	r, err := a.openRepo(path)
+	if err != nil {
+		return out, err
+	}
+	g, _ := r.Graph()
+	if g == nil {
+		return out, nil
+	}
+	idx := r.Refs()
+	for _, c := range colors[:min(len(colors), maxLaneNames)] {
+		name := LaneName{Color: c, Row: -1, Refs: []git.Ref{}}
+		if row, tip, ok := g.LaneStart(c); ok {
+			name.Row, name.Commit = row, g.ID(row)
+			if tip {
+				name.Refs = append(name.Refs, idx.ByCommit[name.Commit]...)
+			}
+		}
+		out = append(out, name)
+	}
+	return out, nil
+}

@@ -222,3 +222,46 @@ func TestSearchGraphForNotes(t *testing.T) {
 		t.Fatalf("text search = %+v", res)
 	}
 }
+
+func TestLaneNamesSayWhichBranchALaneIs(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	shas := fx.Linear(3)
+	fx.Git("checkout", "-q", "-b", "topic", shas[1])
+	fx.CommitFile("t.txt", "t", "topic work")
+	fx.Git("checkout", "-q", "main")
+	tab, err := a.OpenRepo(fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var page GraphPage
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		if page, _ = a.GraphRows(tab.Path, 0, 10); !page.Loading {
+			break
+		}
+	}
+	colors := map[string]int{}
+	for _, row := range page.Rows {
+		colors[row.Subject] = row.Color
+	}
+	names, err := a.LaneNames(tab.Path, []int{colors["topic work"], colors["commit 2"], 987})
+	if err != nil || len(names) != 3 {
+		t.Fatalf("names = %+v, %v", names, err)
+	}
+	short := func(n LaneName) string {
+		if len(n.Refs) == 0 {
+			return ""
+		}
+		return n.Refs[0].Short
+	}
+	if short(names[0]) != "topic" || short(names[1]) != "main" {
+		t.Fatalf("lanes named %q and %q, want topic and main", short(names[0]), short(names[1]))
+	}
+	if names[2].Row != -1 || names[2].Refs == nil || len(names[2].Refs) != 0 {
+		t.Fatalf("unknown lane = %+v", names[2])
+	}
+	if none, err := a.LaneNames(fx.Dir+"-elsewhere", []int{0}); err == nil || none == nil {
+		t.Fatalf("not open: %+v, %v", none, err)
+	}
+}
