@@ -33,7 +33,8 @@ A cloud marks a name that's on a remote, and the prefix of your main remote is l
 
 ### Marks on a commit
 
-- The selected commit has a bar in its line's colour at the left edge of its row.
+- The selected commit has a bar in its line's colour at the left edge of its row, and the row is washed in that colour, fading to the right.
+- A hairline in the line's colour underlines each row, so you can follow a commit across to its message.
 - The checked-out commit's row carries a handwritten "you're here" after its label, when there's room.
 - A commit with a [git note](history.md#notes) wears a folded-page mark. Hover over the mark to read the note, or click it to open the commit with its notes in view.
 - A signed commit wears a seal; its [signature](history.md#signatures) is in the commit's details.
@@ -121,13 +122,15 @@ The graph then shows the branch, its remote-tracking copies, and the history the
 
 Only one focus exists at a time, and choosing another replaces it. The bar above the graph says what's focused. To go back to everything, click the **×** there, or right-click the branch and choose **Stop focusing**. A focus lasts until you close the tab, or until its branch is deleted.
 
-## Two layouts
+## Views
 
-The default **timeline** layout is the one described above: a line for each day, and a second line for a commit that starts a run. **Compact rows** fits one commit per line with no day lines, under column headings, so you see more history at once. In compact rows with enough width, the filter button beside **Author** searches for the selected commit's author, an author carrying on from the row above shows as a ditto mark, and the **When** column holds how long ago each commit was made.
+The default **Timeline** view is the one described above: a line for each day, and a second line for a commit that starts a run. **Compact** fits one commit per line with no day lines, under column headings, so you see more history at once. In Compact with enough width, the filter button beside **Author** searches for the selected commit's author, an author carrying on from the row above shows as a ditto mark, and the **When** column holds how long ago each commit was made.
 
-Switch between them with the pair of icons in the bar above the graph, where the one in use is raised, or in [Settings](settings.md).
+Switch between them with the view menu in the bar above the graph. Its button shows the view in use; click it, or press <kbd>Enter</kbd> on it, and pick another. Settings and the command palette switch views too.
 
-The graph's commit count, **Kinds**, the layout switch and the search share that bar with Undo, Redo, Fetch, Pull and Push, and the bar stays on one line at every width. As it narrows, the commit count moves into the search field ("Search 411 commits"), then the search becomes an icon that opens the field over the bar, then Undo and Redo lose their words, then Fetch, Pull and Push. In a very narrow panel the layout switch goes too; Settings and the command palette still have it. While a file is open, the bar steps aside for the file's own header.
+Two more views, **Horizontal** and **Map**, are experimental. They're off until you switch them on in [Settings](settings.md), and then join the view menu under a handwritten "experimental" label. [Experimental views](experimental-views.md) covers both.
+
+The graph's commit count, **Kinds**, the view menu and the search share that bar with Undo, Redo, Fetch, Pull and Push, and the bar stays on one line at every width. As it narrows, the commit count moves into the search field ("Search 411 commits") and the view menu shows only its icon, then the search becomes an icon that opens the field over the bar, then Undo and Redo lose their words, then Fetch, Pull and Push. In a very narrow panel the view menu goes too; Settings and the command palette still have it. While a file is open, the bar steps aside for the file's own header.
 
 ## Right-click menus
 

@@ -76,6 +76,8 @@ async function reset(page, open = ['tidewater'], { clean = false, branch } = {})
     const st = await window.go.app.App.RestoreSession()
     for (const t of st?.tabs ?? []) await window.go.app.App.CloseRepo(t.path)
     await window.go.app.App.SetActiveRepo('')
+    // A scene of an experimental view leaves it showing: every other scene is of the rows.
+    await window.go.app.App.SetGraphView('')
   })
   // Git processes the app started can hold the folder for a moment after the tab closes.
   for (let tries = 1; ; tries++) {
@@ -490,6 +492,44 @@ scenes.csv = (page) => stills(page, 'preview-csv', (p) => preview(p, 'Add the st
 scenes.mermaid = (page) => stills(page, 'preview-mermaid', (p) => preview(p, 'Diagram how an alert travels', 'docs/alerts.mmd'))
 scenes.markdown = (page) => stills(page, 'preview-markdown', (p) => preview(p, 'Document the units', 'README.md'))
 scenes.json = (page) => stills(page, 'preview-json', (p) => preview(p, 'Add tidal constants', 'data/constants.json'))
+scenes.notebook = (page) => stills(page, 'preview-notebook', (p) => preview(p, 'Look at a week of wind', 'notebooks/wind.ipynb'))
+scenes.html = (page) => stills(page, 'preview-html', (p) => preview(p, 'Add an about page', 'public/about.html'))
+scenes.geojson = (page) =>
+  stills(page, 'preview-geojson', async (p) => {
+    await preview(p, 'Export the stations as GeoJSON', 'data/stations.geojson')
+    // A feature picked from the list, so its properties show.
+    const pick = await p.$(byText('Gull Point', 'button'))
+    if (pick) await pick.click()
+    await park(p)
+  })
+
+/** Shows the graph as an experimental view, switched on for the scene. The next reset puts the
+ * timeline back. */
+async function experiment(p, view) {
+  await p.evaluate(async (v) => {
+    const A = window.go.app.App
+    const prefs = await A.Preferences()
+    await A.SetPreferences({ ...prefs, experimentalViews: ['horizontal', 'map'] })
+    await A.SetGraphView(v)
+  }, view)
+  await p.reload({ waitUntil: 'networkidle0' })
+  await overlay(p)
+  await sleep(2500)
+}
+
+scenes.horizontal = (page) =>
+  stills(page, 'view-horizontal', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await experiment(p, 'horizontal')
+    await park(p)
+  })
+
+scenes.map = (page) =>
+  stills(page, 'view-map', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await experiment(p, 'map')
+    await park(p)
+  })
 
 scenes.blame = (page) =>
   stills(page, 'blame', async (p) => {

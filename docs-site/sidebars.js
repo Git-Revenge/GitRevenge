@@ -34,6 +34,7 @@ const sidebars = {
       items: [
         { type: 'doc', id: 'guide/repositories', label: 'Repositories and tabs' },
         { type: 'doc', id: 'guide/graph', label: 'The commit graph' },
+        { type: 'doc', id: 'guide/experimental-views', label: 'Experimental views' },
         { type: 'doc', id: 'guide/changes', label: 'Changes and commits' },
         { type: 'doc', id: 'guide/ignoring', label: 'Ignoring files' },
         { type: 'doc', id: 'guide/branches', label: 'Branches, merges and rebases' },

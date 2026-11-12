@@ -26,6 +26,7 @@ After that, the guide covers each part of the app in turn:
 |---|---|
 | [Repositories and tabs](repositories.md) | Opening, cloning, tabs, groups, the dashboard and worktrees. |
 | [The commit graph](graph.md) | Reading the graph, moving around it, searching, and the sidebar. |
+| [Experimental views](experimental-views.md) | Horizontal, with time running across, and Map, a picture of every branch around the trunk. |
 | [Changes and commits](changes.md) | Staging, committing, stashing, and undo. |
 | [Ignoring files](ignoring.md) | Ignoring a file from its menu, and the Ignore rules tab. |
 | [Branches, merges and rebases](branches.md) | Previews, interactive rebase, and the conflict tool. |

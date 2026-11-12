@@ -10,6 +10,7 @@ Open **Settings** with <kbd>Ctrl</kbd>+<kbd>,</kbd> or from the command palette.
 | **Theme** | System, Light or Dark. Switching cross-fades the window. |
 | **Commit graph** | Timeline (a line for each day, and authors beside their commits) or Compact (one commit per line). |
 | **Zoom** | Scales the whole app, from 80% to 150%. |
+| **Experimental views** | A checkbox each for [Horizontal and Map](experimental-views.md). A view you switch on joins the graph's view menu, and nothing changes until you pick it there. Switching one off takes the graph back to Timeline or Compact. These can change or go away between versions. |
 | **Git executable** | Which `git` to use. Leave it empty to find it on your `PATH`. A change takes effect after a restart. |
 | **Clone into** | Where new clones go. Empty means the folder of the last repository you opened. |
 | **Updates** | Whether to check GitHub for a newer version at startup. This is the only request the app makes on its own. |

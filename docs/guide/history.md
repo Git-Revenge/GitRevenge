@@ -23,6 +23,11 @@ Some files read better rendered than as text. In the **File** layout, these get 
 | LaTeX (`.tex`, `.latex`) | typeset math |
 | Mermaid (`.mmd`, `.mermaid`) | the diagram |
 | PDF | the document |
+| AsciiDoc (`.adoc`, `.asciidoc`, `.asc`) and reStructuredText (`.rst`, `.rest`) | formatted text: titles, sections, lists, links, images, code blocks, quotes, admonitions and tables. Anything else stays as text, and an include names the file it would have brought in |
+| Jupyter notebooks (`.ipynb`) | the Markdown cells formatted, and each code cell with the outputs the notebook stored: text, images, errors and tables. Nothing runs |
+| HTML (`.html`, `.htm`, `.xhtml`) | the page, in a frame where no script, form or link works. Images from the repository show; anything it would fetch from the web shows as its alt text instead |
+| GeoJSON (`.geojson`) | its shapes, drawn over lines of latitude and longitude, with a list of features beside them. Click one for its properties. The wheel zooms and a drag pans. There's no map underneath, since that would mean fetching tiles from someone's server |
+| Audio and video (MP3, WAV, Ogg, Opus, FLAC, M4A, AAC, MP4, WebM, MOV and more) | a player, with the length, frame size and file size. It plays only when you press play, and whether a format plays depends on your system |
 
 ![A README shown rendered](../img/preview-markdown-light.webp#gh-light-mode-only)
 ![A README shown rendered](../img/preview-markdown-dark.webp#gh-dark-mode-only)
@@ -32,6 +37,14 @@ Some files read better rendered than as text. In the **File** layout, these get 
 ![A JSON file shown as a tree you can search](../img/preview-json-dark.webp#gh-dark-mode-only)
 ![A Mermaid diagram, drawn](../img/preview-mermaid-light.webp#gh-light-mode-only)
 ![A Mermaid diagram, drawn](../img/preview-mermaid-dark.webp#gh-dark-mode-only)
+![A Jupyter notebook, with its stored outputs](../img/preview-notebook-light.webp#gh-light-mode-only)
+![A Jupyter notebook, with its stored outputs](../img/preview-notebook-dark.webp#gh-dark-mode-only)
+![A GeoJSON file drawn as its shapes, with a feature's properties](../img/preview-geojson-light.webp#gh-light-mode-only)
+![A GeoJSON file drawn as its shapes, with a feature's properties](../img/preview-geojson-dark.webp#gh-dark-mode-only)
+![An HTML page in a sandboxed frame](../img/preview-html-light.webp#gh-light-mode-only)
+![An HTML page in a sandboxed frame](../img/preview-html-dark.webp#gh-dark-mode-only)
+
+Nothing a preview shows reaches the network. Audio and video of up to 32 MB open straight away, without the "Load anyway" step other large files ask for.
 
 ## File history and blame
 
@@ -77,7 +90,7 @@ A bisect lives in the repository, not the app: one started with `git bisect` in 
 
 ## Notes
 
-Git notes attach extra text to a commit without changing it. The details panel shows a selected commit's notes, and lets you add, edit or remove one.
+Git notes attach extra text to a commit without changing it. The details panel shows a selected commit's notes, and lets you add, edit or remove one. A note is shown as Markdown, the way a commit message is: issue numbers, SHAs and links in it are clickable, and a single line break stays a line break.
 
 In the graph, a commit with a note wears a folded-page mark. Hover over the mark to read the note, or click it to open the commit with its notes in view. Notes in every notes ref count. Type `has:note` in the graph's [search](graph.md#searching) to step through the commits that have one.
 
