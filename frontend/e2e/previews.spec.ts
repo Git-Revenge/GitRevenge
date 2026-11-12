@@ -250,3 +250,66 @@ test.describe('AsciiDoc and reStructuredText', () => {
     await expect(page.locator('.katex').first()).toBeVisible()
   })
 })
+
+// #161: GeoJSON draws as its shapes, with no map fetched from anywhere.
+test.describe('GeoJSON', () => {
+  const geo = JSON.stringify({
+    type: 'FeatureCollection',
+    features: [
+      { type: 'Feature', properties: { name: 'Common', fill: '#2a7f3f', acres: 50 }, geometry: { type: 'Polygon', coordinates: [[[-71.07, 42.35], [-71.06, 42.35], [-71.06, 42.36], [-71.07, 42.36], [-71.07, 42.35]]] } },
+      { type: 'Feature', properties: { name: 'Path' }, geometry: { type: 'LineString', coordinates: [[-71.075, 42.352], [-71.055, 42.358]] } },
+      { type: 'Feature', properties: { name: 'Fountain', 'marker-color': '#cc3300' }, geometry: { type: 'Point', coordinates: [-71.065, 42.355] } },
+    ],
+  })
+
+  test('draws every shape, counts them, and fetches nothing', async ({ page }) => {
+    const requests: string[] = []
+    page.on('request', (r) => {
+      if (!r.url().startsWith('http://localhost') && !r.url().startsWith('data:')) requests.push(r.url())
+    })
+    await open(page, 'markdownPreview', { responses: { File: { path: 'maps/park.geojson', text: geo } } })
+    await expect(page.locator('.geo .facts')).toContainText('3 features · 1 area · 1 line · 1 point')
+    await expect(page.locator('.geo .facts')).toContainText('No map underneath')
+    await expect(page.locator('path.area')).toHaveCount(1)
+    await expect(page.locator('path.line')).toHaveCount(1)
+    await expect(page.locator('circle')).toHaveCount(1)
+    // The file's own colours, when they're plain colours.
+    await expect(page.locator('path.area')).toHaveAttribute('fill', '#2a7f3f')
+    await expect(page.locator('circle')).toHaveAttribute('fill', '#cc3300')
+    // Lines of latitude and longitude, labelled.
+    await expect(page.locator('.grid text').first()).toHaveText(/°[NSEW]$/)
+    expect(requests).toEqual([])
+  })
+
+  test('the list picks a feature and shows its properties', async ({ page }) => {
+    await open(page, 'markdownPreview', { responses: { File: { path: 'maps/park.geojson', text: geo } } })
+    const list = page.getByRole('complementary', { name: 'Features' })
+    await expect(list.getByRole('button')).toHaveText(['Common', 'Path', 'Fountain'])
+    await list.getByRole('button', { name: 'Common' }).click()
+    const props = page.getByRole('group', { name: 'Properties of Common' })
+    await expect(props.locator('th')).toHaveText(['name', 'fill', 'acres'])
+    await expect(props.locator('td').last()).toHaveText('50')
+    await expect(page.locator('path.area')).toHaveAttribute('fill', 'var(--link)')
+  })
+
+  test('zooms with the buttons and the keyboard, and Fit goes back', async ({ page }) => {
+    await open(page, 'markdownPreview', { responses: { File: { path: 'maps/park.geojson', text: geo } } })
+    const map = page.getByRole('application')
+    await expect(map).toHaveAttribute('aria-roledescription', 'map')
+    const width = async () => Number((await map.getAttribute('viewBox'))!.split(' ')[2])
+    const start = await width()
+    await page.getByRole('button', { name: 'Zoom in' }).click()
+    expect(await width()).toBeLessThan(start)
+    await map.focus()
+    await page.keyboard.press('-')
+    await page.keyboard.press('-')
+    expect(await width()).toBeGreaterThan(start)
+    await page.getByRole('button', { name: 'Fit' }).click()
+    expect(await width()).toBeCloseTo(start, 3)
+  })
+
+  test('says so when the file isn’t GeoJSON', async ({ page }) => {
+    await open(page, 'markdownPreview', { responses: { File: { path: 'maps/bad.geojson', text: '{"features": []}' } } })
+    await expect(page.getByRole('alert')).toHaveText("This doesn't look like GeoJSON: it has no type.")
+  })
+})

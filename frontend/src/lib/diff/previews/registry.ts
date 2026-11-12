@@ -1,5 +1,6 @@
 import type { Component } from 'svelte'
 import CsvPreview from './CsvPreview.svelte'
+import GeoJsonPreview from './GeoJsonPreview.svelte'
 import HtmlPreview from './HtmlPreview.svelte'
 import MediaPreview from './MediaPreview.svelte'
 import { mediaOf } from './media'
@@ -44,6 +45,7 @@ export const PREVIEWERS: Previewer[] = [
   { id: 'asciidoc', matches: (p) => /\.(adoc|asciidoc|asc)$/i.test(p), component: MarkdownPreview },
   { id: 'rst', matches: (p) => /\.(rst|rest)$/i.test(p), component: MarkdownPreview },
   { id: 'csv', matches: (p) => /\.(csv|tsv|tab)$/i.test(p), component: CsvPreview },
+  { id: 'geojson', matches: (p) => /\.geojson$/i.test(p), component: GeoJsonPreview },
   { id: 'structured', matches: (p) => formatOf(p) !== null, component: TreePreview },
   { id: 'tex', matches: (p) => /\.(tex|latex)$/i.test(p), component: TexPreview },
   { id: 'mermaid', matches: (p) => /\.(mmd|mermaid)$/i.test(p), component: MermaidPreview },
