@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="generator" content="Docusaurus v3.10.2">
 <title data-rh="true">Installing | Git Revenge</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" name="twitter:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" property="og:url" content="https://gitrevenge.com/docs/guide/install"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Installing | Git Revenge"><meta data-rh="true" name="description" content="Git Revenge is free, and there&#x27;s nothing to sign up for. Download the Windows installer, the macOS disk image, or a Linux package from the latest release. Each is under 20 MB."><meta data-rh="true" property="og:description" content="Git Revenge is free, and there&#x27;s nothing to sign up for. Download the Windows installer, the macOS disk image, or a Linux package from the latest release. Each is under 20 MB."><link data-rh="true" rel="icon" href="/img/favicon.svg"><link data-rh="true" rel="canonical" href="https://gitrevenge.com/docs/guide/install"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/guide/install" hreflang="en"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/guide/install" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Installing","item":"https://gitrevenge.com/docs/guide/install"}]}</script><link rel="apple-touch-icon" href="/img/apple-touch-icon.png"><link rel="stylesheet" href="/assets/css/styles.1bf894f5.css">
-<script src="/assets/js/runtime~main.b737b4e2.js" defer="defer"></script>
-<script src="/assets/js/main.25c35d2d.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.9f5df2d3.js" defer="defer"></script>
+<script src="/assets/js/main.b5330270.js" defer="defer"></script>
 </head>
 <body>
 <svg style="display: none;"><defs>
@@ -84,7 +84,42 @@
 <li class=""><strong>macOS:</strong> <code>~/Library/Application Support/GitRevenge/settings.json</code></li>
 <li class=""><strong>Linux:</strong> <code>~/.config/GitRevenge/settings.json</code>, or under <code>$XDG_CONFIG_HOME</code> if you set it</li>
 </ul>
-<p>Backups of git config files you save in the <a class="" href="/docs/guide/git-config">Git Config tab</a> go in a <code>config-backups</code> folder beside it. A repository&#x27;s own settings, such as its branch kinds and smart links, are kept in its git config. Nothing about your repositories is stored anywhere else, and nothing is sent anywhere. If the file is ever damaged, the app moves it aside as <code>settings.json.corrupt-&lt;timestamp&gt;</code> and starts with defaults.</p></div><footer class="theme-doc-footer docusaurus-mt-lg"><div class="row margin-top--sm theme-doc-footer-edit-meta-row"><div class="col noPrint_WFHX"><a href="https://github.com/Git-Revenge/GitRevenge/edit/main/docs/guide/install.md" target="_blank" rel="noopener noreferrer" class="theme-edit-this-page"><svg fill="currentColor" height="20" width="20" viewBox="0 0 40 40" class="iconEdit_Z9Sw" aria-hidden="true"><g><path d="m34.5 11.7l-3 3.1-6.3-6.3 3.1-3q0.5-0.5 1.2-0.5t1.1 0.5l3.9 3.9q0.5 0.4 0.5 1.1t-0.5 1.2z m-29.5 17.1l18.4-18.5 6.3 6.3-18.4 18.4h-6.3v-6.2z"></path></g></svg>Edit this page</a></div><div class="col lastUpdated_JAkA"></div></div></footer></article><nav class="docusaurus-mt-lg pagination-nav" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/docs/guide"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">Introduction</div></a><a class="pagination-nav__link pagination-nav__link--next" href="/docs/guide/tour"><div class="pagination-nav__sublabel">Next</div><div class="pagination-nav__label">A tour of the window</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#what-you-need" class="table-of-contents__link toc-highlight">What you need</a></li><li><a href="#linux" class="table-of-contents__link toc-highlight">Linux</a><ul><li><a href="#rhel-10" class="table-of-contents__link toc-highlight">RHEL 10</a></li><li><a href="#if-live-refresh-is-off" class="table-of-contents__link toc-highlight">If live refresh is off</a></li><li><a href="#if-the-window-is-blank" class="table-of-contents__link toc-highlight">If the window is blank</a></li></ul></li><li><a href="#large-repositories" class="table-of-contents__link toc-highlight">Large repositories</a></li><li><a href="#where-your-data-lives" class="table-of-contents__link toc-highlight">Where your data lives</a></li></ul></div></div></div></div></main></div></div></div><footer class="theme-layout-footer footer footer--dark"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">
+<p>Backups of git config files you save in the <a class="" href="/docs/guide/git-config">Git Config tab</a> go in a <code>config-backups</code> folder beside it. A repository&#x27;s own settings, such as its branch kinds and smart links, are kept in its git config. Nothing about your repositories is stored anywhere else, and nothing is sent anywhere; see <a href="#what-leaves-your-machine" class="">what leaves your machine</a>. If the file is ever damaged, the app moves it aside as <code>settings.json.corrupt-&lt;timestamp&gt;</code> and starts with defaults.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="what-leaves-your-machine">What leaves your machine<a href="#what-leaves-your-machine" class="hash-link" aria-label="Direct link to What leaves your machine" title="Direct link to What leaves your machine" translate="no">​</a></h2>
+<p>Git Revenge is local-first. It makes one request of its own, and everything else that reaches the network is something you asked for.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>What</th><th>Where it goes</th><th>When</th></tr></thead><tbody><tr><td>The update check</td><td>GitHub&#x27;s releases API, for the latest version number</td><td>At startup, and when you choose <strong>Check for updates</strong>. Turn it off in <a class="" href="/docs/guide/settings">Settings</a>.</td></tr><tr><td>Fetch, pull, push and clone</td><td>Your remotes, through your own <code>git</code>, credential helpers and SSH agent</td><td>When you ask for one</td></tr><tr><td>A link</td><td>Your web browser</td><td>When you click a link, such as a <a class="" href="/docs/guide/settings#links">smart link</a> or one in a commit message. The app only builds the address</td></tr></tbody></table>
+<p>Everything else stays on your machine, including the parts that could easily have reached out:</p>
+<ul>
+<li class=""><strong>Rendered previews</strong> fetch nothing. A Markdown or notebook image from the web is shown as a link, an HTML page runs in a sandbox with no network, a GeoJSON file is drawn without map tiles, and audio, video and PDFs are read from the repository.</li>
+<li class=""><strong>The Map and Insights</strong> are worked out from the repository alone, with no hosting service&#x27;s API.</li>
+<li class=""><strong>No telemetry.</strong> The app keeps no usage statistics and sends no crash reports.</li>
+<li class=""><strong>The docs site</strong> loads its fonts from itself, not from a font service.</li>
+</ul></div><footer class="theme-doc-footer docusaurus-mt-lg"><div class="row margin-top--sm theme-doc-footer-edit-meta-row"><div class="col noPrint_WFHX"><a href="https://github.com/Git-Revenge/GitRevenge/edit/main/docs/guide/install.md" target="_blank" rel="noopener noreferrer" class="theme-edit-this-page"><svg fill="currentColor" height="20" width="20" viewBox="0 0 40 40" class="iconEdit_Z9Sw" aria-hidden="true"><g><path d="m34.5 11.7l-3 3.1-6.3-6.3 3.1-3q0.5-0.5 1.2-0.5t1.1 0.5l3.9 3.9q0.5 0.4 0.5 1.1t-0.5 1.2z m-29.5 17.1l18.4-18.5 6.3 6.3-18.4 18.4h-6.3v-6.2z"></path></g></svg>Edit this page</a></div><div class="col lastUpdated_JAkA"></div></div></footer></article><nav class="docusaurus-mt-lg pagination-nav" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/docs/guide"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">Introduction</div></a><a class="pagination-nav__link pagination-nav__link--next" href="/docs/guide/tour"><div class="pagination-nav__sublabel">Next</div><div class="pagination-nav__label">A tour of the window</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#what-you-need" class="table-of-contents__link toc-highlight">What you need</a></li><li><a href="#linux" class="table-of-contents__link toc-highlight">Linux</a><ul><li><a href="#rhel-10" class="table-of-contents__link toc-highlight">RHEL 10</a></li><li><a href="#if-live-refresh-is-off" class="table-of-contents__link toc-highlight">If live refresh is off</a></li><li><a href="#if-the-window-is-blank" class="table-of-contents__link toc-highlight">If the window is blank</a></li></ul></li><li><a href="#large-repositories" class="table-of-contents__link toc-highlight">Large repositories</a></li><li><a href="#where-your-data-lives" class="table-of-contents__link toc-highlight">Where your data lives</a></li><li><a href="#what-leaves-your-machine" class="table-of-contents__link toc-highlight">What leaves your machine</a></li></ul></div></div></div></div></main></div></div></div><footer class="theme-layout-footer footer footer--dark"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">
           <div class="footer-bar">
             <div class="footer-bar__brand">
               <svg viewBox="0 0 64 64" width="20" height="20" aria-hidden="true">
