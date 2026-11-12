@@ -110,6 +110,8 @@ export function GraphFocus(arg1:string):Promise<session.Focus>;
 
 export function GraphRows(arg1:string,arg2:number,arg3:number):Promise<app.GraphPage>;
 
+export function GraphViews():Promise<app.GraphViews>;
+
 export function GroupAction(arg1:string,arg2:Array<string>):Promise<void>;
 
 export function GroupBatch(arg1:string,arg2:string):Promise<Array<app.BatchResult>>;
@@ -291,6 +293,8 @@ export function SetGitConfigText(arg1:string,arg2:string):Promise<app.ConfigDoc>
 export function SetGraphDensity(arg1:string):Promise<void>;
 
 export function SetGraphFocus(arg1:string,arg2:string,arg3:boolean):Promise<void>;
+
+export function SetGraphView(arg1:string):Promise<void>;
 
 export function SetIgnoreTab(arg1:string):Promise<void>;
 

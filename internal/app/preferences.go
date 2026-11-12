@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
@@ -17,7 +18,9 @@ type Preferences struct {
 	Theme string `json:"theme"`
 	// GraphDensity is "compact" or "" for the timeline.
 	GraphDensity string `json:"graphDensity"`
-	UpdateChecks bool   `json:"updateChecks"`
+	// ExperimentalViews are the experimental graph views switched on.
+	ExperimentalViews []string `json:"experimentalViews"`
+	UpdateChecks      bool     `json:"updateChecks"`
 	// GitPath is a git executable to use instead of the one found automatically, or "".
 	// It takes effect the next time the app starts.
 	GitPath string `json:"gitPath"`
@@ -60,13 +63,14 @@ func (a *App) Preferences() (Preferences, error) {
 		zoom = 100
 	}
 	return Preferences{
-		Theme:        s.Theme,
-		GraphDensity: s.GraphDensity,
-		UpdateChecks: !s.UpdateChecksOff,
-		GitPath:      s.GitPath,
-		GitInUse:     a.Environment().GitPath,
-		CloneDir:     s.CloneDir,
-		Zoom:         zoom,
+		Theme:             s.Theme,
+		GraphDensity:      s.GraphDensity,
+		ExperimentalViews: enabledViews(s),
+		UpdateChecks:      !s.UpdateChecksOff,
+		GitPath:           s.GitPath,
+		GitInUse:          a.Environment().GitPath,
+		CloneDir:          s.CloneDir,
+		Zoom:              zoom,
 	}, nil
 }
 
@@ -81,6 +85,11 @@ func (a *App) SetPreferences(p Preferences) error {
 	case "", "compact":
 	default:
 		return userError("Unknown graph density " + p.GraphDensity + ".")
+	}
+	for _, v := range p.ExperimentalViews {
+		if !slices.Contains(experimentalViews, v) {
+			return userError("Unknown graph view " + v + ".")
+		}
 	}
 	if p.Zoom < minZoom || p.Zoom > maxZoom {
 		return userError("Zoom must be between 80% and 150%.")
@@ -115,6 +124,16 @@ func (a *App) SetPreferences(p Preferences) error {
 	return m.Settings().Update(func(s *settings.Settings) {
 		s.Theme = p.Theme
 		s.GraphDensity = p.GraphDensity
+		s.ExperimentalViews = nil
+		for _, v := range experimentalViews {
+			if slices.Contains(p.ExperimentalViews, v) {
+				s.ExperimentalViews = append(s.ExperimentalViews, v)
+			}
+		}
+		// A view switched off stops showing.
+		if !slices.Contains(s.ExperimentalViews, s.GraphView) {
+			s.GraphView = ""
+		}
 		s.UpdateChecksOff = !p.UpdateChecks
 		s.GitPath = p.GitPath
 		s.CloneDir = p.CloneDir

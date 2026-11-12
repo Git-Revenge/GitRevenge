@@ -62,6 +62,11 @@ type Settings struct {
 	// GraphDensity is "compact" for single-line graph rows, or empty for the default
 	// two-line timeline.
 	GraphDensity string `json:"graphDensity,omitempty"`
+	// GraphView is the experimental view the graph shows in place of its rows, or empty for
+	// the rows. It only shows while it's listed in ExperimentalViews.
+	GraphView string `json:"graphView,omitempty"`
+	// ExperimentalViews are the experimental graph views switched on in settings.
+	ExperimentalViews []string `json:"experimentalViews,omitempty"`
 	// UpdateChecksOff stops the check for a newer release at startup. A check the user
 	// asks for still runs.
 	UpdateChecksOff bool `json:"updateChecksOff,omitempty"`
@@ -165,6 +170,7 @@ func defaults() Settings {
 func (s Settings) clone() Settings {
 	s.Recent = slices.Clone(s.Recent)
 	s.OpenTabs = slices.Clone(s.OpenTabs)
+	s.ExperimentalViews = slices.Clone(s.ExperimentalViews)
 	groups := make([]Group, len(s.Groups))
 	for i, g := range s.Groups {
 		groups[i] = Group{Name: g.Name, Paths: slices.Clone(g.Paths)}

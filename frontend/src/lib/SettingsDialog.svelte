@@ -118,6 +118,7 @@
       // Apply what can change now; the git executable waits for a restart.
       theme.mode = p.theme as typeof theme.mode
       theme.density = p.graphDensity === 'compact' ? 'compact' : 'comfortable'
+      theme.experimental = p.experimentalViews ?? []
       update.checksOn = p.updateChecks
       prefs.zoom = p.zoom
       prefs.cloneDir = p.cloneDir

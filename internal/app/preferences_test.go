@@ -3,6 +3,7 @@ package app
 import (
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -21,13 +22,13 @@ func TestPreferencesRoundTrip(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	dir := t.TempDir()
-	want := Preferences{Theme: "dark", GraphDensity: "compact", UpdateChecks: false, GitPath: gitPath, CloneDir: dir, Zoom: 125}
+	want := Preferences{Theme: "dark", GraphDensity: "compact", ExperimentalViews: []string{}, UpdateChecks: false, GitPath: gitPath, CloneDir: dir, Zoom: 125}
 	if err := a.SetPreferences(want); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := a.Preferences()
 	got.GitInUse = ""
-	if got != want {
+	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("saved = %+v, want %+v", got, want)
 	}
 	if a.gitOverride() != gitPath {
@@ -46,6 +47,7 @@ func TestPreferencesValidation(t *testing.T) {
 		"relative dir":   {Zoom: 100, CloneDir: "repos"},
 		"missing dir":    {Zoom: 100, CloneDir: filepath.Join(t.TempDir(), "absent")},
 		"density":        {Zoom: 100, GraphDensity: "dense"},
+		"view":           {Zoom: 100, ExperimentalViews: []string{"sideways"}},
 		"not git at all": {Zoom: 100, GitPath: t.TempDir()},
 	}
 	for name, p := range bad {

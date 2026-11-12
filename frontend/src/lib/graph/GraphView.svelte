@@ -12,6 +12,8 @@
   import Icon from '../ui/Icon.svelte'
   import { DUR, easeInk, fadeUp, labelsFold, labelsUnfold, menuOut, reducedMotion, stagger } from '../ui/motion'
   import KindFilter from './KindFilter.svelte'
+  import ViewMenu from './ViewMenu.svelte'
+  import { menuViews } from './views'
   import RefChip from './RefChip.svelte'
   import { bisectRow, DAY_H, dayCountLabel, dayLineLabel, dayLineSpoken, drawDayLine, drawFoldLine, drawRow, FOLD_H, FOLLOWER_H, gapLabel, sameDay, sealOf, startsRun, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { branchMove, headAway, headLabel, isOwnMove, LANDING, moveAnnouncement, tipsOf, type Tips } from './follow'
@@ -1636,14 +1638,7 @@
     {/if}
     {#if kindRows.length}<KindFilter rows={kindRows} onToggle={setKindView} iconOnly={level >= SQUEEZE.network} />{/if}
     {#if level < SQUEEZE.density}
-    <span class="segmented" role="group" aria-label="Row density">
-      <button class="icon" aria-pressed={density !== 'compact'} aria-label="Timeline" title="Timeline: two lines per commit, with authors" onclick={() => density === 'compact' && session.run(() => colorTheme.toggleDensity())}
-        ><Icon name="timeline" size={14} /></button
-      >
-      <button class="icon" aria-pressed={density === 'compact'} aria-label="Compact" title="Compact: one line per commit" onclick={() => density !== 'compact' && session.run(() => colorTheme.toggleDensity())}
-        ><Icon name="rows" size={14} /></button
-      >
-    </span>
+    <ViewMenu views={menuViews(colorTheme.experimental)} current={colorTheme.view} iconOnly={level >= SQUEEZE.count} onPick={(v) => session.run(() => colorTheme.setView(v))} />
     {/if}
     {#if focus}
       <span class="focus" title="Only {focusLabel} and what it's built on are showing">
@@ -2026,8 +2021,7 @@
   }
 
   /* The search box is what gives up width: the buttons keep theirs. */
-  .status > :global(.btn),
-  .status > .segmented {
+  .status > :global(.btn) {
     flex: none;
     white-space: nowrap;
   }
