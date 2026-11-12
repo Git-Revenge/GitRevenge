@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bandOf, BRANCH_R, branchRadius, CROWD, KEY, keyShows, layout, nameWaits, restLength, ringsFor, scales, TAG_SIDE, tagSide, TRUNK_R, trunkRadius, type MapNode } from './mapLayout'
+import { bandOf, BRANCH_R, branchRadius, CROWD, DEFAULT_SCALE, KEY, keyShows, layout, nameWaits, restLength, ringsFor, scales, SCALES, TAG_SIDE, tagSide, TRUNK_R, trunkRadius, zoomBy, type MapNode } from './mapLayout'
 
 const DAY = 24 * 60 * 60
 const NOW = 1_794_480_000
@@ -39,6 +39,7 @@ describe('sizes', () => {
 
 describe('distance', () => {
   const rings = ringsFor(880, 580)
+  const [week, fortnight] = rings.marks
 
   it('sorts nodes into this week, the week before, and older', () => {
     expect(bandOf(NOW - 2 * DAY, NOW)).toBe(0)
@@ -47,28 +48,84 @@ describe('distance', () => {
     expect(bandOf(NOW - 40 * DAY, NOW)).toBe(2)
   })
 
-  it('draws the two-week ring to the top and bottom of the stage, and the week ring inside it', () => {
+  it('draws the outermost ring to the top and bottom of the stage, and the others inside it', () => {
     expect(rings.cx).toBe(440)
     expect(rings.cy).toBe(290)
-    expect(rings.fortnight).toBe(284)
-    expect(rings.week).toBeLessThan(rings.fortnight)
-    expect(rings.edge).toBeGreaterThan(rings.fortnight)
+    expect(rings.marks.map((m) => m.name)).toEqual(['this week', 'last week'])
+    expect(fortnight.r).toBe(284)
+    expect(week.r).toBeLessThan(fortnight.r)
+    expect(rings.edge).toBeGreaterThan(fortnight.r)
   })
 
   it('sits a node further out the longer it has been still, each inside its own ring', () => {
     const at = (days: number) => restLength(NOW - days * DAY, NOW, rings, 70, 9)
     expect(at(0)).toBeLessThan(at(3))
     expect(at(3)).toBeLessThan(at(6))
-    expect(at(6)).toBeLessThan(rings.week)
-    expect(at(8)).toBeGreaterThan(rings.week)
-    expect(at(13)).toBeLessThan(rings.fortnight)
-    expect(at(20)).toBeGreaterThan(rings.fortnight)
-    expect(at(20)).toBeLessThan(at(200))
+    expect(at(6)).toBeLessThan(week.r)
+    expect(at(8)).toBeGreaterThan(week.r)
+    expect(at(13)).toBeLessThan(fortnight.r)
+    expect(at(20)).toBeGreaterThan(fortnight.r)
+    expect(at(20)).toBeLessThan(at(100))
     expect(at(5000)).toBeLessThanOrEqual(rings.edge)
   })
 
   it('never puts a node inside the trunk', () => {
     expect(restLength(NOW, NOW, rings, 70, 30)).toBeGreaterThan(70 + 30)
+  })
+})
+
+describe('zoom', () => {
+  it('goes no closer than one week with a ring for each day', () => {
+    expect(zoomBy(0, -1)).toBe(0)
+    expect(SCALES[0].rings.map((r) => r.days)).toEqual([1, 2, 3, 4, 5, 6, 7])
+    expect(SCALES[0].rings[0].name).toBe('today')
+    expect(SCALES[0].rings[6].name).toBe('1 week')
+  })
+
+  it('opens on this week and last, and steps out to months and then years', () => {
+    expect(SCALES[DEFAULT_SCALE].rings.map((r) => r.name)).toEqual(['this week', 'last week'])
+    expect(zoomBy(DEFAULT_SCALE, 1)).toBe(DEFAULT_SCALE + 1)
+    expect(SCALES[2].rings.map((r) => r.name)).toContain('2 months')
+    expect(SCALES[SCALES.length - 1].rings.map((r) => r.name)).toContain('10 years')
+    expect(zoomBy(SCALES.length - 1, 1)).toBe(SCALES.length - 1)
+  })
+
+  it('reaches further back at each level out', () => {
+    const reach = SCALES.map((s) => s.rings[s.rings.length - 1].days)
+    for (let k = 1; k < reach.length; k++) expect(reach[k]).toBeGreaterThan(reach[k - 1])
+    for (const s of SCALES) for (let k = 1; k < s.rings.length; k++) expect(s.rings[k].days).toBeGreaterThan(s.rings[k - 1].days)
+  })
+
+  it('spaces a level’s rings evenly, the last at the stage’s top and bottom', () => {
+    const days = ringsFor(880, 580, SCALES[0])
+    expect(days.marks).toHaveLength(7)
+    expect(days.marks[6].r).toBe(284)
+    const gaps = days.marks.slice(1).map((m, k) => m.r - days.marks[k].r)
+    for (const g of gaps) expect(g).toBeCloseTo(gaps[0])
+  })
+
+  it('brings a month-old branch inside the rings once zoomed out to months', () => {
+    const old = NOW - 40 * DAY
+    expect(bandOf(old, NOW, SCALES[1])).toBe(2)
+    expect(bandOf(old, NOW, SCALES[2])).toBe(3)
+    const near = ringsFor(880, 580, SCALES[1])
+    const far = ringsFor(880, 580, SCALES[2])
+    expect(restLength(old, NOW, near, 70, 9)).toBeGreaterThan(near.marks[1].r)
+    expect(restLength(old, NOW, far, 70, 9)).toBeLessThan(far.marks[3].r)
+  })
+
+  it('lays the same nodes out differently at another zoom, and still clear of the trunk', () => {
+    const nodes = [node('a', { updated: NOW - DAY }), node('b', { updated: NOW - 3 * DAY }), node('c', { updated: NOW - 5 * DAY })]
+    const close = layout(trunk, nodes, 880, 580, NOW, SCALES[0])
+    const wide = layout(trunk, nodes, 880, 580, NOW, SCALES[3])
+    const far = (out: typeof close, name: string) => {
+      const n = out.nodes.find((x) => x.name === name)!
+      return Math.hypot(n.x - out.trunk.x, n.y - out.trunk.y)
+    }
+    // By day, five days is most of the way out; by month, all three huddle near the trunk.
+    expect(far(close, 'c')).toBeGreaterThan(far(wide, 'c'))
+    expect(far(close, 'a')).toBeLessThan(far(close, 'c'))
+    for (const n of wide.nodes) expect(Math.hypot(n.x - wide.trunk.x, n.y - wide.trunk.y)).toBeGreaterThan(wide.trunk.r + n.r)
   })
 })
 
