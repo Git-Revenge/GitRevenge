@@ -503,3 +503,51 @@ func TestTipKindsSurviveCheckpoints(t *testing.T) {
 		}
 	}
 }
+
+// Each lane says which commit started it: a tip nothing above points to, or a merge.
+func TestLaneStartNamesTheCommitThatStartedALane(t *testing.T) {
+	// 0 is a tip; 1 a second tip; 2 merges 4 into its line; 3 and 4 are older.
+	//   0 → 3, 1 → 3, 3 → 5 is skipped: keep it small.
+	g := build(t, [][]int{{2}, {2}, {3, 4}, {}, {}})
+	rows := g.Rows(0, 10)
+	// Row 0's lane starts at row 0, and is its own tip.
+	if row, tip, ok := g.LaneStart(rows[0].Color); !ok || row != 0 || !tip {
+		t.Fatalf("lane of row 0 starts at %d (tip %v, ok %v)", row, tip, ok)
+	}
+	// Row 1 is a second tip on its own lane.
+	if rows[1].Color == rows[0].Color {
+		t.Fatalf("two tips share colour %d", rows[0].Color)
+	}
+	if row, tip, ok := g.LaneStart(rows[1].Color); !ok || row != 1 || !tip {
+		t.Fatalf("lane of row 1 starts at %d (tip %v, ok %v)", row, tip, ok)
+	}
+	// Row 2 continues row 0's lane; its second parent, row 4, sits on a lane the merge opened.
+	if rows[2].Color != rows[0].Color || rows[3].Color != rows[0].Color {
+		t.Fatalf("first parents changed lane: colours %d %d %d", rows[0].Color, rows[2].Color, rows[3].Color)
+	}
+	if row, tip, ok := g.LaneStart(rows[4].Color); !ok || row != 2 || tip {
+		t.Fatalf("the merged lane starts at %d (tip %v, ok %v), want the merge at row 2, not a tip", row, tip, ok)
+	}
+	if _, _, ok := g.LaneStart(99); ok {
+		t.Fatal("a colour no lane has was found")
+	}
+	if g.ID(2) != fakeID(2) || g.ID(99) != "" {
+		t.Fatalf("ID(2) = %q, ID(99) = %q", g.ID(2), g.ID(99))
+	}
+}
+
+// The first Trunk's lane has colour 0 before any row exists; it starts at that Trunk's tip.
+func TestLaneStartOfThePinnedTrunk(t *testing.T) {
+	// 0 is a feature tip, 1 is main's tip (pinned), both on 2.
+	g := buildPinned(t, [][]int{{2}, {2}, {}}, 1)
+	rows := g.Rows(0, 10)
+	if rows[1].Color != 0 || rows[1].Col != 0 {
+		t.Fatalf("pinned tip: colour %d col %d", rows[1].Color, rows[1].Col)
+	}
+	if row, tip, ok := g.LaneStart(0); !ok || row != 1 || !tip {
+		t.Fatalf("trunk lane starts at %d (tip %v, ok %v), want row 1", row, tip, ok)
+	}
+	if row, tip, ok := g.LaneStart(rows[0].Color); !ok || row != 0 || !tip {
+		t.Fatalf("feature lane starts at %d (tip %v, ok %v)", row, tip, ok)
+	}
+}

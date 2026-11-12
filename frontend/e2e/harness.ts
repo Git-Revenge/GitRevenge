@@ -51,6 +51,17 @@ const behaviours: Record<string, (...args: never[]) => unknown> = {
     const total = scenario.graphData?.length ?? scenario.graphRows ?? 0
     return { rows: Array.from({ length: Math.max(0, Math.min(count, total - start)) }, (_, k) => scenario.graphData?.[start + k] ?? graphRow(start + k)), refs: scenario.graphRefs ?? {}, total, loading: false, paused: false, estimate: total }
   },
+  // A lane is started by the first commit that wears its colour; the refs on that commit name it.
+  LaneNames: (_path: string, colors: number[]) => {
+    if ('LaneNames' in responses) return responses.LaneNames
+    const total = scenario.graphData?.length ?? scenario.graphRows ?? 0
+    const rows = Array.from({ length: Math.min(total, 500) }, (_, k) => (scenario.graphData?.[k] ?? graphRow(k)) as { id: string; color: number })
+    return colors.map((color) => {
+      const row = rows.findIndex((r) => r.color === color)
+      const commit = row < 0 ? '' : rows[row].id
+      return { color, row, commit, refs: (scenario.graphRefs?.[commit] ?? []) as unknown[] }
+    })
+  },
   // The stub's commits are numbered, so a commit's row is its number, unless a test says otherwise.
   CommitRow: (_path: string, id: string) => {
     if ('CommitRow' in responses) return responses.CommitRow

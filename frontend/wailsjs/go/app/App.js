@@ -318,6 +318,10 @@ export function LFSLocks(arg1) {
   return window['go']['app']['App']['LFSLocks'](arg1);
 }
 
+export function LaneNames(arg1, arg2) {
+  return window['go']['app']['App']['LaneNames'](arg1, arg2);
+}
+
 export function LastCommitMessage(arg1) {
   return window['go']['app']['App']['LastCommitMessage'](arg1);
 }
