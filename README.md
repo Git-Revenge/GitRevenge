@@ -21,12 +21,12 @@ The user guide, with pictures and walkthroughs, is at [gitrevenge.com](https://g
 - **Digging through history.** An interactive rebase editor that shows the branch as it will be, a conflict tool built around the result, bisect, file history, blame, the reflog, and git notes. Signed commits get a badge showing whether the signature checks out.
 - **Git's own files.** Ignore a file from its menu, see which rule ignores any path, and edit every ignore file that applies. Edit git config with a line on what each setting does and a backup on every save.
 - **Smart links.** Ticket keys in commit messages, trailers and branch names become links to Jira, GitHub, GitLab, Linear, Azure Boards or anywhere else. The app only builds the link.
-- **Diffs and previews.** Unified or split diffs with syntax highlighting and image diffs. Files can also be shown rendered: Markdown, SVG, images, CSV tables, JSON/YAML/TOML trees, LaTeX math, Mermaid diagrams and PDFs.
+- **Diffs and previews.** Unified or split diffs with syntax highlighting and image diffs. Files can also be shown rendered: Markdown, AsciiDoc and reStructuredText, SVG, images, CSV tables, JSON/YAML/TOML trees, LaTeX math, Mermaid diagrams, PDFs, Jupyter notebooks with their stored outputs, HTML pages in a sandbox, GeoJSON shapes, and audio and video. None of it reaches the network.
 - **Remotes.** Fetch, pull and push through your existing credential helpers and SSH agent. If they can't answer, the app asks you.
 - **Lots of repos at once.** Repos open in tabs, worktrees are supported, and a group of local projects gets a dashboard with batch fetch and pull.
 - **LFS and submodules.** Track LFS patterns, see which files are in LFS, lock and unlock them. Initialize and update submodules.
 - **Insights for sprint reviews.** What shipped in a window, which branches are stuck or would conflict, and where the hotspots are, all computed from the repository alone and reproducible, with Markdown and CSV exports.
-- **Comfortable to live in.** Light and dark themes with subtle, reduced-motion-aware animation, a timeline graph with a compact mode, a settings panel, and a command palette (<kbd>Ctrl</kbd>+<kbd>K</kbd>). Common actions have shortcuts, which you can rebind; <kbd>Ctrl</kbd>+<kbd>/</kbd> lists them. On macOS, read <kbd>⌘</kbd> for <kbd>Ctrl</kbd>.
+- **Comfortable to live in.** Light and dark themes with subtle, reduced-motion-aware animation, a timeline graph with a compact mode and two experimental views (Horizontal, and a Map of every branch), a settings panel, and a command palette (<kbd>Ctrl</kbd>+<kbd>K</kbd>). Common actions have shortcuts, which you can rebind; <kbd>Ctrl</kbd>+<kbd>/</kbd> lists them. On macOS, read <kbd>⌘</kbd> for <kbd>Ctrl</kbd>.
 
 ## Privacy
 

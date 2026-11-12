@@ -205,6 +205,60 @@ EOF
 commit sam "Plot each station as a pin"
 printf 'body { margin: 0; font: 15px system-ui; }\n#map { position: relative; height: 100vh; background: #dfe9ee; }\n.pin { position: absolute; width: 12px; height: 12px; border-radius: 50%%; background: #cb0162; }\n' > public/style.css
 commit sam "Style the map and pins"
+cat > data/stations.geojson <<'EOF'
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "properties": { "id": "HBR", "name": "Harbour Light", "elevation_m": 12 }, "geometry": { "type": "Point", "coordinates": [-4.1423, 50.3712] } },
+    { "type": "Feature", "properties": { "id": "GUL", "name": "Gull Point", "elevation_m": 31 }, "geometry": { "type": "Point", "coordinates": [-4.2210, 50.3381] } },
+    { "type": "Feature", "properties": { "id": "SAL", "name": "Saltmarsh", "elevation_m": 4 }, "geometry": { "type": "Point", "coordinates": [-4.0875, 50.4020] } },
+    { "type": "Feature", "properties": { "id": "CRG", "name": "Craig Head", "elevation_m": 58 }, "geometry": { "type": "Point", "coordinates": [-4.1902, 50.3195] } },
+    { "type": "Feature", "properties": { "name": "Breakwater", "built": 1841 }, "geometry": { "type": "LineString", "coordinates": [[-4.1780, 50.3360], [-4.1650, 50.3330], [-4.1520, 50.3335]] } },
+    { "type": "Feature", "properties": { "name": "Sheltered anchorage", "depth_m": 9 }, "geometry": { "type": "Polygon", "coordinates": [[[-4.1700, 50.3480], [-4.1350, 50.3470], [-4.1300, 50.3620], [-4.1600, 50.3660], [-4.1700, 50.3480]]] } }
+  ]
+}
+EOF
+commit sam "Export the stations as GeoJSON" 1
+cat > public/about.html <<'EOF'
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>About Tidewater</title>
+<style>
+  body { margin: 0; font: 16px/1.55 Georgia, serif; color: #1d2a33; background: #f6f1e7; }
+  header { padding: 40px 48px 24px; background: #12395a; color: #f6f1e7; }
+  header h1 { margin: 0; font-size: 34px; letter-spacing: 0.02em; }
+  header p { margin: 6px 0 0; opacity: 0.8; }
+  main { max-width: 720px; padding: 24px 48px 48px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0 20px; font: 14px system-ui, sans-serif; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #d8cfbf; }
+  th { color: #12395a; }
+  .note { padding: 12px 16px; border-left: 4px solid #cb0162; background: #fff; font: 14px system-ui, sans-serif; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tidewater</h1>
+  <p>Live readings from the stations around the harbour.</p>
+</header>
+<main>
+  <h2>The stations</h2>
+  <p>Each station reports wind, temperature and pressure every ten minutes. The map pins are coloured by wind speed.</p>
+  <table>
+    <tr><th>Station</th><th>Since</th><th>Height</th></tr>
+    <tr><td>Harbour Light</td><td>1998</td><td>12 m</td></tr>
+    <tr><td>Gull Point</td><td>2004</td><td>31 m</td></tr>
+    <tr><td>Saltmarsh</td><td>2011</td><td>4 m</td></tr>
+    <tr><td>Craig Head</td><td>2016</td><td>58 m</td></tr>
+  </table>
+  <p class="note">Readings are provisional until the harbour authority checks them, usually within a day.</p>
+  <p><a href="index.html">Back to the map</a></p>
+</main>
+</body>
+</html>
+EOF
+commit sam "Add an about page" 1
 git checkout -q main
 cat >> src/server.js <<'EOF'
 
@@ -274,6 +328,72 @@ cat > data/constants.json <<'EOF'
 }
 EOF
 commit leo "Add tidal constants for Harbour Light"
+mkdir -p notebooks
+cat > notebooks/wind.ipynb <<'EOF'
+{
+ "nbformat": 4,
+ "nbformat_minor": 5,
+ "metadata": { "kernelspec": { "name": "python3", "display_name": "Python 3" }, "language_info": { "name": "python" } },
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "intro",
+   "metadata": {},
+   "source": ["# A week of wind\n", "\n", "Which station sets off the most alerts? Readings for **12 to 18 August**, from the feed's archive. The alert limit is $v > 60$ km/h."]
+  },
+  {
+   "cell_type": "code",
+   "id": "load",
+   "execution_count": 1,
+   "metadata": {},
+   "source": ["import pandas as pd\n", "\n", "week = pd.read_csv('../data/archive/2026-08-12.csv', parse_dates=['at'])\n", "print(f'{len(week):,} readings from {week.station.nunique()} stations')"],
+   "outputs": [{ "output_type": "stream", "name": "stdout", "text": ["4,032 readings from 4 stations\n"] }]
+  },
+  {
+   "cell_type": "code",
+   "id": "summary",
+   "execution_count": 2,
+   "metadata": {},
+   "source": ["week.groupby('station').wind.agg(['mean', 'max', lambda w: (w > 60).sum()])"],
+   "outputs": [
+    {
+     "output_type": "execute_result",
+     "execution_count": 2,
+     "metadata": {},
+     "data": {
+      "text/plain": ["         mean   max  alerts\n", "CRG      38.2  71.0      14\n", "GUL      31.7  64.5       5\n", "HBR      22.4  48.1       0\n", "SAL      18.9  41.3       0"],
+      "text/html": ["<table class=\"dataframe\"><thead><tr><th></th><th>mean</th><th>max</th><th>alerts</th></tr><tr><th>station</th><th></th><th></th><th></th></tr></thead><tbody><tr><th>CRG</th><td>38.2</td><td>71.0</td><td>14</td></tr><tr><th>GUL</th><td>31.7</td><td>64.5</td><td>5</td></tr><tr><th>HBR</th><td>22.4</td><td>48.1</td><td>0</td></tr><tr><th>SAL</th><td>18.9</td><td>41.3</td><td>0</td></tr></tbody></table>"]
+     }
+    }
+   ]
+  },
+  {
+   "cell_type": "code",
+   "id": "plot",
+   "execution_count": 3,
+   "metadata": {},
+   "source": ["ax = week.pivot_table('wind', 'at', 'station').resample('6h').max().plot(figsize=(6, 2.4))\n", "ax.axhline(60, ls='--')"],
+   "outputs": [
+    {
+     "output_type": "display_data",
+     "metadata": {},
+     "data": {
+      "text/plain": ["<Figure size 600x240 with 1 Axes>"],
+      "image/svg+xml": ["<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"600\" height=\"240\" viewBox=\"0 0 600 240\"><rect width=\"600\" height=\"240\" fill=\"#ffffff\"/><g stroke=\"#d0d7de\"><line x1=\"40\" y1=\"20\" x2=\"40\" y2=\"210\"/><line x1=\"40\" y1=\"210\" x2=\"590\" y2=\"210\"/></g><line x1=\"40\" y1=\"80\" x2=\"590\" y2=\"80\" stroke=\"#cb0162\" stroke-dasharray=\"6 4\"/><polyline fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" points=\"40,120 90,100 140,70 190,60 240,95 290,110 340,75 390,64 440,90 490,105 540,86 590,98\"/><polyline fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" points=\"40,140 90,128 140,96 190,78 240,120 290,132 340,100 390,92 440,118 490,126 540,110 590,121\"/><polyline fill=\"none\" stroke=\"#2ca02c\" stroke-width=\"2\" points=\"40,170 90,160 140,150 190,140 240,158 290,165 340,148 390,142 440,156 490,162 540,151 590,160\"/><polyline fill=\"none\" stroke=\"#9467bd\" stroke-width=\"2\" points=\"40,185 90,180 140,170 190,162 240,178 290,183 340,170 390,166 440,176 490,181 540,172 590,178\"/><g font-family=\"sans-serif\" font-size=\"11\" fill=\"#57606a\"><text x=\"8\" y=\"84\">60</text><text x=\"40\" y=\"228\">12 Aug</text><text x=\"540\" y=\"228\">18 Aug</text></g></svg>"]
+     }
+    }
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "findings",
+   "metadata": {},
+   "source": ["Craig Head is the windiest by far. It's also the highest, at 58 m, so the limit there may want to be higher."]
+  }
+ ]
+}
+EOF
+commit leo "Look at a week of wind in a notebook" 2
 sed -i.bak 's/"version": "0.1.0"/"version": "0.2.0"/' package.json && rm package.json.bak
 commit maya "Release 0.2.0"
 tag v0.2.0 "Tidewater 0.2.0: the station map and wind alerts"
