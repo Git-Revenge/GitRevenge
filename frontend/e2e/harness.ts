@@ -179,7 +179,8 @@ const mounts = {
     const { default: GraphView } = await import('../src/lib/graph/GraphView.svelte')
     // A test about the saved view has the app read it first, as the app does when it starts.
     if (scenario.responses?.GraphViews) await (await import('../src/lib/theme.svelte')).theme.load()
-    mount(GraphView, { target: host, props: { path: '/repo', onSelect: record('select'), onNote: (row: { index: number }) => win.__events.push(['note', row.index]), onContext: (row: { index: number }) => win.__events.push(['context-row', row.index]), onDrop: record('drop') } })
+    const wip = scenario.wip ? { changes: scenario.wip.changes, active: false, open: record('wip') } : undefined
+    mount(GraphView, { target: host, props: { path: '/repo', wip, onSelect: record('select'), onNote: (row: { index: number }) => win.__events.push(['note', row.index]), onContext: (row: { index: number }) => win.__events.push(['context-row', row.index]), onDrop: record('drop') } })
   },
   async commitMenu() {
     const { default: ContextMenu } = await import('../src/lib/ContextMenu.svelte')

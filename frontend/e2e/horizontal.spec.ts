@@ -136,6 +136,37 @@ test.describe('the Horizontal view', () => {
     await expect(names).toContainText('more above')
   })
 
+  // #660: the working tree is the leftmost column.
+  test('puts the working tree before the newest commit, and a click opens it', async ({ page }) => {
+    await open(page, 'graph', { ...scenario({ view: 'horizontal', experimental: ['horizontal'] }), wip: { changes: 3 } })
+    const wip = page.getByRole('option', { name: '3 files changed. The working tree.' })
+    await expect(wip).toBeVisible()
+    const first = (await commit(page, 0).boundingBox())!
+    const box = (await wip.boundingBox())!
+    expect(box.x + box.width).toBeLessThanOrEqual(first.x + 1)
+    await wip.click({ position: { x: 20, y: 300 } })
+    expect(await events(page, 'wip')).toHaveLength(1)
+    // A commit is still one click away, in its own column.
+    await commit(page, 2).click({ position: { x: 20, y: 300 } })
+    await expect(commit(page, 2)).toHaveAttribute('aria-selected', 'true')
+    // Choosing a commit near the start doesn't push the working tree out of view.
+    await expect(wip).toBeInViewport()
+  })
+
+  test('Left from the newest commit goes to the working tree, and says a clean tree is clean', async ({ page }) => {
+    await open(page, 'graph', { ...scenario({ view: 'horizontal', experimental: ['horizontal'] }), wip: { changes: 0 } })
+    await expect(page.getByRole('option', { name: 'Working tree, clean. The working tree.' })).toBeVisible()
+    await commit(page, 0).click({ position: { x: 20, y: 300 } })
+    await page.keyboard.press('ArrowLeft')
+    expect(await events(page, 'wip')).toHaveLength(1)
+  })
+
+  test('has no working tree column when the caller gives none', async ({ page }) => {
+    await open(page, 'graph', scenario({ view: 'horizontal', experimental: ['horizontal'] }))
+    await expect(page.getByRole('option', { name: /The working tree\.$/ })).toHaveCount(0)
+    expect((await commit(page, 0).boundingBox())!.x).toBeLessThan(200)
+  })
+
   // #663: the scrollbar is marked as the timeline's ruler is.
   test('marks the scrollbar where the checked-out commit, a tag and a note are', async ({ page }) => {
     const marks = { loaded: 120, months: [{ row: 0, time: noon }, { row: 60, time: noon - 10 * DAY }], tips: [0], tags: [4, 90], notes: [30] }

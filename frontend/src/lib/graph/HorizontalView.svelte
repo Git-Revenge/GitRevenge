@@ -52,6 +52,7 @@
     remote,
     dimmed,
     ruler,
+    wip,
     onSelect,
     onContext,
   }: {
@@ -71,9 +72,17 @@
     dimmed?: (i: number) => boolean
     /** What the timeline's ruler marks, by row: the scrollbar here carries the same. */
     ruler?: () => { loaded: number; months: MonthMark[]; tips: number[]; tags: number[]; notes: number[]; matches: number[] }
+    /** The working tree, which takes the leftmost column, before the newest commit: how many
+     * files have changed (null until known), whether its panel is the one showing, and how
+     * to show it. Without it the first column is the newest commit. */
+    wip?: { changes: number | null; active: boolean; open: () => void }
     onSelect: (i: number) => void
     onContext?: (row: Row, refs: Ref[], x: number, y: number) => void
   } = $props()
+
+  /** The working tree's column, when there is one: every commit sits that much further right. */
+  let lead = $derived(wip ? 1 : 0)
+  let pad = $derived(lead * COL)
 
   const id = `graph-across-${Math.random().toString(36).slice(2, 8)}`
   let field = $state<HTMLDivElement>()
@@ -87,7 +96,7 @@
   let laneScroll = $state(0)
   let namesW = $derived(namesWidth(bodyW))
 
-  let range = $derived(visibleRange(offset, width, count))
+  let range = $derived(visibleRange(offset - pad, width, count))
   /** The commits to draw, with what the drawing needs of each. */
   let cols = $derived.by(() => {
     void tick
@@ -151,7 +160,7 @@
     lanesAtEdge(
       cols
         // A column half off the left edge still counts as the edge.
-        .filter((c) => c.i >= Math.floor(offset / COL))
+        .filter((c) => c.i >= Math.floor((offset - pad) / COL))
         .map((c) => c.row),
     ),
   )
@@ -229,11 +238,12 @@
       following = true
     }
     if (!following) return
+    // In columns, so the newest commit brings the working tree's column into view with it.
     const next = offsetToShow(
       untrack(() => offset),
       width,
-      selected,
-      count,
+      selected + lead,
+      count + lead,
     )
     if (next !== untrack(() => offset)) offset = next
     // Its lane comes into view too, when the lanes scroll.
@@ -250,7 +260,7 @@
   })
   // A history that got shorter, or a narrower view, can leave the offset past the end.
   $effect(() => {
-    const next = clampOffset(offset, width, count)
+    const next = clampOffset(offset, width, count + lead)
     if (width && next !== offset) offset = next
   })
   $effect(() => {
@@ -274,7 +284,7 @@
     if (!d) return
     e.preventDefault()
     following = false
-    offset = clampOffset(offset + lines(e, d), width, count)
+    offset = clampOffset(offset + lines(e, d), width, count + lead)
   }
 
   function onKey(e: KeyboardEvent) {
@@ -284,15 +294,39 @@
     const moves: Record<string, number> = { ArrowRight: at + 1, ArrowLeft: at - 1, PageDown: at + page, PageUp: at - page, Home: 0, End: count - 1 }
     if (!(e.key in moves) || !count) return
     e.preventDefault()
+    // Left of the newest commit is the working tree; from there, Right comes back.
+    if (wip && e.key === 'ArrowLeft' && selected <= 0 && !wip.active) {
+      offset = 0
+      wip.open()
+      return
+    }
+    if (wip?.active && e.key === 'ArrowRight') return onSelect(at)
     onSelect(Math.min(count - 1, Math.max(0, moves[e.key])))
   }
 
-  const columnAt = (e: MouseEvent) => (field ? colAt(e.clientX - field.getBoundingClientRect().left, offset, count) : -1)
+  /** The column under the pointer: a commit's row, -1 for none, or 'wip' for the working tree. */
+  function columnAt(e: MouseEvent): number | 'wip' {
+    if (!field) return -1
+    const k = colAt(e.clientX - field.getBoundingClientRect().left, offset, count + lead)
+    return k < 0 ? -1 : k < lead ? 'wip' : k - lead
+  }
+
+  /** The lane the working tree sits on: the checked-out commit's, when that's in view. */
+  let wipLane = $derived.by(() => {
+    void tick
+    const at = headRow()
+    return (at >= 0 ? cache.get(at)?.col : undefined) ?? 0
+  })
+  let wipJoins = $derived.by(() => {
+    void tick
+    return headRow() === 0
+  })
+  let wipText = $derived(!wip ? '' : wip.changes ? `${wip.changes} ${wip.changes === 1 ? 'file' : 'files'} changed` : wip.changes === 0 ? 'Working tree, clean' : 'Working tree')
 
   // The scrollbar: a thumb to drag, and a press anywhere on the track goes there.
   let track = $state<HTMLDivElement>()
   let trackW = $state(0)
-  let thumb = $derived(thumbFor(offset, width, count, trackW))
+  let thumb = $derived(thumbFor(offset, width, count + lead, trackW))
   let drag: { grab: number } | null = null
   // The scrollbar is a ruler, as the timeline's is: its length stands for the whole history,
   // and ticks along it show where things are among the commits read so far.
@@ -315,7 +349,7 @@
   function barTo(clientX: number) {
     if (!track || !drag) return
     following = false
-    offset = offsetForThumb(clientX - track.getBoundingClientRect().left - drag.grab, width, count, trackW)
+    offset = offsetForThumb(clientX - track.getBoundingClientRect().left - drag.grab, width, count + lead, trackW)
   }
   function barDown(e: PointerEvent) {
     if (e.button !== 0 || !track) return
@@ -374,14 +408,16 @@
       role="listbox"
       aria-orientation="horizontal"
       aria-label="Commit history, newest first"
-      aria-activedescendant={selected >= range.first && selected < range.last ? `${id}-${selected}` : undefined}
+      aria-activedescendant={wip?.active ? `${id}-wip` : selected >= range.first && selected < range.last ? `${id}-${selected}` : undefined}
       onkeydown={onKey}
       onclick={(e) => {
         const i = columnAt(e)
-        if (i >= 0) onSelect(i)
+        if (i === 'wip') wip?.open()
+        else if (i >= 0) onSelect(i)
       }}
       oncontextmenu={(e) => {
         const i = columnAt(e)
+        if (i === 'wip') return
         const row = i >= 0 ? cache.get(i) : undefined
         if (!row || !onContext) return
         e.preventDefault()
@@ -391,7 +427,7 @@
     >
       <div class="days" style:height="{DAY_BAND}px">
         {#each days as d (d.start)}
-          {@const left = d.start * COL - offset}
+          {@const left = pad + d.start * COL - offset}
           {@const w = (d.end - d.start) * COL}
           {@const seen = Math.max(0, w + Math.min(0, left))}
           {@const says = dayBandText(d.label, d.count, d.time, seen)}
@@ -404,8 +440,14 @@
       <div class="track" style:top="{DAY_BAND}px" style:transform="translateX({-offset}px)">
         <!-- A faint line where each day ends and the one before it begins. -->
         {#each days as d (d.start)}
-          {#if d.start > 0}<span class="daycut" style:left="{d.start * COL}px"></span>{/if}
+          {#if d.start > 0}<span class="daycut" style:left="{pad + d.start * COL}px"></span>{/if}
         {/each}
+        {#if wip}
+          <!-- What isn't a commit yet: always the first column, before the newest commit. -->
+          <div class="col wip" class:selected={wip.active} id="{id}-wip" role="option" aria-selected={wip.active} aria-label="{wipText}. The working tree." style:left="0" style:width="{COL}px">
+            <span class="subject" style:top="{words - 22}px" style:max-width="{subjectMax}px" style:transform="rotate(-{LEAN}deg)">{wipText}</span>
+          </div>
+        {/if}
         {#each cols as c (c.i)}
           {@const names = c.refs.length ? refLabels(c.refs, mainRemote) : []}
           <div
@@ -417,7 +459,7 @@
             role="option"
             aria-selected={c.i === selected}
             aria-label={c.row ? `${c.row.subject}, ${c.row.author}, ${formatTime(c.row.authorTime)}${names.length ? `, ${names.map((l) => l.text).join(', ')}` : ''}` : 'Loading'}
-            style:left="{c.i * COL}px"
+            style:left="{pad + c.i * COL}px"
             style:width="{COL}px"
           >
             {#if c.row}
@@ -426,7 +468,7 @@
           </div>
         {/each}
         {#each marks as m (m.i)}
-          <span class="mark" class:bare={m.room < CHIP_MIN} style:left="{m.i * COL + 3}px" style:top="{words}px" style:height="{TAGS_H}px" style:max-width="{Math.max(COL - 6, m.room)}px" title={m.labels.map((l) => l.text).join(', ')}>
+          <span class="mark" class:bare={m.room < CHIP_MIN} style:left="{pad + m.i * COL + 3}px" style:top="{words}px" style:height="{TAGS_H}px" style:max-width="{Math.max(COL - 6, m.room)}px" title={m.labels.map((l) => l.text).join(', ')}>
             {#if m.room < CHIP_MIN}
               <i class:diamond={m.labels[0].ref.kind === 'tag'} style:--lane={laneVar(m.color)}></i>
             {:else}
@@ -438,7 +480,12 @@
       <!-- The lanes scroll both ways, inside their own window: sideways with the commits, and
            up and down when there are more than fit. -->
       <div class="lanebox" style:top="{DAY_BAND + words + TAGS_H}px">
-        <svg class="lanes" aria-hidden="true" style:transform="translate({range.first * COL - offset}px, {-laneScroll}px)" width={cols.length * COL} height={extent}>
+        {#if wip}
+          <!-- The working tree's node: dashed, as in the timeline, and joined to the checked-out
+               commit when that's the newest. -->
+          <span class="wip-node" class:dirty={!!wip.changes} class:joined={wipJoins} style:--lane={laneVar(0)} style:transform="translate({COL / 2 - offset}px, {laneY(wipLane, pitch) - laneScroll}px)"></span>
+        {/if}
+        <svg class="lanes" aria-hidden="true" style:transform="translate({pad + range.first * COL - offset}px, {-laneScroll}px)" width={cols.length * COL} height={extent}>
           {#each cols as c (c.i)}
             {#if c.row}
               {@const cx = sx(c.i)}
@@ -772,6 +819,36 @@
   .selected .subject {
     color: var(--ink);
     font-weight: 500;
+  }
+
+  .col.wip .subject {
+    font-style: italic;
+  }
+
+  /* A dashed ring on the checked-out lane; filled a little when there's something to commit. */
+  .wip-node {
+    position: absolute;
+    left: -9px;
+    top: -9px;
+    width: 18px;
+    height: 18px;
+    box-sizing: border-box;
+    border: 1.5px dashed var(--lane);
+    border-radius: 50%;
+    background: var(--paper);
+  }
+
+  .wip-node.dirty {
+    background: color-mix(in srgb, var(--lane) 22%, var(--paper));
+  }
+
+  .wip-node.joined::after {
+    content: '';
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    width: 16px;
+    border-top: 1.5px dashed var(--lane);
   }
 
   .col.dimmed .subject,

@@ -69,6 +69,14 @@
   let view = $state<'wip' | 'commit'>('commit')
   /** Files with uncommitted changes; null until the first answer, so nothing claims "clean". */
   let changes = $state<number | null>(null)
+
+  /** Shows the working tree's panel: from its row in the graph, or its column in a view that
+   * runs across. */
+  function openWip() {
+    view = 'wip'
+    right.hidden = false
+    if (diff?.mode === 'commit') diff = null
+  }
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
   /** Where the graph's columns are, so the row of changes above it lines up with them. */
 
@@ -276,7 +284,7 @@
     <!-- The graph stays mounted while a diff is open, so scroll position and selection
          survive returning to it. -->
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           openMenu(commitMenuItems(row, refs, ctx), x, y)}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
@@ -294,11 +302,7 @@
             class:active={view === 'wip'}
             aria-pressed={view === 'wip'}
             style:padding-left="{at.textX}px"
-            onclick={() => {
-              view = 'wip'
-              right.hidden = false
-              if (diff?.mode === 'commit') diff = null
-            }}
+            onclick={openWip}
           >
             <span class="dot" class:dirty={!!changes} style:left="{at.nodeX - 8}px">{#if changes && changes > 0}<span class="ring"></span>{:else if changes !== null}<Icon name="check" />{/if}</span>
             <span class="wip-title">{changes ? `${changes} ${changes === 1 ? 'file' : 'files'} changed` : 'Working tree'}</span>

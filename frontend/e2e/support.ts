@@ -25,6 +25,8 @@ export interface Scenario {
   /** Which preview the preview dialog shows; a merge unless said. */
   previewKind?: 'merge' | 'rebase'
   theme?: 'light' | 'dark'
+  /** Gives the graph a working tree to show, with this many changed files. */
+  wip?: { changes: number | null }
   /** Mounts the toolbar under the error banner, for the commands its actions run. */
   toolbar?: boolean
 }
