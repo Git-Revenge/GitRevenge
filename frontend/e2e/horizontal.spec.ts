@@ -149,6 +149,8 @@ test.describe('the Horizontal view', () => {
     // A commit is still one click away, in its own column.
     await commit(page, 2).click({ position: { x: 20, y: 300 } })
     await expect(commit(page, 2)).toHaveAttribute('aria-selected', 'true')
+    // Choosing a commit near the start doesn't push the working tree out of view.
+    await expect(wip).toBeInViewport()
   })
 
   test('Left from the newest commit goes to the working tree, and says a clean tree is clean', async ({ page }) => {

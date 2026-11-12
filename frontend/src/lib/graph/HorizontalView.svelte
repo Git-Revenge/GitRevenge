@@ -238,8 +238,13 @@
       following = true
     }
     if (!following) return
-    // The newest commit brings the working tree's column back with it.
-    const next = selected === 0 ? 0 : pad + offsetToShow(untrack(() => offset) - pad, width, selected, count)
+    // In columns, so the newest commit brings the working tree's column into view with it.
+    const next = offsetToShow(
+      untrack(() => offset),
+      width,
+      selected + lead,
+      count + lead,
+    )
     if (next !== untrack(() => offset)) offset = next
     // Its lane comes into view too, when the lanes scroll.
     const lane = chosen?.col
