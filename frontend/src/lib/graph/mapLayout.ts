@@ -151,6 +151,19 @@ export function nameWidth(name: string): number {
 const NAME_H = 46
 export const KEY = { width: 200, height: 124 }
 export const ZOOM = { width: 210, height: 52 }
+/** The All / Local / Remote switch in the stage's top left corner. */
+export const SWITCH = { width: 196, height: 44 }
+
+/** What the stage's controls take up, as centre and half-size: the switch in the top left, the
+ * key in the bottom left and the zoom in the bottom right. None show on a stage too small. */
+export function controlBoxes(width: number, height: number): { x: number; y: number; hw: number; hh: number }[] {
+  if (!keyShows(width, height)) return []
+  return [
+    { x: SWITCH.width / 2, y: SWITCH.height / 2, hw: SWITCH.width / 2, hh: SWITCH.height / 2 },
+    { x: KEY.width / 2, y: height - KEY.height / 2, hw: KEY.width / 2, hh: KEY.height / 2 },
+    { x: width - ZOOM.width / 2, y: height - ZOOM.height / 2, hw: ZOOM.width / 2, hh: ZOOM.height / 2 },
+  ]
+}
 /** Whether the stage has room for the key and the rings' names beside the nodes. */
 export function keyShows(width: number, height: number): boolean {
   return width >= 560 && height >= 420
@@ -306,7 +319,10 @@ export function layout(
 
   const keepOn = (p: Placed) => {
     if (p.pinned) return
-    p.x = Math.min(width - p.r - 56, Math.max(p.r + 56, p.x))
+    // The name is centred on the node, so a long one needs more room from the sides than the
+    // node does, or it runs off the stage.
+    const side = Math.min(width / 2, Math.max(p.r + 56, boxOf(p).hw + 4))
+    p.x = Math.min(width - side, Math.max(side, p.x))
     // Room for the name on either side: it goes whichever way is away from the trunk.
     p.y = Math.min(height - p.r - NAME_H, Math.max(p.r + NAME_H, p.y))
     // The key sits in the bottom left corner: a node keeps itself and its name off it.
@@ -315,6 +331,13 @@ export function layout(
     if (box.y + box.hh > height - KEY.height && p.x < KEY.width + box.hw) p.x = KEY.width + box.hw
     // And the zoom control in the bottom right.
     if (box.y + box.hh > height - ZOOM.height && p.x > width - ZOOM.width - box.hw) p.x = width - ZOOM.width - box.hw
+    // And the switch in the top left: whichever way out is shorter, right or down.
+    if (box.y - box.hh < SWITCH.height && p.x < SWITCH.width + box.hw) {
+      const right = SWITCH.width + box.hw - p.x
+      const down = SWITCH.height - (box.y - box.hh)
+      if (right < down) p.x += right
+      else p.y += down
+    }
   }
   // A node takes up its shape and the name beside it: a box as wide as the name, reaching out
   // on the side the name is on. In a crowd there isn't room to keep every name clear: only the
@@ -394,18 +417,21 @@ export function layout(
   // another node, is left out: it shows when the node is pointed at or has the focus.
   type Box = { x: number; y: number; hw: number; hh: number; of?: Placed }
   const hit = (a: Box, b: Box) => Math.abs(a.x - b.x) < a.hw + b.hw && Math.abs(a.y - b.y) < a.hh + b.hh
-  const taken: Box[] = [{ x: hub.x, y: hub.y, hw: hub.r, hh: hub.r }, ...placed.map((p) => ({ x: p.x, y: p.y, hw: p.r, hh: p.r, of: p }))]
+  const controls = controlBoxes(width, height)
+  const taken: Box[] = [{ x: hub.x, y: hub.y, hw: hub.r, hh: hub.r }, ...controls, ...placed.map((p) => ({ x: p.x, y: p.y, hw: p.r, hh: p.r, of: p }))]
+  const onStage = (b: Box) => b.x - b.hw >= 0 && b.x + b.hw <= width && b.y - b.hh >= 0 && b.y + b.hh <= height
   const rank = (p: Placed) => (p.head ? 0 : p.pinned ? 1 : p.kind === 'branch' ? 2 : p.kind === 'group' ? 3 : p.kind === 'remote' ? 4 : 5)
   const wanting = [...placed].sort((a, b) => rank(a) - rank(b) || b.commits - a.commits || b.updated - a.updated || a.name.localeCompare(b.name))
   for (const p of wanting) {
     const off = p.r + 4 + NAME_H / 2
     const label: Box = { x: p.x, y: p.above ? p.y - off : p.y + off, hw: nameWidth(p.name) / 2, hh: NAME_H / 2 - 2 }
     // The checked-out branch is always named: it's where you are.
-    if (!p.head && taken.some((t) => t.of !== p && hit(label, t))) continue
+    // Nor is a name that would run off the stage, or under one of its controls.
+    if (!p.head && (!onStage(label) || taken.some((t) => t.of !== p && hit(label, t)))) continue
     p.named = true
     taken.push(label)
   }
-  return { trunk: hub, nodes: placed, rings, nameAngle: ringNameAngle(rings, placed.map(boxOf), width, height), older }
+  return { trunk: hub, nodes: placed, rings, nameAngle: ringNameAngle(rings, [...placed.map(boxOf), ...controls], width, height), older }
 }
 
 /** The directions the rings' names can run out along, in degrees from "right", clockwise:

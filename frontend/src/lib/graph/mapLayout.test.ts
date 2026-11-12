@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bandOf, BRANCH_R, branchRadius, DEFAULT_SCALE, KEY, keyShows, ZOOM, fittingScale, GROUP_D, groupSize, layout, pinKey, showingNodes, widestScale, restLength, ringNameAngle, ringsFor, scales, SCALES, TAG_SIDE, tagSide, TRUNK_R, trunkRadius, WIP_R, wipPlace, zoomBy, type MapNode } from './mapLayout'
+import { bandOf, BRANCH_R, branchRadius, DEFAULT_SCALE, controlBoxes, KEY, keyShows, nameWidth, ZOOM, fittingScale, GROUP_D, groupSize, layout, pinKey, showingNodes, widestScale, restLength, ringNameAngle, ringsFor, scales, SCALES, TAG_SIDE, tagSide, TRUNK_R, trunkRadius, WIP_R, wipPlace, zoomBy, type MapNode } from './mapLayout'
 
 const DAY = 24 * 60 * 60
 const NOW = 1_794_480_000
@@ -436,5 +436,59 @@ describe('groups', () => {
     expect(names('local')).toEqual(['mine', 'here', 'v1'])
     // The checked-out branch always shows, so there's always somewhere you are.
     expect(names('remote')).toEqual(['here', 'origin/x', 'origin/feature/', 'v1'])
+  })
+})
+
+describe('a narrow stage', () => {
+  // The docs' demo repository with the panel on the right open: the stage is about 580 px wide,
+  // and the switch, the key and the zoom all show.
+  const W = 580
+  const H = 690
+  const nodes = [
+    node('hotfix/gauge-offset', { commits: 0, updated: NOW - 120 * DAY }),
+    node('release/v0.1', { commits: 0, updated: NOW - 140 * DAY }),
+    node('v0.2.0', { kind: 'tag', commits: 15, updated: NOW - 110 * DAY }),
+    node('feature/offline-cache', { commits: 5, updated: NOW - 100 * DAY }),
+    node('v0.1.0', { kind: 'tag', commits: 5, updated: NOW - 150 * DAY }),
+    node('fix/tide-rounding', { commits: 0, updated: NOW - 90 * DAY }),
+    node('release/v0.2', { commits: 0, updated: NOW - 105 * DAY }),
+    node('feature/metric-units', { commits: 2, updated: NOW - 95 * DAY }),
+    node('dependabot/npm_and_yarn/vite-7.1', { kind: 'remote', commits: 1, updated: NOW - 96 * DAY }),
+  ]
+  const sixMonths = SCALES.find((s) => s.name === 'Six months')!
+  const out = layout(trunk, nodes, W, H, NOW, sixMonths)
+  const controls = controlBoxes(W, H)
+  type Box = { x: number; y: number; hw: number; hh: number }
+  const hit = (a: Box, b: Box) => Math.abs(a.x - b.x) < a.hw + b.hw && Math.abs(a.y - b.y) < a.hh + b.hh
+  /** A named node's name, as the view draws it: centred under (or over) the node. */
+  const label = (n: (typeof out.nodes)[number]): Box => ({ x: n.x, y: n.above ? n.y - n.r - 27 : n.y + n.r + 27, hw: nameWidth(n.name) / 2, hh: 21 })
+
+  it('has a switch, a key and a zoom to keep clear of', () => {
+    expect(controls).toHaveLength(3)
+  })
+
+  it('keeps every name on the stage', () => {
+    for (const n of out.nodes.filter((n) => n.named)) {
+      const b = label(n)
+      expect(b.x - b.hw, n.name).toBeGreaterThanOrEqual(0)
+      expect(b.x + b.hw, n.name).toBeLessThanOrEqual(W)
+    }
+  })
+
+  it('keeps nodes and their names off the switch, the key and the zoom', () => {
+    for (const n of out.nodes) {
+      for (const c of controls) {
+        expect(hit({ x: n.x, y: n.y, hw: n.r, hh: n.r }, c), n.name).toBe(false)
+        if (n.named) expect(hit(label(n), c), `${n.name}'s name`).toBe(false)
+      }
+    }
+  })
+
+  it('runs the rings’ names clear of the controls', () => {
+    const a = (out.nameAngle * Math.PI) / 180
+    for (const m of out.rings.marks) {
+      const at = { x: out.rings.cx + Math.cos(a) * m.r, y: out.rings.cy + Math.sin(a) * m.r, hw: 34, hh: 10 }
+      for (const c of controls) expect(hit(at, c), m.name).toBe(false)
+    }
   })
 })
