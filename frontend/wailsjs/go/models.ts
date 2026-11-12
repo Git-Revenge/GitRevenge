@@ -923,6 +923,7 @@ export namespace app {
 	    row: number;
 	    commit: string;
 	    refs: git.Ref[];
+	    merge?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new LaneName(source);
@@ -934,6 +935,7 @@ export namespace app {
 	        this.row = source["row"];
 	        this.commit = source["commit"];
 	        this.refs = this.convertValues(source["refs"], git.Ref);
+	        this.merge = source["merge"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

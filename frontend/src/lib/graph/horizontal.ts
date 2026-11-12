@@ -246,3 +246,20 @@ export function dayBandText(full: string, count: string, time: number, width: nu
   const short = monthDay.format(date)
   return { label: wide(short) <= room ? short : dayOnly.format(date), count: '' }
 }
+
+/**
+ * What a merge says it merged, from its subject, for naming the lane it opened: the branch or
+ * tag in git's own messages ("Merge branch 'x'", "Merge tag 'v1' of ..."), or the branch of a
+ * pull request ("Merge pull request #12 from someone/topic" is "topic #12"). '' when the
+ * subject doesn't say.
+ */
+export function mergedName(subject: string): string {
+  const quoted = /^Merge (?:remote-tracking )?(?:branch|branches|tag|tags|commit) '([^']+)'/.exec(subject)
+  if (quoted) return quoted[1]
+  const pull = /^Merge pull request #(\d+) from (\S+)/.exec(subject)
+  if (pull) return `${pull[2].includes('/') ? pull[2].slice(pull[2].indexOf('/') + 1) : pull[2]} #${pull[1]}`
+  // GitLab's and Bitbucket's own words, and a plain "Merge x into y".
+  const request = /^Merged? (?:in )?(\S+) (?:into|\(pull request)/.exec(subject)
+  if (request) return request[1].replace(/^'|'$/g, '')
+  return ''
+}

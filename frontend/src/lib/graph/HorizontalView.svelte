@@ -29,6 +29,7 @@
     laneY,
     LEAN,
     maxLaneScroll,
+    mergedName,
     namesWidth,
     offsetForThumb,
     offsetToShow,
@@ -147,6 +148,8 @@
   interface LaneName {
     commit: string
     refs: Ref[]
+    /** The subject of the merge that opened the lane, when one did. */
+    merge: string
   }
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- namesTick says when it changed
   let laneNames = new Map<number, LaneName>()
@@ -185,7 +188,7 @@
       .then((res) => {
         if (epoch !== namesEpoch) return
         for (const n of res ?? []) {
-          if (n.row >= 0) laneNames.set(n.color, { commit: n.commit, refs: (n.refs ?? []) as unknown as Ref[] })
+          if (n.row >= 0) laneNames.set(n.color, { commit: n.commit, refs: (n.refs ?? []) as unknown as Ref[], merge: n.merge ?? '' })
           // A lane whose start isn't read yet is asked about again when more has been.
           else setTimeout(() => asked.delete(n.color), 1500)
         }
@@ -200,8 +203,10 @@
     return [...edge]
       .sort((a, b) => a[0] - b[0])
       .map(([lane, e]) => {
-        const refs = laneNames.get(e.color)?.refs ?? []
-        return { lane, color: e.color, later: e.later, labels: refs.length ? refLabels(refs, mainRemote) : [] }
+        const name = laneNames.get(e.color)
+        const refs = name?.refs ?? []
+        const merge = name?.merge ?? ''
+        return { lane, color: e.color, later: e.later, labels: refs.length ? refLabels(refs, mainRemote) : [], merge, merged: mergedName(merge) }
       })
   })
   let above = $derived(laneRows.filter((r) => laneY(r.lane, pitch) - laneScroll < 6).length)
@@ -388,9 +393,10 @@
               <span class="one" title={r.labels.map((l) => l.text).join(', ') + (r.later ? ' (starts further right)' : '')}><RefChip label={first} lane={laneVar(r.color)} /></span>
               {#if r.labels.length > 1}<span class="more">+{r.labels.length - 1}</span>{/if}
               {#if first.ref.head && namesW > 150}<span class="here">you’re here</span>{/if}
-            {:else}
-              <!-- A lane no branch started: a merged branch whose name is gone. -->
-              <span class="nameless" style:--lane={laneVar(r.color)} title="No branch points at this lane's first commit: it was merged in, and its name is gone"></span>
+            {:else if r.merged}
+              <!-- A lane a merge opened has no branch of its own any more: it's named by what
+                   the merge says it brought in, more quietly than a live branch. -->
+              <span class="merged" style:--lane={laneVar(r.color)} title="Merged in by: {r.merge}"><i></i><span>{r.merged}</span><span class="visually-hidden">, merged</span></span>
             {/if}
           </div>
         {/each}
@@ -673,10 +679,27 @@
     color: var(--ink-mute);
   }
 
-  .nameless {
-    width: 14px;
-    border-top: 1.75px dashed var(--lane);
-    opacity: 0.6;
+  .merged {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    font-size: 13px;
+    font-style: italic;
+    color: var(--ink-mute);
+  }
+
+  .merged i {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--lane);
+  }
+
+  .merged span {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .more {

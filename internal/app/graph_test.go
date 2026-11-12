@@ -265,3 +265,41 @@ func TestLaneNamesSayWhichBranchALaneIs(t *testing.T) {
 		t.Fatalf("not open: %+v, %v", none, err)
 	}
 }
+
+func TestLaneNamesGiveAMergedLaneItsMergesSubject(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.WithMergeHistory(t)
+	tab, err := a.OpenRepo(fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var page GraphPage
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		if page, _ = a.GraphRows(tab.Path, 0, 50); !page.Loading {
+			break
+		}
+	}
+	// The lane a merge opens: the colour of a line that leaves a two-parent commit for another lane.
+	merged, subject := -1, ""
+	for _, row := range page.Rows {
+		if row.Parents < 2 {
+			continue
+		}
+		for _, s := range row.Down {
+			if s.From != s.To && s.Color != row.Color {
+				merged, subject = s.Color, row.Subject
+			}
+		}
+	}
+	if merged < 0 {
+		t.Skip("the fixture's merged branch still has its name: no lane was opened by a merge")
+	}
+	names, err := a.LaneNames(tab.Path, []int{merged})
+	if err != nil || len(names) != 1 {
+		t.Fatalf("names = %+v, %v", names, err)
+	}
+	if names[0].Merge != subject || len(names[0].Refs) != 0 {
+		t.Fatalf("merged lane = %+v, want the merge's subject %q and no refs", names[0], subject)
+	}
+}

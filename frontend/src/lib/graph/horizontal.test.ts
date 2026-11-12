@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chipRooms, clampOffset, COL, colAt, colX, dayBandText, dayCount, daySpans, LABEL_MAX, LANE, lanesAt, lanesAtEdge, laneScrollToShow, lanesExtent, laneY, LEAN_REACH, maxLaneScroll, maxOffset, namesWidth, NAMES, offsetForThumb, offsetToShow, segPath, subjectLength, THUMB_MIN, thumbFor, visibleRange, WORDS, wordsHeight } from './horizontal'
+import { chipRooms, clampOffset, COL, colAt, colX, dayBandText, dayCount, daySpans, LABEL_MAX, LANE, lanesAt, lanesAtEdge, laneScrollToShow, lanesExtent, laneY, LEAN_REACH, maxLaneScroll, maxOffset, mergedName, namesWidth, NAMES, offsetForThumb, offsetToShow, segPath, subjectLength, THUMB_MIN, thumbFor, visibleRange, WORDS, wordsHeight } from './horizontal'
 
 const DAY = 24 * 60 * 60
 // Noon, so a few hours either way stay in the same day in any time zone.
@@ -229,5 +229,30 @@ describe('the day band', () => {
     expect(two.count).toBe('')
     expect(two.label).toMatch(/^(Nov 3|3)$/)
     expect(dayBandText(full, '1 commit', time, COL)).toEqual({ label: '3', count: '' })
+  })
+})
+
+describe('a merged lane\u2019s name', () => {
+  it('is the branch or tag git says it merged', () => {
+    expect(mergedName("Merge branch 'topic'")).toBe('topic')
+    expect(mergedName("Merge branch 'topic' into main")).toBe('topic')
+    expect(mergedName("Merge tag 'platform-drivers-x86-v7.4-1' of git://git.kernel.org/pub/scm/linux")).toBe('platform-drivers-x86-v7.4-1')
+    expect(mergedName("Merge remote-tracking branch 'origin/release'")).toBe('origin/release')
+    expect(mergedName("Merge branches 'a' and 'b'")).toBe('a')
+  })
+
+  it('is a pull request\u2019s branch and number', () => {
+    expect(mergedName('Merge pull request #655 from Git-Revenge/652-map-view')).toBe('652-map-view #655')
+    expect(mergedName('Merge pull request #7 from topic')).toBe('topic #7')
+  })
+
+  it('reads the other hosts\u2019 wording too', () => {
+    expect(mergedName('Merged in feature/login (pull request #12)')).toBe('feature/login')
+    expect(mergedName('Merge main into topic')).toBe('main')
+  })
+
+  it('is nothing when the subject does not say', () => {
+    expect(mergedName('feat: a ruler in place of the scrollbar (#638)')).toBe('')
+    expect(mergedName('')).toBe('')
   })
 })
