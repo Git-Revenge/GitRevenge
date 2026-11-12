@@ -26,6 +26,8 @@ export function BranchAction(arg1:string,arg2:string,arg3:Array<string>):Promise
 
 export function BranchMap(arg1:string):Promise<app.BranchMap>;
 
+export function BranchMapGroup(arg1:string,arg2:string):Promise<app.MapGroup>;
+
 export function BranchMergeState(arg1:string,arg2:string):Promise<git.BranchMerge>;
 
 export function BuiltWith():Promise<app.BuiltWith>;

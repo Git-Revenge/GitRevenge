@@ -6,7 +6,7 @@
 /** A node as the backend sends it (app.MapNode in Go). */
 export interface MapNode {
   name: string
-  kind: 'trunk' | 'branch' | 'remote' | 'tag' | 'tags'
+  kind: 'trunk' | 'branch' | 'remote' | 'tag' | 'tags' | 'group'
   commit: string
   commits: number
   /** When it last moved, in Unix seconds. */
@@ -21,6 +21,9 @@ export interface MapNode {
   branchKind?: string
   /** How many tags a fold holds. */
   tags?: number
+  /** How many branches a group stands for: remote-only branches that share a first path
+   * segment are one node until it's opened. */
+  branches?: number
 }
 
 export interface Placed extends MapNode {
@@ -116,6 +119,25 @@ const DAY = 24 * 60 * 60
 export const TRUNK_R = { min: 44, max: 70 }
 export const BRANCH_R = { min: 9, max: 40 }
 export const TAG_SIDE = { min: 14, max: 40 }
+/** A group's diameter: by how many branches it stands for, not by commits, which aren't
+ * counted until it's opened. */
+export const GROUP_D = { min: 26, max: 72 }
+
+/** How big a group of this many branches is drawn. */
+export function groupSize(branches: number): number {
+  return Math.min(GROUP_D.max, Math.max(GROUP_D.min, 6 * Math.sqrt(Math.max(0, branches))))
+}
+
+/** Which branches the map shows. */
+export type Showing = 'all' | 'local' | 'remote'
+
+/** The nodes to show: all of them, only what's here (local branches and tags), or only what's
+ * on the remote alone. The checked-out branch always shows. */
+export function showingNodes<T extends Pick<MapNode, 'kind' | 'head'>>(nodes: T[], showing: Showing): T[] {
+  if (showing === 'local') return nodes.filter((n) => n.kind !== 'remote' && n.kind !== 'group')
+  if (showing === 'remote') return nodes.filter((n) => n.kind !== 'branch' || n.head)
+  return nodes
+}
 /** px of radius per square root of a commit, at most: area carries the number. */
 const BRANCH_K = 4
 const TAG_K = 4.5
@@ -241,12 +263,16 @@ export function layout(
   hub.size = hub.r * 2
 
   const placed: Placed[] = nodes.map((n) => {
-    const size = n.kind === 'tags' ? TAG_SIDE.max : isTag(n) ? tagSide(n.commits, k.tag) : branchRadius(n.commits, k.branch) * 2
+    const size = n.kind === 'group' ? groupSize(n.branches ?? 0) : n.kind === 'tags' ? TAG_SIDE.max : isTag(n) ? tagSide(n.commits, k.tag) : branchRadius(n.commits, k.branch) * 2
     return { ...n, x: 0, y: 0, size, r: isTag(n) ? (size * Math.SQRT2) / 2 : size / 2, band: bandOf(n.updated, now, scale), above: false, named: false }
   })
   const byName = new Map(placed.filter((p) => !isTag(p)).map((p) => [p.name, p]))
   const holder = (p: Placed) => (p.parent ? byName.get(p.parent) : undefined)
-  const rest = (p: Placed) => (holder(p) ? holder(p)!.r + p.r + 46 : restLength(p.updated, now, rings, hub.r, p.r))
+  // What hangs off a node sits a short spring away from it; the more that hang there, the
+  // longer the spring, so an opened group's branches have a ring to stand in.
+  const hanging = new Map<string, number>()
+  for (const p of placed) if (p.parent && byName.has(p.parent)) hanging.set(p.parent, (hanging.get(p.parent) ?? 0) + 1)
+  const rest = (p: Placed) => (holder(p) ? holder(p)!.r + p.r + 46 + 9 * Math.sqrt(Math.max(0, (hanging.get(p.parent) ?? 1) - 1)) : restLength(p.updated, now, rings, hub.r, p.r))
 
   // Seeded newest first, each a golden angle on from the last, starting up and to the right.
   const order = [...placed].sort((a, b) => b.updated - a.updated || a.name.localeCompare(b.name))
@@ -258,10 +284,14 @@ export function layout(
     p.y = from.y + Math.sin(angle) * d
   })
   // A node that hangs off a branch was seeded before the branch had its place.
+  // Several on one node start spread evenly round it, from the side away from the trunk.
+  const turn = new Map<string, number>()
   for (const p of order) {
     const from = holder(p)
     if (!from) continue
-    const out = Math.atan2(from.y - hub.y, from.x - hub.x) + 0.6
+    const k = turn.get(p.parent) ?? 0
+    turn.set(p.parent, k + 1)
+    const out = Math.atan2(from.y - hub.y, from.x - hub.x) + 0.6 + (k * 2 * Math.PI) / (hanging.get(p.parent) ?? 1)
     p.x = from.x + Math.cos(out) * rest(p)
     p.y = from.y + Math.sin(out) * rest(p)
   }
@@ -293,7 +323,10 @@ export function layout(
   const crowded = placed.length > CROWD
   const isAbove = (p: Placed) => p.y < hub.y - 24 && !holder(p)
   const boxOf = (p: Placed) => {
-    const named = !crowded || p.head || !!p.pinned || p.kind === 'branch'
+    // An opened group's branches stand close round it: their names are given out afterwards,
+    // where there's room, and keep none here.
+    const member = holder(p)?.kind === 'group'
+    const named = !member && (!crowded || p.head || !!p.pinned || p.kind === 'branch' || p.kind === 'group')
     const hw = Math.max(p.r, named ? nameWidth(p.name) / 2 : 0) + 5
     const hh = p.r + (named ? NAME_H / 2 : 0) + 3
     return { x: p.x, y: p.y + (named ? (isAbove(p) ? -NAME_H / 2 : NAME_H / 2) : 0), hw, hh }
@@ -362,7 +395,7 @@ export function layout(
   type Box = { x: number; y: number; hw: number; hh: number; of?: Placed }
   const hit = (a: Box, b: Box) => Math.abs(a.x - b.x) < a.hw + b.hw && Math.abs(a.y - b.y) < a.hh + b.hh
   const taken: Box[] = [{ x: hub.x, y: hub.y, hw: hub.r, hh: hub.r }, ...placed.map((p) => ({ x: p.x, y: p.y, hw: p.r, hh: p.r, of: p }))]
-  const rank = (p: Placed) => (p.head ? 0 : p.pinned ? 1 : p.kind === 'branch' ? 2 : p.kind === 'remote' ? 3 : 4)
+  const rank = (p: Placed) => (p.head ? 0 : p.pinned ? 1 : p.kind === 'branch' ? 2 : p.kind === 'group' ? 3 : p.kind === 'remote' ? 4 : 5)
   const wanting = [...placed].sort((a, b) => rank(a) - rank(b) || b.commits - a.commits || b.updated - a.updated || a.name.localeCompare(b.name))
   for (const p of wanting) {
     const off = p.r + 4 + NAME_H / 2
