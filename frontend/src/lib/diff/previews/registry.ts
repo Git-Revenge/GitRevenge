@@ -5,6 +5,7 @@ import MediaPreview from './MediaPreview.svelte'
 import { mediaOf } from './media'
 import MarkdownPreview from './MarkdownPreview.svelte'
 import MermaidPreview from './MermaidPreview.svelte'
+import NotebookPreview from './NotebookPreview.svelte'
 import PdfPreview from './PdfPreview.svelte'
 import TexPreview from './TexPreview.svelte'
 import TreePreview from './TreePreview.svelte'
@@ -44,6 +45,7 @@ export const PREVIEWERS: Previewer[] = [
   { id: 'structured', matches: (p) => formatOf(p) !== null, component: TreePreview },
   { id: 'tex', matches: (p) => /\.(tex|latex)$/i.test(p), component: TexPreview },
   { id: 'mermaid', matches: (p) => /\.(mmd|mermaid)$/i.test(p), component: MermaidPreview },
+  { id: 'notebook', matches: (p) => /\.ipynb$/i.test(p), component: NotebookPreview },
   { id: 'html', matches: (p) => /\.(html?|xhtml)$/i.test(p), component: HtmlPreview },
   { id: 'pdf', matches: (p) => /\.pdf$/i.test(p), component: PdfPreview, binary: true },
   { id: 'media', matches: (p) => mediaOf(p) !== null, component: MediaPreview, binary: true, large: true },

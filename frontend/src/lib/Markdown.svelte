@@ -44,6 +44,8 @@
   const WEB_LINK = /^(https?:|mailto:)/i
   /** A relative path: no scheme, not protocol-relative, not just a fragment. */
   const RELATIVE = /^(?![a-z][a-z0-9+.-]*:|\/\/|#)/i
+  /** An image the caller can load: a path in the repository, or a notebook cell's attachment. */
+  const LOADABLE = (href: string) => RELATIVE.test(href) || /^attachment:/i.test(href)
 
   function open(e: MouseEvent, href: string) {
     e.preventDefault()
@@ -75,7 +77,7 @@
         href={(t as Tokens.Link).href}
         title={(t as Tokens.Link).href}
         onclick={(e) => open(e, (t as Tokens.Link).href)}>{@render inline((t as Tokens.Link).tokens, true)}</a
-      >{:else if t.type === 'image'}{#if resolveImage && RELATIVE.test((t as Tokens.Image).href)}<MarkdownImage
+      >{:else if t.type === 'image'}{#if resolveImage && LOADABLE((t as Tokens.Image).href)}<MarkdownImage
           src={(t as Tokens.Image).href}
           alt={(t as Tokens.Image).text}
           resolve={resolveImage}
