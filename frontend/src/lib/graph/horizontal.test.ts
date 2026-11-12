@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampOffset, COL, colAt, colX, dayCount, daySpans, LANE, lanePitch, laneY, LEAN_REACH, maxOffset, offsetForThumb, offsetToShow, segPath, subjectLength, THUMB_MIN, thumbFor, visibleRange, WORDS, wordsHeight } from './horizontal'
+import { clampOffset, COL, colAt, colX, dayCount, daySpans, LABEL_MAX, labelPlaces, LANE, lanePitch, laneY, LEAN_REACH, maxOffset, offsetForThumb, offsetToShow, segPath, subjectLength, THUMB_MIN, thumbFor, visibleRange, WORDS, wordsHeight } from './horizontal'
 
 const DAY = 24 * 60 * 60
 // Noon, so a few hours either way stay in the same day in any time zone.
@@ -161,5 +161,27 @@ describe('the scrollbar', () => {
     const t = thumbFor(offset, 440, 100, 400)
     expect(offsetForThumb(t.left, 440, 100, 400)).toBeCloseTo(offset)
     expect(offsetForThumb(9999, 440, 100, 400)).toBe(maxOffset(440, 100))
+  })
+})
+
+describe('labels', () => {
+  it('sits a label on the lower row, by its commit, with all the room it wants', () => {
+    expect(labelPlaces([4]).get(4)).toEqual({ row: 1, room: LABEL_MAX })
+  })
+
+  it('keeps labels far enough apart on one row, each as wide as the gap to the next', () => {
+    const p = labelPlaces([0, 5, 20])
+    expect([...p.values()].map((v) => v.row)).toEqual([1, 1, 1])
+    expect(p.get(0)!.room).toBe(5 * COL - 6)
+    expect(p.get(5)!.room).toBe(LABEL_MAX)
+  })
+
+  it('lifts a label to the upper row when the commit before it has labels too', () => {
+    const p = labelPlaces([0, 1, 2, 3])
+    expect([...p.values()].map((v) => v.row)).toEqual([1, 0, 1, 0])
+    // Each has two columns before the next label on its own row, not one.
+    expect(p.get(0)!.room).toBe(2 * COL - 6)
+    expect(p.get(1)!.room).toBe(2 * COL - 6)
+    expect(p.get(3)!.room).toBe(LABEL_MAX)
   })
 })

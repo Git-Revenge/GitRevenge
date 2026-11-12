@@ -9,8 +9,13 @@ export const COL = 44
 export const DAY_BAND = 26
 /** The band the subjects lean in, at its tallest and shortest. */
 export const WORDS = { max: 200, min: 64 }
-/** The row of branch and tag labels, between the subjects and the lanes. */
-export const LABELS_H = 28
+/** The band of branch and tag labels, between the subjects and the lanes: two rows, so labels
+ * on neighbouring commits don't squeeze each other down to a letter. */
+export const LABEL_ROW = 26
+export const LABELS_H = LABEL_ROW * 2 + 4
+/** The widest a label gets, and how many columns one wants clear to its right to read well. */
+export const LABEL_MAX = 220
+const LABEL_WANT = 3
 /** A lane's height, at its roomiest and tightest, and the space above the first lane. */
 export const LANE = { max: 26, min: 12, pad: 20 }
 /** How far the subjects lean back from the horizontal, in degrees. */
@@ -159,4 +164,25 @@ export function offsetForThumb(left: number, width: number, count: number, track
   const { width: w } = thumbFor(0, width, count, track)
   if (track - w <= 0) return 0
   return clampOffset((left / (track - w)) * maxOffset(width, count), width, count)
+}
+
+/**
+ * Where each labelled commit's labels go, given the labelled columns in order: which of the two
+ * rows, and how wide they can be before running into the next labels on that row. A label takes
+ * the lower row, nearer its commit, unless the last one there is too close; then the upper row,
+ * and when both are close, whichever has more room.
+ */
+export function labelPlaces(columns: number[]): Map<number, { row: 0 | 1; room: number }> {
+  const out = new Map<number, { row: 0 | 1; room: number }>()
+  // The last labelled column on each row: row 1 is the lower one, next to the lanes.
+  const last: [number, number] = [-Infinity, -Infinity]
+  for (const c of columns) {
+    const row: 0 | 1 = c - last[1] >= LABEL_WANT ? 1 : c - last[0] >= LABEL_WANT ? 0 : c - last[1] >= c - last[0] ? 1 : 0
+    const before = last[row]
+    const prev = out.get(before)
+    if (prev) prev.room = Math.min(LABEL_MAX, (c - before) * COL - 6)
+    out.set(c, { row, room: LABEL_MAX })
+    last[row] = c
+  }
+  return out
 }

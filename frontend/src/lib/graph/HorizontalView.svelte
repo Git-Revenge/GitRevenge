@@ -5,7 +5,7 @@
   import { onMount } from 'svelte'
   import RefChip from './RefChip.svelte'
   import { dayLineLabel, formatTime, initials, laneVar, refLabels, startsRun } from './draw'
-  import { BAR_H, clampOffset, COL, colAt, DAY_BAND, dayCount, daySpans, LABELS_H, lanePitch, laneY, LEAN, offsetForThumb, offsetToShow, segPath, subjectLength, thumbFor, visibleRange, wordsHeight } from './horizontal'
+  import { BAR_H, clampOffset, COL, colAt, DAY_BAND, dayCount, daySpans, LABEL_ROW, labelPlaces, LABELS_H, lanePitch, laneY, LEAN, offsetForThumb, offsetToShow, segPath, subjectLength, thumbFor, visibleRange, wordsHeight } from './horizontal'
   import type { Ref, Row, RowCache } from './rowCache'
 
   let {
@@ -89,11 +89,8 @@
     })
   })
 
-  /** How wide a commit's labels can be: up to the next commit that has labels of its own. */
-  function labelRoom(k: number): number {
-    for (let j = k + 1; j < cols.length; j++) if (cols[j].refs.length) return Math.min(220, (j - k) * COL - 6)
-    return 220
-  }
+  /** Which row each labelled commit's labels sit on, and how wide they can be. */
+  let places = $derived(labelPlaces(cols.filter((c) => c.refs.length).map((c) => c.i)))
 
   let chosen = $derived.by(() => {
     void tick
@@ -196,7 +193,7 @@
       {/each}
     </div>
     <div class="track" style:top="{DAY_BAND}px" style:transform="translateX({-offset}px)">
-      {#each cols as c, k (c.i)}
+      {#each cols as c (c.i)}
         {@const labels = c.refs.length ? refLabels(c.refs, mainRemote) : []}
         <div
           class="col"
@@ -212,8 +209,9 @@
         >
           {#if c.row}
             <span class="subject" style:top="{words - 22}px" style:max-width="{subjectMax}px" style:transform="rotate(-{LEAN}deg)">{c.row.subject}</span>
-            {#if labels.length}
-              <span class="labels" style:top="{words}px" style:height="{LABELS_H}px" style:max-width="{labelRoom(k)}px">
+            {@const place = places.get(c.i)}
+            {#if labels.length && place}
+              <span class="labels" style:top="{words + 2 + place.row * LABEL_ROW}px" style:height="{LABEL_ROW}px" style:max-width="{place.room}px">
                 <RefChip label={labels[0]} lane={laneVar(c.row.color)} />{#if labels.length > 1}<span class="more" title={labels.slice(1).map((l) => l.text).join(', ')}>+{labels.length - 1}</span>{/if}
               </span>
             {/if}
