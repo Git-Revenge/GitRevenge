@@ -151,6 +151,44 @@ test.describe('the Map view', () => {
     await expect(nodeOf(page, 'main')).toBeVisible()
   })
 
+  // #662: the working tree, worktrees and stacks.
+  test('marks the working tree against the checked-out branch, and a click opens it', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 700 })
+    await open(page, 'graph', { ...scenario(), wip: { changes: 3 } })
+    const wip = page.getByRole('button', { name: '3 files changed. The working tree, on main.' })
+    await expect(wip).toHaveText('3')
+    const mark = (await wip.boundingBox())!
+    const main = (await nodeOf(page, 'main').boundingBox())!
+    const gap = Math.hypot(mark.x + mark.width / 2 - main.x - main.width / 2, mark.y + mark.height / 2 - main.y - main.height / 2)
+    expect(gap).toBeLessThan(main.width / 2 + mark.width)
+    await wip.click()
+    expect(await events(page, 'wip')).toHaveLength(1)
+  })
+
+  test('has no working tree mark when the caller gives none', async ({ page }) => {
+    await open(page, 'graph', scenario())
+    await expect(nodeOf(page, 'main')).toBeVisible()
+    await expect(page.getByRole('button', { name: /The working tree/ })).toHaveCount(0)
+  })
+
+  test('hangs a stacked branch off the one under it, and says where a worktree is', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 700 })
+    const stacked = { ...map, nodes: [node('base', 'branch', 3, 1, { worktree: '/code/wt-base' }), node('top', 'branch', 1, 0, { parent: 'base', stacked: true })], branches: 3, tags: 0 }
+    await open(page, 'graph', scenario({ BranchMap: stacked }))
+    const centre = async (name: string) => {
+      const b = (await nodeOf(page, name).boundingBox())!
+      return { x: b.x + b.width / 2, y: b.y + b.height / 2 }
+    }
+    const [top, base, main] = [await centre('top'), await centre('base'), await centre('main')]
+    expect(Math.hypot(top.x - base.x, top.y - base.y)).toBeLessThan(Math.hypot(top.x - main.x, top.y - main.y))
+    await expect(page.locator('line.stackline')).toHaveCount(1)
+    await expect(nodeOf(page, 'base').locator('.badge')).toHaveAttribute('title', 'Checked out in the worktree at /code/wt-base')
+    await nodeOf(page, 'top').click()
+    await expect(page.getByRole('group', { name: 'About top' })).toContainText('Stacked on base.')
+    await nodeOf(page, 'base').click()
+    await expect(page.getByRole('group', { name: 'About base' })).toContainText('Checked out in the worktree at /code/wt-base.')
+  })
+
   // #661: zoom changes what the rings mean.
   test('zooms out to months and in to a week of days, and no closer', async ({ page }) => {
     await page.setViewportSize({ width: 1200, height: 700 })

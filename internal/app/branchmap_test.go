@@ -1,6 +1,7 @@
 package app
 
 import (
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -173,5 +174,34 @@ func TestBranchMapWithNothingToShow(t *testing.T) {
 	m, err := a.BranchMap(tab.Path)
 	if err != nil || m.Trunk.Name != "" || m.Nodes == nil || len(m.Nodes) != 0 {
 		t.Fatalf("empty repository: %+v, %v", m, err)
+	}
+}
+
+func TestBranchMapHangsAStackedBranchOffItsParentAndSaysWhereAWorktreeIs(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.Linear(2)
+	fx.Branch("base")
+	fx.CommitFile("a.txt", "a", "base work")
+	fx.Branch("top")
+	fx.CommitFile("b.txt", "b", "top work")
+	fx.Checkout("main")
+	// base is checked out in a second worktree.
+	fx.Git("worktree", "add", "-q", filepath.Join(t.TempDir(), "wt"), "base")
+
+	m, err := a.BranchMap(openForMap(t, a, fx))
+	if err != nil {
+		t.Fatal(err)
+	}
+	top, base := mapNode(t, m, "top"), mapNode(t, m, "base")
+	if top.Parent != "base" || !top.Stacked {
+		t.Fatalf("top = %+v, want it hanging off base as a stacked branch", top)
+	}
+	if base.Parent != "" || base.Stacked {
+		t.Fatalf("base = %+v, want it on the trunk", base)
+	}
+	if base.Worktree == "" || top.Worktree != "" {
+		t.Fatalf("worktrees: base %q, top %q; want base's folder and nothing for top", base.Worktree, top.Worktree)
 	}
 }

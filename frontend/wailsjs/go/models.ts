@@ -290,6 +290,8 @@ export namespace app {
 	    commits: number;
 	    updated: number;
 	    parent: string;
+	    stacked?: boolean;
+	    worktree?: string;
 	    head: boolean;
 	    branchKind?: string;
 	    tags?: number;
@@ -306,6 +308,8 @@ export namespace app {
 	        this.commits = source["commits"];
 	        this.updated = source["updated"];
 	        this.parent = source["parent"];
+	        this.stacked = source["stacked"];
+	        this.worktree = source["worktree"];
 	        this.head = source["head"];
 	        this.branchKind = source["branchKind"];
 	        this.tags = source["tags"];

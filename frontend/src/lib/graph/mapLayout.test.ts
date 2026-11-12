@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bandOf, BRANCH_R, branchRadius, CROWD, DEFAULT_SCALE, KEY, keyShows, layout, nameWaits, restLength, ringsFor, scales, SCALES, TAG_SIDE, tagSide, TRUNK_R, trunkRadius, zoomBy, type MapNode } from './mapLayout'
+import { bandOf, BRANCH_R, branchRadius, CROWD, DEFAULT_SCALE, KEY, keyShows, ZOOM, layout, nameWaits, restLength, ringsFor, scales, SCALES, TAG_SIDE, tagSide, TRUNK_R, trunkRadius, WIP_R, wipPlace, zoomBy, type MapNode } from './mapLayout'
 
 const DAY = 24 * 60 * 60
 const NOW = 1_794_480_000
@@ -208,6 +208,8 @@ describe('layout', () => {
     for (const n of crowd.nodes) {
       const low = n.y + n.r > H - KEY.height
       if (low) expect(n.x - n.r).toBeGreaterThanOrEqual(KEY.width)
+      // Nor on the zoom control in the other corner.
+      if (n.y + n.r > H - ZOOM.height + 46) expect(n.x + n.r).toBeLessThanOrEqual(W - ZOOM.width)
     }
   })
 
@@ -236,5 +238,33 @@ describe('names', () => {
     expect(nameWaits({ band: 2 }, CROWD)).toBe(false)
     expect(nameWaits({ band: 0 }, CROWD + 1)).toBe(false)
     expect(nameWaits({ band: 1 }, CROWD + 1)).toBe(true)
+  })
+})
+
+describe('stacks and the working tree', () => {
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y)
+
+  it('chains a stack: each branch nearer the one under it than the trunk', () => {
+    const nodes = [node('base', { commits: 3 }), node('middle', { commits: 2, parent: 'base', stacked: true }), node('top', { commits: 1, parent: 'middle', stacked: true })]
+    const out = layout(trunk, nodes, 1000, 640, NOW)
+    const find = (name: string) => out.nodes.find((n) => n.name === name)!
+    expect(dist(find('middle'), find('base'))).toBeLessThan(dist(find('middle'), out.trunk))
+    expect(dist(find('top'), find('middle'))).toBeLessThan(dist(find('top'), out.trunk))
+    expect(dist(find('top'), find('middle'))).toBeGreaterThan(find('top').r + find('middle').r)
+  })
+
+  it('sets the working tree against the checked-out node, away from the trunk', () => {
+    const hub = { x: 500, y: 300 }
+    const head = { x: 650, y: 300, r: 20 }
+    const at = wipPlace(head, hub, 1000, 600)
+    expect(at.y).toBeCloseTo(300)
+    expect(at.x).toBeCloseTo(650 + 20 + WIP_R + 3)
+    // On the trunk itself it goes up and to the left.
+    const onTrunk = wipPlace({ ...hub, r: 70 }, hub, 1000, 600)
+    expect(onTrunk.x).toBeLessThan(hub.x)
+    expect(onTrunk.y).toBeLessThan(hub.y)
+    expect(dist(onTrunk, hub)).toBeCloseTo(70 + WIP_R + 3)
+    // And never off the stage.
+    expect(wipPlace({ x: 990, y: 300, r: 20 }, hub, 1000, 600).x).toBeLessThanOrEqual(1000 - WIP_R)
   })
 })

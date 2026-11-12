@@ -45,8 +45,13 @@ type MapNode struct {
 	Commits int `json:"commits"`
 	// Updated is when the node last moved, in Unix seconds.
 	Updated int64 `json:"updated"`
-	// Parent is the name of the branch node this one hangs off, or "" for the trunk.
+	// Parent is the name of the branch node this one hangs off, or "" for the trunk: the
+	// branch that holds a tag, or the branch a stacked branch is stacked on.
 	Parent string `json:"parent"`
+	// Stacked marks a branch that hangs off the branch it's stacked on.
+	Stacked bool `json:"stacked,omitempty"`
+	// Worktree is the folder of the other worktree the branch is checked out in, or "".
+	Worktree string `json:"worktree,omitempty"`
 	// Head marks the checked-out branch.
 	Head bool `json:"head"`
 	// BranchKind is the branch's kind ("release", "docs", …), or "".
@@ -92,7 +97,7 @@ func (a *App) BranchMap(path string) (BranchMap, error) {
 	}
 	// Every count is its own git call, and none depends on another: they run side by side.
 	var jobs []func() error
-	out.Trunk = MapNode{Name: trunk.Short, Kind: mapTrunk, Commit: trunk.Commit, Updated: trunk.Updated, Head: trunk.Head, BranchKind: trunk.BranchKind}
+	out.Trunk = MapNode{Name: trunk.Short, Kind: mapTrunk, Commit: trunk.Commit, Updated: trunk.Updated, Head: trunk.Head, BranchKind: trunk.BranchKind, Worktree: trunk.Worktree}
 	jobs = append(jobs, func() (err error) {
 		out.Trunk.Commits, err = count(trunk.Name)
 		return err
@@ -114,11 +119,24 @@ func (a *App) BranchMap(path string) (BranchMap, error) {
 			kind = mapRemote
 		}
 		shown[b.Name] = true
-		branchNodes[i] = MapNode{Name: b.Short, Kind: kind, Commit: b.Commit, Updated: b.Updated, Head: b.Head, BranchKind: b.BranchKind}
+		branchNodes[i] = MapNode{Name: b.Short, Kind: kind, Commit: b.Commit, Updated: b.Updated, Head: b.Head, BranchKind: b.BranchKind, Worktree: b.Worktree}
 		jobs = append(jobs, func() (err error) {
 			branchNodes[i].Commits, err = count(trunk.Name + ".." + b.Name)
 			return err
 		})
+	}
+
+	// A stacked branch hangs off the branch under it, when that one has a node too.
+	local := map[string]bool{}
+	for _, b := range branches {
+		if b.Kind == git.LocalBranch {
+			local[b.Short] = true
+		}
+	}
+	for i, b := range branches {
+		if b.Kind == git.LocalBranch && b.StackParent != "" && local[b.StackParent] {
+			branchNodes[i].Parent, branchNodes[i].Stacked = b.StackParent, true
+		}
 	}
 
 	tags := mapTagsOf(refs)

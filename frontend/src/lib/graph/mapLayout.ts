@@ -11,8 +11,12 @@ export interface MapNode {
   commits: number
   /** When it last moved, in Unix seconds. */
   updated: number
-  /** The branch node it hangs off, or '' for the trunk. */
+  /** The branch node it hangs off, or '' for the trunk: the branch that holds a tag, or the
+   * one a stacked branch is stacked on. */
   parent: string
+  stacked?: boolean
+  /** The folder of the other worktree the branch is checked out in. */
+  worktree?: string
   head: boolean
   branchKind?: string
   /** How many tags a fold holds. */
@@ -91,6 +95,7 @@ export function nameWidth(name: string): number {
 /** The two lines of words under a node, and the key in the stage's bottom left corner. */
 const NAME_H = 46
 export const KEY = { width: 200, height: 124 }
+export const ZOOM = { width: 210, height: 52 }
 /** Whether the stage has room for the key and the rings' names beside the nodes. */
 export function keyShows(width: number, height: number): boolean {
   return width >= 560 && height >= 420
@@ -222,6 +227,8 @@ export function layout(trunk: MapNode, nodes: MapNode[], width: number, height: 
     if (!keyShows(width, height)) return
     const box = boxOf(p)
     if (box.y + box.hh > height - KEY.height && p.x < KEY.width + box.hw) p.x = KEY.width + box.hw
+    // And the zoom control in the bottom right.
+    if (box.y + box.hh > height - ZOOM.height && p.x > width - ZOOM.width - box.hw) p.x = width - ZOOM.width - box.hw
   }
   // A node takes up its shape and the name beside it: a box as wide as the name, reaching out
   // on the side the name is on. In a crowd the names that wait take no room.
@@ -292,3 +299,17 @@ export function layout(trunk: MapNode, nodes: MapNode[], width: number, height: 
 export function nameWaits(node: Pick<Placed, 'band'>, total: number): boolean {
   return total > CROWD && node.band > 0
 }
+
+/** Where the working tree's mark goes: touching the checked-out node, on the side away from
+ * the trunk (up and to the left of the trunk itself), and kept on the stage. */
+export function wipPlace(head: Pick<Placed, 'x' | 'y' | 'r'>, hub: Pick<Placed, 'x' | 'y'>, width: number, height: number): { x: number; y: number } {
+  const dx = head.x - hub.x
+  const dy = head.y - hub.y
+  const d = Math.hypot(dx, dy)
+  const ux = d < 1 ? -Math.SQRT1_2 : dx / d
+  const uy = d < 1 ? -Math.SQRT1_2 : dy / d
+  const reach = head.r + WIP_R + 3
+  return { x: Math.min(width - WIP_R - 4, Math.max(WIP_R + 4, head.x + ux * reach)), y: Math.min(height - WIP_R - 4, Math.max(WIP_R + 4, head.y + uy * reach)) }
+}
+/** The working tree mark's radius. */
+export const WIP_R = 11

@@ -2060,7 +2060,7 @@
       onContext={onContext}
     />
   {:else if mapView}
-    <Lazy load={() => import('./MapView.svelte')} {path} tick={mapTick} onSummary={(text: string) => (mapSummary = text)} onShow={showFromMap} onMenu={onContext ? mapMenu : undefined} />
+    <Lazy load={() => import('./MapView.svelte')} {path} tick={mapTick} onSummary={(text: string) => (mapSummary = text)} onShow={showFromMap} onMenu={onContext ? mapMenu : undefined} {wip} />
   {/if}
   </div>
 </div>
