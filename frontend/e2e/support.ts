@@ -93,3 +93,9 @@ export const textUnderFloor = (page: Page) =>
     }
     return out
   })
+
+/** Chooses a view of the graph from the bar's view menu, by the name on its menu item. */
+export async function pickView(page: Page, name: string | RegExp): Promise<void> {
+  await page.getByRole('button', { name: /^Graph view/ }).click()
+  await page.getByRole('menuitemradio', { name }).click()
+}

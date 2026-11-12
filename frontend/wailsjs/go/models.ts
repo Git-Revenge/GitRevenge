@@ -577,6 +577,20 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class GraphViews {
+	    view: string;
+	    experimental: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new GraphViews(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.view = source["view"];
+	        this.experimental = source["experimental"];
+	    }
+	}
 	export class GroupRepo {
 	    path: string;
 	    name: string;
@@ -919,6 +933,7 @@ export namespace app {
 	export class Preferences {
 	    theme: string;
 	    graphDensity: string;
+	    experimentalViews: string[];
 	    updateChecks: boolean;
 	    gitPath: string;
 	    gitInUse: string;
@@ -933,6 +948,7 @@ export namespace app {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.theme = source["theme"];
 	        this.graphDensity = source["graphDensity"];
+	        this.experimentalViews = source["experimentalViews"];
 	        this.updateChecks = source["updateChecks"];
 	        this.gitPath = source["gitPath"];
 	        this.gitInUse = source["gitInUse"];

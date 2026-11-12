@@ -1,5 +1,6 @@
-import { GraphDensity, SetGraphDensity, SetTheme, Theme } from '../../wailsjs/go/app/App.js'
+import { GraphDensity, GraphViews, SetGraphDensity, SetGraphView, SetTheme, Theme } from '../../wailsjs/go/app/App.js'
 import type { Density } from './graph/draw'
+import { currentView, savedFor, type GraphView } from './graph/views'
 import { reducedMotion } from './ui/motion'
 
 type Resolved = 'light' | 'dark'
@@ -29,11 +30,18 @@ function applyTheme(theme: Resolved) {
   })
 }
 
-/** Appearance: the colour theme, applied as data-theme on the document root, and the
- * graph's row density. */
+/** Appearance: the colour theme, applied as data-theme on the document root, the graph's row
+ * density, and which view of the graph shows. */
 class ThemeState {
   mode = $state<Mode>('')
   density = $state<Density>('comfortable')
+  /** The experimental views switched on in settings, and the one saved as showing ('' for the
+   * rows). */
+  experimental = $state<string[]>([])
+  savedView = $state('')
+  /** The view of the graph that shows: its rows at the saved density, unless an experimental
+   * view is both chosen and switched on. */
+  view: GraphView = $derived(currentView(this.density, this.savedView, this.experimental))
   system = $state<Resolved>(media.matches ? 'dark' : 'light')
   resolved: Resolved = $derived(this.mode || this.system)
 
@@ -52,18 +60,31 @@ class ThemeState {
    * theme and the graph uses the timeline. */
   async load() {
     try {
-      const [mode, density] = await Promise.all([Theme(), GraphDensity()])
+      const [mode, density, views] = await Promise.all([Theme(), GraphDensity(), GraphViews()])
       this.mode = mode as Mode
       this.density = density === 'compact' ? 'compact' : 'comfortable'
+      this.experimental = views?.experimental ?? []
+      this.savedView = views?.view ?? ''
     } catch {
       // Keep the defaults.
     }
   }
 
-  /** Switches the graph between the timeline and compact rows, and saves the choice. */
+  /** Switches the graph between the timeline and compact rows, and saves the choice. From an
+   * experimental view it goes to the rows as they aren't now, as the command's title says. */
   async toggleDensity() {
-    this.density = this.density === 'compact' ? 'comfortable' : 'compact'
-    await SetGraphDensity(this.density === 'compact' ? 'compact' : '')
+    await this.setView(this.density === 'compact' ? 'timeline' : 'compact')
+  }
+
+  /** Shows the graph as the given view and saves the choice. */
+  async setView(view: GraphView) {
+    const next = savedFor(view)
+    const viewChanged = next.view !== this.savedView
+    const densityChanged = !!next.density && next.density !== this.density
+    this.savedView = next.view
+    if (next.density) this.density = next.density
+    if (viewChanged) await SetGraphView(next.view)
+    if (densityChanged) await SetGraphDensity(this.density === 'compact' ? 'compact' : '')
   }
 
   /** Switches to the other theme and saves that as the choice. */

@@ -206,6 +206,10 @@ export function GraphRows(arg1, arg2, arg3) {
   return window['go']['app']['App']['GraphRows'](arg1, arg2, arg3);
 }
 
+export function GraphViews() {
+  return window['go']['app']['App']['GraphViews']();
+}
+
 export function GroupAction(arg1, arg2) {
   return window['go']['app']['App']['GroupAction'](arg1, arg2);
 }
@@ -568,6 +572,10 @@ export function SetGraphDensity(arg1) {
 
 export function SetGraphFocus(arg1, arg2, arg3) {
   return window['go']['app']['App']['SetGraphFocus'](arg1, arg2, arg3);
+}
+
+export function SetGraphView(arg1) {
+  return window['go']['app']['App']['SetGraphView'](arg1);
 }
 
 export function SetIgnoreTab(arg1) {

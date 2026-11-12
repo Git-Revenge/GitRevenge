@@ -68,6 +68,7 @@
         id: 'app.density',
         group: 'View',
         title: theme.density === 'compact' ? 'Show the graph as a timeline' : 'Show the graph as compact rows',
+        // From an experimental view this goes back to the rows, at the other density.
         keywords: 'density rows history',
         run: () => session.run(() => theme.toggleDensity()),
       },

@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { branch, calls, events, open, remote, tag, textUnderFloor } from './support'
+import { branch, calls, events, open, pickView, remote, tag, textUnderFloor } from './support'
 
 test.describe('commit menu', () => {
   // #505
@@ -375,7 +375,7 @@ test.describe('commit graph', () => {
       await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '20')
       const header = page.locator('.columns')
       await expect(header).toHaveCount(0)
-      await page.getByRole('button', { name: 'Compact' }).click()
+      await pickView(page, 'Compact')
       for (const name of ['Branch / tag', 'Message', 'Author', 'When', 'SHA']) await expect(header.getByText(name, { exact: true })).toBeVisible()
     })
 
@@ -419,7 +419,7 @@ test.describe('commit graph', () => {
     test("the author button searches for the selected commit's author", async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 800 })
       await open(page, 'graph', scenario)
-      await page.getByRole('button', { name: 'Compact' }).click()
+      await pickView(page, 'Compact')
       await page.getByRole('button', { name: "Search for the selected commit's author" }).click()
       await expect(page.getByRole('searchbox', { name: 'Search commits' })).toHaveValue('Ana Cruz')
       await expect.poll(() => calls(page, 'SearchGraph')).toContainEqual(['/repo', 'Ana Cruz'])
@@ -430,7 +430,7 @@ test.describe('commit graph', () => {
       await page.setViewportSize({ width: 1280, height: 300 })
       await open(page, 'graph', { ...scenario, graphData: wideLater })
       // Compact names its columns, which is how this test finds the message column.
-      await page.getByRole('button', { name: 'Compact' }).click()
+      await pickView(page, 'Compact')
       const message = page.locator('.columns').getByText('Message')
       await expect(message).toBeVisible()
       const before = (await message.boundingBox())!.x
@@ -700,7 +700,7 @@ test.describe('commit graph', () => {
 
     test('compact folds too', async ({ page }) => {
       await ready(page)
-      await page.getByRole('button', { name: 'Compact' }).click()
+      await pickView(page, 'Compact')
       await page.waitForTimeout(200)
       await page.locator('.scroller').focus()
       // Rows of 30: main's tip, the docs tip, commit 2, the fold's line (28), commit 4, commit 7.
@@ -837,7 +837,7 @@ test.describe('commit graph', () => {
 
     test('compact has no day lines', async ({ page }) => {
       await ready(page)
-      await page.getByRole('button', { name: 'Compact' }).click()
+      await pickView(page, 'Compact')
       await page.waitForTimeout(200)
       // Under compact's column headings the first row is the first commit, and the eleventh
       // follows the tenth with nothing between.
@@ -2142,7 +2142,7 @@ test.describe('before the first load has answered', () => {
       }
 
       test('with room, everything is spelled out', async ({ page }) => {
-        await at(page, 1100)
+        await at(page, 1160)
         await expect(page.getByText('411 commits')).toBeVisible()
         await expect(page.getByRole('searchbox', { name: 'Search commits' })).toHaveAttribute('placeholder', 'Search message, author or SHA')
         for (const name of ['Undo', 'Redo', 'Fetch', 'Pull', 'Push']) expect(await worded(page, name)).toBe(true)
@@ -2186,7 +2186,7 @@ test.describe('before the first load has answered', () => {
         await at(page, 600)
         for (const name of ['Undo', 'Redo', 'Fetch', 'Pull', 'Push']) expect(await worded(page, name)).toBe(false)
         await expect(page.getByRole('button', { name: /^Kinds/ })).toBeVisible()
-        await expect(page.getByRole('group', { name: 'Row density' })).toBeVisible()
+        await expect(page.getByRole('button', { name: /^Graph view/ })).toBeVisible()
         await oneLine(page)
       })
     })
@@ -2221,7 +2221,7 @@ test.describe('before the first load has answered', () => {
       const scroller = (await page.locator('.scroller').boundingBox())!
       expect((await bar(page).boundingBox())!.y).toBe(scroller.y)
       // Compact names its columns, which says where the messages start.
-      await page.getByRole('button', { name: 'Compact' }).click()
+      await pickView(page, 'Compact')
       const message = (await page.locator('.columns').getByText('Message').boundingBox())!
       const title = (await bar(page).locator('.wip-title').boundingBox())!
       expect(Math.abs(title.x - message.x)).toBeLessThanOrEqual(2)

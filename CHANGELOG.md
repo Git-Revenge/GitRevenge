@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Changed
 
+- The graph's two-icon switch between Timeline and Compact is now a menu: one button in the bar shows the current view and opens the list. It takes less room, and it's where experimental views will go. Swapping the two takes one more click than before; the command palette's command still does it in one. (#650)
 - Rendered previews use newer libraries: Mermaid 12.3.0 for diagrams, PDF.js 6.5.438 for PDFs and marked 18.1.3 for Markdown. (#643)
 - The documentation site no longer loads its fonts from Google, so reading the docs sends nothing to a third party. (#645, #646)
 
