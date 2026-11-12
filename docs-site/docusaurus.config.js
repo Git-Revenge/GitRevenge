@@ -54,14 +54,6 @@ const config = {
       tagName: 'link',
       attributes: { rel: 'apple-touch-icon', href: `${baseUrl}img/apple-touch-icon.png` },
     },
-    {
-      tagName: 'link',
-      attributes: {
-        rel: 'stylesheet',
-        type: 'text/css',
-        href: 'https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Caveat:wght@400;600;700&family=JetBrains+Mono:wght@400;500&family=Crimson+Pro:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap',
-      },
-    },
   ],
 
   i18n: {
