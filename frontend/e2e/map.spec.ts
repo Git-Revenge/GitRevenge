@@ -64,8 +64,7 @@ test.describe('the Map view', () => {
     await page.setViewportSize({ width: 1200, height: 700 })
     await open(page, 'graph', scenario())
     await expect(nodeOf(page, 'main')).toBeVisible()
-    expect(await shapeWidth(page, 'release/v0.7')).toBeGreaterThan(await shapeWidth(page, 'release/v0.6'))
-    expect(await shapeWidth(page, 'release/v0.6')).toBeGreaterThan(await shapeWidth(page, 'topic'))
+    expect(await shapeWidth(page, 'release/v0.7')).toBeGreaterThan(await shapeWidth(page, 'topic'))
     expect(await shapeWidth(page, 'main')).toBeGreaterThan(await shapeWidth(page, 'origin/gh-pages'))
     await expect(nodeOf(page, 'release/v0.8')).toHaveClass(/is-merged/)
     await expect(nodeOf(page, 'origin/gh-pages')).toHaveClass(/is-remote/)
@@ -86,7 +85,7 @@ test.describe('the Map view', () => {
       return Math.hypot(c.x - main.x, c.y - main.y)
     }
     expect(await far('topic')).toBeLessThan(await far('release/v0.7'))
-    expect(await far('release/v0.7')).toBeLessThan(await far('release/v0.6'))
+    expect(await far('origin/gh-pages')).toBeLessThan(await far('release/v0.7'))
   })
 
   test('a click opens a node’s card, and Escape closes it and gives the focus back', async ({ page }) => {
@@ -106,6 +105,8 @@ test.describe('the Map view', () => {
     await open(page, 'graph', scenario())
     await nodeOf(page, 'v0.7.0').click()
     await expect(page.getByRole('group', { name: 'About v0.7.0' })).toContainText('47 commits since the tag before it, on release/v0.7')
+    // The fold of older tags is older than the last ring: zooming out brings it in.
+    await page.getByRole('button', { name: 'Zoom out' }).click()
     await nodeOf(page, '6 older tags').click()
     await expect(page.getByRole('group', { name: 'About 6 older tags' })).toContainText('6 tags older than the ones shown')
   })
@@ -143,7 +144,7 @@ test.describe('the Map view', () => {
     await page.setViewportSize({ width: 1200, height: 700 })
     await open(page, 'graph', scenario())
     await expect(page.locator('.legend')).toBeVisible()
-    await expect(page.locator('.ringname')).toHaveCount(3)
+    await expect(page.locator('.ringname')).toHaveCount(2)
     await expect(page.getByRole('group', { name: 'Zoom' })).toBeVisible()
     await page.setViewportSize({ width: 400, height: 700 })
     await expect(page.locator('.legend')).toHaveCount(0)
@@ -222,7 +223,7 @@ test.describe('the Map view', () => {
   test('the rings’ names sit on their rings', async ({ page }) => {
     await page.setViewportSize({ width: 1200, height: 700 })
     await open(page, 'graph', scenario())
-    await expect(page.locator('.ringname')).toHaveText(['this week', 'last week', 'older'])
+    await expect(page.locator('.ringname')).toHaveText(['this week', 'last week'])
     const main = (await nodeOf(page, 'main').boundingBox())!
     const cx = main.x + main.width / 2
     const cy = main.y + main.height / 2
@@ -240,30 +241,50 @@ test.describe('the Map view', () => {
     await page.setViewportSize({ width: 1200, height: 700 })
     await open(page, 'graph', scenario())
     const names = page.locator('.ringname')
-    await expect(names).toHaveText(['this week', 'last week', 'older'])
+    await expect(names).toHaveText(['this week', 'last week'])
     await page.getByRole('button', { name: 'Zoom out' }).click()
-    await expect(names).toHaveText(['1 week', '2 weeks', '1 month', '2 months', 'older'])
+    await expect(names).toHaveText(['1 week', '2 weeks', '1 month', '2 months'])
     await expect(page.getByRole('group', { name: 'Zoom' })).toContainText('Two months')
     await page.getByRole('button', { name: 'Zoom in' }).click()
     await page.getByRole('button', { name: 'Zoom in' }).click()
-    await expect(names).toHaveText(['today', '2 days', '3 days', '4 days', '5 days', '6 days', '1 week', 'older'])
+    await expect(names).toHaveText(['today', '2 days', '3 days', '4 days', '5 days', '6 days', '1 week'])
     await expect(page.getByRole('button', { name: 'Zoom in' })).toBeDisabled()
-    // The level is kept for the next visit.
-    expect(await page.evaluate(() => localStorage.getItem('graph.map.zoom'))).toBe('0')
+    // The level is kept for this repository.
+    expect(await page.evaluate(() => localStorage.getItem('graph.map.zoom:/repo'))).toBe('0')
   })
 
-  test('a month-old branch comes inside the rings when zoomed out', async ({ page }) => {
+  // #683: what's older than the last ring is counted, not flung to the edge.
+  test('counts what is older than the last ring, and a click on the count zooms out to it', async ({ page }) => {
     await page.setViewportSize({ width: 1200, height: 700 })
     await open(page, 'graph', scenario())
-    const far = async () => {
-      const main = (await nodeOf(page, 'main').boundingBox())!
-      const n = (await nodeOf(page, 'release/v0.6').boundingBox())!
-      return Math.hypot(n.x + n.width / 2 - main.x - main.width / 2, n.y + n.height / 2 - main.y - main.height / 2)
-    }
-    const before = await far()
+    await expect(nodeOf(page, 'main')).toBeVisible()
+    // A branch that last moved a month ago, and a fold of tags from three weeks back.
+    await expect(nodeOf(page, 'release/v0.6')).toHaveCount(0)
+    const tally = page.getByRole('button', { name: '2 older' })
+    await expect(tally).toBeVisible()
+    await tally.click()
+    await expect(page.getByRole('group', { name: 'Zoom' })).toContainText('Two months')
+    await expect(nodeOf(page, 'release/v0.6')).toBeVisible()
+    await expect(page.getByRole('button', { name: /older$/ })).toHaveCount(0)
+  })
+
+  test('zooms out no further than the oldest branch needs', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 700 })
+    await open(page, 'graph', scenario())
     await page.getByRole('button', { name: 'Zoom out' }).click()
-    await page.getByRole('button', { name: 'Zoom out' }).click()
-    await expect.poll(far).toBeLessThan(before)
+    // The oldest node is a month old: two months holds everything.
+    await expect(page.getByRole('button', { name: 'Zoom out' })).toBeDisabled()
+    await nodeOf(page, 'main').focus()
+    await page.keyboard.press('-')
+    await expect(page.getByRole('group', { name: 'Zoom' })).toContainText('Two months')
+  })
+
+  test('opens at the level that fits most of the repository', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 700 })
+    const old = { ...map, nodes: Array.from({ length: 10 }, (_, i) => node(`old-${i}`, 'branch', 2, 100 + i)), branches: 11, tags: 0 }
+    await open(page, 'graph', scenario({ BranchMap: old }))
+    await expect(page.getByRole('group', { name: 'Zoom' })).toContainText('Six months')
+    await expect(nodeOf(page, 'old-3')).toBeVisible()
   })
 
   test('the wheel and the plus and minus keys zoom too', async ({ page }) => {
@@ -275,9 +296,10 @@ test.describe('the Map view', () => {
     await nodeOf(page, 'main').focus()
     await page.keyboard.press('+')
     await expect(page.getByRole('group', { name: 'Zoom' })).toContainText('Two weeks')
+    await page.keyboard.press('+')
+    await expect(page.getByRole('group', { name: 'Zoom' })).toContainText('A week, day by day')
     await page.keyboard.press('-')
-    await page.keyboard.press('-')
-    await expect(page.getByRole('group', { name: 'Zoom' })).toContainText('Six months')
+    await expect(page.getByRole('group', { name: 'Zoom' })).toContainText('Two weeks')
   })
 
   test('says so when the repository has no branch to draw', async ({ page }) => {
@@ -285,14 +307,35 @@ test.describe('the Map view', () => {
     await expect(page.locator('.map')).toContainText('No branches yet')
   })
 
-  test('in a crowd, older names wait for the focus', async ({ page }) => {
+  // #683: in a crowd a name shows only where it has room.
+  test('in a crowd, names that would run together wait for the focus', async ({ page }) => {
     await page.setViewportSize({ width: 1400, height: 800 })
-    const many = Array.from({ length: 44 }, (_, i) => node(`b${i}`, 'branch', 1 + (i % 7), i < 4 ? 1 : 20))
-    await open(page, 'graph', scenario({ BranchMap: { ...map, nodes: many, branches: 45, tags: 0 } }))
-    await expect(nodeOf(page, 'b0').locator('.name')).toBeVisible()
-    await expect(nodeOf(page, 'b30').locator('.name')).toBeHidden()
-    await nodeOf(page, 'b30').focus()
-    await expect(nodeOf(page, 'b30').locator('.name')).toBeVisible()
+    const many = Array.from({ length: 48 }, (_, i) => node(`origin/feature/SC2-${25000 + i}-a-long-name`, 'remote', 1 + (i % 7), i % 6))
+    await open(page, 'graph', scenario({ BranchMap: { ...map, nodes: [node('mine', 'branch', 2, 1), ...many], branches: 50, tags: 0 } }))
+    await expect(nodeOf(page, 'main')).toBeVisible()
+    // A local branch gets its name before any remote one.
+    await expect(nodeOf(page, 'mine').locator('.name')).toBeVisible()
+    const quiet = page.locator('.node.quiet')
+    expect(await quiet.count()).toBeGreaterThan(5)
+    await expect(quiet.first().locator('.name')).toBeHidden()
+    await quiet.first().focus()
+    await expect(quiet.first().locator('.name')).toBeVisible()
+    // The names that do show don't run over each other.
+    const boxes = await page.locator('.node:not(.quiet):not(.is-trunk) .name').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => ({ l: r.left, r: r.right, t: r.top, b: r.bottom })))
+    expect(boxes.length).toBeGreaterThan(1)
+    for (let i = 0; i < boxes.length; i++)
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i]
+        const b = boxes[j]
+        expect(a.r <= b.l + 2 || b.r <= a.l + 2 || a.b <= b.t + 2 || b.b <= a.t + 2).toBe(true)
+      }
+  })
+
+  test('a remote-only branch has a fainter line than a local one', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 700 })
+    await open(page, 'graph', scenario())
+    await expect(nodeOf(page, 'main')).toBeVisible()
+    await expect(page.locator('line.farline')).toHaveCount(1)
   })
 })
 

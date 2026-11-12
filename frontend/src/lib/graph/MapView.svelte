@@ -8,7 +8,7 @@
   import Loading from '../ui/Loading.svelte'
   import { laneVar, relativeTime } from './draw'
   import Icon from '../ui/Icon.svelte'
-  import { DEFAULT_SCALE, keyShows, layout, nameWaits, pinKey, SCALES, WIP_R, wipPlace, zoomBy, type MapNode, type Placed } from './mapLayout'
+  import { DEFAULT_SCALE, fittingScale, keyShows, layout, pinKey, SCALES, widestScale, WIP_R, wipPlace, zoomBy, type MapNode, type Placed } from './mapLayout'
 
   let {
     path,
@@ -71,24 +71,31 @@
     void data
     return Date.now() / 1000
   })
+
   // Zoom: what the rings mean. All the way in, the map is one week and each ring a day; out,
   // the rings become weeks, then months, then years. The level is kept between visits.
-  const ZOOM_KEY = 'graph.map.zoom'
-  function savedZoom(): number {
+  // The level is kept for each repository: a year-old one and a twenty-year-old one want
+  // different scales. Until one is chosen, the map opens at the level that fits most of it.
+  const zoomKey = () => `graph.map.zoom:${path}`
+  function savedZoom(): number | null {
     try {
-      const n = Number(localStorage.getItem(ZOOM_KEY) ?? DEFAULT_SCALE)
-      return Number.isInteger(n) ? zoomBy(n, 0) : DEFAULT_SCALE
+      const got = localStorage.getItem(zoomKey())
+      const n = got === null ? NaN : Number(got)
+      return Number.isInteger(n) ? zoomBy(n, 0) : null
     } catch {
-      return DEFAULT_SCALE
+      return null
     }
   }
-  let zoom = $state(savedZoom())
+  let chosenZoom = $state(savedZoom())
+  /** As far out as it's worth going: the level that just holds the oldest node. */
+  let widest = $derived(data ? widestScale(data.nodes, now) : SCALES.length - 1)
+  let zoom = $derived(Math.min(widest, chosenZoom ?? (data ? fittingScale(data.nodes, now) : DEFAULT_SCALE)))
   let scale = $derived(SCALES[zoom])
   function zoomTo(level: number) {
     if (level === zoom) return
-    zoom = level
+    chosenZoom = level
     try {
-      localStorage.setItem(ZOOM_KEY, String(level))
+      localStorage.setItem(zoomKey(), String(level))
     } catch {
       // The level just isn't kept.
     }
@@ -100,7 +107,7 @@
     e.preventDefault()
     wheeled += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY
     if (Math.abs(wheeled) < 80) return
-    zoomTo(zoomBy(zoom, wheeled > 0 ? 1 : -1))
+    zoomTo(zoomBy(zoom, wheeled > 0 ? 1 : -1, widest))
     wheeled = 0
   }
   $effect(() => {
@@ -161,7 +168,6 @@
   }
 
   let placed = $derived(data && data.trunk.name && width > 0 && height > 0 ? layout(data.trunk, data.nodes, width, height, now, scale, pins) : null)
-  let crowd = $derived(placed ? placed.nodes.length : 0)
   /** Tab order: the trunk, then the rest, newest first. */
   let ordered = $derived(placed ? [...placed.nodes].sort((a, b) => b.updated - a.updated || a.name.localeCompare(b.name)) : [])
   /** Where each line starts: the branch a tag hangs off, or the trunk. */
@@ -226,7 +232,7 @@
     // Plus and minus zoom, as they do a map.
     if (e.key === '+' || e.key === '=' || e.key === '-') {
       e.preventDefault()
-      zoomTo(zoomBy(zoom, e.key === '-' ? 1 : -1))
+      zoomTo(zoomBy(zoom, e.key === '-' ? 1 : -1, widest))
       return
     }
     if (e.key !== 'Escape' || !picked) return
@@ -244,7 +250,7 @@
   <button
     class="node is-{shapeOf(n)}"
     class:picked={picked === key}
-    class:quiet={n.kind !== 'trunk' && nameWaits(n, crowd)}
+    class:quiet={n.kind !== 'trunk' && !n.named}
     data-node={key}
     aria-pressed={picked === key}
     aria-label="{n.name}{n.head ? ', checked out' : ''}. {about(n)}"
@@ -308,7 +314,7 @@
       {/each}
       {#each placed.nodes as n (keyOf(n))}
         {@const from = holderOf(n) ?? placed.trunk}
-        <line class:tagline={n.kind === 'tag' || n.kind === 'tags'} class:stackline={n.stacked} x1={from.x} y1={from.y} x2={n.x} y2={n.y} stroke={colorOf(n)} />
+        <line class:tagline={n.kind === 'tag' || n.kind === 'tags'} class:stackline={n.stacked} class:farline={n.kind === 'remote'} x1={from.x} y1={from.y} x2={n.x} y2={n.y} stroke={colorOf(n)} />
       {/each}
     </svg>
     <!-- A narrow panel has no room for the rings' names or the key: the nodes come first. -->
@@ -320,7 +326,17 @@
       <span class="ringname" style:left="{placed.rings.cx + Math.cos(ray) * ring.r}px" style:top="{placed.rings.cy + Math.sin(ray) * ring.r}px">{ring.name}</span>
     {/each}
     {@const last = placed.rings.marks[placed.rings.marks.length - 1].r + 30}
-    <span class="ringname" style:left="{Math.min(width - 34, Math.max(34, placed.rings.cx + Math.cos(ray) * last))}px" style:top="{Math.min(height - 12, Math.max(12, placed.rings.cy + Math.sin(ray) * last))}px">older</span>
+{#if placed.older}
+      <!-- What's older than the last ring isn't drawn at this zoom: it's counted here, past the
+           last ring, and a click zooms out to bring it in. -->
+      <button
+        class="tally"
+        style:left="{Math.min(width - 54, Math.max(54, placed.rings.cx + Math.cos(ray) * last))}px"
+        style:top="{Math.min(height - 16, Math.max(16, placed.rings.cy + Math.sin(ray) * last))}px"
+        title="{placed.older.toLocaleString()} {placed.older === 1 ? 'branch or tag is' : 'branches and tags are'} older than the last ring. Zoom out to see {placed.older === 1 ? 'it' : 'them'}."
+        onclick={() => zoomTo(zoomBy(zoom, 1, widest))}>{placed.older.toLocaleString()} older</button
+      >
+    {/if}
     {/if}
 
     <div class="nodes" role="group" aria-label="Branches and tags around {data.trunk.name}">
@@ -341,7 +357,7 @@
     <div class="zoom" role="group" aria-label="Zoom">
       <button class="btn sm quiet icon" aria-label="Zoom in" title="Zoom in: the rings mark less time (+)" disabled={zoom === 0} onclick={() => zoomTo(zoomBy(zoom, -1))}>+</button>
       <span class="span" aria-live="polite">{scale.name}</span>
-      <button class="btn sm quiet icon" aria-label="Zoom out" title="Zoom out: the rings mark more time (-)" disabled={zoom === SCALES.length - 1} onclick={() => zoomTo(zoomBy(zoom, 1))}>−</button>
+      <button class="btn sm quiet icon" aria-label="Zoom out" title="Zoom out: the rings mark more time (-)" disabled={zoom >= widest} onclick={() => zoomTo(zoomBy(zoom, 1, widest))}>−</button>
     </div>
 
     <div class="legend">
@@ -388,6 +404,13 @@
     stroke-opacity: 0.5;
   }
 
+  /* A branch that's only on the remote is somebody else's: its line stands back, so local work
+     reads first. */
+  line.farline {
+    stroke-width: 1.25;
+    stroke-opacity: 0.24;
+  }
+
   /* A stack's links are heavier: they're what the stack is. */
   line.stackline {
     stroke-width: 2.5;
@@ -412,6 +435,22 @@
     transform: translate(-50%, -50%) rotate(-2deg);
     pointer-events: none;
     white-space: nowrap;
+  }
+
+  .tally {
+    position: absolute;
+    z-index: 2;
+    padding: 2px 8px;
+    border: none;
+    border-radius: var(--r-sm);
+    background: var(--paper-deep);
+    font-family: var(--font-hand);
+    font-size: 18px;
+    line-height: 1.1;
+    color: var(--ink-soft);
+    transform: translate(-50%, -50%) rotate(-2deg);
+    white-space: nowrap;
+    cursor: pointer;
   }
 
   /* A node put somewhere by hand: a small pin's head at its edge. */
@@ -574,7 +613,7 @@
     color: var(--ink-mute);
   }
 
-  /* In a crowd the older names wait for the pointer or the focus. */
+  /* A name that would run over another waits for the pointer or the focus. */
   .node.quiet .name {
     display: none;
   }

@@ -37,6 +37,9 @@ export interface Placed extends MapNode {
   above: boolean
   /** Someone put it here by hand: the springs leave it alone. */
   pinned?: boolean
+  /** Its name shows. In a busy map a name that would run over another, or over a node, waits
+   * for the pointer or the focus. */
+  named: boolean
 }
 
 /** Where a node was put by hand, by its kind and name ("branch:topic"). */
@@ -75,9 +78,29 @@ export const SCALES: Scale[] = [
 /** The zoom the map opens at: this week and last. */
 export const DEFAULT_SCALE = 1
 
-/** The zoom level one step in (-1) or out (+1) from `level`, within the levels there are. */
-export function zoomBy(level: number, step: number): number {
-  return Math.min(SCALES.length - 1, Math.max(0, Math.round(level) + step))
+/** The zoom level one step in (-1) or out (+1) from `level`, no further out than `widest`. */
+export function zoomBy(level: number, step: number, widest = SCALES.length - 1): number {
+  return Math.min(widest, Math.max(0, Math.round(level) + step))
+}
+
+/** How old each node is, in days. */
+const ages = (nodes: Pick<MapNode, 'updated'>[], now: number) => nodes.map((n) => (now - n.updated) / DAY)
+
+/** The furthest out worth zooming: the first level whose last ring holds the oldest node.
+ * Past it, everything only crowds the middle. */
+export function widestScale(nodes: Pick<MapNode, 'updated'>[], now: number): number {
+  const oldest = Math.max(0, ...ages(nodes, now))
+  const at = SCALES.findIndex((s) => s.rings[s.rings.length - 1].days >= oldest)
+  // Never closer than this week and last: that's where a map opens.
+  return at < 0 ? SCALES.length - 1 : Math.max(DEFAULT_SCALE, at)
+}
+
+/** The level a map opens at when none has been chosen: the closest that holds most of its
+ * nodes (three in five), and no closer than this week and last. */
+export function fittingScale(nodes: Pick<MapNode, 'updated'>[], now: number): number {
+  const all = ages(nodes, now)
+  const at = SCALES.findIndex((s) => all.filter((d) => d <= s.rings[s.rings.length - 1].days).length >= all.length * 0.6)
+  return Math.min(widestScale(nodes, now), Math.max(DEFAULT_SCALE, at < 0 ? SCALES.length - 1 : at))
 }
 
 export interface Rings {
@@ -205,15 +228,21 @@ export function layout(
   now: number,
   scale: Scale = SCALES[DEFAULT_SCALE],
   pins: Pins = new Map(),
-): { trunk: Placed; nodes: Placed[]; rings: Rings; nameAngle: number } {
+): { trunk: Placed; nodes: Placed[]; rings: Rings; nameAngle: number; older: number } {
   const rings = ringsFor(width, height, scale)
+  // What's older than the last ring isn't drawn at this zoom: it would only be a long spoke to
+  // the edge. It's counted instead, and zooming out brings it in. The checked-out branch and
+  // anything pinned always show.
+  const all = nodes
+  nodes = all.filter((n) => bandOf(n.updated, now, scale) < scale.rings.length || n.head || pins.has(pinKey(n)))
+  const older = all.length - nodes.length
   const k = scales(nodes)
-  const hub: Placed = { ...trunk, x: rings.cx, y: rings.cy, r: trunkRadius(trunk.commits, k.branch), size: 0, band: 0, above: false }
+  const hub: Placed = { ...trunk, x: rings.cx, y: rings.cy, r: trunkRadius(trunk.commits, k.branch), size: 0, band: 0, above: false, named: true }
   hub.size = hub.r * 2
 
   const placed: Placed[] = nodes.map((n) => {
     const size = n.kind === 'tags' ? TAG_SIDE.max : isTag(n) ? tagSide(n.commits, k.tag) : branchRadius(n.commits, k.branch) * 2
-    return { ...n, x: 0, y: 0, size, r: isTag(n) ? (size * Math.SQRT2) / 2 : size / 2, band: bandOf(n.updated, now, scale), above: false }
+    return { ...n, x: 0, y: 0, size, r: isTag(n) ? (size * Math.SQRT2) / 2 : size / 2, band: bandOf(n.updated, now, scale), above: false, named: false }
   })
   const byName = new Map(placed.filter((p) => !isTag(p)).map((p) => [p.name, p]))
   const holder = (p: Placed) => (p.parent ? byName.get(p.parent) : undefined)
@@ -258,11 +287,13 @@ export function layout(
     if (box.y + box.hh > height - ZOOM.height && p.x > width - ZOOM.width - box.hw) p.x = width - ZOOM.width - box.hw
   }
   // A node takes up its shape and the name beside it: a box as wide as the name, reaching out
-  // on the side the name is on. In a crowd the names that wait take no room.
+  // on the side the name is on. In a crowd there isn't room to keep every name clear: only the
+  // checked-out branch, pinned nodes and local branches keep room for theirs, the rest are
+  // spaced by their shapes alone, and names are given out afterwards to those with room.
   const crowded = placed.length > CROWD
   const isAbove = (p: Placed) => p.y < hub.y - 24 && !holder(p)
   const boxOf = (p: Placed) => {
-    const named = !(crowded && p.band > 0)
+    const named = !crowded || p.head || !!p.pinned || p.kind === 'branch'
     const hw = Math.max(p.r, named ? nameWidth(p.name) / 2 : 0) + 5
     const hh = p.r + (named ? NAME_H / 2 : 0) + 3
     return { x: p.x, y: p.y + (named ? (isAbove(p) ? -NAME_H / 2 : NAME_H / 2) : 0), hw, hh }
@@ -324,7 +355,24 @@ export function layout(
   }
   // A node above the trunk wears its name on top, so the name doesn't run across the trunk.
   for (const p of placed) p.above = isAbove(p)
-  return { trunk: hub, nodes: placed, rings, nameAngle: ringNameAngle(rings, placed.map(boxOf), width, height) }
+
+  // Names, in order of who most needs one: the checked-out branch, what's pinned, local
+  // branches, then the rest by size. A name that would run over a name already given, or over
+  // another node, is left out: it shows when the node is pointed at or has the focus.
+  type Box = { x: number; y: number; hw: number; hh: number; of?: Placed }
+  const hit = (a: Box, b: Box) => Math.abs(a.x - b.x) < a.hw + b.hw && Math.abs(a.y - b.y) < a.hh + b.hh
+  const taken: Box[] = [{ x: hub.x, y: hub.y, hw: hub.r, hh: hub.r }, ...placed.map((p) => ({ x: p.x, y: p.y, hw: p.r, hh: p.r, of: p }))]
+  const rank = (p: Placed) => (p.head ? 0 : p.pinned ? 1 : p.kind === 'branch' ? 2 : p.kind === 'remote' ? 3 : 4)
+  const wanting = [...placed].sort((a, b) => rank(a) - rank(b) || b.commits - a.commits || b.updated - a.updated || a.name.localeCompare(b.name))
+  for (const p of wanting) {
+    const off = p.r + 4 + NAME_H / 2
+    const label: Box = { x: p.x, y: p.above ? p.y - off : p.y + off, hw: nameWidth(p.name) / 2, hh: NAME_H / 2 - 2 }
+    // The checked-out branch is always named: it's where you are.
+    if (!p.head && taken.some((t) => t.of !== p && hit(label, t))) continue
+    p.named = true
+    taken.push(label)
+  }
+  return { trunk: hub, nodes: placed, rings, nameAngle: ringNameAngle(rings, placed.map(boxOf), width, height), older }
 }
 
 /** The directions the rings' names can run out along, in degrees from "right", clockwise:
@@ -367,10 +415,6 @@ export function ringNameAngle(rings: Rings, boxes: { x: number; y: number; hw: n
 /** Half the size a ring's name takes, for keeping nodes off it. */
 const RING_NAME = { hw: 34, hh: 10 }
 
-/** Whether a node's name waits for a hover or the focus: in a crowd, all but the newest. */
-export function nameWaits(node: Pick<Placed, 'band'>, total: number): boolean {
-  return total > CROWD && node.band > 0
-}
 
 /** Where the working tree's mark goes: touching the checked-out node, on the side away from
  * the trunk (up and to the left of the trunk itself), and kept on the stage. */
