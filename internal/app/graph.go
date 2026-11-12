@@ -223,6 +223,9 @@ type LaneName struct {
 	// Refs are the branches and tags on that commit, when it's the lane's own tip. A lane a
 	// merge opened has none: the branch it was is gone, or was never here.
 	Refs []git.Ref `json:"refs"`
+	// Merge is the subject of the merge that opened the lane, when one did: it usually says
+	// what was merged ("Merge tag 'v1' of ...", "Merge branch 'topic'").
+	Merge string `json:"merge,omitempty"`
 }
 
 // LaneNames says which commit started each of the given lanes of the graph at path, and the
@@ -244,6 +247,8 @@ func (a *App) LaneNames(path string, colors []int) ([]LaneName, error) {
 			name.Row, name.Commit = row, g.ID(row)
 			if tip {
 				name.Refs = append(name.Refs, idx.ByCommit[name.Commit]...)
+			} else {
+				name.Merge = g.Subject(row)
 			}
 		}
 		out = append(out, name)

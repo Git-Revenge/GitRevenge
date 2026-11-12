@@ -336,6 +336,16 @@ func (g *Graph) LaneStart(color int) (row int, tip, ok bool) {
 	return int(at), int(g.nodeColor[at]) == color%0x10000, true
 }
 
+// Subject returns the subject of the commit at row, or "" past the end.
+func (g *Graph) Subject(row int) string {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	if row < 0 || row >= len(g.subjects) {
+		return ""
+	}
+	return g.subjects[row]
+}
+
 // ID returns the full ID of the commit at row, or "" past the end.
 func (g *Graph) ID(row int) string {
 	g.mu.RLock()

@@ -101,6 +101,21 @@ test.describe('the Horizontal view', () => {
     expect(mark.x).toBeLessThan(column.x + column.width)
   })
 
+  // #671: a lane a merge opened is named by what was merged, where it was a row of dashes.
+  test('names a merged lane by what its merge says it brought in', async ({ page }) => {
+    const merged = rows.map((r, i) => {
+      const side = { from: 1, to: 1, color: 5 }
+      if (i === 0) return { ...r, parents: 2, subject: "Merge tag 'drivers-v7.4' of git://example.org/linux", width: 2, down: [...r.down, { from: 0, to: 1, color: 5 }] }
+      if (i < 4) return { ...r, width: 2, up: [...r.up, side], down: [...r.down, side] }
+      return r
+    })
+    await open(page, 'graph', { ...scenario({ view: 'horizontal', experimental: ['horizontal'] }), graphData: merged })
+    const names = page.getByRole('list', { name: 'Branches, by lane' })
+    await expect(names.getByRole('listitem')).toHaveCount(2)
+    await expect(names.getByRole('listitem').nth(1)).toContainText('drivers-v7.4')
+    await expect(names.locator('.merged')).toHaveAttribute('title', /Merge tag 'drivers-v7\.4'/)
+  })
+
   test('keeps the lane’s name pinned when its tip has scrolled away', async ({ page }) => {
     await open(page, 'graph', scenario({ view: 'horizontal', experimental: ['horizontal'] }))
     const names = page.getByRole('list', { name: 'Branches, by lane' })

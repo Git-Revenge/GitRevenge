@@ -55,11 +55,15 @@ const behaviours: Record<string, (...args: never[]) => unknown> = {
   LaneNames: (_path: string, colors: number[]) => {
     if ('LaneNames' in responses) return responses.LaneNames
     const total = scenario.graphData?.length ?? scenario.graphRows ?? 0
-    const rows = Array.from({ length: Math.min(total, 500) }, (_, k) => (scenario.graphData?.[k] ?? graphRow(k)) as { id: string; color: number })
+    type Stub = { id: string; color: number; subject: string; down: { from: number; to: number; color: number }[] }
+    const rows = Array.from({ length: Math.min(total, 500) }, (_, k) => (scenario.graphData?.[k] ?? graphRow(k)) as Stub)
     return colors.map((color) => {
-      const row = rows.findIndex((r) => r.color === color)
-      const commit = row < 0 ? '' : rows[row].id
-      return { color, row, commit, refs: (scenario.graphRefs?.[commit] ?? []) as unknown[] }
+      const tip = rows.findIndex((r) => r.color === color)
+      // Before its own first commit, a lane may have been opened by a merge on another lane.
+      const opener = rows.findIndex((r) => r.color !== color && r.down.some((s) => s.color === color && s.from !== s.to))
+      if (opener >= 0 && (tip < 0 || opener < tip)) return { color, row: opener, commit: rows[opener].id, refs: [], merge: rows[opener].subject }
+      const commit = tip < 0 ? '' : rows[tip].id
+      return { color, row: tip, commit, refs: (scenario.graphRefs?.[commit] ?? []) as unknown[] }
     })
   },
   // The stub's commits are numbered, so a commit's row is its number, unless a test says otherwise.
