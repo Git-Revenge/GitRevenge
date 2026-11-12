@@ -1474,6 +1474,42 @@ test.describe('commit graph', () => {
     }
     const tab = (page: Page, name: string) => page.getByRole('tab', { name, exact: true })
 
+    // #681: a note is prose about the commit, and links the way its message does.
+    test('a note links web addresses and smart links, and keeps its line breaks', async ({ page }) => {
+      const rule = { name: 'Jira', pattern: 'ABC-\\d+', url: 'https://jira.example.com/browse/{0}', in: ['message', 'trailers', 'branches'], enabled: true }
+      const notes = [{ ref: 'refs/notes/commits', text: 'Deployed for ABC-1234.\nRunbook: https://example.com/runbook' }]
+      const s = scenario()
+      await open(page, 'repoView', { ...s, responses: { ...s.responses, CommitNotes: notes, LinkRules: { web: true, rules: [rule] } } })
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.click(box.x + 500, box.y + ROW + 26)
+      await tab(page, 'Details').click()
+      const note = page.locator('.notes .note')
+      await expect(note).toContainText('Deployed for ABC-1234.')
+      const key = note.getByRole('link', { name: 'ABC-1234' })
+      await expect(key).toHaveAttribute('href', 'https://jira.example.com/browse/ABC-1234')
+      await expect(key).toHaveClass(/smart/)
+      await expect(note.getByRole('link', { name: 'https://example.com/runbook' })).toHaveAttribute('href', 'https://example.com/runbook')
+      // The words around a link are still there, and so is the note's second line.
+      await expect(note.locator('p')).toHaveText('Deployed for ABC-1234.\nRunbook: https://example.com/runbook', { useInnerText: true })
+      // A click opens it in the browser, not in the app's own window.
+      await key.click()
+      expect(await events(page, 'open-url')).toContainEqual(['https://jira.example.com/browse/ABC-1234'])
+      // And it has the message's link menu.
+      await key.click({ button: 'right' })
+      await expect(page.getByRole('menuitem', { name: 'Open ABC-1234 in Jira' })).toBeVisible()
+      await expect(page.getByRole('menuitem', { name: 'Find commits mentioning ABC-1234' })).toBeVisible()
+    })
+
+    test('a note with nothing to link reads as it did', async ({ page }) => {
+      const s = scenario()
+      await open(page, 'repoView', { ...s, responses: { ...s.responses, CommitNotes: [{ ref: 'refs/notes/commits', text: 'just a plain note' }] } })
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.click(box.x + 500, box.y + ROW + 26)
+      await tab(page, 'Details').click()
+      await expect(page.locator('.notes .note p')).toHaveText('just a plain note')
+      await expect(page.locator('.notes .note a')).toHaveCount(0)
+    })
+
     test('opens on the message, under plain headings', async ({ page }) => {
       await openCommit(page)
       await expect(tab(page, 'Message')).toHaveAttribute('aria-selected', 'true')

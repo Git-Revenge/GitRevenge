@@ -490,7 +490,9 @@
                 {#if !(n.ref === DEFAULT_NOTES && noteDraft !== null)}
                   <div class="note">
                     {#if n.ref !== DEFAULT_NOTES}<span class="meta note-ref">{n.ref.replace(/^refs\/notes\//, '')}</span>{/if}
-                    <p>{n.text}</p>
+                    <!-- A note is prose about the commit, as its message is: web addresses and the
+                         repository's smart links are links in it too. Its line breaks are kept. -->
+                    <p>{#each linker.parts(n.text, 'message') as part, k (k)}{#if part.href}<a href={part.href} title={linkTitle(part)} class:smart={!!part.rule} onclick={(e) => openLink(e, part.href!)} oncontextmenu={(e) => linkMenu(e, part)}>{part.text}</a>{:else}{part.text}{/if}{/each}</p>
                   </div>
                 {/if}
               {/each}

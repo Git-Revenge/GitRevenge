@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 - Rendered previews use newer libraries: Mermaid 12.3.0 for diagrams, PDF.js 6.5.438 for PDFs and marked 18.1.3 for Markdown. (#643)
 - The documentation site no longer loads its fonts from Google, so reading the docs sends nothing to a third party. (#645, #646)
 
+### Fixed
+
+- A commit's notes link the way its message does: web addresses and your smart links (a ticket key such as `ABC-1234`) are links in a note, with the same right-click menu. They were plain text. (#681)
+
 ## [0.11.0] - 2026-11-11
 
 Git tools: everyday git chores without leaving the app.
