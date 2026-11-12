@@ -3,6 +3,7 @@ package app
 import (
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -203,5 +204,62 @@ func TestBranchMapHangsAStackedBranchOffItsParentAndSaysWhereAWorktreeIs(t *test
 	}
 	if base.Worktree == "" || top.Worktree != "" {
 		t.Fatalf("worktrees: base %q, top %q; want base's folder and nothing for top", base.Worktree, top.Worktree)
+	}
+}
+
+func TestBranchMapGroupsRemoteBranchesThatShareAPath(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	local, remote := gittest.WithRemote(t, 2)
+	other := gittest.Clone(t, remote)
+	for _, name := range []string{"feature/a", "feature/b", "feature/c", "bugfix/x", "lone"} {
+		other.Git("checkout", "-q", "-b", name, "main")
+		other.CommitFile(strings.ReplaceAll(name, "/", "-")+".txt", name, "work on "+name)
+		other.Git("push", "-q", "origin", name)
+	}
+	local.Git("fetch", "-q", "origin")
+	// A local branch is never grouped, whatever its name.
+	local.Git("branch", "feature/mine")
+
+	path := openForMap(t, a, local)
+	m, err := a.BranchMap(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	group := mapNode(t, m, "origin/feature/")
+	if group.Kind != "group" || group.Branches != 3 || group.Commit == "" || group.Updated == 0 {
+		t.Fatalf("group = %+v, want three branches under origin/feature/", group)
+	}
+	// Two branches don't make a group, and a branch with no path has none to join.
+	if got := mapNode(t, m, "origin/bugfix/x"); got.Kind != "remote" || got.Commits != 1 {
+		t.Fatalf("origin/bugfix/x = %+v, want a branch of its own", got)
+	}
+	if got := mapNode(t, m, "origin/lone"); got.Kind != "remote" {
+		t.Fatalf("origin/lone = %+v", got)
+	}
+	if got := mapNode(t, m, "feature/mine"); got.Kind != "branch" {
+		t.Fatalf("feature/mine = %+v, want a local branch of its own", got)
+	}
+	for _, n := range m.Nodes {
+		if strings.HasPrefix(n.Name, "origin/feature/") && n.Kind != "group" {
+			t.Fatalf("%s has a node of its own beside its group", n.Name)
+		}
+	}
+	// Every branch still counts: main, feature/mine, and the five on the remote.
+	if m.Branches != 7 {
+		t.Fatalf("branches = %d, want 7", m.Branches)
+	}
+
+	opened, err := a.BranchMapGroup(path, "origin/feature/")
+	if err != nil || len(opened.Nodes) != 3 || opened.More != 0 {
+		t.Fatalf("opened = %+v, %v", opened, err)
+	}
+	for _, n := range opened.Nodes {
+		if n.Kind != "remote" || n.Parent != "origin/feature/" || n.Commits != 1 || !strings.HasPrefix(n.Name, "origin/feature/") {
+			t.Fatalf("member = %+v, want a remote branch with 1 commit, hanging off its group", n)
+		}
+	}
+	if none, err := a.BranchMapGroup(path, "origin/nothing/"); err != nil || len(none.Nodes) != 0 {
+		t.Fatalf("a group that isn't there: %+v, %v", none, err)
 	}
 }

@@ -18,6 +18,11 @@ const (
 	maxMapBranches = 60
 	// maxMapTags is how many tags get a node of their own; older ones fold into one.
 	maxMapTags = 6
+	// minMapGroup is how many remote-only branches must share a first path segment
+	// (feature/, bugfix/) to be drawn as one node.
+	minMapGroup = 3
+	// maxMapGroup caps the branches an opened group shows: the ones that moved most recently.
+	maxMapGroup = 40
 )
 
 // The kinds of node in the Map view.
@@ -27,6 +32,7 @@ const (
 	mapRemote = "remote"
 	mapTag    = "tag"
 	mapTags   = "tags"
+	mapGroup  = "group"
 )
 
 // MapNode is one node of the Map view: the trunk, a branch, a tag, or the older tags folded
@@ -58,6 +64,9 @@ type MapNode struct {
 	BranchKind string `json:"branchKind,omitempty"`
 	// Tags is how many tags the fold holds.
 	Tags int `json:"tags,omitempty"`
+	// Branches is how many branches a group stands for. A group isn't counted commit by
+	// commit until it's opened: Commits is 0.
+	Branches int `json:"branches,omitempty"`
 }
 
 // BranchMap is what the Map view draws.
@@ -105,6 +114,10 @@ func (a *App) BranchMap(path string) (BranchMap, error) {
 
 	branches := mapBranches(refs, trunk)
 	out.Branches = len(branches) + 1
+	// Remote-only branches that share a first path segment are one node between them. They're
+	// somebody else's work, there can be hundreds, and counting each one's commits is what
+	// takes the time: a group is only counted when it's opened (BranchMapGroup).
+	branches, groupNodes := mapGroups(branches)
 	// The ones that moved last are the ones to show, when there are too many.
 	slices.SortStableFunc(branches, func(x, y git.Ref) int { return cmp.Compare(y.Updated, x.Updated) })
 	if len(branches) > maxMapBranches {
@@ -168,7 +181,108 @@ func (a *App) BranchMap(path string) (BranchMap, error) {
 	if err := runMapJobs(jobs); err != nil {
 		return BranchMap{Nodes: []MapNode{}}, err
 	}
-	out.Nodes = append(append(out.Nodes, branchNodes...), tagNodes...)
+	out.Nodes = append(append(append(out.Nodes, branchNodes...), groupNodes...), tagNodes...)
+	return out, nil
+}
+
+// mapGroupOf names the group a remote-only branch belongs to: its remote and the first
+// segment of its path, "origin/feature/" for origin/feature/login. A branch with no path
+// (origin/topic) belongs to none.
+func mapGroupOf(ref git.Ref) string {
+	if ref.Kind != git.RemoteBranch {
+		return ""
+	}
+	remote, rest, ok := strings.Cut(ref.Short, "/")
+	if !ok {
+		return ""
+	}
+	segment, _, ok := strings.Cut(rest, "/")
+	if !ok {
+		return ""
+	}
+	return remote + "/" + segment + "/"
+}
+
+// mapGroups takes the remote-only branches that share a group with enough others out of
+// branches, and returns the rest with a node for each group: its newest branch's commit and
+// date, and how many branches it stands for.
+func mapGroups(branches []git.Ref) (rest []git.Ref, groups []MapNode) {
+	sizes := map[string]int{}
+	for _, b := range branches {
+		if g := mapGroupOf(b); g != "" {
+			sizes[g]++
+		}
+	}
+	at := map[string]int{}
+	for _, b := range branches {
+		g := mapGroupOf(b)
+		if g == "" || sizes[g] < minMapGroup {
+			rest = append(rest, b)
+			continue
+		}
+		i, seen := at[g]
+		if !seen {
+			i = len(groups)
+			at[g] = i
+			groups = append(groups, MapNode{Name: g, Kind: mapGroup, Branches: sizes[g]})
+		}
+		if b.Updated >= groups[i].Updated {
+			groups[i].Updated, groups[i].Commit = b.Updated, b.Commit
+		}
+	}
+	return rest, groups
+}
+
+// MapGroup is a group of the Map view, opened.
+type MapGroup struct {
+	// Nodes are the group's branches, newest first, each hanging off the group.
+	Nodes []MapNode `json:"nodes"`
+	// More is how many of its branches were left out for being the least recently moved.
+	More int `json:"more"`
+}
+
+// BranchMapGroup returns the branches of one group of the Map view (see BranchMap), sized by
+// the commits the trunk doesn't have. group is the group node's name.
+func (a *App) BranchMapGroup(path, group string) (MapGroup, error) {
+	out := MapGroup{Nodes: []MapNode{}}
+	r, err := a.openRepo(path)
+	if err != nil {
+		return out, err
+	}
+	ctx := context.Background()
+	refs := r.Refs().All
+	trunk, ok := mapTrunkOf(refs)
+	if !ok {
+		return out, nil
+	}
+	var members []git.Ref
+	for _, b := range mapBranches(refs, trunk) {
+		if mapGroupOf(b) == group {
+			members = append(members, b)
+		}
+	}
+	slices.SortStableFunc(members, func(x, y git.Ref) int { return cmp.Compare(y.Updated, x.Updated) })
+	if len(members) > maxMapGroup {
+		out.More = len(members) - maxMapGroup
+		members = members[:maxMapGroup]
+	}
+	nodes := make([]MapNode, len(members))
+	var jobs []func() error
+	for i, b := range members {
+		nodes[i] = MapNode{Name: b.Short, Kind: mapRemote, Commit: b.Commit, Updated: b.Updated, BranchKind: b.BranchKind, Parent: group}
+		jobs = append(jobs, func() error {
+			s, err := r.Git.ReadString(ctx, "rev-list", "--count", trunk.Name+".."+b.Name, "--")
+			if err != nil {
+				return err
+			}
+			nodes[i].Commits, err = strconv.Atoi(strings.TrimSpace(s))
+			return err
+		})
+	}
+	if err := runMapJobs(jobs); err != nil {
+		return out, err
+	}
+	out.Nodes = nodes
 	return out, nil
 }
 

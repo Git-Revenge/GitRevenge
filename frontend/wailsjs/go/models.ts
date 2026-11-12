@@ -295,6 +295,7 @@ export namespace app {
 	    head: boolean;
 	    branchKind?: string;
 	    tags?: number;
+	    branches?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new MapNode(source);
@@ -313,6 +314,7 @@ export namespace app {
 	        this.head = source["head"];
 	        this.branchKind = source["branchKind"];
 	        this.tags = source["tags"];
+	        this.branches = source["branches"];
 	    }
 	}
 	export class BranchMap {
@@ -972,6 +974,38 @@ export namespace app {
 	        this.commits = source["commits"];
 	        this.matches = this.convertValues(source["matches"], links.Match);
 	        this.problem = source["problem"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MapGroup {
+	    nodes: MapNode[];
+	    more: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MapGroup(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.nodes = this.convertValues(source["nodes"], MapNode);
+	        this.more = source["more"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

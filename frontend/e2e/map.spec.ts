@@ -236,6 +236,55 @@ test.describe('the Map view', () => {
     expect(Math.abs((await far(1)) - (main.y + main.height / 2 - 41 - 6))).toBeLessThan(40)
   })
 
+  // #684: remote-only branches under one path are one node, which opens.
+  test('a group stands for several remote branches, and opens to show them', async ({ page }) => {
+    await page.setViewportSize({ width: 1300, height: 760 })
+    const group = node('origin/feature/', 'group', 0, 1, { branches: 312 })
+    const members = Array.from({ length: 5 }, (_, i) => node(`origin/feature/f${i}`, 'remote', 2 + i, 1 + i, { parent: 'origin/feature/' }))
+    await open(page, 'graph', scenario({ BranchMap: { ...map, nodes: [node('mine', 'branch', 2, 1), group], branches: 314, tags: 0 }, BranchMapGroup: { nodes: members, more: 307 } }))
+    const g = nodeOf(page, 'origin/feature/')
+    await expect(g).toHaveClass(/is-group/)
+    await expect(g.locator('.shape')).toHaveText('312')
+    await expect(g).toContainText('312 branches')
+    await expect(nodeOf(page, 'origin/feature/f0')).toHaveCount(0)
+    // Its branches aren't read until it's opened.
+    expect(await calls(page, 'BranchMapGroup')).toEqual([])
+    await g.click()
+    const card = page.getByRole('group', { name: 'About origin/feature/' })
+    await expect(card).toContainText('312 branches under origin/feature/, only on the remote.')
+    await card.getByRole('button', { name: 'Show its branches' }).click()
+    await expect(nodeOf(page, 'origin/feature/f0')).toBeVisible()
+    await expect(nodeOf(page, 'origin/feature/f4')).toBeVisible()
+    expect(await calls(page, 'BranchMapGroup')).toEqual([['/repo', 'origin/feature/']])
+    await expect(card).toContainText("The 307 oldest of them aren't shown.")
+    // They sit round their group, not round the trunk.
+    const centre = async (name: string) => {
+      const b = (await nodeOf(page, name).boundingBox())!
+      return { x: b.x + b.width / 2, y: b.y + b.height / 2 }
+    }
+    const [f0, hub, main] = [await centre('origin/feature/f0'), await centre('origin/feature/'), await centre('main')]
+    expect(Math.hypot(f0.x - hub.x, f0.y - hub.y)).toBeLessThan(Math.hypot(f0.x - main.x, f0.y - main.y))
+    await card.getByRole('button', { name: 'Fold its branches away' }).click()
+    await expect(nodeOf(page, 'origin/feature/f0')).toHaveCount(0)
+  })
+
+  test('the switch shows all branches, only local ones, or only remote ones, and remembers', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 700 })
+    await open(page, 'graph', scenario())
+    const sw = page.getByRole('group', { name: 'Branches to show' })
+    await expect(sw.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(nodeOf(page, 'origin/gh-pages')).toBeVisible()
+    await sw.getByRole('button', { name: 'Local' }).click()
+    await expect(nodeOf(page, 'origin/gh-pages')).toHaveCount(0)
+    await expect(nodeOf(page, 'topic')).toBeVisible()
+    await expect(nodeOf(page, 'v0.11.0')).toBeVisible()
+    await sw.getByRole('button', { name: 'Remote' }).click()
+    await expect(nodeOf(page, 'origin/gh-pages')).toBeVisible()
+    await expect(nodeOf(page, 'topic')).toHaveCount(0)
+    await expect(nodeOf(page, 'main')).toBeVisible()
+    expect(await page.evaluate(() => localStorage.getItem('graph.map.show:/repo'))).toBe('remote')
+  })
+
   // #661: zoom changes what the rings mean.
   test('zooms out to months and in to a week of days, and no closer', async ({ page }) => {
     await page.setViewportSize({ width: 1200, height: 700 })

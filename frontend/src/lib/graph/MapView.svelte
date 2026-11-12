@@ -2,13 +2,13 @@
   // An experimental view with no commits in it: a node for each branch and tag, held around
   // the trunk. Size is commits, distance is how long since it moved. It's a way in to the
   // timeline, not a place to work: a node's card opens the timeline on it.
-  import { BranchMap } from '../../../wailsjs/go/app/App.js'
+  import { BranchMap, BranchMapGroup } from '../../../wailsjs/go/app/App.js'
   import { kindInfo } from '../branchKinds'
   import { errorText } from '../errors'
   import Loading from '../ui/Loading.svelte'
   import { laneVar, relativeTime } from './draw'
   import Icon from '../ui/Icon.svelte'
-  import { DEFAULT_SCALE, fittingScale, keyShows, layout, pinKey, SCALES, widestScale, WIP_R, wipPlace, zoomBy, type MapNode, type Placed } from './mapLayout'
+  import { DEFAULT_SCALE, fittingScale, keyShows, layout, pinKey, SCALES, showingNodes, widestScale, WIP_R, wipPlace, zoomBy, type MapNode, type Placed, type Showing } from './mapLayout'
 
   let {
     path,
@@ -60,6 +60,12 @@
         error = ''
         onSummary?.(`${plural(data.branches, 'branch', 'branches')} · ${plural(data.tags, 'tag')}`)
         if (picked && ![data.trunk, ...data.nodes].some((n) => keyOf(n) === picked)) picked = ''
+        // The groups that were open are read again, and one that's gone is forgotten.
+        const groups = new Set(data.nodes.filter((n) => n.kind === 'group').map((n) => n.name))
+        for (const name of Object.keys(opened)) {
+          if (groups.has(name)) void openGroup(name)
+          else closeGroup(name)
+        }
       })
       .catch((e: unknown) => {
         if (mine !== seq) return
@@ -71,6 +77,51 @@
     void data
     return Date.now() / 1000
   })
+
+  // Groups: remote-only branches that share a first path segment are one node, which opens to
+  // show them around it. Their commits are only counted when it's opened.
+  let opened = $state<Record<string, { nodes: MapNode[]; more: number }>>({})
+  let opening = $state('')
+  async function openGroup(name: string) {
+    opening = name
+    try {
+      const res = await BranchMapGroup(path, name)
+      opened = { ...opened, [name]: { nodes: (res?.nodes ?? []) as unknown as MapNode[], more: res?.more ?? 0 } }
+      error = ''
+    } catch (e) {
+      error = errorText(e)
+    } finally {
+      if (opening === name) opening = ''
+    }
+  }
+  function closeGroup(name: string) {
+    opened = Object.fromEntries(Object.entries(opened).filter(([k]) => k !== name))
+  }
+
+  // Which branches show: all, only local ones, or only what's on the remote alone. Kept for
+  // each repository.
+  const showKey = () => `graph.map.show:${path}`
+  function savedShowing(): Showing {
+    try {
+      const got = localStorage.getItem(showKey())
+      return got === 'local' || got === 'remote' ? got : 'all'
+    } catch {
+      return 'all'
+    }
+  }
+  let showing = $state<Showing>(savedShowing())
+  function show(which: Showing) {
+    showing = which
+    try {
+      if (which === 'all') localStorage.removeItem(showKey())
+      else localStorage.setItem(showKey(), which)
+    } catch {
+      // The choice just isn't kept.
+    }
+  }
+  /** The nodes to draw: the map's own and the branches of the groups that are open, less what
+   * the switch leaves out. */
+  let nodes = $derived(data ? showingNodes([...data.nodes, ...Object.values(opened).flatMap((g) => g.nodes)], showing) : [])
 
   // Zoom: what the rings mean. All the way in, the map is one week and each ring a day; out,
   // the rings become weeks, then months, then years. The level is kept between visits.
@@ -88,8 +139,9 @@
   }
   let chosenZoom = $state(savedZoom())
   /** As far out as it's worth going: the level that just holds the oldest node. */
-  let widest = $derived(data ? widestScale(data.nodes, now) : SCALES.length - 1)
-  let zoom = $derived(Math.min(widest, chosenZoom ?? (data ? fittingScale(data.nodes, now) : DEFAULT_SCALE)))
+  let widest = $derived(data ? widestScale(nodes, now) : SCALES.length - 1)
+  // The level that fits is judged by the map's own nodes: opening a group doesn't change it.
+  let zoom = $derived(Math.min(widest, chosenZoom ?? (data ? fittingScale(showingNodes(data.nodes, showing), now) : DEFAULT_SCALE)))
   let scale = $derived(SCALES[zoom])
   function zoomTo(level: number) {
     if (level === zoom) return
@@ -167,11 +219,11 @@
     drag = null
   }
 
-  let placed = $derived(data && data.trunk.name && width > 0 && height > 0 ? layout(data.trunk, data.nodes, width, height, now, scale, pins) : null)
+  let placed = $derived(data && data.trunk.name && width > 0 && height > 0 ? layout(data.trunk, nodes, width, height, now, scale, pins) : null)
   /** Tab order: the trunk, then the rest, newest first. */
   let ordered = $derived(placed ? [...placed.nodes].sort((a, b) => b.updated - a.updated || a.name.localeCompare(b.name)) : [])
   /** Where each line starts: the branch a tag hangs off, or the trunk. */
-  const holderOf = (n: Placed) => (n.parent && placed?.nodes.find((p) => p.name === n.parent && (p.kind === 'branch' || p.kind === 'remote'))) || placed?.trunk
+  const holderOf = (n: Placed) => (n.parent && placed?.nodes.find((p) => p.name === n.parent && (p.kind === 'branch' || p.kind === 'remote' || p.kind === 'group'))) || placed?.trunk
   /** The oldest tag has no tag before it to count from. */
   let firstTag = $derived.by(() => {
     if (!data || data.nodes.some((n) => n.kind === 'tags')) return ''
@@ -200,6 +252,7 @@
   }
 
   function sizeLine(n: MapNode): string {
+    if (n.kind === 'group') return plural(n.branches ?? 0, 'branch', 'branches')
     if (n.kind === 'tags' || n.kind === 'trunk') return plural(n.commits, 'commit')
     if (n.kind === 'tag') return plural(n.commits, 'commit')
     return n.commits ? plural(n.commits, 'commit') : `all in ${data?.trunk.name ?? 'the trunk'}`
@@ -211,6 +264,10 @@
     const when = relativeTime(n.updated, now)
     const moved = `Last moved ${when === 'now' ? 'just now' : when}.`
     if (n.kind === 'trunk') return `${plural(n.commits, 'commit')}. ${moved}`
+    if (n.kind === 'group') {
+      const more = opened[n.name]?.more ?? 0
+      return `${plural(n.branches ?? 0, 'branch', 'branches')} under ${n.name}, only on the remote. The newest moved ${when === 'now' ? 'just now' : when}.${more ? ` The ${plural(more, 'oldest', 'oldest')} of them ${more === 1 ? "isn't" : "aren't"} shown.` : ''}`
+    }
     if (n.kind === 'tags') return `${plural(n.tags ?? 0, 'tag')} older than the ones shown, with ${plural(n.commits, 'commit')} up to the newest of them.`
     if (n.kind === 'tag') return `${plural(n.commits, 'commit')} ${n.name === firstTag ? 'up to it' : 'since the tag before it'}${n.parent ? `, on ${n.parent}` : ''}. ${moved}`
     const where = (n.kind === 'remote' ? 'Only on the remote. ' : '') + (n.stacked && n.parent ? `Stacked on ${n.parent}. ` : '') + (n.worktree ? `Checked out in the worktree at ${n.worktree}. ` : '')
@@ -219,6 +276,8 @@
   }
 
   const shapeOf = (n: MapNode) => (n.kind === 'tag' || n.kind === 'tags' ? 'tag' : n.kind === 'remote' ? 'remote' : n.kind === 'branch' && !n.commits ? 'merged' : n.kind)
+  /** Opens a group, or folds it away again. */
+  const toggleGroup = (name: string) => (opened[name] ? closeGroup(name) : void openGroup(name))
 
   /** The card sits beside its node, on whichever side has the room. */
   function cardPlace(n: Placed): string {
@@ -269,9 +328,9 @@
     onpointermove={nodeMove}
     onpointerup={nodeUp}
     onpointercancel={nodeUp}
-    ondblclick={() => n.pinned && unpin(key)}
+    ondblclick={() => (n.pinned ? unpin(key) : n.kind === 'group' ? toggleGroup(n.name) : undefined)}
     oncontextmenu={(e) => {
-      if (!onMenu || n.kind === 'tags') return
+      if (!onMenu || n.kind === 'tags' || n.kind === 'group') return
       e.preventDefault()
       onMenu(n, e.clientX, e.clientY)
     }}
@@ -279,6 +338,8 @@
     <span class="shape">
       {#if n.kind === 'trunk'}
         <b>{n.name}</b><span>{plural(n.commits, 'commit')}</span>{#if n.head}<i>you’re here</i>{/if}
+      {:else if n.kind === 'group'}
+        <b>{(n.branches ?? 0).toLocaleString()}</b>
       {/if}
     </span>
     {#if n.worktree}<span class="badge" title="Checked out in the worktree at {n.worktree}"><Icon name="worktree" size={12} /></span>{/if}
@@ -291,7 +352,11 @@
       <b>{n.name}</b>
       <span>{about(n)}</span>
       <span class="acts">
-        <button class="btn sm text" onclick={() => onShow(n, false)}>Show it in the timeline</button>
+        {#if n.kind === 'group'}
+          <button class="btn sm text" disabled={opening === n.name} onclick={() => toggleGroup(n.name)}>{opened[n.name] ? 'Fold its branches away' : opening === n.name ? 'Reading its branches…' : 'Show its branches'}</button>
+        {:else}
+          <button class="btn sm text" onclick={() => onShow(n, false)}>Show it in the timeline</button>
+        {/if}
         {#if n.kind === 'branch'}<button class="btn sm text" onclick={() => onShow(n, true)}>Focus the timeline on it</button>{/if}
         {#if n.pinned}<button class="btn sm text" onclick={() => unpin(key)}>Let it go back to its place</button>{/if}
       </span>
@@ -314,7 +379,7 @@
       {/each}
       {#each placed.nodes as n (keyOf(n))}
         {@const from = holderOf(n) ?? placed.trunk}
-        <line class:tagline={n.kind === 'tag' || n.kind === 'tags'} class:stackline={n.stacked} class:farline={n.kind === 'remote'} x1={from.x} y1={from.y} x2={n.x} y2={n.y} stroke={colorOf(n)} />
+        <line class:tagline={n.kind === 'tag' || n.kind === 'tags'} class:stackline={n.stacked} class:farline={n.kind === 'remote' || n.kind === 'group'} x1={from.x} y1={from.y} x2={n.x} y2={n.y} stroke={colorOf(n)} />
       {/each}
     </svg>
     <!-- A narrow panel has no room for the rings' names or the key: the nodes come first. -->
@@ -354,6 +419,12 @@
       </button>
     {/if}
 
+    <div class="showing" role="group" aria-label="Branches to show">
+      {#each [['all', 'All'], ['local', 'Local'], ['remote', 'Remote']] as [which, label] (which)}
+        <button aria-pressed={showing === which} onclick={() => show(which as Showing)}>{label}</button>
+      {/each}
+    </div>
+
     <div class="zoom" role="group" aria-label="Zoom">
       <button class="btn sm quiet icon" aria-label="Zoom in" title="Zoom in: the rings mark less time (+)" disabled={zoom === 0} onclick={() => zoomTo(zoomBy(zoom, -1))}>+</button>
       <span class="span" aria-live="polite">{scale.name}</span>
@@ -363,6 +434,7 @@
     <div class="legend">
       <div><i class="k-branch"></i>Local branch</div>
       <div><i class="k-remote"></i>Only on the remote</div>
+      <div><i class="k-group"></i>Several, under one path</div>
       <div><i class="k-merged"></i>Nothing of its own left</div>
       <div><i class="k-tag"></i>Tag</div>
       {#if data.moreBranches}<div class="more">{plural(data.moreBranches, 'older branch', 'older branches')} not shown</div>{/if}
@@ -512,6 +584,24 @@
     border-radius: 52% 48% 47% 53% / 48% 53% 47% 52%;
     background: color-mix(in srgb, var(--c) 20%, var(--paper));
     border: 1.75px dashed var(--c);
+  }
+
+  /* A group: several remote-only branches under one path. A doubled outline, and how many. */
+  .node.is-group .shape {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--c) 14%, var(--paper));
+    border: 1.5px dashed var(--c);
+    box-shadow: 0 0 0 3px var(--paper), 0 0 0 4.25px color-mix(in srgb, var(--c) 55%, transparent);
+  }
+
+  .node.is-group .shape b {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-soft);
   }
 
   .node.is-merged .shape {
@@ -712,6 +802,36 @@
     outline-offset: 3px;
   }
 
+  .showing {
+    position: absolute;
+    left: 12px;
+    top: 10px;
+    z-index: 3;
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--r-md);
+    background: color-mix(in srgb, var(--paper-deep) 90%, transparent);
+  }
+
+  .showing button {
+    height: 24px;
+    padding: 0 10px;
+    border: none;
+    border-radius: var(--btn-r-sm);
+    background: none;
+    font-family: var(--font-serif);
+    font-size: 13px;
+    color: var(--ink-mute);
+    cursor: pointer;
+  }
+
+  .showing button[aria-pressed='true'] {
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow: 0 0 0 1px var(--paper-edge);
+  }
+
   .zoom {
     position: absolute;
     right: 12px;
@@ -774,6 +894,13 @@
     border-radius: 50%;
     border: 1.5px dashed var(--lane-5);
     background: color-mix(in srgb, var(--lane-5) 20%, var(--paper));
+  }
+
+  .legend .k-group {
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 1.5px dashed var(--lane-3);
+    box-shadow: 0 0 0 2px var(--paper), 0 0 0 3px color-mix(in srgb, var(--lane-3) 55%, transparent);
   }
 
   .legend .k-merged {

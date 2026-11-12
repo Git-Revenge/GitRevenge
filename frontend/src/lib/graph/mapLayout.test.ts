@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bandOf, BRANCH_R, branchRadius, DEFAULT_SCALE, KEY, keyShows, ZOOM, fittingScale, layout, pinKey, widestScale, restLength, ringNameAngle, ringsFor, scales, SCALES, TAG_SIDE, tagSide, TRUNK_R, trunkRadius, WIP_R, wipPlace, zoomBy, type MapNode } from './mapLayout'
+import { bandOf, BRANCH_R, branchRadius, DEFAULT_SCALE, KEY, keyShows, ZOOM, fittingScale, GROUP_D, groupSize, layout, pinKey, showingNodes, widestScale, restLength, ringNameAngle, ringsFor, scales, SCALES, TAG_SIDE, tagSide, TRUNK_R, trunkRadius, WIP_R, wipPlace, zoomBy, type MapNode } from './mapLayout'
 
 const DAY = 24 * 60 * 60
 const NOW = 1_794_480_000
@@ -402,5 +402,39 @@ describe('the rings\u2019 names', () => {
 
   it('come with the layout', () => {
     expect(typeof layout(trunk, [node('a')], 1000, 640, NOW).nameAngle).toBe('number')
+  })
+})
+
+describe('groups', () => {
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y)
+
+  it('sizes a group by how many branches it stands for, within limits', () => {
+    expect(groupSize(3)).toBe(GROUP_D.min)
+    expect(groupSize(64)).toBe(48)
+    expect(groupSize(64)).toBeGreaterThan(groupSize(25))
+    expect(groupSize(5000)).toBe(GROUP_D.max)
+  })
+
+  it('places a group as a node, and an opened group\u2019s branches around it', () => {
+    const group = node('origin/feature/', { kind: 'group', commits: 0, branches: 40, updated: NOW - DAY })
+    const members = Array.from({ length: 6 }, (_, i) => node(`origin/feature/f${i}`, { kind: 'remote', commits: 2 + i, updated: NOW - (1 + i) * DAY, parent: 'origin/feature/' }))
+    const closed = layout(trunk, [group, node('mine')], 1100, 700, NOW)
+    expect(closed.nodes.find((n) => n.kind === 'group')!.size).toBe(groupSize(40))
+    const open = layout(trunk, [group, node('mine'), ...members], 1100, 700, NOW)
+    const hub = open.nodes.find((n) => n.kind === 'group')!
+    for (const m of open.nodes.filter((n) => n.parent === 'origin/feature/')) {
+      // Round their group: a short spring's length away, whichever side of it they fall.
+      expect(dist(m, hub)).toBeLessThan(230)
+      expect(dist(m, hub)).toBeGreaterThan(m.r + hub.r)
+    }
+  })
+
+  it('shows all branches, only local ones, or only remote ones', () => {
+    const nodes = [node('mine'), node('here', { head: true }), node('origin/x', { kind: 'remote' }), node('origin/feature/', { kind: 'group', branches: 9 }), node('v1', { kind: 'tag' })]
+    const names = (showing: 'all' | 'local' | 'remote') => showingNodes(nodes, showing).map((n) => n.name)
+    expect(names('all')).toHaveLength(5)
+    expect(names('local')).toEqual(['mine', 'here', 'v1'])
+    // The checked-out branch always shows, so there's always somewhere you are.
+    expect(names('remote')).toEqual(['here', 'origin/x', 'origin/feature/', 'v1'])
   })
 })
