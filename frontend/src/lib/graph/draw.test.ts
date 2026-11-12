@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clip, DATE_COLUMN, noteMarkSpan, middleCut, fitLabelColumn, LABEL_COLUMN, labelColumnNeed, moreLabels, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine, bisectRow, startsRun, RUN_PAUSE, dayLineLabel, dayLineSpoken, gapLabel, dayCountLabel } from './draw'
+import { clip, DATE_COLUMN, noteMarkSpan, middleCut, fitLabelColumn, LABEL_COLUMN, labelColumnNeed, moreLabels, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine, bisectRow, startsRun, RUN_PAUSE, dayLineLabel, dayLineSpoken, gapLabel, dayCountLabel, strongAbove, strongBelow, selectionWash, thinned } from './draw'
 import type { Ref, Row } from './rowCache'
 
 describe('graph geometry', () => {
@@ -587,5 +587,48 @@ describe('bisectRow', () => {
     expect(bisectRow('m', done, colors)).toEqual({ extra: { mark: 'found', note: 'it broke here', noteColor: '#800' }, faded: false })
     expect(bisectRow('old', done, colors)).toEqual({ extra: {}, faded: true })
     expect(bisectRow('a', done, colors).faded).toBe(false)
+  })
+})
+
+describe('where a quiet line meets a full one', () => {
+  const row = (col: number, over: Partial<Row> = {}) => ({ index: 0, col, color: 0, up: [], down: [], width: 2, id: 'x', parents: 1, author: 'a', authorTime: 0, subject: '', ...over }) as Row
+
+  it('is strong at the top when the row above has its commit on the lane', () => {
+    expect(strongAbove(1, { prev: row(1) })).toBe(true)
+    expect(strongAbove(1, { prev: row(0) })).toBe(false)
+    expect(strongAbove(1, {})).toBe(false)
+  })
+
+  it('is strong at the top when the row above sends a line down into the lane', () => {
+    const merge = row(0, { down: [{ from: 0, to: 0, color: 0 }, { from: 0, to: 1, color: 3 }] })
+    expect(strongAbove(1, { prev: merge })).toBe(true)
+    // A line passing straight down the lane above is as quiet as this one.
+    expect(strongAbove(1, { prev: row(0, { down: [{ from: 1, to: 1, color: 3 }] }) })).toBe(false)
+  })
+
+  it('is strong at the bottom when the row below has its commit on the lane or takes a line from it', () => {
+    expect(strongBelow(1, { next: row(1) })).toBe(true)
+    expect(strongBelow(1, { next: row(0, { up: [{ from: 1, to: 0, color: 3 }] }) })).toBe(true)
+    expect(strongBelow(1, { next: row(0, { up: [{ from: 1, to: 1, color: 3 }] }) })).toBe(false)
+  })
+})
+
+describe('the selected row\'s wash', () => {
+  it('is whole up to where the words start, and still there at the far edge', () => {
+    const stops: [number, string][] = []
+    const ctx = { createLinearGradient: () => ({ addColorStop: (at: number, color: string) => void stops.push([at, color]) }) as unknown as CanvasGradient }
+    selectionWash(ctx, 'rgba(203, 1, 98, 0.12)', 300, 1000)
+    expect(stops[0]).toEqual([0, 'rgba(203, 1, 98, 0.12)'])
+    expect(stops[1]).toEqual([0.3, 'rgba(203, 1, 98, 0.12)'])
+    expect(stops[2][0]).toBe(1)
+    expect(stops[2][1]).toBe('rgba(203, 1, 98, 0.0408)')
+  })
+
+  it('thins a colour a canvas can take, and leaves alone one it cannot read', () => {
+    expect(thinned('rgba(226, 74, 138, 0.16)', 0.5)).toBe('rgba(226, 74, 138, 0.08)')
+    expect(thinned('rgb(10 20 30 / 50%)', 0.5)).toBe('rgba(10, 20, 30, 0.25)')
+    expect(thinned('#cb0162', 0.5)).toBe('rgba(203, 1, 98, 0.5)')
+    expect(thinned('#cb016280', 0.5)).toBe('rgba(203, 1, 98, 0.251)')
+    expect(thinned('oklch(0.5 0.2 20)', 0.5)).toBe('oklch(0.5 0.2 20)')
   })
 })

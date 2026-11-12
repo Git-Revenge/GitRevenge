@@ -786,8 +786,9 @@
     background: var(--wash-hover);
   }
 
+  /* Lit from the top, thinning down the column: the same idea as the timeline's row. */
   .col.selected {
-    background: var(--selected);
+    background: linear-gradient(to bottom, var(--selected) 0, var(--selected) 38%, color-mix(in srgb, var(--selected) 34%, transparent) 100%);
   }
 
   .col.selected::before {
