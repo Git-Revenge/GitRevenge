@@ -118,6 +118,7 @@ export const ICONS = {
   timeline: [c(6, 7, 2.5), c(6, 17, 2.5), 'M6 9.5v5M11 6h9M11 8.5h6M11 16h9M11 18.5h6'],
 
   // The graph's experimental views: commits along a line that runs across.
+  map: [c(12, 12, 4), c(5, 6, 1.5), c(19, 7, 1.5), c(17, 19, 1.5), 'M9 9.5 6.2 7M15.5 10l2.3-1.9M14.4 15.2l1.8 2.5'],
   across: ['M3 9h18', c(8, 9, 2.25), c(16, 9, 2.25), 'M8 11.25c0 5 4 4.75 8 4.75h5'],
 
   // File status: an outline plus a mark, so shape tells them apart

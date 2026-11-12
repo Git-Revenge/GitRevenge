@@ -54,7 +54,7 @@ func (a *App) SetGraphDensity(density string) error {
 
 // experimentalViews are the graph views that settings can switch on, by the names saved for
 // them and in the order the view menu lists them.
-var experimentalViews = []string{"horizontal"}
+var experimentalViews = []string{"horizontal", "map"}
 
 // GraphViews is what the graph's view menu needs.
 type GraphViews struct {

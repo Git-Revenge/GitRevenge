@@ -19,6 +19,7 @@ export const VIEWS: ViewInfo[] = [
   { id: 'timeline', label: 'Timeline', icon: 'timeline', title: 'Two lines for a commit that starts a run, with authors', experimental: false },
   { id: 'compact', label: 'Compact', icon: 'rows', title: 'One line per commit', experimental: false },
   { id: 'horizontal', label: 'Horizontal', icon: 'across', title: 'Time runs across: a column per commit, newest on the left', experimental: true },
+  { id: 'map', label: 'Map', icon: 'map', title: 'A node for each branch and tag around the trunk, sized by commits', experimental: true },
 ]
 
 /** The views the menu lists: the rows, and the experimental views switched on. */
@@ -42,7 +43,10 @@ export function savedFor(view: GraphView): { view: string; density?: Density } {
 }
 
 /** The experimental views, with what the settings panel says of each. */
-export const EXPERIMENTS: { id: string; label: string; about: string }[] = [{ id: 'horizontal', label: 'Horizontal', about: 'Time runs across: a column for each commit and a row for each lane, newest on the left.' }]
+export const EXPERIMENTS: { id: string; label: string; about: string }[] = [
+  { id: 'horizontal', label: 'Horizontal', about: 'Time runs across: a column for each commit and a row for each lane, newest on the left.' },
+  { id: 'map', label: 'Map', about: 'No commits: a node for each branch and tag around the trunk. Size is commits, distance is how long since it moved.' },
+]
 
 /** Whether the view is the graph's rows, at either density. */
 export function isRows(view: GraphView): boolean {

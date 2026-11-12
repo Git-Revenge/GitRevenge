@@ -34,6 +34,10 @@ export function BranchAction(arg1, arg2, arg3) {
   return window['go']['app']['App']['BranchAction'](arg1, arg2, arg3);
 }
 
+export function BranchMap(arg1) {
+  return window['go']['app']['App']['BranchMap'](arg1);
+}
+
 export function BranchMergeState(arg1, arg2) {
   return window['go']['app']['App']['BranchMergeState'](arg1, arg2);
 }
