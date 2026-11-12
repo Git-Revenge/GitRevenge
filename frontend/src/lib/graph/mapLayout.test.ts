@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bandOf, BRANCH_R, branchRadius, CROWD, DEFAULT_SCALE, KEY, keyShows, layout, nameWaits, restLength, ringsFor, scales, SCALES, TAG_SIDE, tagSide, TRUNK_R, trunkRadius, WIP_R, wipPlace, zoomBy, type MapNode } from './mapLayout'
+import { bandOf, BRANCH_R, branchRadius, CROWD, DEFAULT_SCALE, KEY, keyShows, ZOOM, layout, nameWaits, restLength, ringsFor, scales, SCALES, TAG_SIDE, tagSide, TRUNK_R, trunkRadius, WIP_R, wipPlace, zoomBy, type MapNode } from './mapLayout'
 
 const DAY = 24 * 60 * 60
 const NOW = 1_794_480_000
@@ -208,6 +208,8 @@ describe('layout', () => {
     for (const n of crowd.nodes) {
       const low = n.y + n.r > H - KEY.height
       if (low) expect(n.x - n.r).toBeGreaterThanOrEqual(KEY.width)
+      // Nor on the zoom control in the other corner.
+      if (n.y + n.r > H - ZOOM.height + 46) expect(n.x + n.r).toBeLessThanOrEqual(W - ZOOM.width)
     }
   })
 

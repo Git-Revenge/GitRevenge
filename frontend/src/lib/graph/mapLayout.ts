@@ -95,6 +95,7 @@ export function nameWidth(name: string): number {
 /** The two lines of words under a node, and the key in the stage's bottom left corner. */
 const NAME_H = 46
 export const KEY = { width: 200, height: 124 }
+export const ZOOM = { width: 210, height: 52 }
 /** Whether the stage has room for the key and the rings' names beside the nodes. */
 export function keyShows(width: number, height: number): boolean {
   return width >= 560 && height >= 420
@@ -226,6 +227,8 @@ export function layout(trunk: MapNode, nodes: MapNode[], width: number, height: 
     if (!keyShows(width, height)) return
     const box = boxOf(p)
     if (box.y + box.hh > height - KEY.height && p.x < KEY.width + box.hw) p.x = KEY.width + box.hw
+    // And the zoom control in the bottom right.
+    if (box.y + box.hh > height - ZOOM.height && p.x > width - ZOOM.width - box.hw) p.x = width - ZOOM.width - box.hw
   }
   // A node takes up its shape and the name beside it: a box as wide as the name, reaching out
   // on the side the name is on. In a crowd the names that wait take no room.
