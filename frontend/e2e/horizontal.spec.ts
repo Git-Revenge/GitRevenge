@@ -136,6 +136,26 @@ test.describe('the Horizontal view', () => {
     await expect(names).toContainText('more above')
   })
 
+  // #663: the scrollbar is marked as the timeline's ruler is.
+  test('marks the scrollbar where the checked-out commit, a tag and a note are', async ({ page }) => {
+    const marks = { loaded: 120, months: [{ row: 0, time: noon }, { row: 60, time: noon - 10 * DAY }], tips: [0], tags: [4, 90], notes: [30] }
+    const s = scenario({ view: 'horizontal', experimental: ['horizontal'] })
+    await open(page, 'graph', { ...s, responses: { ...s.responses, RulerMarks: marks } })
+    const bar = page.locator('.bar')
+    await expect(bar.locator('.tick .head')).toHaveCount(1)
+    await expect(bar.locator('.tick .tags')).toHaveCount(2)
+    await expect(bar.locator('.tick .notes')).toHaveCount(1)
+    await expect(bar.locator('.month')).toHaveCount(1)
+    // A tick three quarters of the way through the history sits three quarters along the bar.
+    const box = (await bar.boundingBox())!
+    const far = (await bar.locator('.tick').last().boundingBox())!
+    expect((far.x - box.x) / box.width).toBeGreaterThan(0.7)
+    expect((far.x - box.x) / box.width).toBeLessThan(0.8)
+    // Pointing at one says what's there.
+    await page.mouse.move(far.x, box.y + box.height / 2)
+    await expect(bar).toHaveAttribute('title', '1 tag')
+  })
+
   test('a click selects a commit and shows its subject in full below', async ({ page }) => {
     await open(page, 'graph', scenario({ view: 'horizontal', experimental: ['horizontal'] }))
     await commit(page, 3).click({ position: { x: 20, y: 300 } })

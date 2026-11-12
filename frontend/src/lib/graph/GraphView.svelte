@@ -2050,6 +2050,7 @@
       headRow={() => headRow}
       remote={() => remote}
       dimmed={(i: number) => !!matchSet && !matchSet.has(i)}
+      ruler={() => ({ ...marks, matches })}
       onSelect={(i: number) => select(i)}
       onContext={onContext}
     />
