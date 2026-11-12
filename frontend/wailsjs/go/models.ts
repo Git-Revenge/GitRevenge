@@ -283,6 +283,72 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class MapNode {
+	    name: string;
+	    kind: string;
+	    commit: string;
+	    commits: number;
+	    updated: number;
+	    parent: string;
+	    head: boolean;
+	    branchKind?: string;
+	    tags?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MapNode(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.commit = source["commit"];
+	        this.commits = source["commits"];
+	        this.updated = source["updated"];
+	        this.parent = source["parent"];
+	        this.head = source["head"];
+	        this.branchKind = source["branchKind"];
+	        this.tags = source["tags"];
+	    }
+	}
+	export class BranchMap {
+	    trunk: MapNode;
+	    nodes: MapNode[];
+	    branches: number;
+	    tags: number;
+	    moreBranches: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new BranchMap(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.trunk = this.convertValues(source["trunk"], MapNode);
+	        this.nodes = this.convertValues(source["nodes"], MapNode);
+	        this.branches = source["branches"];
+	        this.tags = source["tags"];
+	        this.moreBranches = source["moreBranches"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	export class BuiltWith {
 	    go: string;
@@ -884,6 +950,7 @@ export namespace app {
 		    return a;
 		}
 	}
+	
 	export class MergePreview {
 	    into: string;
 	    alreadyMerged: boolean;

@@ -13,6 +13,7 @@
   import { DUR, easeInk, fadeUp, labelsFold, labelsUnfold, menuOut, reducedMotion, stagger } from '../ui/motion'
   import KindFilter from './KindFilter.svelte'
   import Lazy from '../ui/Lazy.svelte'
+  import type { MapNode } from './mapLayout'
   import ViewMenu from './ViewMenu.svelte'
   import { isRows, menuViews } from './views'
   import RefChip from './RefChip.svelte'
@@ -279,6 +280,7 @@
   /** After a reload: keeps the selection on its commit, and, when the reload came of something
    * the person did that moved a branch, takes the view to that branch's new tip. */
   async function afterReload() {
+    mapTick++
     const before = tips
     const now = await readTips()
     tips = now
@@ -346,6 +348,42 @@
   let rowsView = $derived(isRows(colorTheme.view))
   /** Goes up whenever the rows may have changed, for a view that reads them from the cache. */
   let rowsTick = $state(0)
+  /** The Map view: whether it shows, when to read its branches and tags again, and what it
+   * says it holds, which takes the commit count's place in the bar. */
+  let mapView = $derived(colorTheme.view === 'map')
+  let mapTick = $state(0)
+  let mapSummary = $state('')
+
+  /** Opens the timeline on a node of the map: at its commit, or focused on its branch. */
+  async function showFromMap(node: MapNode, focusIt: boolean) {
+    const ok = await session.run(async () => {
+      if (focusIt) await SetGraphFocus(path, node.name, false)
+      await colorTheme.setView(density === 'compact' ? 'compact' : 'timeline')
+      return true
+    })
+    // A new focus reloads the graph and starts it from the top, which is the branch's tip.
+    if (!ok || focusIt) return
+    const row = await CommitRow(path, node.commit).catch(() => -1)
+    if (row < 0) {
+      session.error = `${node.name} points at a commit that isn't in the graph. It may be hidden, or outside what the graph is focused on.`
+      return
+    }
+    await tick()
+    reveal(row)
+  }
+
+  /** A right-click on a map node: its commit's menu, for that branch or tag alone. */
+  async function mapMenu(node: MapNode, x: number, y: number) {
+    if (!onContext) return
+    const at = await CommitRow(path, node.commit).catch(() => -1)
+    if (at < 0) return
+    const page = (await GraphRows(path, at, 1).catch(() => null)) as unknown as Page | null
+    const row = page?.rows?.[0]
+    if (!row) return
+    const refs = page?.refs?.[row.id] ?? []
+    const own = refs.filter((r) => r.short === node.name && (r.kind === 'tag') === (node.kind === 'tag'))
+    onContext(row, own.length ? own : refs, x, y)
+  }
   let rowH = $derived(METRICS[density].rowH)
 
   let scroller: HTMLDivElement
@@ -1641,7 +1679,9 @@
 
 <div class="graph" bind:clientWidth={ownWidth}>
   <div class="status" class:searching={searchIconOnly && (searchOpen || !!query.trim())} use:hosted={toolsHost}>
-    {#if error || rowError}
+    {#if mapView}
+      {#if level < SQUEEZE.count}<span class="meta">{mapSummary}</span>{/if}
+    {:else if error || rowError}
       <span class="error">Couldn't read history: {error || rowError}</span>
     {:else if level >= SQUEEZE.count}
       <!-- The count has left the bar: the search field's placeholder says it. -->
@@ -1664,10 +1704,11 @@
         <button class="btn sm quiet icon" onclick={stopFocusing} aria-label="Stop focusing" title="Stop focusing, and show every branch again"><Icon name="close" size={13} /></button>
       </span>
     {/if}
-    {#if searchIconOnly && !searchOpen && !query.trim()}
+    {#if searchIconOnly && !searchOpen && !query.trim() && !mapView}
       <button class="btn sm quiet icon search-open" aria-label="Search commits" title="Search commits" aria-expanded="false" onclick={focusSearch}><Icon name="search" size={14} /></button>
     {/if}
-    <span class="search" class:closed={searchIconOnly && !searchOpen && !query.trim()} class:over={searchIconOnly}>
+    <!-- The map has no commits to search: the field keeps its place, out of sight and out of reach. -->
+    <span class="search" class:closed={searchIconOnly && !searchOpen && !query.trim()} class:over={searchIconOnly} class:away={mapView} inert={mapView}>
       <Icon name="search" size={14} />
       <input
         bind:this={searchInput}
@@ -2011,6 +2052,8 @@
       onSelect={(i: number) => select(i)}
       onContext={onContext}
     />
+  {:else if mapView}
+    <Lazy load={() => import('./MapView.svelte')} {path} tick={mapTick} onSummary={(text: string) => (mapSummary = text)} onShow={showFromMap} onMenu={onContext ? mapMenu : undefined} />
   {/if}
   </div>
 </div>
@@ -2064,6 +2107,10 @@
   /* Only an icon's worth of room: the field waits behind its button, and opens over the bar. */
   .search.closed {
     display: none;
+  }
+
+  .search.away {
+    visibility: hidden;
   }
 
   .search-open {
