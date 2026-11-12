@@ -189,6 +189,52 @@ test.describe('the Map view', () => {
     await expect(page.getByRole('group', { name: 'About base' })).toContainText('Checked out in the worktree at /code/wt-base.')
   })
 
+  // #672: a node dragged somewhere stays there.
+  test('a dragged node stays where it was dropped, and can be let go again', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 700 })
+    await open(page, 'graph', scenario())
+    const centre = async (name: string) => {
+      const b = (await nodeOf(page, name).boundingBox())!
+      return { x: b.x + b.width / 2, y: b.y + b.height / 2 }
+    }
+    const from = await centre('topic')
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    await page.mouse.move(from.x + 60, from.y + 20, { steps: 4 })
+    await page.mouse.move(1000, 140, { steps: 6 })
+    await page.mouse.up()
+    await expect(nodeOf(page, 'topic')).toHaveClass(/pinned/)
+    const to = await centre('topic')
+    expect(Math.abs(to.x - 1000)).toBeLessThan(4)
+    expect(Math.abs(to.y - 140)).toBeLessThan(4)
+    // Dropping it didn't open its card, and the place is kept for this repository.
+    await expect(page.getByRole('group', { name: 'About topic' })).toHaveCount(0)
+    expect(await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('graph.map.pins:/repo') ?? '{}')))).toEqual(['branch:topic'])
+    // Its card lets it go, for anyone not using a pointer's double-click.
+    await nodeOf(page, 'topic').click()
+    await page.getByRole('button', { name: 'Let it go back to its place' }).click()
+    await expect(nodeOf(page, 'topic')).not.toHaveClass(/pinned/)
+    const back = await centre('topic')
+    expect(Math.hypot(back.x - from.x, back.y - from.y)).toBeLessThan(4)
+    expect(await page.evaluate(() => localStorage.getItem('graph.map.pins:/repo'))).toBeNull()
+  })
+
+  test('the rings’ names sit on their rings', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 700 })
+    await open(page, 'graph', scenario())
+    await expect(page.locator('.ringname')).toHaveText(['this week', 'last week', 'older'])
+    const main = (await nodeOf(page, 'main').boundingBox())!
+    const cx = main.x + main.width / 2
+    const cy = main.y + main.height / 2
+    const far = async (k: number) => {
+      const b = (await page.locator('.ringname').nth(k).boundingBox())!
+      return Math.hypot(b.x + b.width / 2 - cx, b.y + b.height / 2 - cy)
+    }
+    // The second ring touches the stage's top and bottom, and the first is inside it.
+    expect(await far(1)).toBeGreaterThan(await far(0))
+    expect(Math.abs((await far(1)) - (main.y + main.height / 2 - 41 - 6))).toBeLessThan(40)
+  })
+
   // #661: zoom changes what the rings mean.
   test('zooms out to months and in to a week of days, and no closer', async ({ page }) => {
     await page.setViewportSize({ width: 1200, height: 700 })

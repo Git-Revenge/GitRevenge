@@ -8,7 +8,7 @@
   import Loading from '../ui/Loading.svelte'
   import { laneVar, relativeTime } from './draw'
   import Icon from '../ui/Icon.svelte'
-  import { DEFAULT_SCALE, keyShows, layout, nameWaits, SCALES, WIP_R, wipPlace, zoomBy, type MapNode, type Placed } from './mapLayout'
+  import { DEFAULT_SCALE, keyShows, layout, nameWaits, pinKey, SCALES, WIP_R, wipPlace, zoomBy, type MapNode, type Placed } from './mapLayout'
 
   let {
     path,
@@ -45,7 +45,7 @@
   let height = $state(0)
   /** The node whose card shows, by kind and name: a branch and a tag can share a name. */
   let picked = $state('')
-  const keyOf = (n: Pick<MapNode, 'kind' | 'name'>) => `${n.kind}:${n.name}`
+  const keyOf = pinKey
 
   const plural = (n: number, one: string, many = one + 's') => `${n.toLocaleString()} ${n === 1 ? one : many}`
 
@@ -109,7 +109,58 @@
     return () => stage?.removeEventListener('wheel', onWheel)
   })
 
-  let placed = $derived(data && data.trunk.name && width > 0 && height > 0 ? layout(data.trunk, data.nodes, width, height, now, scale) : null)
+  // Pins: a node dragged somewhere stays there, for this repository, until it's let go. They're
+  // kept as shares of the stage, measured from its middle, so they hold when the panel resizes.
+  const pinsKey = () => `graph.map.pins:${path}`
+  function savedPins(): Record<string, { dx: number; dy: number }> {
+    try {
+      const got: unknown = JSON.parse(localStorage.getItem(pinsKey()) ?? '{}')
+      return got && typeof got === 'object' ? (got as Record<string, { dx: number; dy: number }>) : {}
+    } catch {
+      return {}
+    }
+  }
+  let pinned = $state(savedPins())
+  function savePins() {
+    try {
+      if (Object.keys(pinned).length) localStorage.setItem(pinsKey(), JSON.stringify(pinned))
+      else localStorage.removeItem(pinsKey())
+    } catch {
+      // The pins just aren't kept.
+    }
+  }
+  let unit = $derived(Math.max(1, Math.min(width, height) / 2))
+  let pins = $derived(new Map(Object.entries(pinned).map(([key, p]) => [key, { x: width / 2 + p.dx * unit, y: height / 2 + p.dy * unit }])))
+  function unpin(key: string) {
+    pinned = Object.fromEntries(Object.entries(pinned).filter(([k]) => k !== key))
+    savePins()
+  }
+  /** A drag in progress: which node, where it was pressed, and whether it has moved enough to
+   * be a drag and not a click. */
+  let drag: { key: string; x: number; y: number; moved: boolean } | null = null
+  /** The node a drag just ended on: the click that follows the release isn't a choice of it. */
+  let dragged = ''
+  function nodeDown(e: PointerEvent, n: Placed) {
+    if (e.button !== 0 || n.kind === 'trunk') return
+    drag = { key: pinKey(n), x: e.clientX, y: e.clientY, moved: false }
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  }
+  function nodeMove(e: PointerEvent) {
+    if (!drag || !stage) return
+    if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 5) return
+    drag.moved = true
+    const box = stage.getBoundingClientRect()
+    pinned = { ...pinned, [drag.key]: { dx: (e.clientX - box.left - width / 2) / unit, dy: (e.clientY - box.top - height / 2) / unit } }
+  }
+  function nodeUp() {
+    if (drag?.moved) {
+      dragged = drag.key
+      savePins()
+    }
+    drag = null
+  }
+
+  let placed = $derived(data && data.trunk.name && width > 0 && height > 0 ? layout(data.trunk, data.nodes, width, height, now, scale, pins) : null)
   let crowd = $derived(placed ? placed.nodes.length : 0)
   /** Tab order: the trunk, then the rest, newest first. */
   let ordered = $derived(placed ? [...placed.nodes].sort((a, b) => b.updated - a.updated || a.name.localeCompare(b.name)) : [])
@@ -202,7 +253,17 @@
     style:--c={colorOf(n)}
     style:--size="{n.size}px"
     style:--reach="{n.r}px"
-    onclick={() => (picked = picked === key ? '' : key)}
+    class:pinned={n.pinned}
+    onclick={() => {
+      // The release at the end of a drag isn't a click on the node.
+      if (dragged === key) return void (dragged = '')
+      picked = picked === key ? '' : key
+    }}
+    onpointerdown={(e) => nodeDown(e, n)}
+    onpointermove={nodeMove}
+    onpointerup={nodeUp}
+    onpointercancel={nodeUp}
+    ondblclick={() => n.pinned && unpin(key)}
     oncontextmenu={(e) => {
       if (!onMenu || n.kind === 'tags') return
       e.preventDefault()
@@ -226,6 +287,7 @@
       <span class="acts">
         <button class="btn sm text" onclick={() => onShow(n, false)}>Show it in the timeline</button>
         {#if n.kind === 'branch'}<button class="btn sm text" onclick={() => onShow(n, true)}>Focus the timeline on it</button>{/if}
+        {#if n.pinned}<button class="btn sm text" onclick={() => unpin(key)}>Let it go back to its place</button>{/if}
       </span>
     </div>
   {/if}
@@ -251,11 +313,14 @@
     </svg>
     <!-- A narrow panel has no room for the rings' names or the key: the nodes come first. -->
     {#if keyShows(width, height)}
-    <!-- Each ring's name sits on it, up and to the right; what's past the last is "older". -->
+    <!-- Each ring's name sits on its ring, along whichever direction is clearest of nodes;
+         what's past the last ring is "older". -->
+    {@const ray = (placed.nameAngle * Math.PI) / 180}
     {#each placed.rings.marks as ring (ring.days)}
-      <span class="ringname" style:left="{placed.rings.cx + ring.r * 0.64 + 4}px" style:top="{Math.max(2, placed.rings.cy - ring.r * 0.77 - 20)}px">{ring.name}</span>
+      <span class="ringname" style:left="{placed.rings.cx + Math.cos(ray) * ring.r}px" style:top="{placed.rings.cy + Math.sin(ray) * ring.r}px">{ring.name}</span>
     {/each}
-    <span class="ringname" style:left="{Math.min(width - 60, placed.rings.cx + placed.rings.marks[placed.rings.marks.length - 1].r + 34)}px" style:top="30px">older</span>
+    {@const last = placed.rings.marks[placed.rings.marks.length - 1].r + 30}
+    <span class="ringname" style:left="{Math.min(width - 34, Math.max(34, placed.rings.cx + Math.cos(ray) * last))}px" style:top="{Math.min(height - 12, Math.max(12, placed.rings.cy + Math.sin(ray) * last))}px">older</span>
     {/if}
 
     <div class="nodes" role="group" aria-label="Branches and tags around {data.trunk.name}">
@@ -334,15 +399,36 @@
     stroke-dasharray: 4 4;
   }
 
+  /* Set on the ring's line with paper behind it, as a contour's height is on a map. */
   .ringname {
     position: absolute;
+    padding: 1px 6px;
+    border-radius: var(--r-sm);
+    background: var(--paper);
     font-family: var(--font-hand);
-    font-size: 19px;
+    font-size: 18px;
     line-height: 1;
     color: var(--ink-faint);
-    transform: rotate(-2deg);
+    transform: translate(-50%, -50%) rotate(-2deg);
     pointer-events: none;
     white-space: nowrap;
+  }
+
+  /* A node put somewhere by hand: a small pin's head at its edge. */
+  .node.pinned::after {
+    content: '';
+    position: absolute;
+    left: calc(50% - var(--reach) * 0.7 - 3px);
+    top: calc(50% - var(--reach) * 0.7 - 3px);
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 0 0 2px var(--paper);
+  }
+
+  .node:not(.is-trunk) {
+    touch-action: none;
   }
 
   /* The button is the press target: as big as the shape, and never smaller than 28px. The

@@ -35,6 +35,16 @@ export interface Placed extends MapNode {
   band: number
   /** The name goes over the node, not under it: the side away from the trunk. */
   above: boolean
+  /** Someone put it here by hand: the springs leave it alone. */
+  pinned?: boolean
+}
+
+/** Where a node was put by hand, by its kind and name ("branch:topic"). */
+export type Pins = ReadonlyMap<string, { x: number; y: number }>
+
+/** A node's key among the pins. A branch and a tag can share a name. */
+export function pinKey(n: Pick<MapNode, 'kind' | 'name'>): string {
+  return `${n.kind}:${n.name}`
 }
 
 /** One ring: how old something is at it, in days, and what it's called. */
@@ -187,7 +197,15 @@ const STEPS = 260
  * rest length from what it hangs off (the trunk, or the branch that holds a tag), pushed off
  * any node it would overlap, and kept on the stage.
  */
-export function layout(trunk: MapNode, nodes: MapNode[], width: number, height: number, now: number, scale: Scale = SCALES[DEFAULT_SCALE]): { trunk: Placed; nodes: Placed[]; rings: Rings } {
+export function layout(
+  trunk: MapNode,
+  nodes: MapNode[],
+  width: number,
+  height: number,
+  now: number,
+  scale: Scale = SCALES[DEFAULT_SCALE],
+  pins: Pins = new Map(),
+): { trunk: Placed; nodes: Placed[]; rings: Rings; nameAngle: number } {
   const rings = ringsFor(width, height, scale)
   const k = scales(nodes)
   const hub: Placed = { ...trunk, x: rings.cx, y: rings.cy, r: trunkRadius(trunk.commits, k.branch), size: 0, band: 0, above: false }
@@ -218,8 +236,17 @@ export function layout(trunk: MapNode, nodes: MapNode[], width: number, height: 
     p.x = from.x + Math.cos(out) * rest(p)
     p.y = from.y + Math.sin(out) * rest(p)
   }
+  // A pinned node goes where it was put, kept on the stage; the rest make room for it.
+  for (const p of order) {
+    const at = pins.get(pinKey(p))
+    if (!at) continue
+    p.pinned = true
+    p.x = Math.min(width - p.r - 4, Math.max(p.r + 4, at.x))
+    p.y = Math.min(height - p.r - 4, Math.max(p.r + 4, at.y))
+  }
 
   const keepOn = (p: Placed) => {
+    if (p.pinned) return
     p.x = Math.min(width - p.r - 56, Math.max(p.r + 56, p.x))
     // Room for the name on either side: it goes whichever way is away from the trunk.
     p.y = Math.min(height - p.r - NAME_H, Math.max(p.r + NAME_H, p.y))
@@ -253,19 +280,24 @@ export function layout(trunk: MapNode, nodes: MapNode[], width: number, height: 
     // Two boxes on one spot part by which two they are.
     const sx = dx === 0 ? (salt % 2 ? 1 : -1) : Math.sign(dx)
     const sy = dy === 0 ? (salt % 2 ? 1 : -1) : Math.sign(dy)
-    const share = fixed ? 1 : 0.5
+    // What's held still (the trunk, a pinned node) doesn't give way: the other moves it all.
+    const moveA = !a.pinned
+    const moveB = !fixed && !b.pinned
+    if (!moveA && !moveB) return
+    const share = moveA && moveB ? 0.5 : 1
     if (ox < oy) {
       const push = Math.min(ox, 30) * share
-      a.x -= sx * push
-      if (!fixed) b.x += sx * push
+      if (moveA) a.x -= sx * push
+      if (moveB) b.x += sx * push
     } else {
       const push = Math.min(oy, 30) * share
-      a.y -= sy * push
-      if (!fixed) b.y += sy * push
+      if (moveA) a.y -= sy * push
+      if (moveB) b.y += sy * push
     }
   }
   for (let step = 0; step < STEPS; step++) {
     for (const p of order) {
+      if (p.pinned) continue
       const from = holder(p) ?? hub
       const dx = p.x - from.x
       const dy = p.y - from.y
@@ -281,7 +313,7 @@ export function layout(trunk: MapNode, nodes: MapNode[], width: number, height: 
       const hx = a.x - hub.x
       const hy = a.y - hub.y
       const hd = Math.hypot(hx, hy) || 1
-      if (hd < off) {
+      if (hd < off && !a.pinned) {
         a.x = hub.x + (hx / hd) * off
         a.y = hub.y + (hy / hd) * off
       }
@@ -292,8 +324,48 @@ export function layout(trunk: MapNode, nodes: MapNode[], width: number, height: 
   }
   // A node above the trunk wears its name on top, so the name doesn't run across the trunk.
   for (const p of placed) p.above = isAbove(p)
-  return { trunk: hub, nodes: placed, rings }
+  return { trunk: hub, nodes: placed, rings, nameAngle: ringNameAngle(rings, placed.map(boxOf), width, height) }
 }
+
+/** The directions the rings' names can run out along, in degrees from "right", clockwise:
+ * the upper right first, as a map's contour labels usually sit, then round the clock. */
+const NAME_ANGLES = [-50, -35, -65, -20, -80, -130, -145, -115, -160, 50, 35, 65, 130, 145, 115, 20, 160, -100, 100]
+
+/**
+ * The direction the rings' names run out along: the one whose names are furthest from any
+ * node or node's name, among those that keep every name on the stage. Boxes are what nodes
+ * take up, as centre and half-size.
+ */
+export function ringNameAngle(rings: Rings, boxes: { x: number; y: number; hw: number; hh: number }[], width: number, height: number): number {
+  let best = NAME_ANGLES[0]
+  let bestClear = -Infinity
+  for (const deg of NAME_ANGLES) {
+    const a = (deg * Math.PI) / 180
+    let clear = Infinity
+    let onStage = true
+    for (const ring of rings.marks) {
+      const x = rings.cx + Math.cos(a) * ring.r
+      const y = rings.cy + Math.sin(a) * ring.r
+      if (x < 40 || x > width - 40 || y < 12 || y > height - 12) onStage = false
+      for (const b of boxes) {
+        // How far the name's middle is from the box, edge to point; inside is negative.
+        const dx = Math.abs(x - b.x) - b.hw - RING_NAME.hw
+        const dy = Math.abs(y - b.y) - b.hh - RING_NAME.hh
+        clear = Math.min(clear, Math.max(dx, dy))
+      }
+    }
+    if (!onStage) continue
+    // The first direction that's clear enough wins: the names don't hop about for a pixel.
+    if (clear >= 10) return deg
+    if (clear > bestClear) {
+      bestClear = clear
+      best = deg
+    }
+  }
+  return best
+}
+/** Half the size a ring's name takes, for keeping nodes off it. */
+const RING_NAME = { hw: 34, hh: 10 }
 
 /** Whether a node's name waits for a hover or the focus: in a crowd, all but the newest. */
 export function nameWaits(node: Pick<Placed, 'band'>, total: number): boolean {
