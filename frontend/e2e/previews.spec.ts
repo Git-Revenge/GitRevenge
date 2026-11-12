@@ -167,3 +167,86 @@ test.describe('Jupyter notebooks', () => {
     await expect(page.getByRole('alert')).toHaveText("This isn't valid JSON, so it can't be read as a notebook.")
   })
 })
+
+// #159: AsciiDoc and reStructuredText render as documents, read into Markdown.
+test.describe('AsciiDoc and reStructuredText', () => {
+  const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+
+  test('an AsciiDoc page renders its headings, marks, lists, code, notes and tables', async ({ page }) => {
+    const adoc = [
+      '= Getting Started',
+      ':project: Git Revenge',
+      '',
+      'Welcome to *{project}*, the _friendly_ client. See https://example.com[the site].',
+      '',
+      'image::img/shot.png[A screenshot]',
+      '',
+      '== Install',
+      '',
+      '* Download it',
+      '* Run it',
+      '',
+      '[source,bash]',
+      '----',
+      'make install',
+      '----',
+      '',
+      'WARNING: It needs git 2.40.',
+      '',
+      '|===',
+      '|Platform |Status',
+      '',
+      '|Linux |Yes',
+      '|===',
+      '',
+      '++++',
+      '<script>window.ran = true</script>',
+      '++++',
+    ].join('\n')
+    await open(page, 'markdownPreview', { responses: { File: { path: 'docs/start.adoc', text: adoc }, Images: { 'docs/img/shot.png': PIXEL } } })
+    await expect(page.getByRole('heading', { level: 2, name: 'Getting Started' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 3, name: 'Install' })).toBeVisible()
+    await expect(page.locator('strong').first()).toHaveText('Git Revenge')
+    await expect(page.locator('em').first()).toHaveText('friendly')
+    await expect(page.getByRole('link', { name: 'the site' })).toHaveAttribute('href', 'https://example.com')
+    await expect(page.getByRole('img', { name: 'A screenshot' })).toHaveAttribute('src', PIXEL)
+    await expect(page.getByRole('listitem')).toHaveText(['Download it', 'Run it'])
+    await expect(page.locator('pre code').first()).toHaveText('make install')
+    await expect(page.locator('blockquote')).toContainText('Warning: It needs git 2.40.')
+    await expect(page.getByRole('table').getByRole('columnheader')).toHaveText(['Platform', 'Status'])
+    // A passthrough block shows as code: its script is text.
+    await expect(page.locator('pre code').last()).toHaveText('<script>window.ran = true</script>')
+    expect(await page.evaluate(() => (window as unknown as { ran?: boolean }).ran)).toBeUndefined()
+  })
+
+  test('a reStructuredText page renders its headings, links, code, notes and math', async ({ page }) => {
+    const rst = [
+      'Getting Started',
+      '===============',
+      '',
+      'Welcome to **Git Revenge**. Read the guide_ or `the site <https://example.com>`_.',
+      '',
+      'Install',
+      '-------',
+      '',
+      'Run this::',
+      '',
+      '    make install',
+      '',
+      '.. note:: It needs git 2.40.',
+      '',
+      'The area is :math:`\\pi r^2`.',
+      '',
+      '.. _guide: https://example.com/guide',
+    ].join('\n')
+    await open(page, 'markdownPreview', { responses: { File: { path: 'docs/start.rst', text: rst } } })
+    await expect(page.getByRole('heading', { level: 2, name: 'Getting Started' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 3, name: 'Install' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'guide' })).toHaveAttribute('href', 'https://example.com/guide')
+    await expect(page.getByRole('link', { name: 'the site' })).toHaveAttribute('href', 'https://example.com')
+    await expect(page.getByText('Run this:', { exact: true })).toBeVisible()
+    await expect(page.locator('pre code')).toHaveText('make install')
+    await expect(page.locator('blockquote')).toContainText('Note: It needs git 2.40.')
+    await expect(page.locator('.katex').first()).toBeVisible()
+  })
+})

@@ -41,6 +41,8 @@ export interface Previewer {
  */
 export const PREVIEWERS: Previewer[] = [
   { id: 'markdown', matches: (p) => /\.(md|mdx|markdown|mdown|mkd|mkdn)$/i.test(p), component: MarkdownPreview },
+  { id: 'asciidoc', matches: (p) => /\.(adoc|asciidoc|asc)$/i.test(p), component: MarkdownPreview },
+  { id: 'rst', matches: (p) => /\.(rst|rest)$/i.test(p), component: MarkdownPreview },
   { id: 'csv', matches: (p) => /\.(csv|tsv|tab)$/i.test(p), component: CsvPreview },
   { id: 'structured', matches: (p) => formatOf(p) !== null, component: TreePreview },
   { id: 'tex', matches: (p) => /\.(tex|latex)$/i.test(p), component: TexPreview },
