@@ -12,7 +12,7 @@
   import Icon from '../ui/Icon.svelte'
   import { DUR, easeInk, fadeUp, labelsFold, labelsUnfold, menuOut, reducedMotion, stagger } from '../ui/motion'
   import KindFilter from './KindFilter.svelte'
-  import HorizontalView from './HorizontalView.svelte'
+  import Lazy from '../ui/Lazy.svelte'
   import ViewMenu from './ViewMenu.svelte'
   import { isRows, menuViews } from './views'
   import RefChip from './RefChip.svelte'
@@ -1997,16 +1997,18 @@
       </div>
     {/each}
   </div>
+  <!-- An experimental view loads its code the first time it shows: most people never open one. -->
   {#if colorTheme.view === 'horizontal'}
-    <HorizontalView
+    <Lazy
+      load={() => import('./HorizontalView.svelte')}
       {cache}
       tick={rowsTick}
       count={span}
       {selected}
       headRow={() => headRow}
       remote={() => remote}
-      dimmed={(i) => !!matchSet && !matchSet.has(i)}
-      onSelect={(i) => select(i)}
+      dimmed={(i: number) => !!matchSet && !matchSet.has(i)}
+      onSelect={(i: number) => select(i)}
       onContext={onContext}
     />
   {/if}
