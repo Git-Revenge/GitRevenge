@@ -208,7 +208,9 @@ const mounts = {
     const component = previewerFor(path)!.component
     // A binary previewer reads the file's bytes, given here as base64.
     const loadData = async () => data ?? ''
-    mount(component, { target: host, props: { path, text, loadImage: async () => '', openFile: record('openFile'), loadData } })
+    // Pictures in the repository, by path, as data URLs.
+    const images = (scenario.responses?.Images ?? {}) as Record<string, string>
+    mount(component, { target: host, props: { path, text, loadImage: async (file: string) => images[file] ?? '', openFile: record('openFile'), loadData } })
   },
   async upstreamDialog() {
     const { default: Dialog } = await import('../src/lib/Dialog.svelte')

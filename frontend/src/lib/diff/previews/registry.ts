@@ -1,5 +1,6 @@
 import type { Component } from 'svelte'
 import CsvPreview from './CsvPreview.svelte'
+import HtmlPreview from './HtmlPreview.svelte'
 import MediaPreview from './MediaPreview.svelte'
 import { mediaOf } from './media'
 import MarkdownPreview from './MarkdownPreview.svelte'
@@ -43,6 +44,7 @@ export const PREVIEWERS: Previewer[] = [
   { id: 'structured', matches: (p) => formatOf(p) !== null, component: TreePreview },
   { id: 'tex', matches: (p) => /\.(tex|latex)$/i.test(p), component: TexPreview },
   { id: 'mermaid', matches: (p) => /\.(mmd|mermaid)$/i.test(p), component: MermaidPreview },
+  { id: 'html', matches: (p) => /\.(html?|xhtml)$/i.test(p), component: HtmlPreview },
   { id: 'pdf', matches: (p) => /\.pdf$/i.test(p), component: PdfPreview, binary: true },
   { id: 'media', matches: (p) => mediaOf(p) !== null, component: MediaPreview, binary: true, large: true },
 ]

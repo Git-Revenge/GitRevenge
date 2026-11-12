@@ -52,3 +52,64 @@ test.describe('audio and video', () => {
     await expect(page.getByRole('alert')).toContainText('The file is empty or missing.')
   })
 })
+
+// #160: an HTML file shows as its page, and nothing on it runs or reaches the network.
+test.describe('HTML pages', () => {
+  const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+  const page1 = [
+    '<!doctype html><html><head><title>Docs</title>',
+    '<meta http-equiv="refresh" content="0; url=https://example.com/away">',
+    '<link rel="stylesheet" href="https://example.com/site.css">',
+    '<style>h1 { color: rgb(200, 0, 0) }</style>',
+    '<script>document.title = "ran"; fetch("https://example.com/beacon")</script>',
+    '</head><body>',
+    '<h1 onclick="alert(1)">Hello</h1>',
+    '<p>Read <a href="https://example.com/more">the guide</a> or <a href="#top">go up</a>.</p>',
+    '<img id="local" src="img/logo.png" alt="our logo">',
+    '<img id="far" src="https://example.com/track.gif" alt="a tracker">',
+    '<iframe src="https://example.com/embed"></iframe>',
+    '<form action="https://example.com/post"><input name="q"></form>',
+    '</body></html>',
+  ].join('\n')
+  const scenario = { responses: { File: { path: 'site/index.html', text: page1 }, Images: { 'site/img/logo.png': PIXEL } } }
+
+  test('shows the page in a frame that allows nothing', async ({ page }) => {
+    const requests: string[] = []
+    page.on('request', (r) => {
+      if (r.url().includes('example.com')) requests.push(r.url())
+    })
+    await open(page, 'markdownPreview', scenario)
+    const frame = page.locator('iframe')
+    await expect(frame).toHaveAttribute('sandbox', '')
+    const inside = page.frameLocator('iframe')
+    await expect(inside.getByRole('heading', { name: 'Hello' })).toBeVisible()
+    // The page's own styles apply.
+    await expect(inside.getByRole('heading', { name: 'Hello' })).toHaveCSS('color', 'rgb(200, 0, 0)')
+    // Its script never ran, and nothing went to the network.
+    await page.waitForTimeout(500)
+    expect(requests).toEqual([])
+    const doc = (await frame.getAttribute('srcdoc')) ?? ''
+    expect(doc).not.toContain('<script')
+    expect(doc).not.toContain('onclick')
+    expect(doc).not.toContain('example.com/away')
+    expect(doc).toContain('Content-Security-Policy')
+  })
+
+  test('links keep their words and lose their address, so the frame goes nowhere', async ({ page }) => {
+    await open(page, 'markdownPreview', scenario)
+    const link = page.frameLocator('iframe').getByText('the guide')
+    await expect(link).toHaveAttribute('title', 'https://example.com/more')
+    await expect(link).not.toHaveAttribute('href', /./)
+  })
+
+  test('a picture in the repository shows; one on the web is left out', async ({ page }) => {
+    await open(page, 'markdownPreview', scenario)
+    const inside = page.frameLocator('iframe')
+    await expect(inside.locator('#local')).toHaveAttribute('src', PIXEL)
+    // One on the web becomes its alt text, with what it was in the tooltip.
+    await expect(inside.locator('#far')).toHaveText('[a tracker]')
+    await expect(inside.locator('#far')).toHaveAttribute('title', "https://example.com/track.gif, which isn't fetched")
+    await expect(inside.locator('img#far')).toHaveCount(0)
+    await expect(page.locator('.html .note')).toContainText('Shown without 4 parts that would run or load something and 1 picture from the web.')
+  })
+})
