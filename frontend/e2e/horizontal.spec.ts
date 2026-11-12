@@ -265,6 +265,34 @@ test.describe('the Horizontal view', () => {
     await expect(commit(page, 7)).toHaveAttribute('aria-selected', 'true')
   })
 
+  // #674: one commit dragged onto another.
+  test('dragging one commit onto another asks what to do with the two', async ({ page }) => {
+    await open(page, 'graph', scenario({ view: 'horizontal', experimental: ['horizontal'] }))
+    const from = (await commit(page, 2).boundingBox())!
+    const to = (await commit(page, 6).boundingBox())!
+    await page.mouse.move(from.x + 20, from.y + 300)
+    await page.mouse.down()
+    await page.mouse.move(from.x + 40, from.y + 305, { steps: 3 })
+    await page.mouse.move(to.x + 20, to.y + 300, { steps: 5 })
+    await expect(commit(page, 6)).toHaveClass(/drop/)
+    await expect(commit(page, 2)).toHaveClass(/lifted/)
+    const before = (await events(page, 'select')).length
+    await page.mouse.up()
+    const drop = (await events(page, 'drop'))[0] as { index: number }[]
+    expect(drop[0].index).toBe(2)
+    expect(drop[2].index).toBe(6)
+    await expect(commit(page, 6)).not.toHaveClass(/drop/)
+    // The release didn't choose a commit.
+    expect((await events(page, 'select')).length).toBe(before)
+  })
+
+  test('a press and release without moving is still a click', async ({ page }) => {
+    await open(page, 'graph', scenario({ view: 'horizontal', experimental: ['horizontal'] }))
+    await commit(page, 3).click({ position: { x: 20, y: 300 } })
+    await expect(commit(page, 3)).toHaveAttribute('aria-selected', 'true')
+    expect(await events(page, 'drop')).toHaveLength(0)
+  })
+
   // #663: the scrollbar is marked as the timeline's ruler is.
   test('marks the scrollbar where the checked-out commit, a tag and a note are', async ({ page }) => {
     const marks = { loaded: 120, months: [{ row: 0, time: noon }, { row: 60, time: noon - 10 * DAY }], tips: [0], tags: [4, 90], notes: [30] }

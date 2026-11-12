@@ -63,6 +63,7 @@
     folds,
     onSelect,
     onContext,
+    onDrop,
   }: {
     path: string
     /** The timeline's rows. It isn't reactive: `tick` says when to read it again. */
@@ -95,6 +96,8 @@
     }
     onSelect: (i: number) => void
     onContext?: (row: Row, refs: Ref[], x: number, y: number) => void
+    /** One commit's column dragged onto another's. */
+    onDrop?: (source: Row, sourceRefs: Ref[], target: Row, targetRefs: Ref[], x: number, y: number) => void
   } = $props()
 
   /** The working tree's column, when there is one: it comes before commit 0, as column -1. */
@@ -348,6 +351,41 @@
     return !spot ? -1 : spot.i < 0 ? 'wip' : spot.i
   }
 
+  // Dragging one commit onto another, as in the timeline: the caller says what that can do.
+  /** The commit a drag started on, and the one under the pointer now; -1 for none. */
+  let dragFrom = $state(-1)
+  let dropOn = $state(-1)
+  let dragStart: { i: number; x: number; y: number } | null = null
+  /** A drag just ended: the click that follows the release isn't a choice of a commit. */
+  let dropped = false
+  function dragDown(e: MouseEvent) {
+    if (e.button !== 0 || !onDrop) return
+    const i = columnAt(e)
+    if (typeof i === 'number' && i >= 0 && !folds?.hidden(i)) dragStart = { i, x: e.clientX, y: e.clientY }
+  }
+  function dragMove(e: MouseEvent) {
+    if (!dragStart) return
+    if (dragFrom < 0 && Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y) > 6) dragFrom = dragStart.i
+    if (dragFrom < 0) return
+    const i = columnAt(e)
+    const over = typeof i === 'number' && i >= 0 && i !== dragFrom && !folds?.hidden(i) ? i : -1
+    if (over !== dropOn) dropOn = over
+  }
+  function dragEnd(e: MouseEvent | null) {
+    const from = dragFrom
+    const to = dropOn
+    dragStart = null
+    dragFrom = -1
+    dropOn = -1
+    if (from < 0) return
+    dropped = true
+    // The flag is for the click this release makes; if none comes, it mustn't eat a later one.
+    setTimeout(() => (dropped = false))
+    const s = cache.get(from)
+    const t = to >= 0 ? cache.get(to) : undefined
+    if (e && s && t && t.id !== s.id) onDrop?.(s, cache.refsFor(s.id), t, cache.refsFor(t.id), e.clientX, e.clientY)
+  }
+
   /** The lane the working tree sits on: the checked-out commit's, when that's in view. */
   let wipLane = $derived.by(() => {
     void tick
@@ -448,7 +486,13 @@
       aria-label="Commit history, newest first"
       aria-activedescendant={wip?.active ? `${id}-wip` : cols.some((c) => c.i === selected) ? `${id}-${selected}` : undefined}
       onkeydown={onKey}
+      class:dragging={dragFrom >= 0}
+      onmousedown={dragDown}
+      onmousemove={dragMove}
+      onmouseup={dragEnd}
+      onmouseleave={() => dragEnd(null)}
       onclick={(e) => {
+        if (dropped) return void (dropped = false)
         const i = columnAt(e)
         if (i === 'wip') wip?.open()
         // A fold's own column opens it; any other is a commit to choose.
@@ -495,6 +539,8 @@
             class:dimmed={c.i !== selected && dimmed?.(c.i)}
             class:waiting={!c.row}
             class:fold={folded}
+            class:lifted={c.i === dragFrom}
+            class:drop={c.i === dropOn}
             id="{id}-{c.i}"
             role="option"
             aria-selected={c.i === selected}
@@ -903,6 +949,24 @@
 
   .col.fold {
     cursor: pointer;
+  }
+
+  /* A commit being dragged, and the one it would land on. */
+  .plot.dragging {
+    cursor: grabbing;
+  }
+
+  .col.lifted {
+    background: var(--wash-hover);
+  }
+
+  .col.lifted .subject {
+    color: var(--ink);
+  }
+
+  .col.drop {
+    background: color-mix(in srgb, var(--accent-a) 14%, transparent);
+    box-shadow: inset 0 0 0 1.5px var(--accent-a);
   }
 
   .refold {

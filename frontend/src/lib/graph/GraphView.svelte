@@ -2072,6 +2072,7 @@
       folds={horizontalFolds}
       onSelect={(i: number) => select(i)}
       onContext={onContext}
+      onDrop={onDrop}
     />
   {:else if mapView}
     <Lazy load={() => import('./MapView.svelte')} {path} tick={mapTick} onSummary={(text: string) => (mapSummary = text)} onShow={showFromMap} onMenu={onContext ? mapMenu : undefined} {wip} />
