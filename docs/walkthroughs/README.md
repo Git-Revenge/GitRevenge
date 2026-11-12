@@ -11,6 +11,7 @@ Each walkthrough takes one everyday job from start to finish, with a short anima
 | [Find a commit](find-a-commit.md) | Search by message, author, SHA or trailer. |
 | [Find what broke it](find-what-broke.md) | Bisect down to the one commit that introduced a bug. |
 | [Look after several repositories](several-repositories.md) | Fetch and pull a whole group at once. |
+| [Find your way round a busy repository](busy-repository.md) | See every branch at once on the Map, then focus the timeline on one. |
 
 ## A practice repository
 

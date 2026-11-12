@@ -531,15 +531,56 @@ scenes.map = (page) =>
   stills(page, 'view-map', async (p) => {
     await reset(p, ['tidewater'], { clean: true })
     await experiment(p, 'map')
-    // The map wants the room: the panel on the right is hidden, and the next reset brings it back.
-    await p.keyboard.down('Control')
-    await p.keyboard.down('Alt')
-    await p.keyboard.press('b')
-    await p.keyboard.up('Alt')
-    await p.keyboard.up('Control')
-    await sleep(2500)
+    await hidePanel(p)
+    await sleep(1000)
     await park(p)
   })
+
+/** Hides the panel on the right, for a view that wants the room. The next reset brings it back. */
+async function hidePanel(p) {
+  await p.keyboard.down('Control')
+  await p.keyboard.down('Alt')
+  await p.keyboard.press('b')
+  await p.keyboard.up('Alt')
+  await p.keyboard.up('Control')
+  await sleep(1500)
+}
+
+/** The selected row's wash and every row's hairline, close up. */
+scenes.rowMarks = (page) =>
+  stills(
+    page,
+    'graph-row-marks',
+    async (p) => {
+      await reset(p, ['tidewater'], { clean: true })
+      await selectCommit(p, 'Show wind in knots')
+      await park(p)
+    },
+    async (p) => {
+      const card = await (await p.waitForSelector('.row-actions', { visible: true })).boundingBox()
+      const s = await (await p.$('.scroller')).boundingBox()
+      return { x: s.x, y: Math.max(s.y, card.y - 150), width: s.width, height: 300 }
+    },
+  )
+
+/** The busy-repository walkthrough: from the Map to a branch, and the timeline focused on it. */
+scenes.busyAnim = (page) =>
+  animation(
+    page,
+    'busy-repository',
+    async (p) => {
+      await reset(p, ['tidewater'], { clean: true })
+      await experiment(p, 'map')
+      await hidePanel(p)
+      await park(p)
+    },
+    async (p) => {
+      await sleep(1200)
+      await click(p, '.node[data-node$=":feature/offline-cache"]', { pause: 1400 })
+      await click(p, byText('Focus the timeline on it', 'button'), { pause: 2400 })
+      await click(p, 'button[aria-label^="Stop focusing"]', { pause: 1800 })
+    },
+  )
 
 scenes.blame = (page) =>
   stills(page, 'blame', async (p) => {

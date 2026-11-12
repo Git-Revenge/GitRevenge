@@ -40,6 +40,9 @@ A cloud marks a name that's on a remote, and the prefix of your main remote is l
 - A signed commit wears a seal; its [signature](history.md#signatures) is in the commit's details.
 - After a pull, or anything else that moves your branch, each commit that arrived wears a teal bar at the right edge until you select something else.
 
+![The selected row, washed in its line's colour, and the hairline under every row](../img/graph-row-marks-light.webp#gh-light-mode-only)
+![The selected row, washed in its line's colour, and the hairline under every row](../img/graph-row-marks-dark.webp#gh-dark-mode-only)
+
 ## Moving around
 
 Jumping to a commit, from a branch in the sidebar, a parent link or a search match, glides there when it's close and cuts when it's far, and the commit lands under a wash that fades so you can find it. If your system asks for reduced motion, everything moves at once instead.
