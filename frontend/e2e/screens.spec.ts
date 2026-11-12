@@ -1474,7 +1474,27 @@ test.describe('commit graph', () => {
     }
     const tab = (page: Page, name: string) => page.getByRole('tab', { name, exact: true })
 
-    // #681: a note is prose about the commit, and links the way its message does.
+    // #681: a note is rendered as markdown, as the message is.
+    test('a note is rendered as markdown, and as written when the message is', async ({ page }) => {
+      const notes = [{ ref: 'refs/notes/commits', text: '**Deployed** to `staging`\n\n- smoke tests pass\n- waiting on QA' }]
+      const s = scenario()
+      await open(page, 'repoView', { ...s, responses: { ...s.responses, CommitNotes: notes } })
+      const box = (await page.locator('.scroller').boundingBox())!
+      await page.mouse.click(box.x + 500, box.y + ROW + 26)
+      await tab(page, 'Details').click()
+      const note = page.locator('.notes .note')
+      await expect(note.locator('strong')).toHaveText('Deployed')
+      await expect(note.locator('code')).toHaveText('staging')
+      await expect(note.getByRole('listitem')).toHaveText(['smoke tests pass', 'waiting on QA'])
+      await expect(note).not.toContainText('**')
+      // The message's Raw switch shows the note as it was written, too.
+      await tab(page, 'Message').click()
+      await page.getByRole('button', { name: 'Markdown' }).click()
+      await tab(page, 'Details').click()
+      await expect(note).toContainText('**Deployed** to `staging`')
+      await expect(note.locator('strong')).toHaveCount(0)
+    })
+
     test('a note links web addresses and smart links, and keeps its line breaks', async ({ page }) => {
       const rule = { name: 'Jira', pattern: 'ABC-\\d+', url: 'https://jira.example.com/browse/{0}', in: ['message', 'trailers', 'branches'], enabled: true }
       const notes = [{ ref: 'refs/notes/commits', text: 'Deployed for ABC-1234.\nRunbook: https://example.com/runbook' }]
@@ -1506,7 +1526,7 @@ test.describe('commit graph', () => {
       const box = (await page.locator('.scroller').boundingBox())!
       await page.mouse.click(box.x + 500, box.y + ROW + 26)
       await tab(page, 'Details').click()
-      await expect(page.locator('.notes .note p')).toHaveText('just a plain note')
+      await expect(page.locator('.notes .note')).toContainText('just a plain note')
       await expect(page.locator('.notes .note a')).toHaveCount(0)
     })
 

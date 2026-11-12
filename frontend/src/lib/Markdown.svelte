@@ -18,6 +18,7 @@
     onLink,
     resolveImage,
     math = false,
+    breaks = false,
   }: {
     text: string
     /** Turns text into links: web addresses, and in a commit message the repository's smart
@@ -33,9 +34,12 @@
     resolveImage?: (src: string) => Promise<string>
     /** Reads $…$ and $$…$$ as math; off for commit messages, where "$5" is money. */
     math?: boolean
+    /** Keeps a single line break as a line break, for short text written a line at a time,
+     * such as a note. Markdown proper joins such lines into one paragraph. */
+    breaks?: boolean
   } = $props()
 
-  let tokens = $derived(math ? mathMarked.lexer(text) : marked.lexer(text, { gfm: true }))
+  let tokens = $derived(math ? mathMarked.lexer(text) : marked.lexer(text, { gfm: true, breaks }))
 
   const WEB_LINK = /^(https?:|mailto:)/i
   /** A relative path: no scheme, not protocol-relative, not just a fragment. */
