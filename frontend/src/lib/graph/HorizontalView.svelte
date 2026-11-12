@@ -2,10 +2,10 @@
   // An experimental view of the graph with time running across: a column per commit, lanes as
   // rows, newest on the left. It reads the same rows as the timeline, through the timeline's
   // own cache, and hands selection back to it, so the two stay on the same commit.
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import RefChip from './RefChip.svelte'
   import { dayLineLabel, formatTime, initials, laneVar, refLabels, startsRun } from './draw'
-  import { BAR_H, clampOffset, COL, colAt, DAY_BAND, dayCount, daySpans, LABEL_ROW, labelPlaces, LABELS_H, lanePitch, laneY, LEAN, offsetForThumb, offsetToShow, segPath, subjectLength, thumbFor, visibleRange, wordsHeight } from './horizontal'
+  import { BAR_H, clampOffset, COL, colAt, DAY_BAND, dayBandText, dayCount, daySpans, LABEL_ROW, labelPlaces, LABELS_H, lanePitch, laneY, LEAN, offsetForThumb, offsetToShow, segPath, subjectLength, thumbFor, visibleRange, wordsHeight } from './horizontal'
   import type { Ref, Row, RowCache } from './rowCache'
 
   let {
@@ -98,12 +98,24 @@
   })
 
   // Keeps the selected commit in view: when it changes, and when the view is first measured.
+  // It goes on following it while the history's length or the view's width settles (End lands
+  // on an estimate first), until the person scrolls somewhere themselves.
   let shown = -1
+  let following = false
   $effect(() => {
     if (selected < 0 || !width) return
-    if (selected === shown) return
-    shown = selected
-    offset = offsetToShow(offset, width, selected, count)
+    if (selected !== shown) {
+      shown = selected
+      following = true
+    }
+    if (!following) return
+    const next = offsetToShow(
+      untrack(() => offset),
+      width,
+      selected,
+      count,
+    )
+    if (next !== untrack(() => offset)) offset = next
   })
   // A history that got shorter, or a narrower view, can leave the offset past the end.
   $effect(() => {
@@ -116,6 +128,7 @@
     const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
     if (!d) return
     e.preventDefault()
+    following = false
     offset = clampOffset(offset + d * (e.deltaMode === 1 ? COL : 1), width, count)
   }
 
@@ -138,6 +151,7 @@
   let drag: { grab: number } | null = null
   function barTo(clientX: number) {
     if (!track || !drag) return
+    following = false
     offset = offsetForThumb(clientX - track.getBoundingClientRect().left - drag.grab, width, count, trackW)
   }
   function barDown(e: PointerEvent) {
@@ -187,12 +201,18 @@
         {@const left = d.start * COL - offset}
         {@const w = (d.end - d.start) * COL}
         <!-- The day's name stays at the left edge while its day scrolls under it. -->
-        <div class="day" style:left="{Math.max(0, left)}px" style:width="{Math.max(0, w + Math.min(0, left))}px">
-          <span class="meta">{d.label}</span>{#if d.count}<span class="count">{d.count}</span>{/if}
+        {@const seen = Math.max(0, w + Math.min(0, left))}
+        {@const says = dayBandText(d.label, d.count, d.time, seen)}
+        <div class="day" title={d.count ? `${d.label} · ${d.count}` : d.label} style:left="{Math.max(0, left)}px" style:width="{seen}px">
+          <span class="meta">{says.label}</span>{#if says.count}<span class="count">{says.count}</span>{/if}
         </div>
       {/each}
     </div>
     <div class="track" style:top="{DAY_BAND}px" style:transform="translateX({-offset}px)">
+      <!-- A faint line where each day ends and the one before it begins. -->
+      {#each days as d (d.start)}
+        {#if d.start > 0}<span class="daycut" style:left="{d.start * COL}px"></span>{/if}
+      {/each}
       {#each cols as c (c.i)}
         {@const labels = c.refs.length ? refLabels(c.refs, mainRemote) : []}
         <div
@@ -338,6 +358,15 @@
     bottom: 0;
     left: 0;
     will-change: transform;
+  }
+
+  .daycut {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    border-left: 1px dashed var(--hairline);
+    pointer-events: none;
   }
 
   .col {
@@ -512,9 +541,10 @@
     color: var(--ink-soft);
   }
 
+  /* When the strip is short of room the subject keeps its place: who and when give way. */
   .what {
-    flex: 1;
-    min-width: 0;
+    flex: 1 1 0;
+    min-width: min(60%, 320px);
     overflow: hidden;
     text-overflow: ellipsis;
     font-size: 15px;
@@ -525,6 +555,13 @@
   .sha {
     flex: none;
     color: var(--ink-mute);
+  }
+
+  .detail .meta {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .sha {

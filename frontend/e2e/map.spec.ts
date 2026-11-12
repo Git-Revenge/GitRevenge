@@ -138,6 +138,18 @@ test.describe('the Map view', () => {
     await expect.poll(() => events(page, 'context-row')).toEqual([[5]])
   })
 
+  // #657: in a narrow panel the key and the rings' names covered the nodes.
+  test('a narrow panel leaves the key and the rings’ names out', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 700 })
+    await open(page, 'graph', scenario())
+    await expect(page.locator('.legend')).toBeVisible()
+    await expect(page.locator('.ringname')).toHaveCount(3)
+    await page.setViewportSize({ width: 400, height: 700 })
+    await expect(page.locator('.legend')).toHaveCount(0)
+    await expect(page.locator('.ringname')).toHaveCount(0)
+    await expect(nodeOf(page, 'main')).toBeVisible()
+  })
+
   test('says so when the repository has no branch to draw', async ({ page }) => {
     await open(page, 'graph', scenario({ BranchMap: { trunk: node('', 'trunk', 0, 0), nodes: [], branches: 0, tags: 0, moreBranches: 0 } }))
     await expect(page.locator('.map')).toContainText('No branches yet')

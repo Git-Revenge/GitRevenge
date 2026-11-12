@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bandOf, BRANCH_R, branchRadius, CROWD, layout, nameWaits, restLength, ringsFor, scales, TAG_SIDE, tagSide, TRUNK_R, trunkRadius, type MapNode } from './mapLayout'
+import { bandOf, BRANCH_R, branchRadius, CROWD, KEY, keyShows, layout, nameWaits, restLength, ringsFor, scales, TAG_SIDE, tagSide, TRUNK_R, trunkRadius, type MapNode } from './mapLayout'
 
 const DAY = 24 * 60 * 60
 const NOW = 1_794_480_000
@@ -143,6 +143,21 @@ describe('layout', () => {
       if (n.y > out.trunk.y) expect(n.above).toBe(false)
     }
     expect(out.nodes.some((n) => n.above)).toBe(true)
+  })
+
+  it('keeps nodes and their names off the key in the corner', () => {
+    const many = Array.from({ length: 24 }, (_, i) => node(`branch-number-${i}`, { updated: NOW - (i % 20) * DAY, commits: 1 + i }))
+    const crowd = layout(trunk, many, W, H, NOW)
+    for (const n of crowd.nodes) {
+      const low = n.y + n.r > H - KEY.height
+      if (low) expect(n.x - n.r).toBeGreaterThanOrEqual(KEY.width)
+    }
+  })
+
+  it('leaves the key out of a stage too small for it', () => {
+    expect(keyShows(880, 580)).toBe(true)
+    expect(keyShows(280, 520)).toBe(false)
+    expect(keyShows(900, 300)).toBe(false)
   })
 
   it('comes out the same every time', () => {

@@ -7,7 +7,7 @@
   import { errorText } from '../errors'
   import Loading from '../ui/Loading.svelte'
   import { laneVar, relativeTime } from './draw'
-  import { layout, nameWaits, type MapNode, type Placed } from './mapLayout'
+  import { keyShows, layout, nameWaits, type MapNode, type Placed } from './mapLayout'
 
   let {
     path,
@@ -189,9 +189,12 @@
         <line class:tagline={n.kind === 'tag' || n.kind === 'tags'} x1={from.x} y1={from.y} x2={n.x} y2={n.y} stroke={colorOf(n)} />
       {/each}
     </svg>
+    <!-- A narrow panel has no room for the rings' names or the key: the nodes come first. -->
+    {#if keyShows(width, height)}
     <span class="ringname" style:left="{placed.rings.cx + placed.rings.week * 0.64}px" style:top="{placed.rings.cy - placed.rings.week * 0.77 - 22}px">this week</span>
     <span class="ringname" style:left="{placed.rings.cx + placed.rings.fortnight * 0.5}px" style:top="{Math.max(2, placed.rings.cy - placed.rings.fortnight * 0.866 - 22)}px">last week</span>
     <span class="ringname" style:left="{Math.min(width - 60, placed.rings.cx + placed.rings.fortnight + 34)}px" style:top="30px">older</span>
+    {/if}
 
     <div class="nodes" role="group" aria-label="Branches and tags around {data.trunk.name}">
       {@render nodeButton(placed.trunk)}
@@ -200,6 +203,7 @@
       {/each}
     </div>
 
+    {#if keyShows(width, height)}
     <div class="legend">
       <div><i class="k-branch"></i>Local branch</div>
       <div><i class="k-remote"></i>Only on the remote</div>
@@ -207,6 +211,7 @@
       <div><i class="k-tag"></i>Tag</div>
       {#if data.moreBranches}<div class="more">{plural(data.moreBranches, 'older branch', 'older branches')} not shown</div>{/if}
     </div>
+    {/if}
   {/if}
 </div>
 
