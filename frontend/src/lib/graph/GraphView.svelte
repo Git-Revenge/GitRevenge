@@ -35,6 +35,7 @@
     onSelectedRefs,
     onNote,
     lead,
+    wip,
     toolsHost,
     squeeze,
     bisect = null,
@@ -53,6 +54,9 @@
      * with the history, and is told where the first lane and the messages are so it can line
      * up with them. */
     lead?: Snippet<[{ nodeX: number; textX: number }]>
+    /** The working tree, for a view that draws it itself where the rows use `lead`: how many
+     * files have changed (null until known), whether its panel is showing, and how to show it. */
+    wip?: { changes: number | null; active: boolean; open: () => void }
     /** Right-click on a row, with the refs pointing at it and the mouse position. */
     onContext?: (row: Row, refs: Ref[], x: number, y: number) => void
     /** A row dragged onto another row. */
@@ -2051,6 +2055,7 @@
       remote={() => remote}
       dimmed={(i: number) => !!matchSet && !matchSet.has(i)}
       ruler={() => ({ ...marks, matches })}
+      {wip}
       onSelect={(i: number) => select(i)}
       onContext={onContext}
     />
