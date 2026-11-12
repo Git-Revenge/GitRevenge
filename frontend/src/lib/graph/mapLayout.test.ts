@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bandOf, BRANCH_R, branchRadius, CROWD, DEFAULT_SCALE, KEY, keyShows, ZOOM, layout, nameWaits, restLength, ringsFor, scales, SCALES, TAG_SIDE, tagSide, TRUNK_R, trunkRadius, WIP_R, wipPlace, zoomBy, type MapNode } from './mapLayout'
+import { bandOf, BRANCH_R, branchRadius, CROWD, DEFAULT_SCALE, KEY, keyShows, ZOOM, layout, nameWaits, pinKey, restLength, ringNameAngle, ringsFor, scales, SCALES, TAG_SIDE, tagSide, TRUNK_R, trunkRadius, WIP_R, wipPlace, zoomBy, type MapNode } from './mapLayout'
 
 const DAY = 24 * 60 * 60
 const NOW = 1_794_480_000
@@ -266,5 +266,73 @@ describe('stacks and the working tree', () => {
     expect(dist(onTrunk, hub)).toBeCloseTo(70 + WIP_R + 3)
     // And never off the stage.
     expect(wipPlace({ x: 990, y: 300, r: 20 }, hub, 1000, 600).x).toBeLessThanOrEqual(1000 - WIP_R)
+  })
+})
+
+describe('pins', () => {
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y)
+  const nodes = [node('a', { commits: 9 }), node('b', { commits: 4, updated: NOW - DAY }), node('c', { commits: 1, updated: NOW - 2 * DAY })]
+
+  it('keys a node by its kind and name', () => {
+    expect(pinKey(node('v1', { kind: 'tag' }))).toBe('tag:v1')
+    expect(pinKey(node('v1'))).toBe('branch:v1')
+  })
+
+  it('puts a pinned node where it was put, and nowhere else', () => {
+    const out = layout(trunk, nodes, 1000, 640, NOW, SCALES[DEFAULT_SCALE], new Map([['branch:b', { x: 820, y: 120 }]]))
+    const b = out.nodes.find((n) => n.name === 'b')!
+    expect(b.pinned).toBe(true)
+    expect(b.x).toBe(820)
+    expect(b.y).toBe(120)
+    expect(out.nodes.find((n) => n.name === 'a')!.pinned).toBeUndefined()
+  })
+
+  it('keeps a pin on the stage', () => {
+    const out = layout(trunk, nodes, 1000, 640, NOW, SCALES[DEFAULT_SCALE], new Map([['branch:b', { x: 5000, y: -40 }]]))
+    const b = out.nodes.find((n) => n.name === 'b')!
+    expect(b.x).toBeLessThanOrEqual(1000 - b.r)
+    expect(b.y).toBeGreaterThanOrEqual(b.r)
+  })
+
+  it('has the other nodes make room for a node pinned on top of them', () => {
+    const free = layout(trunk, nodes, 1000, 640, NOW)
+    const a = free.nodes.find((n) => n.name === 'a')!
+    const out = layout(trunk, nodes, 1000, 640, NOW, SCALES[DEFAULT_SCALE], new Map([['branch:c', { x: a.x, y: a.y }]]))
+    const moved = out.nodes.find((n) => n.name === 'a')!
+    const pin = out.nodes.find((n) => n.name === 'c')!
+    expect(pin.x).toBe(a.x)
+    expect(dist(moved, pin)).toBeGreaterThan(moved.r + pin.r)
+  })
+})
+
+describe('the rings\u2019 names', () => {
+  const rings = ringsFor(1000, 640)
+
+  it('run out to the upper right when nothing is in the way', () => {
+    expect(ringNameAngle(rings, [], 1000, 640)).toBe(-50)
+  })
+
+  it('go another way when a node sits on that line', () => {
+    const a = (-50 * Math.PI) / 180
+    const on = rings.marks.map((m) => ({ x: rings.cx + Math.cos(a) * m.r, y: rings.cy + Math.sin(a) * m.r, hw: 40, hh: 30 }))
+    const angle = ringNameAngle(rings, on, 1000, 640)
+    expect(angle).not.toBe(-50)
+    const b = (angle * Math.PI) / 180
+    for (const m of rings.marks) for (const box of on) expect(Math.hypot(rings.cx + Math.cos(b) * m.r - box.x, rings.cy + Math.sin(b) * m.r - box.y)).toBeGreaterThan(40)
+  })
+
+  it('never run off a short stage', () => {
+    const squat = ringsFor(1200, 320)
+    const angle = ringNameAngle(squat, [], 1200, 320)
+    const b = (angle * Math.PI) / 180
+    for (const m of squat.marks) {
+      const y = squat.cy + Math.sin(b) * m.r
+      expect(y).toBeGreaterThanOrEqual(12)
+      expect(y).toBeLessThanOrEqual(308)
+    }
+  })
+
+  it('come with the layout', () => {
+    expect(typeof layout(trunk, [node('a')], 1000, 640, NOW).nameAngle).toBe('number')
   })
 })
