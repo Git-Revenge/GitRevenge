@@ -372,4 +372,4 @@ jobs:
           identifier: GitRevenge.GitRevenge
           installers-regex: '-windows-amd64-installer\.exe$'
           token: ${{ secrets.WINGET_TOKEN }}
-          fork-user: risadams
+          fork-user: risadams-bot

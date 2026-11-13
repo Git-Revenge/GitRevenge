@@ -56,10 +56,10 @@ Signing uses a Developer ID Application certificate. Notarization uses an App St
 
 The package is `GitRevenge.GitRevenge`. Its manifest templates are in `build/windows/winget/`, and `build/windows/winget/manifests.sh VERSION OUTDIR` fills them in for a published release, taking the installer's sha256 from the release. `winget validate --manifest <folder>` checks the result.
 
-**The first version is submitted by hand,** because the release job can only update a package winget already has. Fork [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) to your account, then, once the release is published:
+**The first version is submitted by hand,** because the release job can only update a package winget already has. Fork [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) to the account in the job's `fork-user` (`risadams-bot`), then, once the release is published:
 
 ```sh
-git clone https://github.com/<you>/winget-pkgs && cd winget-pkgs
+git clone https://github.com/risadams-bot/winget-pkgs && cd winget-pkgs
 bash /path/to/GitRevenge/build/windows/winget/manifests.sh 1.0.0 .
 git switch -c GitRevenge.GitRevenge-1.0.0 && git add manifests/g/GitRevenge && git commit -m "New package: GitRevenge.GitRevenge version 1.0.0"
 git push -u origin HEAD && gh pr create --repo microsoft/winget-pkgs --fill
