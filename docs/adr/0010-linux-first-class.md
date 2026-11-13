@@ -29,6 +29,6 @@ We checked the distributions on 2026-11-04:
 ## Consequences
 
 - RHEL 10 support depends on a community repository, and EPEL's WebKitGTK can lag behind other distributions.
-- Packages are unsigned, and there's no apt or dnf repository, so people update by downloading a new package. The app says when one is out.
+- Packages are unsigned, and there's no apt or dnf repository, so people update by downloading a new package. The app says when one is out. *Amended 2026-11-13 (#704): signed apt and dnf repositories at packages.gitrevenge.com now carry each stable release, and sign the RPMs they serve. The downloads on a release are still unsigned.*
 - inotify takes one watch per directory, so a very large tree can hit the system's limit. The app says so when it happens at open. A limit reached later, such as by a new folder, isn't reported.
 - Graph performance hasn't been measured on slower machines or real Linux desktops, and the blank-window risk is untested here. Revisit the rendering choice when it can be.
