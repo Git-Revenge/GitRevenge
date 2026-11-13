@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="generator" content="Docusaurus v3.10.2">
 <title data-rh="true">Branches, merges and rebases | Git Revenge</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" name="twitter:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" property="og:url" content="https://gitrevenge.com/docs/guide/branches"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Branches, merges and rebases | Git Revenge"><meta data-rh="true" name="description" content="Branches and tags"><meta data-rh="true" property="og:description" content="Branches and tags"><link data-rh="true" rel="icon" href="/img/favicon.svg"><link data-rh="true" rel="canonical" href="https://gitrevenge.com/docs/guide/branches"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/guide/branches" hreflang="en"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/guide/branches" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Branches, merges and rebases","item":"https://gitrevenge.com/docs/guide/branches"}]}</script><link rel="apple-touch-icon" href="/img/apple-touch-icon.png"><link rel="stylesheet" href="/assets/css/styles.1bf894f5.css">
-<script src="/assets/js/runtime~main.d45bf372.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.97876711.js" defer="defer"></script>
 <script src="/assets/js/main.082de980.js" defer="defer"></script>
 </head>
 <body>
@@ -34,8 +34,8 @@
 </li>
 <li class="">
 <p><strong>Set upstream</strong> suggests the remote branches git knows about, and you can also type any name. Leave it empty to stop tracking.</p>
-<p><img decoding="async" loading="lazy" alt="The upstream dialog for feature/metric-units" src="/assets/images/set-upstream-light-ab94304714675fbbcc35aec4cc414bbf.webp#gh-light-mode-only" width="2560" height="1600" class="img_ev3q">
-<img decoding="async" loading="lazy" alt="The upstream dialog for feature/metric-units" src="/assets/images/set-upstream-dark-4a84a61feedfbdb27a287fd869e579e4.webp#gh-dark-mode-only" width="2560" height="1600" class="img_ev3q"></p>
+<p><img decoding="async" loading="lazy" alt="The upstream dialog for feature/metric-units" src="/assets/images/set-upstream-light-37db4244906a33c8309aa879fa4d5636.webp#gh-light-mode-only" width="2560" height="1600" class="img_ev3q">
+<img decoding="async" loading="lazy" alt="The upstream dialog for feature/metric-units" src="/assets/images/set-upstream-dark-13cce2709cad163d1eef9c22fe88205f.webp#gh-dark-mode-only" width="2560" height="1600" class="img_ev3q"></p>
 </li>
 <li class="">
 <p>Right-click a branch to mark it as a kind (<strong>Mark <code>name</code> as…</strong>), <strong>Hide</strong> it, or say what it&#x27;s stacked on (<strong>Stack <code>name</code> on…</strong>). <a class="" href="/docs/guide/branch-care">Branch care</a> explains these.</p>
@@ -66,8 +66,8 @@
 <li class=""><strong>Squash into one</strong> stages everything the other branch changed as one change for you to commit. Nothing is committed, and the other branch isn&#x27;t recorded as merged. It&#x27;s turned off when files would conflict.</li>
 </ul>
 <p>The button says what it will do, such as <strong>Fast-forward main</strong> or <strong>Merge, and resolve 2 conflicts</strong>.</p>
-<p><img decoding="async" loading="lazy" alt="A merge preview that names one file that will conflict" src="/assets/images/merge-preview-light-98a6a36237cfa83e6cfab51b9f2b06e5.webp#gh-light-mode-only" width="2560" height="1600" class="img_ev3q">
-<img decoding="async" loading="lazy" alt="A merge preview that names one file that will conflict" src="/assets/images/merge-preview-dark-20b93188600da05b0e992dedd696db9d.webp#gh-dark-mode-only" width="2560" height="1600" class="img_ev3q"></p>
+<p><img decoding="async" loading="lazy" alt="A merge preview that names one file that will conflict" src="/assets/images/merge-preview-light-4367fec7b0aec40fc729df680fd6638e.webp#gh-light-mode-only" width="2560" height="1600" class="img_ev3q">
+<img decoding="async" loading="lazy" alt="A merge preview that names one file that will conflict" src="/assets/images/merge-preview-dark-14891e47dbce79d568b4448b85f15ecc.webp#gh-dark-mode-only" width="2560" height="1600" class="img_ev3q"></p>
 <p>A rebase preview lists the commits that will be written again, oldest first, and says which commit it would first stop on. Later commits can&#x27;t be tried until that one is settled, so there may be more. It also offers:</p>
 <ul>
 <li class=""><strong>Fold the fixups into the commits they name</strong>, when the branch has <code>fixup!</code> or <code>squash!</code> commits. It&#x27;s on to begin with.</li>
@@ -124,8 +124,8 @@
 <p>A commit that folds into another sits indented under it. Drag a commit by its grip to reorder, or press <kbd>Alt</kbd>+<kbd>↑</kbd> or <kbd>Alt</kbd>+<kbd>↓</kbd> to move the focused one. When the list has <code>fixup!</code> or <code>squash!</code> commits for others in it, <strong>Fold it in for me</strong> moves each under the commit it names.</p>
 <p>A panel beside the plan shows the branch as it will be afterwards: the commits that will exist, marked <em>folded</em> or <em>reworded</em>, what is dropped and how many lines go with it, and whether this order would stop on a conflict. The forecast follows the plan as you change it. If the branch is already pushed, the panel says it will need a force push.</p>
 <p>The button says the outcome, such as <strong>Rewrite as 3 commits</strong>. <strong>Reset the plan</strong> puts every row back, and <strong>Cancel</strong> goes back to the graph with nothing changed. One Undo brings the whole branch back as it was.</p>
-<p><img decoding="async" loading="lazy" alt="The interactive rebase editor" src="/assets/images/rebase-editor-light-bc80eb91cabcc0d56f07b280d60658bc.webp#gh-light-mode-only" width="2560" height="1600" class="img_ev3q">
-<img decoding="async" loading="lazy" alt="The interactive rebase editor" src="/assets/images/rebase-editor-dark-7f4d43001d8e5bf87e8c8f0c3a765686.webp#gh-dark-mode-only" width="2560" height="1600" class="img_ev3q"></p>
+<p><img decoding="async" loading="lazy" alt="The interactive rebase editor" src="/assets/images/rebase-editor-light-dab098faccf77098b8db9ed4c920af66.webp#gh-light-mode-only" width="2560" height="1600" class="img_ev3q">
+<img decoding="async" loading="lazy" alt="The interactive rebase editor" src="/assets/images/rebase-editor-dark-784e83eb378422d9d24f2905a84e0473.webp#gh-dark-mode-only" width="2560" height="1600" class="img_ev3q"></p>
 <p>The walkthrough <a class="" href="/docs/walkthroughs/tidy-a-branch">Tidy a branch before you share it</a> shows a full clean-up.</p>
 <h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="conflicts">Conflicts<a href="#conflicts" class="hash-link" aria-label="Direct link to Conflicts" title="Direct link to Conflicts" translate="no">​</a></h2>
 <p>When a merge, rebase or cherry-pick stops on conflicts, the conflicted files are listed with your uncommitted changes. For each one you can:</p>
@@ -143,13 +143,13 @@
 </ul>
 <p>The panel on the right lists the files of the operation with their progress, and the files that merged without help. For the whole file it offers <strong>Take ours</strong> and <strong>Take theirs</strong>, <strong>Start this file again</strong>, and, when <code>merge.tool</code> is set in your git config, <strong>Open in</strong> that tool.</p>
 <p>A binary file, or one a side deleted, has no lines to choose between: the tool offers the whole-file choices only.</p>
-<p><img decoding="async" loading="lazy" alt="The conflict tool: both sides of a place above the result" src="/assets/images/conflict-tool-light-99e0cf1fca37a98c4836bb02ce14e16a.webp#gh-light-mode-only" width="2560" height="1600" class="img_ev3q">
-<img decoding="async" loading="lazy" alt="The conflict tool: both sides of a place above the result" src="/assets/images/conflict-tool-dark-e421779f8b66e37fe90897b59e22fa92.webp#gh-dark-mode-only" width="2560" height="1600" class="img_ev3q"></p>
+<p><img decoding="async" loading="lazy" alt="The conflict tool: both sides of a place above the result" src="/assets/images/conflict-tool-light-7eb7a98abbdc0d632d0eb815992406a0.webp#gh-light-mode-only" width="2560" height="1600" class="img_ev3q">
+<img decoding="async" loading="lazy" alt="The conflict tool: both sides of a place above the result" src="/assets/images/conflict-tool-dark-10bdba3ce54ae9bef80cc968c746ca33.webp#gh-dark-mode-only" width="2560" height="1600" class="img_ev3q"></p>
 <p>See <a class="" href="/docs/walkthroughs/resolve-a-conflict">Resolve a merge conflict</a> for the whole thing, step by step.</p>
 <h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="while-a-merge-or-rebase-is-in-progress">While a merge or rebase is in progress<a href="#while-a-merge-or-rebase-is-in-progress" class="hash-link" aria-label="Direct link to While a merge or rebase is in progress" title="Direct link to While a merge or rebase is in progress" translate="no">​</a></h3>
 <p>A strip at the top stays until the operation is finished. It names the operation and both sides, such as <em>Rebasing feature/offline-cache onto main</em>, and says where things stand: which commit a rebase stopped on and how far along it is, or how many of a merge&#x27;s conflicted files are resolved.</p>
-<p><img decoding="async" loading="lazy" alt="The strip for a merge in progress, with one file left to resolve" src="/assets/images/operation-strip-light-25a102a5ec525611c4369cac570bded9.webp#gh-light-mode-only" width="2560" height="1600" class="img_ev3q">
-<img decoding="async" loading="lazy" alt="The strip for a merge in progress, with one file left to resolve" src="/assets/images/operation-strip-dark-ad618ee020e62b3669e8cdb551159465.webp#gh-dark-mode-only" width="2560" height="1600" class="img_ev3q"></p>
+<p><img decoding="async" loading="lazy" alt="The strip for a merge in progress, with one file left to resolve" src="/assets/images/operation-strip-light-7d102ed8cbf208ec49004eefd7b0e727.webp#gh-light-mode-only" width="2560" height="1600" class="img_ev3q">
+<img decoding="async" loading="lazy" alt="The strip for a merge in progress, with one file left to resolve" src="/assets/images/operation-strip-dark-2b9bc871b3cb8d0edb701931c53a1062.webp#gh-dark-mode-only" width="2560" height="1600" class="img_ev3q"></p>
 <ul>
 <li class=""><strong>Resolve N files</strong> opens the first conflicted file in the conflict tool.</li>
 <li class=""><strong>Continue</strong> is off while anything is conflicted, and its tooltip names what&#x27;s left. Once everything is resolved it says what it will do: <strong>Continue with 2 more</strong>, <strong>Finish the rebase</strong> or <strong>Commit the merge</strong>. <kbd>Ctrl</kbd>+<kbd>Enter</kbd> presses it.</li>
