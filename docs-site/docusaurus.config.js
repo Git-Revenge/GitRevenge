@@ -145,6 +145,7 @@ const config = {
               <a href="https://github.com/Git-Revenge/GitRevenge/releases">Releases</a>
               <a href="https://github.com/Git-Revenge/GitRevenge/issues">Issues</a>
               <a href="https://github.com/Git-Revenge/GitRevenge/security/policy">Security</a>
+              <a href="${baseUrl}docs/privacy">Privacy</a>
               <a href="https://github.com/sponsors/risadams">Sponsor</a>
             </nav>
             <div class="footer-bar__copy">© ${new Date().getFullYear()} Ris Adams · Apache-2.0 · ${version}</div>

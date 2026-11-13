@@ -30,7 +30,7 @@ The user guide, with pictures and walkthroughs, is at [gitrevenge.com](https://g
 
 ## Privacy
 
-No accounts, no cloud sync, no telemetry. Git Revenge uses your own git config, credential helpers and SSH agent. The only request it makes on its own is a check of GitHub Releases for a newer version at startup, and you can turn that off in Settings.
+No accounts, no cloud sync, no telemetry. Git Revenge uses your own git config, credential helpers and SSH agent. The only request it makes on its own is a check of GitHub Releases for a newer version at startup, and you can turn that off in Settings. The [privacy policy](docs/privacy.md) has the details, including the website and the download channels.
 
 ## Install
 
@@ -83,7 +83,7 @@ Performance checks run against a large repository of your choice; see [Performan
 - [Architecture decision records](docs/adr/).
 - [Changelog](CHANGELOG.md): what changed in each release.
 - [Releasing](docs/RELEASING.md).
-- [Accessibility](ACCESSIBILITY.md), [contributing](CONTRIBUTING.md), [code of conduct](CODE_OF_CONDUCT.md) and [security policy](SECURITY.md).
+- [Accessibility](ACCESSIBILITY.md), [contributing](CONTRIBUTING.md), [code of conduct](CODE_OF_CONDUCT.md), [security policy](SECURITY.md) and [privacy policy](docs/privacy.md).
 - Work is tracked in [issues](https://github.com/Git-Revenge/GitRevenge/issues), grouped by [milestone](https://github.com/Git-Revenge/GitRevenge/milestones).
 
 ## License
