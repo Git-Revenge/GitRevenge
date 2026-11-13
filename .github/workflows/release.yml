@@ -5,7 +5,7 @@ on:
     tags: ["v*.*.*"]
   # Dry run: build and package (unsigned) without publishing when this workflow changes.
   pull_request:
-    paths: [.github/workflows/release.yml, build/linux/**]
+    paths: [.github/workflows/release.yml, build/linux/**, build/windows/**, build/darwin/**]
 
 permissions:
   contents: read
@@ -130,6 +130,40 @@ jobs:
         run: |
           mkdir -p dist
           cp build/bin/*-installer.exe "dist/GitRevenge-${{ steps.version.outputs.version }}-windows-amd64-installer.exe"
+
+      # 1.0 moved the install folder and renamed the uninstall key. Install 0.11.0, upgrade it
+      # with this installer, and check that one install is left, in the new place, and that it
+      # uninstalls cleanly.
+      - name: Upgrade a 0.11.0 install
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $uninstall = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
+          $oldDir = "$env:ProgramFiles\Ris Adams\Git Revenge"
+          $newDir = "$env:ProgramFiles\Git Revenge"
+          function Check($ok, $what) { if (-not $ok) { throw "Failed: $what" } else { Write-Host "ok: $what" } }
+
+          gh release download v0.11.0 --repo $env:GITHUB_REPOSITORY --pattern 'GitRevenge-0.11.0-windows-amd64-installer.exe' --dir old
+          Start-Process old\GitRevenge-0.11.0-windows-amd64-installer.exe -ArgumentList '/S' -Wait
+          Check (Test-Path "$oldDir\gitrevenge.exe") '0.11.0 installed in the old folder'
+          Check (Test-Path "$uninstall\Ris AdamsGit Revenge") '0.11.0 registered under the old key'
+
+          $new = Get-ChildItem dist\*-windows-amd64-installer.exe | Select-Object -First 1
+          Start-Process $new.FullName -ArgumentList '/S' -Wait
+          Check (Test-Path "$newDir\gitrevenge.exe") 'installed in Program Files\Git Revenge'
+          Check (Test-Path "$uninstall\GitRevenge") 'registered under the GitRevenge key'
+          Check (-not (Test-Path "$uninstall\Ris AdamsGit Revenge")) 'old key removed'
+          Check (-not (Test-Path $oldDir)) 'old folder removed'
+          Check (-not (Test-Path "$env:ProgramFiles\Ris Adams")) 'empty Ris Adams folder removed'
+          Check (Test-Path "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Git Revenge.lnk") 'Start menu shortcut kept'
+
+          Start-Process "$newDir\uninstall.exe" -ArgumentList '/S' -Wait
+          # The uninstaller copies itself to a temp folder and returns before it's done.
+          for ($i = 0; $i -lt 30 -and (Test-Path "$uninstall\GitRevenge"); $i++) { Start-Sleep 1 }
+          Check (-not (Test-Path "$uninstall\GitRevenge")) 'uninstall removes the key'
 
       - name: Package for Linux
         if: matrix.packager
