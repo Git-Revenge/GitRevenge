@@ -219,8 +219,8 @@ const installs = [
   },
   {
     os: 'Linux',
-    how: 'A .deb for Ubuntu and Debian, and an .rpm for RHEL 9 and 10.',
-    code: 'sudo apt install ./GitRevenge-*.deb',
+    how: 'From the signed apt and dnf repositories, for Ubuntu, Debian and RHEL 9 and 10. Add one once; the install guide has the commands.',
+    code: 'sudo apt install gitrevenge\nsudo dnf install gitrevenge',
   },
 ];
 

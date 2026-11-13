@@ -34,11 +34,11 @@ No accounts, no cloud sync, no telemetry. Git Revenge uses your own git config, 
 
 ## Install
 
-Grab the Windows installer, the macOS disk image, or a Linux `.deb` or `.rpm` from the [latest release](https://github.com/Git-Revenge/GitRevenge/releases/latest).
+Grab the Windows installer or the macOS disk image from the [latest release](https://github.com/Git-Revenge/GitRevenge/releases/latest).
 
 - **macOS:** the disk image is signed and notarized. With Homebrew: `brew install --cask git-revenge/tap/gitrevenge`.
 - **Windows:** the installer isn't signed yet, so SmartScreen will warn you before it runs.
-- **Linux:** Ubuntu 24.04, Debian 13, RHEL 9, and RHEL 10 with EPEL, or newer. See the [install guide](docs/guide/install.md).
+- **Linux:** Ubuntu 24.04, Debian 13, RHEL 9, and RHEL 10 with EPEL, or newer. Install with `apt` or `dnf` from the signed repositories at [packages.gitrevenge.com](https://packages.gitrevenge.com); the [install guide](docs/guide/install.md#linux) has the commands. The `.deb` and `.rpm` files are on each release too.
 
 ## Requirements
 
