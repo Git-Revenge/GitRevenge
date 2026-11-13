@@ -27,6 +27,10 @@ Unicode true
 ###
 ## !define PRODUCT_EXECUTABLE  "Application.exe"      # Default "${INFO_PROJECTNAME}.exe"
 ## !define UNINST_KEY_NAME     "UninstKeyInRegistry"  # Default "${INFO_COMPANYNAME}${INFO_PRODUCTNAME}"
+# The uninstall key is fixed, so it doesn't depend on the publisher's name. Before 1.0 it was
+# "Ris AdamsGit Revenge"; winget and RemoveInstallBefore1_0 below rely on these names.
+!define UNINST_KEY_NAME "GitRevenge"
+!define OLD_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Ris AdamsGit Revenge"
 ####
 ## !define REQUEST_EXECUTION_LEVEL "admin"            # Default "admin"  see also https://nsis.sourceforge.io/Docs/Chapter4.html
 ####
@@ -76,10 +80,10 @@ OutFile "..\..\bin\${INFO_PROJECTNAME}-${ARCH}-installer.exe" # Name of the inst
   !if "${WAILS_INSTALL_SCOPE}" == "user"
     InstallDir "$LOCALAPPDATA\Programs\${INFO_PRODUCTNAME}"
   !else
-    InstallDir "$PROGRAMFILES64\${INFO_COMPANYNAME}\${INFO_PRODUCTNAME}"
+    InstallDir "$PROGRAMFILES64\${INFO_PRODUCTNAME}"
   !endif
 !else
-  InstallDir "$PROGRAMFILES64\${INFO_COMPANYNAME}\${INFO_PRODUCTNAME}"
+  InstallDir "$PROGRAMFILES64\${INFO_PRODUCTNAME}"
 !endif # Default installing folder ($PROGRAMFILES is Program Files folder).
 ShowInstDetails show # This will always show the installation details.
 
@@ -87,8 +91,31 @@ Function .onInit
    !insertmacro wails.checkArchitecture
 FunctionEnd
 
+# Versions before 1.0 installed into "Ris Adams\Git Revenge" under another uninstall key.
+# Upgrading from one runs its own uninstaller quietly, from wherever it was installed, so
+# Apps & features lists one Git Revenge. Settings live in %APPDATA% and aren't touched.
+Function RemoveInstallBefore1_0
+    SetRegView 64
+    ReadRegStr $0 HKLM "${OLD_UNINST_KEY}" "UninstallString"
+    StrCmp $0 "" done
+    StrCpy $0 $0 -1 1 # drop the quotes around the path
+    ${GetParent} $0 $1
+    DetailPrint "Removing the earlier install in $1"
+    IfFileExists $0 0 +2
+        ExecWait '"$0" /S _?=$1'
+    # With _?= the uninstaller runs in place and leaves itself and its folder behind.
+    Delete $0
+    RMDir $1
+    ${GetParent} $1 $2
+    RMDir $2 # the "Ris Adams" folder, only if nothing else is in it
+    DeleteRegKey HKLM "${OLD_UNINST_KEY}"
+  done:
+FunctionEnd
+
 Section
     !insertmacro wails.setShellContext
+
+    Call RemoveInstallBefore1_0
 
     !insertmacro wails.webview2runtime
 

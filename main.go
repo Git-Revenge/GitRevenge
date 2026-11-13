@@ -23,6 +23,8 @@ func main() {
 		os.Exit(askpass.RunHelper(os.Stdout, os.Stderr))
 	}
 
+	carryOverWebStorage()
+
 	a := app.New()
 
 	err := wails.Run(&options.App{
