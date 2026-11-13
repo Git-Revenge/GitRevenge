@@ -1,6 +1,6 @@
 # Experimental views
 
-The graph has two views besides Timeline and Compact, for looking at history another way. They're experimental: off until you ask for them, and they may change or go away between versions.
+The graph has two views besides Timeline and Compact, for looking at history another way. They're experimental: off until you ask for them, and they may change or go away in any version, even a patch release. They're outside [what a version promises](../PLAN.md#what-a-version-promises).
 
 To try one, open [Settings](settings.md) (<kbd>Ctrl</kbd>+<kbd>,</kbd>) and tick **Horizontal** or **Map** under **Experimental views**. The view joins the [view menu](graph.md#views) above the graph, under a handwritten "experimental" label. Pick it there, and pick Timeline to go back. The view you pick is remembered, as Timeline and Compact are. Untick a view in Settings and the graph goes back to the rows.
 

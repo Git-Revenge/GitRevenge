@@ -164,12 +164,32 @@ Each feature area has an epic issue. Its tasks are tracked as sub-issues, each s
 - **Issues to PRs.** Each issue gets its own branch, named `<issue#>-short-slug`, and one PR that says `Closes #N` and is squash-merged into `main`.
 - **Commits** follow [Conventional Commits](https://www.conventionalcommits.org/). Release notes are generated from them.
 - **Merging.** Chore PRs may be merged once CI is green. Feature PRs are reviewed by the maintainer.
-- **Versioning.** Semver, starting at `0.1.0`.
+- **Versioning.** Semver, from `0.1.0` to `1.0.0`; [what a version promises](#what-a-version-promises) says what counts as breaking from 1.0 on.
 - **Testing.**
   - Go tests run against fixture repos that are built on the fly with real git.
   - Vitest covers frontend logic.
   - CI runs on Windows, macOS and Linux.
 - **Linting.** `golangci-lint`, `svelte-check` and `eslint`.
+
+## What a version promises
+
+From 1.0.0, Git Revenge follows [semantic versioning](https://semver.org/). It's an app, not a library, so its "public API" is what people and their setups depend on. A **major** version (2.0.0) is the only release that may break these, and its changelog marks each break with **Breaking:**:
+
+- **Your settings.** A newer 1.x reads the `settings.json` an older one wrote, keeping your settings, project groups, recent repositories and open tabs. A 1.x may add settings; it doesn't drop or reinterpret one.
+- **Repository settings in git config.** The `gitrevenge.*` keys (branch kinds, hidden branches, smart links, cleanup and notes options) keep their names and meaning, so a repository set up by one 1.x works the same in the next, and so do teammates on different 1.x versions.
+- **What it runs on.** The systems under [Platforms](#platforms) and the minimum git (2.40). Dropping one waits for a major version, unless its vendor has ended support for it.
+- **How git is used.** Git Revenge keeps running your own `git`, with your config, hooks, credential helpers and SSH agent.
+- **Where it installs.** The install locations, the package names (`gitrevenge` in apt, dnf and Homebrew), and the repository and signing key at packages.gitrevenge.com.
+
+A **minor** version (1.1.0) adds features and may change how something looks or where it sits. A **patch** version (1.0.1) only fixes bugs and security problems.
+
+Not covered, and free to change in any release:
+
+- **Experimental views** and anything else marked experimental. They're off until you turn them on, and may change or go away.
+- **The look**: layout, colours, wording, and the order of menus and lists.
+- **Keyboard shortcuts**, when one has to move to stop clashing with the system or another one. The changelog says when one does.
+- **Browser storage the interface keeps for itself**, such as panel sizes and which sections are open. Losing it resets the layout, not your settings.
+- **The askpass helper mode** of the `gitrevenge` binary. It's how the app talks to git, not a command for people to run.
 
 ## Distribution
 
