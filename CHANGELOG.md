@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Changed
 
+- On Windows, Git Revenge now installs to `Program Files\Git Revenge`, not `Program Files\Ris Adams\Git Revenge`. Installing 1.0 over an earlier version removes the earlier install, so Apps & features lists one Git Revenge; your settings stay as they are. On macOS the app's bundle identifier is now `com.gitrevenge.gitrevenge`, and the first start carries the window's layout (panel sizes and the like) over from the old one. (#711)
 - Three touches to the graph's rows. The selected commit's wash thins away across the row, where it was a flat block. A lane line that leaves a commit at full strength now fades into the quiet line below it, where it stopped at a flat edge. And each row has a hairline under it in its lane's colour, from under the commit's node out across the message, thinning to nothing. [Docs](https://gitrevenge.com/docs/guide/graph#marks-on-a-commit). (#670)
 - The graph's two-icon switch between Timeline and Compact is now a menu: one button in the bar shows the current view and opens the list. It takes less room, and it's where experimental views will go. Swapping the two takes one more click than before; the command palette's command still does it in one. [Docs](https://gitrevenge.com/docs/guide/graph#views). (#650)
 - Rendered previews use newer libraries: Mermaid 12.3.0 for diagrams, PDF.js 6.5.438 for PDFs and marked 18.1.3 for Markdown. (#643)
