@@ -23,6 +23,7 @@ The workflow then does the following:
 3. Builds a universal macOS `.dmg`. When the Apple secrets are configured, it also signs, notarizes and staples it.
 4. Creates the GitHub Release, with notes generated from merged PRs. CHANGELOG.md is the curated record; the generated notes list every PR.
 5. For a stable release, tells [Git-Revenge/packages](https://github.com/Git-Revenge/packages) (the apt and dnf repos at packages.gitrevenge.com) and [Git-Revenge/homebrew-tap](https://github.com/Git-Revenge/homebrew-tap) to update. Both also check every six hours, so a missed notice only delays them.
+6. For a stable release, opens a pull request on [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) to update `GitRevenge.GitRevenge`. Microsoft's checks and reviewers take it from there, usually within a day or two.
 
 ## Keeping the changelog
 
@@ -50,3 +51,20 @@ Signing uses a Developer ID Application certificate. Notarization uses an App St
 ## Package repo token
 
 `PACKAGE_REPOS_TOKEN` lets the release notify the package repos. Without it that step is skipped. Create a fine-grained personal access token with **Git-Revenge** as the resource owner, access to only `packages` and `homebrew-tap`, and the **Contents: Read and write** permission. Store it as a repository secret here. When it expires, the release still publishes and the step warns.
+
+## winget
+
+The package is `GitRevenge.GitRevenge`. Its manifest templates are in `build/windows/winget/`, and `build/windows/winget/manifests.sh VERSION OUTDIR` fills them in for a published release, taking the installer's sha256 from the release. `winget validate --manifest <folder>` checks the result.
+
+**The first version is submitted by hand,** because the release job can only update a package winget already has. Fork [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) to the account in the job's `fork-user` (`risadams-bot`), then, once the release is published:
+
+```sh
+git clone https://github.com/risadams-bot/winget-pkgs && cd winget-pkgs
+bash /path/to/GitRevenge/build/windows/winget/manifests.sh 1.0.0 .
+git switch -c GitRevenge.GitRevenge-1.0.0 && git add manifests/g/GitRevenge && git commit -m "New package: GitRevenge.GitRevenge version 1.0.0"
+git push -u origin HEAD && gh pr create --repo microsoft/winget-pkgs --fill
+```
+
+Fill in the pull request template as it asks. After that, each release updates it.
+
+**`WINGET_TOKEN`** lets the release do that. It must be a **classic** personal access token with the `public_repo` scope, from the account that owns the winget-pkgs fork (the job's `fork-user`), as the winget-releaser action asks. Without it, or when the update fails, the release still publishes, and you can submit by hand as above.
