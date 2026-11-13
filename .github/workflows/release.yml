@@ -295,3 +295,20 @@ jobs:
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then prerelease="--prerelease"; fi
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
             --title "Git Revenge ${GITHUB_REF_NAME}" --generate-notes $prerelease
+      # The apt/dnf repo and the Homebrew tap follow releases/latest every six hours anyway;
+      # this makes them pick up a stable release at once. GITHUB_TOKEN can't dispatch to other
+      # repos, so it takes a fine-grained token with Contents: read and write on both. Without
+      # it the step is skipped, and a failed dispatch only warns.
+      - name: Tell the package repos
+        if: ${{ !contains(github.ref_name, '-') }}
+        env:
+          GH_TOKEN: ${{ secrets.PACKAGE_REPOS_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::PACKAGE_REPOS_TOKEN is not set; the package repos will catch up on their schedules"
+            exit 0
+          fi
+          for repo in Git-Revenge/packages Git-Revenge/homebrew-tap; do
+            gh api "repos/$repo/dispatches" -f event_type=release -f "client_payload[tag]=$GITHUB_REF_NAME" \
+              || echo "::warning::Could not notify $repo; it will catch up on its schedule"
+          done

@@ -22,6 +22,7 @@ The workflow then does the following:
 2. Builds the Windows NSIS installer. It is unsigned, so SmartScreen will warn.
 3. Builds a universal macOS `.dmg`. When the Apple secrets are configured, it also signs, notarizes and staples it.
 4. Creates the GitHub Release, with notes generated from merged PRs. CHANGELOG.md is the curated record; the generated notes list every PR.
+5. For a stable release, tells [Git-Revenge/packages](https://github.com/Git-Revenge/packages) (the apt and dnf repos at packages.gitrevenge.com) and [Git-Revenge/homebrew-tap](https://github.com/Git-Revenge/homebrew-tap) to update. Both also check every six hours, so a missed notice only delays them.
 
 ## Keeping the changelog
 
@@ -45,3 +46,7 @@ Signing uses a Developer ID Application certificate. Notarization uses an App St
 | `APPLE_API_KEY` | The full text of the `AuthKey_<KEY ID>.p8` file, including the `BEGIN` and `END` lines |
 | `APPLE_API_KEY_ID` | The key's Key ID, shown in its row on the Team Keys page |
 | `APPLE_API_ISSUER` | The Issuer ID, shown above the Team Keys table |
+
+## Package repo token
+
+`PACKAGE_REPOS_TOKEN` lets the release notify the package repos. Without it that step is skipped. Create a fine-grained personal access token with **Git-Revenge** as the resource owner, access to only `packages` and `homebrew-tap`, and the **Contents: Read and write** permission. Store it as a repository secret here. When it expires, the release still publishes and the step warns.
