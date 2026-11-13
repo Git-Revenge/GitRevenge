@@ -90,7 +90,7 @@ Backups of git config files you save in the [Git Config tab](git-config.md) go i
 
 ## What leaves your machine
 
-Git Revenge is local-first. It makes one request of its own, and everything else that reaches the network is something you asked for.
+Git Revenge is local-first. It makes one request of its own, and everything else that reaches the network is something you asked for. The [privacy policy](../privacy.md) covers the website and the download channels too.
 
 | What | Where it goes | When |
 |---|---|---|

@@ -54,6 +54,7 @@ const sidebars = {
       items: [
         { type: 'doc', id: 'PLAN', label: 'Plan' },
         { type: 'doc', id: 'RELEASING', label: 'Releasing' },
+        { type: 'doc', id: 'privacy', label: 'Privacy policy' },
         {
           type: 'category',
           label: 'Design decisions',
