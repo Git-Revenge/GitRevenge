@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { CancelClone, ChooseFolder, Clone, CloneName } from '../../wailsjs/go/app/App.js'
+  import { CancelClone, ChooseFolder, Clone, CloneName, HomeDir } from '../../wailsjs/go/app/App.js'
   import { EventsOn } from '../../wailsjs/runtime/runtime.js'
   import { errorText } from './errors'
   import { prefs } from './prefs.svelte'
@@ -15,7 +15,8 @@
   const dirOf = (p: string) => p.replace(/[\\/][^\\/]*$/, '')
 
   let url = $state('')
-  // Default to the folder holding the most recently opened repository.
+  // Start in the clone folder from Settings, else the folder holding the most recently opened
+  // repository, else the home folder (filled in on mount, below).
   let parent = $state(prefs.cloneDir || (session.recent[0] ? dirOf(session.recent[0].path) : ''))
   let name = $state('')
   /** True once the user types a name, so it stops following the URL. */
@@ -57,6 +58,13 @@
     if (running) CancelClone()
     else onClose()
   }
+
+  onMount(() => {
+    if (!parent)
+      HomeDir().then((home) => {
+        if (!parent && home) parent = home
+      })
+  })
 
   onMount(() =>
     EventsOn('net:progress', (p: { op: string; phase: string; percent: number; line: string }) => {

@@ -1930,6 +1930,22 @@ test.describe('start page', () => {
   })
 })
 
+test.describe('clone dialog', () => {
+  const folder = (page: Page) => page.getByLabel('Into folder')
+
+  // #724: with no clone folder in Settings and no recent repository, the field started empty.
+  test('starts in the home folder when nothing else says where', async ({ page }) => {
+    await open(page, 'cloneDialog', { responses: { HomeDir: 'C:\\Users\\sam' } })
+    await expect(folder(page)).toHaveValue('C:\\Users\\sam')
+  })
+
+  test('the clone folder from Settings wins over the home folder', async ({ page }) => {
+    await open(page, 'cloneDialog', { responses: { HomeDir: 'C:\\Users\\sam', Preferences: { zoom: 100, cloneDir: 'D:\\src' } } })
+    await expect(folder(page)).toHaveValue('D:\\src')
+    expect(await calls(page, 'HomeDir')).toEqual([])
+  })
+})
+
 test.describe('upstream dialog', () => {
   const refs = [branch('main', { upstream: 'origin/main' }), remote('origin/main'), remote('origin/x'), tag('v1')]
   const field = (page: Page) => page.getByLabel('Track')

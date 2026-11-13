@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Fixed
 
+- The clone dialog starts in your home folder when there's no clone folder in Settings and no recent repository. It started empty. (#724)
 - A commit's notes are rendered as markdown, as its message is, and link the same way: web addresses and your smart links (a ticket key such as `ABC-1234`) are links in a note, with the same right-click menu. A single line break in a note stays a line break. The message's **Raw** switch shows notes as written too. They were plain text. [Docs](https://gitrevenge.com/docs/guide/history#notes). (#681)
 
 ## [0.11.0] - 2026-11-11

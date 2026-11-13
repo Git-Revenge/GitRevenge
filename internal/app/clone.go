@@ -20,6 +20,16 @@ func (a *App) CloneName(url string) string {
 	return git.CloneName(url)
 }
 
+// HomeDir is the user's home folder, where the clone dialog starts when neither Settings nor
+// a recent repository says where. It is "" if the home folder can't be found.
+func (a *App) HomeDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return home
+}
+
 // Clone clones url into parent/name and returns the new repository's path. Progress is
 // reported as "net:progress" events with op "clone"; CancelClone stops it. A folder the
 // clone created, or files it left in an empty one, are removed if it fails.

@@ -199,3 +199,13 @@ func TestInitBadBranchIsExplained(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestHomeDirIsTheUsersHome(t *testing.T) {
+	want, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home folder here:", err)
+	}
+	if got := newTestApp(t).HomeDir(); got != want {
+		t.Fatalf("HomeDir() = %q, want %q", got, want)
+	}
+}

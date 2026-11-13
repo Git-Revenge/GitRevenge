@@ -242,6 +242,10 @@ export function HideBranch(arg1, arg2, arg3) {
   return window['go']['app']['App']['HideBranch'](arg1, arg2, arg3);
 }
 
+export function HomeDir() {
+  return window['go']['app']['App']['HomeDir']();
+}
+
 export function IgnoreFileNames(arg1) {
   return window['go']['app']['App']['IgnoreFileNames'](arg1);
 }
