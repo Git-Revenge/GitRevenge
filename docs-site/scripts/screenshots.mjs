@@ -76,8 +76,11 @@ async function reset(page, open = ['tidewater'], { clean = false, branch } = {})
     const st = await window.go.app.App.RestoreSession()
     for (const t of st?.tabs ?? []) await window.go.app.App.CloseRepo(t.path)
     await window.go.app.App.SetActiveRepo('')
-    // A scene of an experimental view leaves it showing: every other scene is of the rows.
+    // A scene of an experimental view leaves it showing and switched on: every other scene is
+    // of the rows, with the experimental views off as they are by default.
     await window.go.app.App.SetGraphView('')
+    const prefs = await window.go.app.App.Preferences()
+    if (prefs.experimentalViews?.length) await window.go.app.App.SetPreferences({ ...prefs, experimentalViews: [] })
   })
   // Git processes the app started can hold the folder for a moment after the tab closes.
   for (let tries = 1; ; tries++) {
