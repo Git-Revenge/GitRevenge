@@ -346,3 +346,30 @@ jobs:
             gh api "repos/$repo/dispatches" -f event_type=release -f "client_payload[tag]=$GITHUB_REF_NAME" \
               || echo "::warning::Could not notify $repo; it will catch up on its schedule"
           done
+
+  # Opens a pull request on microsoft/winget-pkgs for a stable release, from a fork of it under
+  # the maintainer's account. It needs WINGET_TOKEN (see docs/RELEASING.md) and a package
+  # already in winget, so the first version is submitted by hand. A failure only warns: winget
+  # can be updated by hand later without touching the release.
+  winget:
+    name: Update winget
+    needs: release
+    if: github.ref_type == 'tag' && !contains(github.ref_name, '-')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for the token
+        id: token
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          if [ -n "$WINGET_TOKEN" ]; then echo "set=true" >> "$GITHUB_OUTPUT"; else
+            echo "::notice::WINGET_TOKEN is not set; submit the winget update by hand (docs/RELEASING.md)"
+          fi
+      - uses: vedantmgoyal9/winget-releaser@b7370d4d152efdce803a26cc6ca9eee58cb2ad54 # v2
+        if: steps.token.outputs.set == 'true'
+        continue-on-error: true
+        with:
+          identifier: GitRevenge.GitRevenge
+          installers-regex: '-windows-amd64-installer\.exe$'
+          token: ${{ secrets.WINGET_TOKEN }}
+          fork-user: risadams
