@@ -1,0 +1,1 @@
+"use strict";(globalThis.webpackChunkgitrevenge_docs||=[]).push([[9647],{7121(e,r,s){s.r(r),s.d(r,{default:()=>i});s(6540);var a=s(4164),c=s(7559),t=s(5500),u=s(2831),n=s(1656),d=s(4848);function i(e){return(0,d.jsx)(t.e3,{className:(0,a.A)(c.G.wrapper.docsPages),children:(0,d.jsx)(n.A,{children:(0,u.v)(e.route.routes)})})}}}]);
