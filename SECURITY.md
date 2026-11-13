@@ -25,7 +25,7 @@ Include the affected version, your operating system, and steps to reproduce. A p
 3. **Disclosure** when the fix is released: the advisory is published with a CVE where one applies, and the release notes and changelog say which version fixed it. We agree the date with you, and if 90 days pass without a fix, you're free to disclose.
 4. **Credit** in the advisory, under the name you choose, unless you'd rather not be named.
 
-Git Revenge is maintained by volunteers and has no bug bounty.
+Git Revenge is maintained by volunteers and has no bug bounty. What we do with a reporter's details is in the [privacy policy](docs/privacy.md#when-you-contact-us).
 
 ## Scope
 
