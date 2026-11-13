@@ -128,6 +128,8 @@ export function HeadCommit(arg1:string):Promise<git.HeadState>;
 
 export function HideBranch(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
+export function HomeDir():Promise<string>;
+
 export function IgnoreFileNames(arg1:string):Promise<app.IgnoreFiles>;
 
 export function IgnoreSources(arg1:string):Promise<Array<git.IgnoreSource>>;

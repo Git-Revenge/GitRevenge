@@ -212,6 +212,12 @@ const mounts = {
     const images = (scenario.responses?.Images ?? {}) as Record<string, string>
     mount(component, { target: host, props: { path, text, loadImage: async (file: string) => images[file] ?? '', openFile: record('openFile'), loadData } })
   },
+  async cloneDialog() {
+    const { default: CloneDialog } = await import('../src/lib/CloneDialog.svelte')
+    // Read the saved settings first, as the app does when it starts.
+    await (await import('../src/lib/prefs.svelte')).prefs.load()
+    mount(CloneDialog, { target: host, props: { onClose: record('close') } })
+  },
   async upstreamDialog() {
     const { default: Dialog } = await import('../src/lib/Dialog.svelte')
     const { upstreamDialog } = await import('../src/lib/menus')
@@ -392,6 +398,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'upstreamDialog':
     await mounts.upstreamDialog()
+    break
+  case 'cloneDialog':
+    await mounts.cloneDialog()
     break
   case 'workingTree':
     await mounts.workingTree()
