@@ -1,3 +1,4 @@
+import { marked, type Tokens } from 'marked'
 import { describe, expect, it } from 'vitest'
 import { asciidocInline, asciidocToMarkdown } from './asciidoc'
 import { rstInline, rstToMarkdown } from './rst'
@@ -58,6 +59,14 @@ describe('AsciiDoc', () => {
     expect(md).toBe('| Name | Score |\n| --- | --- |\n| Ana | 3 |\n| Bo | 5 |\n')
     // One cell to a line, with the header named in the options.
     expect(asciidocToMarkdown('[options="header"]\n|===\n|A\n|B\n|1\n|2\n|===\n')).toBe('| A |\n| --- |\n| B |\n| 1 |\n| 2 |\n')
+  })
+
+  it('keeps a pipe after a backslash inside its cell', () => {
+    // An attribute can bring a pipe into a cell. Escaping only the pipe would leave `\\|`,
+    // a literal backslash and then a real column break.
+    const md = asciidocToMarkdown(':p: C:\\|D\n\n|===\n|{p} |x\n|===\n')
+    const table = marked.lexer(md).find((t) => t.type === 'table') as Tokens.Table
+    expect(table.rows[0].map((c) => c.text)).toEqual(['C:\\\\|D', 'x'])
   })
 
   it('leaves out comments, and names what an include would bring in', () => {

@@ -76,7 +76,7 @@ test.describe('HTML pages', () => {
   test('shows the page in a frame that allows nothing', async ({ page }) => {
     const requests: string[] = []
     page.on('request', (r) => {
-      if (r.url().includes('example.com')) requests.push(r.url())
+      if (new URL(r.url()).hostname === 'example.com') requests.push(r.url())
     })
     await open(page, 'markdownPreview', scenario)
     const frame = page.locator('iframe')

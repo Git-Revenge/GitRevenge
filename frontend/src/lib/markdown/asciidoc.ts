@@ -29,7 +29,7 @@ export function asciidocInline(text: string, attrs: Record<string, string> = {})
   s = s.replace(/image:(?!:)([^\s[]+)\[([^\]]*)\]/g, (_, src: string, alt: string) => hold(`![${alt.split(',')[0].trim()}](${src})`))
   s = s.replace(/(?:link:)?((?:https?|ftp|mailto|irc):[^\s[\]]+)\[([^\]]*)\]/g, (_, url: string, label: string) => hold(`[${label.replace(/\^$/, '').trim() || url}](${url})`))
   s = s.replace(/link:([^\s[]+)\[([^\]]*)\]/g, (_, url: string, label: string) => hold(`[${label.trim() || url}](${url})`))
-  s = s.replace(/xref:([^\s[]+)\[([^\]]*)\]/g, (_, ref: string, label: string) => hold(`[${label.trim() || ref.replace(/#.*$/, '')}](${ref.replace(/\.adoc(?=#|$)/, '.adoc')})`))
+  s = s.replace(/xref:([^\s[]+)\[([^\]]*)\]/g, (_, ref: string, label: string) => hold(`[${label.trim() || ref.replace(/#.*$/, '')}](${ref})`))
   s = s.replace(/<<([^,>]+)(?:,\s*([^>]+))?>>/g, (_, id: string, label?: string) => (label ?? id).trim())
   // Bold before italic: AsciiDoc's *x* is Markdown's **x**, and its _x_ is Markdown's *x*.
   s = s.replace(/\*\*(.+?)\*\*/g, (_, t: string) => hold('**') + t + hold('**'))
@@ -71,7 +71,9 @@ function table(lines: string[], header: boolean, attrs: Record<string, string>):
   if (!width || !cells.length) return []
   const rows: string[][] = []
   for (let i = 0; i < cells.length; i += width) rows.push(cells.slice(i, i + width))
-  const cell = (c: string | undefined) => asciidocInline(c ?? '', attrs).replace(/\|/g, '\\|')
+  // Escape each pipe, and double any backslashes before it, or `\|` would become `\\|`: a
+  // literal backslash and then a real column break.
+  const cell = (c: string | undefined) => asciidocInline(c ?? '', attrs).replace(/(\\*)\|/g, (_, bs: string) => `${bs}${bs}\\|`)
   const line = (r: string[]) => `| ${Array.from({ length: width }, (_, k) => cell(r[k])).join(' | ')} |`
   const hasHeader = header || implicitHeader
   const head = hasHeader ? rows.shift()! : Array.from({ length: width }, () => '')
