@@ -63,7 +63,7 @@ func TestMergeConflictLeavesOperation(t *testing.T) {
 	if !errors.Is(err, ErrConflicts) {
 		t.Fatalf("err = %v", err)
 	}
-	if op, _, _ := DetectOperation(fx.Path(".git")); op != Merge {
+	if op, _, _ := OpenRepo(newTestRunner(t), fx.Dir).DetectOperation(context.Background(), fx.Path(".git")); op != Merge {
 		t.Fatalf("operation = %q, want merge in progress", op)
 	}
 }
@@ -111,7 +111,7 @@ func TestCherryPickConflict(t *testing.T) {
 	if !errors.Is(err, ErrConflicts) {
 		t.Fatalf("err = %v", err)
 	}
-	if op, _, _ := DetectOperation(fx.Path(".git")); op != CherryPick {
+	if op, _, _ := OpenRepo(newTestRunner(t), fx.Dir).DetectOperation(context.Background(), fx.Path(".git")); op != CherryPick {
 		t.Fatalf("operation = %q", op)
 	}
 }
