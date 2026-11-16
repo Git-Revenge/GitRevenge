@@ -35,7 +35,7 @@ func TestPlaceOriginNamesWhoLastChangedEachSide(t *testing.T) {
 
 	for side, want := range map[string]string{"ours": "Change two on main", "theirs": "Change two on topic", "base": "Add the file"} {
 		o, err := repo.PlaceOrigin(ctx, gitDir, "f.txt", side, 2, 2)
-		if err != nil || o.Subject != want || o.Author == "" || len(o.Commit) != 40 {
+		if err != nil || o.Subject != want || o.Author == "" || !IsCommitID(o.Commit) {
 			t.Errorf("%s: origin = %+v, %v; want %q", side, o, err, want)
 		}
 	}

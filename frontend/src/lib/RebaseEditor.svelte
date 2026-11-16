@@ -3,7 +3,7 @@
   import { InteractiveRebase, PreviewRebasePlan, RebasePlan, RepoState } from '../../wailsjs/go/app/App.js'
   import type { app, git } from '../../wailsjs/go/models'
   import { errorText } from './errors'
-  import { ACTIONS, actionForKey, actionLabel, changed, foldable, foldIn, foldTarget, move, newPlan, outcome, problem as problemOf, setAction, toRun, type Action, type PlanItem } from './rebasePlan'
+  import { ACTIONS, actionForKey, isCommitId, actionLabel, changed, foldable, foldIn, foldTarget, move, newPlan, outcome, problem as problemOf, setAction, toRun, type Action, type PlanItem } from './rebasePlan'
   import { session } from './session.svelte'
   import Icon from './ui/Icon.svelte'
 
@@ -49,7 +49,7 @@
   )
   const short = (id: string) => id.slice(0, 7)
   /** The base as it's named: a branch or tag as it is, a commit id shortened. */
-  let baseName = $derived(base.length === 40 && !base.includes('/') ? short(base) : base)
+  let baseName = $derived(isCommitId(base) ? short(base) : base)
   const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
   // The forecast for this order. It follows the plan a moment behind, so dragging a commit

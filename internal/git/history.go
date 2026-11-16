@@ -131,7 +131,7 @@ func parseBlame(rd io.Reader) ([]BlameLine, error) {
 			continue
 		}
 		key, val, _ := strings.Cut(line, " ")
-		if len(key) == 40 || len(key) == 64 {
+		if IsCommitID(key) {
 			// "<sha> <orig-line> <final-line> [<count>]" starts each line's entry.
 			cur = key
 			f := strings.Fields(val)

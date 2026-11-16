@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actionForKey, autosquashOf, changed, foldable, foldIn, foldTarget, move, newPlan, outcome, problem, setAction, toRun } from './rebasePlan'
+import { actionForKey, autosquashOf, isCommitId, changed, foldable, foldIn, foldTarget, move, newPlan, outcome, problem, setAction, toRun } from './rebasePlan'
 
 const commit = (id: string, subject: string) => ({ commit: id.repeat(40), subject, message: subject })
 const plan = () =>
@@ -119,5 +119,17 @@ describe('the rest', () => {
 
   it('hands the backend the plan as it runs it', () => {
     expect(toRun(setAction(plan(), 4, 'drop')).at(-1)).toEqual({ commit: 'e'.repeat(40), subject: 'debugging', message: 'debugging', action: 'drop' })
+  })
+})
+
+describe('isCommitId', () => {
+  it('takes a SHA-1 or a SHA-256 commit ID, and nothing else', () => {
+    expect(isCommitId('a'.repeat(40))).toBe(true)
+    expect(isCommitId('0123456789abcdef'.repeat(4))).toBe(true)
+    expect(isCommitId('a'.repeat(39))).toBe(false)
+    expect(isCommitId('a'.repeat(50))).toBe(false)
+    expect(isCommitId('A'.repeat(40))).toBe(false)
+    expect(isCommitId('origin/main')).toBe(false)
+    expect(isCommitId('v1.0.0')).toBe(false)
   })
 })

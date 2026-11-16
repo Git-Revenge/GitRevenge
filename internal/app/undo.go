@@ -322,7 +322,7 @@ func friendlyUndo(err error) error {
 
 // shortRef abbreviates full commit IDs for labels; names are kept as they are.
 func shortRef(ref string) string {
-	if len(ref) >= 40 {
+	if git.IsCommitID(ref) {
 		return ref[:7]
 	}
 	return ref
