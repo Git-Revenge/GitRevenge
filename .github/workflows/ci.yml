@@ -188,8 +188,6 @@ jobs:
     needs: changes
     if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-24.04
-    # Some tests fail here until #732, #733 and #734 land; the last of those makes it count.
-    continue-on-error: true
     env:
       GITREVENGE_TEST_GIT3: '1'
     steps:
@@ -218,8 +216,16 @@ jobs:
         run: |
           git --version
           git init -q --object-format=sha256 --ref-format=reftable "$RUNNER_TEMP/probe"
+      # Some tests fail here until #732, #733 and #734 land, so for now each failing test is
+      # reported as a warning on the run instead of failing it. A follow-up makes it strict.
       - name: go test
-        run: go test ./...
+        run: |
+          set -o pipefail
+          if ! go test ./... 2>&1 | tee "$RUNNER_TEMP/go-test.log"; then
+            grep -E '^--- FAIL' "$RUNNER_TEMP/go-test.log" | sed -E 's/^--- FAIL: ([^ ]+).*/::warning title=Fails with Git 3.0 defaults::\1/'
+            # A build or vet failure isn't a known gap: that still fails the job.
+            if grep -qE '^(# |FAIL\s.*\[(build|setup) failed\])' "$RUNNER_TEMP/go-test.log"; then exit 1; fi
+          fi
 
   rhel:
     # AlmaLinux stands in for RHEL. Each version gets its own package, because RHEL 9 only has
