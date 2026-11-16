@@ -165,3 +165,9 @@ export function changed(items: PlanItem[], original: string[]): boolean {
 export function toRun(items: PlanItem[]): { commit: string; subject: string; message: string; action: string }[] {
   return items.map((it) => ({ commit: it.commit, subject: it.subject, message: it.message, action: it.action }))
 }
+
+/** Whether s is a full commit ID as git prints it: 40 hex digits with SHA-1, or 64 with
+ * SHA-256, Git 3.0's default for new repositories. */
+export function isCommitId(s: string): boolean {
+  return /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(s)
+}

@@ -91,7 +91,7 @@ func (r *Repo) PlaceOrigin(ctx context.Context, gitDir, path, side string, start
 		}
 		key, value, _ := strings.Cut(line, " ")
 		switch {
-		case len(key) == 40 && isHex(key):
+		case IsCommitID(key):
 			keep()
 			if key != cur.Commit {
 				cur, curTime = PlaceOrigin{Commit: key}, 0
@@ -106,6 +106,12 @@ func (r *Repo) PlaceOrigin(ctx context.Context, gitDir, path, side string, start
 	}
 	keep()
 	return best, nil
+}
+
+// IsCommitID reports whether s is a full commit ID as git prints it: 40 lowercase hex digits
+// with SHA-1, or 64 with SHA-256 (Git 3.0's default for new repositories).
+func IsCommitID(s string) bool {
+	return (len(s) == 40 || len(s) == 64) && isHex(s)
 }
 
 func isHex(s string) bool {

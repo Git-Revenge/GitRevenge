@@ -35,7 +35,7 @@ func TestFileHistoryFollowsRenames(t *testing.T) {
 	if hist[2].Path != "old.txt" || hist[3].Status != "A" {
 		t.Fatalf("older entries should use the old name: %+v / %+v", hist[2], hist[3])
 	}
-	if hist[0].Author != "Test User" || hist[0].Time == 0 || len(hist[0].ID) != 40 {
+	if hist[0].Author != "Test User" || hist[0].Time == 0 || !IsCommitID(hist[0].ID) {
 		t.Fatalf("fields = %+v", hist[0])
 	}
 }
