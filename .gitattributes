@@ -7,3 +7,5 @@
 # the docs workflow fetches LFS: an app icon in LFS would reach CI and release builds as a pointer.
 docs/img/*.png filter=lfs diff=lfs merge=lfs -text
 docs/img/*.webp filter=lfs diff=lfs merge=lfs -text
+# cmd.exe misreads some batch files with LF endings.
+*.cmd text eol=crlf

@@ -6,6 +6,14 @@ on:
   # Dry run: build and package (unsigned) without publishing when this workflow changes.
   pull_request:
     paths: [.github/workflows/release.yml, build/linux/**, build/windows/**, build/darwin/**]
+  # Build from a branch without publishing, optionally signing the Windows installer, to test
+  # signing without a tag.
+  workflow_dispatch:
+    inputs:
+      sign:
+        description: Sign the Windows installer
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -60,6 +68,9 @@ jobs:
     # themselves are scoped to the steps that use them, never to npm or go install steps.
     env:
       MAC_SIGNING: ${{ github.ref_type == 'tag' && secrets.APPLE_CERTIFICATE_P12 != '' && secrets.APPLE_API_KEY != '' }}
+      # Windows signing, with the Certum certificate in SimplySign, runs for tags and for a
+      # manual run that asks for it, when the Certum secrets are configured.
+      WIN_SIGNING: ${{ (github.ref_type == 'tag' || inputs.sign == true) && secrets.CERTUM_USERNAME != '' && secrets.CERTUM_TOTP_SECRET != '' }}
       # A container runs as root, but the checkout belongs to the runner's user, so Go can't
       # read its VCS information.
       GOFLAGS: ${{ matrix.container && '-buildvcs=false' || '' }}
@@ -124,6 +135,45 @@ jobs:
           if [ -n "${{ matrix.tags }}" ]; then args+=(-tags "${{ matrix.tags }}"); fi
           wails build "${args[@]}"
 
+      # Signing waits until the build is done, so no npm or Go install step runs while the
+      # SimplySign session is open. The action installs SimplySign Desktop, signs in with a
+      # one-time code made from the TOTP secret, and puts signtool on the PATH.
+      - name: Sign in to SimplySign
+        id: certum
+        if: runner.os == 'Windows' && env.WIN_SIGNING == 'true'
+        uses: jay0lee/certum-cloud-code-sign@a3324503499c49090869856eeeecfe95fb613d87 # v1
+        with:
+          username: ${{ secrets.CERTUM_USERNAME }}
+          totp_secret: ${{ secrets.CERTUM_TOTP_SECRET }}
+          cert_sha1: ${{ secrets.CERTUM_CERT_SHA1 }}
+
+      # Builds the installer again from the same files, this time with GITREVENGE_SIGN_SHA1 set,
+      # so project.nsi signs the app, the uninstaller and the installer (see sign.cmd).
+      - name: Sign the app and installer
+        if: runner.os == 'Windows' && env.WIN_SIGNING == 'true'
+        working-directory: build/windows/installer
+        shell: pwsh
+        env:
+          GITREVENGE_SIGN_SHA1: ${{ steps.certum.outputs.cert-thumbprint }}
+        run: |
+          if (-not $env:GITREVENGE_SIGN_SHA1) { throw 'SimplySign gave no certificate thumbprint' }
+          makensis "-DARG_WAILS_AMD64_BINARY=..\..\bin\gitrevenge.exe" project.nsi
+          if ($LASTEXITCODE) { throw "makensis failed with $LASTEXITCODE" }
+          $installer = (Get-ChildItem ..\..\bin\*-installer.exe | Select-Object -First 1).FullName
+          foreach ($file in '..\..\bin\gitrevenge.exe', $installer) {
+            signtool verify /pa $file
+            if ($LASTEXITCODE) { throw "$file is not signed" }
+            $sig = Get-AuthenticodeSignature $file
+            if ($sig.SignerCertificate.Thumbprint -ne $env:GITREVENGE_SIGN_SHA1 -or -not $sig.TimeStamperCertificate) {
+              throw "$file is not signed and timestamped with the Certum certificate"
+            }
+            Write-Host "ok: $file signed by $($sig.SignerCertificate.Subject)"
+          }
+
+      - name: Sign out of SimplySign
+        if: always() && runner.os == 'Windows' && env.WIN_SIGNING == 'true'
+        uses: jay0lee/certum-cloud-code-sign/teardown@a3324503499c49090869856eeeecfe95fb613d87 # v1
+
       - name: Package Windows installer
         if: runner.os == 'Windows'
         shell: bash
@@ -159,6 +209,11 @@ jobs:
           Check (-not (Test-Path $oldDir)) 'old folder removed'
           Check (-not (Test-Path "$env:ProgramFiles\Ris Adams")) 'empty Ris Adams folder removed'
           Check (Test-Path "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Git Revenge.lnk") 'Start menu shortcut kept'
+          if ($env:WIN_SIGNING -eq 'true') {
+            foreach ($file in 'gitrevenge.exe', 'uninstall.exe') {
+              Check ((Get-AuthenticodeSignature "$newDir\$file").Status -eq 'Valid') "installed $file is signed"
+            }
+          }
 
           Start-Process "$newDir\uninstall.exe" -ArgumentList '/S' -Wait
           # The uninstaller copies itself to a temp folder and returns before it's done.
