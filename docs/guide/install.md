@@ -1,6 +1,14 @@
 # Installing
 
-Git Revenge is free, and there's nothing to sign up for. Download the Windows installer or the macOS disk image from the [latest release](https://github.com/Git-Revenge/GitRevenge/releases/latest), or install with Homebrew, apt or dnf. Each download is under 20 MB.
+Git Revenge is free, and there's nothing to sign up for. Download the Windows installer or the macOS disk image from the [latest release](https://github.com/Git-Revenge/GitRevenge/releases/latest), or install with winget, Homebrew, apt or dnf. Each download is under 20 MB.
+
+- **Windows:** install and update it with winget:
+
+  ```sh
+  winget install GitRevenge.GitRevenge
+  ```
+
+  The installer on the release, and the app in it, are signed by the project too. If you download it, SmartScreen may still warn you about a new release while its signature builds up a reputation: choose **More info**, then **Run anyway**. winget doesn't trigger that warning.
 
 - **macOS:** the disk image is signed and notarized, so it opens like any other app. With [Homebrew](https://brew.sh), install and update it from the project's tap instead:
 
@@ -8,7 +16,6 @@ Git Revenge is free, and there's nothing to sign up for. Download the Windows in
   brew install --cask git-revenge/tap/gitrevenge
   ```
 
-- **Windows:** the installer, and the app in it, are signed by the project. SmartScreen may still warn you about a new release while its signature builds up a reputation: choose **More info**, then **Run anyway**.
 - **Linux:** install from the project's apt or dnf repository, so updates come with the rest of your system. See [Linux](#linux).
 
 When a new release comes out, the app tells you at startup. You can also check by hand with **Check for updates** in the command palette. That check is the only request the app makes on its own, and [Settings](settings.md) turns it off.
