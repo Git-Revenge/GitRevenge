@@ -20,12 +20,12 @@ The walkthroughs all use Tidewater, a small made-up project: a dashboard for a n
 You can build the same repository and follow along. You need `git` and a bash shell; on Windows, use Git Bash, which comes with Git for Windows.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/Git-Revenge/GitRevenge/main/docs-site/scripts/demo-repo.sh -o demo-repo.sh
+curl -fsSL https://github.com/Git-Revenge/demo-repos/releases/latest/download/demo-repo.sh -o demo-repo.sh
 bash demo-repo.sh ~/gitrevenge-practice
 ```
 
 That makes `~/gitrevenge-practice/tidewater`, along with its remote and a few neighbours, in under a minute. Open it with **Open repository** on the start page. The script deletes and rebuilds the folders it made each time you run it, so run it again whenever you want a clean start.
 
-To try the repository as Git 3.0 will make it, with SHA-256 commit IDs and reftable refs, download `demo-repo-git3.sh` from the same folder and run it the same way. It needs git 2.45 or later and `demo-repo.sh` beside it, and makes `tidewater-git3` next to `tidewater`.
+To try the repository as Git 3.0 will make it, with SHA-256 commit IDs and reftable refs, download `demo-repo-git3.sh` from the same release and run it the same way. It needs git 2.45 or later and `demo-repo.sh` beside it, and makes `tidewater-git3` next to `tidewater`. Both scripts live in [Git-Revenge/demo-repos](https://github.com/Git-Revenge/demo-repos), which says more about what's in the repository.
 
 The practice repository sets its own author name (Emily Carter) and never signs commits, so nothing you do in it uses your identity or keys.
