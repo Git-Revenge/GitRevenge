@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="generator" content="Docusaurus v3.10.2">
 <title data-rh="true">Git Revenge — Plan | Git Revenge</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" name="twitter:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" property="og:url" content="https://gitrevenge.com/docs/PLAN"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Git Revenge — Plan | Git Revenge"><meta data-rh="true" name="description" content="Git Revenge is a fast, local-only desktop git client. It has a Go backend and is built to handle multiple repos, including very large ones."><meta data-rh="true" property="og:description" content="Git Revenge is a fast, local-only desktop git client. It has a Go backend and is built to handle multiple repos, including very large ones."><link data-rh="true" rel="icon" href="/img/favicon.svg"><link data-rh="true" rel="canonical" href="https://gitrevenge.com/docs/PLAN"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/PLAN" hreflang="en"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/PLAN" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Plan","item":"https://gitrevenge.com/docs/PLAN"}]}</script><link rel="apple-touch-icon" href="/img/apple-touch-icon.png"><link rel="stylesheet" href="/assets/css/styles.1bf894f5.css">
-<script src="/assets/js/runtime~main.819a0f50.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.11c8085d.js" defer="defer"></script>
 <script src="/assets/js/main.082de980.js" defer="defer"></script>
 </head>
 <body>
@@ -306,7 +306,7 @@
 <ul>
 <li class=""><strong>Builds.</strong> A GitHub Actions workflow is triggered by <code>v*</code> tags.
 <ul>
-<li class="">Windows: an NSIS installer, unsigned for now.</li>
+<li class="">Windows: an NSIS installer, signed with the maintainer&#x27;s Certum open source code signing certificate.</li>
 <li class="">macOS: a universal <code>.dmg</code>, signed and notarized with the maintainer&#x27;s Apple Developer account. A Homebrew tap (<code>git-revenge/tap</code>) follows the latest release.</li>
 <li class="">Linux: a <code>.deb</code> for Ubuntu and Debian, and an <code>.rpm</code> each for RHEL 9 and RHEL 10. Signed apt and dnf repositories at packages.gitrevenge.com (<a href="https://github.com/Git-Revenge/packages" target="_blank" rel="noopener noreferrer" class="">Git-Revenge/packages</a>) follow the latest stable release; a release notifies them and the tap as soon as it&#x27;s published.</li>
 </ul>
