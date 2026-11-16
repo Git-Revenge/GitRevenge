@@ -1,6 +1,6 @@
 # Resolve a merge conflict
 
-Maya switched the dashboard's wind readings to knots on `main`. Meanwhile Sam, on `feature/metric-units`, switched them to metres per second. Both changed the same lines of `src/feed.js`, so when Maya merges Sam's branch, git can't choose between them. That's a conflict, and it needs a person to decide.
+Emily switched the dashboard's wind readings to knots on `main`. Meanwhile Tyler, on `feature/metric-units`, switched them to metres per second. Both changed the same lines of `src/feed.js`, so when Emily merges Tyler's branch, git can't choose between them. That's a conflict, and it needs a person to decide.
 
 ![Merging a branch, opening the conflict tool, taking one side, and finishing the merge](../img/conflict-light.webp#gh-light-mode-only)
 ![Merging a branch, opening the conflict tool, taking one side, and finishing the merge](../img/conflict-dark.webp#gh-dark-mode-only)

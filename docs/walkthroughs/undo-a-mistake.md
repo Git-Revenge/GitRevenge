@@ -1,6 +1,6 @@
 # Undo a mistake
 
-Maya meant to look at `feature/offline-cache`, and merged it into `main` instead. One keystroke takes it back.
+Emily meant to look at `feature/offline-cache`, and merged it into `main` instead. One keystroke takes it back.
 
 ![Merging a branch by mistake, then pressing Ctrl+Z to undo it](../img/undo-light.webp#gh-light-mode-only)
 ![Merging a branch by mistake, then pressing Ctrl+Z to undo it](../img/undo-dark.webp#gh-dark-mode-only)

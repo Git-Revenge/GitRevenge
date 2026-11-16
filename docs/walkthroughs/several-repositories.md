@@ -1,6 +1,6 @@
 # Look after several repositories
 
-Tidewater is three repositories: the dashboard, `harbour-api` and `tide-tables`. Each morning Leo wants to know which of them have changes he hasn't pulled, and which have work he hasn't committed, without opening each one.
+Tidewater is three repositories: the dashboard, `harbour-api` and `tide-tables`. Each morning Marcus wants to know which of them have changes he hasn't pulled, and which have work he hasn't committed, without opening each one.
 
 ## Make a group
 
