@@ -2008,6 +2008,7 @@ export namespace git {
 	    deleted: number;
 	    binary?: boolean;
 	    caseClash?: boolean;
+	    caseTwin?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new FileStatus(source);
@@ -2026,6 +2027,7 @@ export namespace git {
 	        this.deleted = source["deleted"];
 	        this.binary = source["binary"];
 	        this.caseClash = source["caseClash"];
+	        this.caseTwin = source["caseTwin"];
 	    }
 	}
 	export class HeadState {

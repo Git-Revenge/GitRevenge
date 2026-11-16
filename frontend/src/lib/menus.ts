@@ -1,4 +1,4 @@
-import { DeleteBranchAndWorktree, DeleteStack, PushStack, RebaseStack, RestoreStack, StackDeletePlan, StackPushPlan, Unstack, UpdateStack, BranchAction, BranchMergeState, HideBranch, Integrate, MarkBranchKind, Pull, PullBranch, PushBranch, PushRef, Refs, Restack, SetGraphFocus, SetStackParent, StashAction, Worktrees } from '../../wailsjs/go/app/App.js'
+import { DeleteBranchAndWorktree, DeleteStack, PushStack, RebaseStack, RestoreStack, StackDeletePlan, StackPushPlan, Unstack, UpdateStack, BranchAction, BranchCaseTwin, BranchMergeState, HideBranch, Integrate, MarkBranchKind, Pull, PullBranch, PushBranch, PushRef, Refs, Restack, SetGraphFocus, SetStackParent, StashAction, Worktrees } from '../../wailsjs/go/app/App.js'
 import { CONFIRM_DELETE, CONFIRM_FORCE_PUSH, KINDS, kindWarning } from './branchKinds'
 import type { MenuItem } from './ContextMenu.svelte'
 import type { DialogSpec } from './Dialog.svelte'
@@ -70,6 +70,18 @@ async function attempt(fn: () => Promise<unknown>): Promise<string | void> {
 }
 
 const branch = (path: string, action: string, ...args: string[]) => BranchAction(path, action, args)
+
+/** Warns, as a branch name is typed, when it differs from an existing branch only by letter
+ * case. except is the branch being renamed. */
+const caseWarning =
+  (path: string, except = '') =>
+  async (v: Record<string, string | boolean>) => {
+    const name = String(v.name ?? '').trim()
+    const twin = name ? await BranchCaseTwin(path, name, except) : ''
+    if (!twin) return ''
+    const what = twin.endsWith('/') ? 'A folder in this name differs' : 'This name differs'
+    return `${what} from ${twin} only by letter case. Windows and macOS can't keep the two apart, so git there can mix them up.`
+  }
 
 /** Whether a branch's work is on another branch (git.BranchMerge in Go). */
 export interface BranchMerge {
@@ -289,6 +301,7 @@ export function refItems(ref: Ref, ctx: MenuContext): MenuItem[] {
                 title: `Rename branch ${ref.short}`,
                 fields: [{ key: 'name', label: 'New name', value: ref.short }],
                 submit: 'Rename',
+                warn: caseWarning(path, ref.short),
                 run: (v) => attempt(() => branch(path, 'rename', ref.short, String(v.name).trim())),
               }),
           },
@@ -522,6 +535,7 @@ export function branchAtDialog(path: string, commit: string): DialogSpec {
       { key: 'checkout', label: 'Check it out', type: 'checkbox', value: true },
     ],
     submit: 'Create branch',
+    warn: caseWarning(path),
     run: (v) => attempt(() => branch(path, 'create', String(v.name).trim(), commit, v.checkout ? 'true' : '')),
   }
 }
@@ -633,6 +647,7 @@ function branchOnDialog(path: string, start: string): DialogSpec {
       { key: 'checkout', label: 'Check it out', type: 'checkbox', value: true },
     ],
     submit: 'Create branch',
+    warn: caseWarning(path),
     run: (v) => attempt(() => branch(path, 'create', String(v.name).trim(), start, v.checkout ? 'true' : '')),
   }
 }
@@ -688,6 +703,7 @@ export function newBranchDialog(ctx: MenuContext): DialogSpec {
       { key: 'checkout', label: 'Check it out', type: 'checkbox', value: true },
     ],
     submit: 'Create branch',
+    warn: caseWarning(ctx.path),
     run: (v) => attempt(() => branch(ctx.path, 'create', String(v.name).trim(), '', v.checkout ? 'true' : '')),
   }
 }

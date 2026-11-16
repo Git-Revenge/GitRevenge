@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Ref, Row } from './graph/rowCache'
-import { Pull, PullBranch, PushBranch } from '../../wailsjs/go/app/App.js'
+import { BranchCaseTwin, Pull, PullBranch, PushBranch } from '../../wailsjs/go/app/App.js'
 import { session } from './session.svelte'
-import { stackItems, commitItems, commitMenuItems, deleteBranchDialog, deleteWorktreeBranchDialog, dropItems, groups, refItems, upstreamDialog, type MenuContext } from './menus'
+import { stackItems, commitItems, commitMenuItems, deleteBranchDialog, deleteWorktreeBranchDialog, dropItems, groups, newBranchDialog, refItems, upstreamDialog, type MenuContext } from './menus'
 
 vi.mock('../../wailsjs/go/app/App.js', async (original) => ({
   ...(await original<typeof import('../../wailsjs/go/app/App.js')>()),
+  BranchCaseTwin: vi.fn(async () => ''),
   Pull: vi.fn(async () => {}),
   PullBranch: vi.fn(async () => {}),
   PushBranch: vi.fn(async () => {}),
@@ -403,5 +404,28 @@ describe('smart links in branch menus', () => {
     expect(labels(refItems(ref('origin/feature/ABC-12-retry', 'remote'), ctx('main')))[0]).toBe('Open ABC-12 in Jira')
     expect(labels(refItems(ref('wip-docs', 'local'), ctx('main')))[0]).not.toMatch(/^Open /)
     delete linkStore.configs['/r']
+  })
+})
+
+describe('newBranchDialog', () => {
+  const warn = (name: string) => newBranchDialog(ctx('main')).warn!({ name, checkout: true })
+
+  it('warns when the name differs from a branch only by letter case', async () => {
+    vi.mocked(BranchCaseTwin).mockResolvedValueOnce('foo')
+    expect(await warn('Foo')).toBe("This name differs from foo only by letter case. Windows and macOS can't keep the two apart, so git there can mix them up.")
+    expect(BranchCaseTwin).toHaveBeenLastCalledWith('/r', 'Foo', '')
+  })
+
+  it('names a folder twin as a folder', async () => {
+    vi.mocked(BranchCaseTwin).mockResolvedValueOnce('feature/')
+    expect(await warn(' Feature/y ')).toMatch(/^A folder in this name differs from feature\/ only/)
+    expect(BranchCaseTwin).toHaveBeenLastCalledWith('/r', 'Feature/y', '')
+  })
+
+  it('says nothing without a twin, or a name', async () => {
+    expect(await warn('fresh')).toBe('')
+    vi.mocked(BranchCaseTwin).mockClear()
+    expect(await warn('  ')).toBe('')
+    expect(BranchCaseTwin).not.toHaveBeenCalled()
   })
 })

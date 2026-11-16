@@ -884,7 +884,8 @@ textarea {
   color: var(--ink-mute);
 }
 
-.form-error {
+.form-error,
+.form-warning {
   margin: 0;
   padding: 8px 12px;
   border-radius: var(--r-sm);
@@ -892,6 +893,10 @@ textarea {
   color: var(--ink);
   font-size: 13px;
   white-space: pre-wrap;
+}
+
+.form-warning {
+  background: var(--warning-wash);
 }
 
 .form-actions {

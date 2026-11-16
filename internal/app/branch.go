@@ -61,6 +61,17 @@ func (a *App) BranchAction(path, action string, args []string) error {
 	return branchErr(err)
 }
 
+// BranchCaseTwin returns an existing branch whose name differs from name only by letter case,
+// or "" if none does, for the new-branch and rename dialogs to warn about. A folder twin ends
+// in "/", and a remote one starts with its remote. except is the branch being renamed.
+func (a *App) BranchCaseTwin(path, name, except string) (string, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return "", err
+	}
+	return r.Git.BranchCaseTwin(context.Background(), name, except)
+}
+
 func branchErr(err error) error {
 	switch {
 	case errors.Is(err, git.ErrInvalidName):

@@ -6,6 +6,9 @@
   /** Repositories where the person set the case-clash notice aside, for this session. */
   // eslint-disable-next-line svelte/prefer-svelte-reactivity
   const caseNoticeSeen = new Set<string>()
+  /** The same for the notice about new files that clash by case on Windows and macOS. */
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const twinNoticeSeen = new Set<string>()
   import Empty from './ui/Empty.svelte'
   import Loading from './ui/Loading.svelte'
 </script>
@@ -173,6 +176,15 @@
   function hideCaseNotice() {
     caseNoticeSeen.add(path)
     caseNoticeHidden = true
+  }
+  // New names a case-sensitive filesystem holds but Windows and macOS can't. Real edits, so
+  // they stay tickable.
+  // svelte-ignore state_referenced_locally
+  let twinNoticeHidden = $state(twinNoticeSeen.has(path))
+  let twins = $derived(listed.filter((f) => f.caseTwin))
+  function hideTwinNotice() {
+    twinNoticeSeen.add(path)
+    twinNoticeHidden = true
   }
   /** What the tick at the top covers. Case clashes aren't real edits, so they stay out unless
    * they're all there is. */
@@ -589,6 +601,7 @@
       {#if f.origPath}<span class="from">from {f.origPath}</span>{/if}
       {#if tick === 'part'}<span class="partly">partly staged</span>{/if}
       {#if f.caseClash}<span class="partly" title="Another file has the same name in different letter case">case clash</span>{/if}
+      {#if f.caseTwin}<span class="partly" title="Another file has the same name in different letter case. Windows and macOS can keep only one.">case twin</span>{/if}
       {#if f.binary}
         <span class="binary">binary</span>
       {:else if f.added || f.deleted}
@@ -652,6 +665,13 @@
       <strong>{clashes.length === 1 ? 'This may not be your edit.' : `These ${clashes.length} may not be your edits.`}</strong>
       {clashes.length === 1 ? 'Its name differs' : 'Each name differs'} from another file's only by letter case, which this computer can't keep apart, so git sees a change you never made.
       <button class="btn sm secondary" onclick={hideCaseNotice}>{clashes.length === 1 ? 'Leave it out' : `Leave these ${clashes.length} out`}</button>
+    </div>
+  {/if}
+  {#if twins.length && !twinNoticeHidden}
+    <div class="notice" role="note">
+      <strong>{twins.length === 1 ? 'This name will clash on Windows and macOS.' : `These ${twins.length} names will clash on Windows and macOS.`}</strong>
+      {twins.length === 1 ? 'It differs' : 'Each differs'} from another file's only by letter case. Those systems can hold only one of them, so a checkout there shows changes nobody made.
+      <button class="btn sm secondary" onclick={hideTwinNotice}>Got it</button>
     </div>
   {/if}
   <div class="lists">
