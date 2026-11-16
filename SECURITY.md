@@ -41,11 +41,13 @@ Out of scope:
 
 - Vulnerabilities in git, WebView2, WebKit or a dependency. Report those to that project, but tell us too if Git Revenge exposes users to them or should work around them.
 - Anything that needs an attacker to already control your account or your machine.
-- The Windows installer being unsigned. SmartScreen's warning is known and expected.
+- SmartScreen warning about a signed release it doesn't recognize yet. That's about the certificate's reputation, not the file, and fades as more people install it.
 
 ## Verifying what you download
 
 - **Every release asset** has a sha256 digest on the release page. Releases are immutable: once published, an asset or tag can't be replaced.
+- **The Windows installer**, and the app and uninstaller in it, are signed and timestamped with the maintainer's Certum open source code signing certificate (issued by Certum Code Signing 2021 CA). Check it under the file's **Properties → Digital Signatures**, or with `Get-AuthenticodeSignature` in PowerShell, which should say `Valid`.
 - **The macOS disk image** is signed with a Developer ID certificate and notarized by Apple.
+- **winget** pins the installer's sha256 in its manifest.
 - **The apt and dnf repositories** sign their metadata, and the dnf repositories sign each RPM, with the key whose fingerprint is `03A4 C486 592C CA4D A332  B396 1221 F135 7F3C 5ECA`.
 - **The Homebrew cask** pins the disk image's sha256.

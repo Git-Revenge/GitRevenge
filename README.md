@@ -10,7 +10,7 @@ Git Revenge is a free, private desktop git client for Windows, macOS and Linux t
 
 The user guide, with pictures and walkthroughs, is at [gitrevenge.com](https://gitrevenge.com).
 
-> **Status:** early development. The latest release is [`0.11.0`](https://github.com/Git-Revenge/GitRevenge/releases/tag/v0.11.0).
+> **Status:** stable since 1.0.0. The [latest release](https://github.com/Git-Revenge/GitRevenge/releases/latest) is on GitHub, and [what a version promises](docs/PLAN.md#what-a-version-promises) says what 1.x keeps working.
 
 ## What it does
 
