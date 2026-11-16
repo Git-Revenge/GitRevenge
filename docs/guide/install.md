@@ -8,7 +8,7 @@ Git Revenge is free, and there's nothing to sign up for. Download the Windows in
   brew install --cask git-revenge/tap/gitrevenge
   ```
 
-- **Windows:** the installer isn't signed yet, so SmartScreen warns you before it runs. Choose **More info**, then **Run anyway**.
+- **Windows:** the installer, and the app in it, are signed by the project. SmartScreen may still warn you about a new release while its signature builds up a reputation: choose **More info**, then **Run anyway**.
 - **Linux:** install from the project's apt or dnf repository, so updates come with the rest of your system. See [Linux](#linux).
 
 When a new release comes out, the app tells you at startup. You can also check by hand with **Check for updates** in the command palette. That check is the only request the app makes on its own, and [Settings](settings.md) turns it off.
