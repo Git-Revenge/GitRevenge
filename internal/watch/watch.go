@@ -251,6 +251,10 @@ func classifyGitPath(rel string) Kind {
 		// a folder in it), and on a slower checkout the watch is up before git removes "locked",
 		// its last step.
 		name, file, nested := strings.Cut(rest, "/")
+		// With reftable, the worktree's HEAD is in its own reftable stack.
+		if file == "reftable" || strings.HasPrefix(file, "reftable/") {
+			return Refs
+		}
 		if strings.Contains(file, "/") {
 			return 0
 		}
@@ -263,6 +267,11 @@ func classifyGitPath(rel string) Kind {
 		return Head
 	case "refs", "packed-refs", "FETCH_HEAD":
 		return Refs
+	case "reftable":
+		// A reftable repository (Git 3.0's default) keeps every ref in one stack: HEAD (whose
+		// file is a stub that never changes), branches, tags, and the CHERRY_PICK_HEAD and
+		// the like that say an operation is under way. Any write could be any of them.
+		return Head | Refs | State
 	case "index":
 		return Index
 	case "config":
@@ -281,11 +290,8 @@ func classifyCommonPath(rel string) Kind {
 	if rel == "HEAD" {
 		return Refs
 	}
-	switch k := classifyGitPath(rel); k {
-	case Refs, Config:
-		return k
-	}
-	return 0
+	// The main worktree's HEAD in a reftable stack, like the file above, counts as refs.
+	return classifyGitPath(rel) & (Refs | Config)
 }
 
 // relTo returns path relative to base, slash-separated, if path is base or inside it.
