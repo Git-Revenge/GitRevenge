@@ -12,7 +12,7 @@
 //        subst T: A:\demo
 //   2. Build the demo once, so its global git config exists. The script lives in
 //      https://github.com/Git-Revenge/demo-repos; this uses the tag DEMO_REPOS_TAG names:
-//        curl -fsSL https://raw.githubusercontent.com/Git-Revenge/demo-repos/v1.0.0/demo-repo.sh -o demo-repo.sh
+//        curl -fsSL https://github.com/Git-Revenge/demo-repos/releases/download/v1.0.0/demo-repo.sh -o demo-repo.sh
 //        bash demo-repo.sh /t/
 //   3. Point the app's settings at a scratch folder and its global git config at the demo's,
 //      so your own repositories and config stay out of the shots, and start it:
@@ -47,7 +47,8 @@ const CHROME = process.env.CHROME ?? 'C:\\Program Files\\Google\\Chrome\\Applica
 // Git's bash, not WSL's, which is also on PATH as bash.exe.
 const BASH = process.env.BASH_EXE ?? 'C:\\Program Files\\Git\\bin\\bash.exe'
 const REPO = path.win32.join(DEMO, 'tidewater')
-// The demo-repos release the docs' pictures are built from. Moving it means retaking them.
+// The demo-repos release the docs' pictures are built from (its semver says when a move
+// changes them; see its README). Moving it means retaking them.
 const DEMO_REPOS_TAG = 'v1.0.0'
 const WIDTH = 1280
 const HEIGHT = 800
@@ -70,7 +71,7 @@ async function demoScript() {
   if (process.env.DEMO_SCRIPT) return process.env.DEMO_SCRIPT
   const file = path.join(tmpdir(), 'gitrevenge-demo-repos', DEMO_REPOS_TAG, 'demo-repo.sh')
   if (existsSync(file)) return file
-  const url = `https://raw.githubusercontent.com/Git-Revenge/demo-repos/${DEMO_REPOS_TAG}/demo-repo.sh`
+  const url = `https://github.com/Git-Revenge/demo-repos/releases/download/${DEMO_REPOS_TAG}/demo-repo.sh`
   const res = await fetch(url)
   if (!res.ok) throw new Error(`${url}: ${res.status}`)
   mkdirSync(path.dirname(file), { recursive: true })
