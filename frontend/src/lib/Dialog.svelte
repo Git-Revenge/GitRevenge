@@ -16,6 +16,9 @@
     fields?: Field[]
     submit: string
     danger?: boolean
+    /** Runs as the values change; a message it returns shows as a warning that doesn't stop
+     * the submit. */
+    warn?: (values: Record<string, string | boolean>) => Promise<string>
     /** Runs on submit; return an error message to keep the dialog open, or nothing to close. */
     run: (values: Record<string, string | boolean>) => Promise<string | void>
   }
@@ -34,6 +37,23 @@
   )
   let error = $state('')
   let busy = $state(false)
+  let warning = $state('')
+
+  // A short pause first, so typing doesn't ask on every key; a stale answer is dropped.
+  $effect(() => {
+    const warn = spec.warn
+    if (!warn) return
+    const now = $state.snapshot(values)
+    let stale = false
+    const timer = setTimeout(async () => {
+      const w = await warn(now).catch(() => '')
+      if (!stale) warning = w
+    }, 150)
+    return () => {
+      stale = true
+      clearTimeout(timer)
+    }
+  })
 
   async function submit(e: SubmitEvent) {
     e.preventDefault()
@@ -72,6 +92,7 @@
         </label>
       {/if}
     {/each}
+    {#if warning}<p class="form-warning" role="status">{warning}</p>{/if}
     {#if error}<p class="form-error" role="alert">{error}</p>{/if}
     <div class="form-actions">
       <InkButton variant="secondary" onclick={onClose} disabled={busy}>Cancel</InkButton>

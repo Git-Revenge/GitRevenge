@@ -27,6 +27,9 @@ type FileStatus struct {
 	// CaseClash means this file's name differs from another tracked file's only by letter
 	// case, on a filesystem that can't keep them apart (see MarkCaseClashes).
 	CaseClash bool `json:"caseClash,omitempty"`
+	// CaseTwin means this new file's path differs from a tracked one's only by letter case.
+	// This filesystem keeps them apart, but Windows and macOS can't (see markCaseTwins).
+	CaseTwin bool `json:"caseTwin,omitempty"`
 }
 
 // Staged reports whether the file has changes in the index.

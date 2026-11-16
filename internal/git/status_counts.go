@@ -40,13 +40,16 @@ func (r *Repo) CountLines(ctx context.Context, st *Status) {
 // MarkCaseClashes flags changed files whose names differ from another tracked file's only by
 // letter case. A case-insensitive filesystem can only hold one of them, so git sees a change
 // nobody made. It looks only in the folders of the changed files, so it stays cheap on a big
-// repository, and a failure just leaves nothing flagged.
+// repository, and a failure just leaves nothing flagged. Where the filesystem tells case
+// apart, it flags new files that would clash on Windows and macOS instead (see markCaseTwins).
 func (r *Repo) MarkCaseClashes(ctx context.Context, st *Status) {
 	if len(st.Files) == 0 || len(st.Files) > maxCountedFiles {
 		return
 	}
 	ignore, err := r.ReadString(ctx, "config", "--bool", "core.ignorecase")
 	if err != nil || strings.TrimSpace(ignore) != "true" {
+		// Here the filesystem keeps them apart, so the risk is adding a twin instead.
+		r.markCaseTwins(ctx, st)
 		return
 	}
 	folders := map[string]bool{}

@@ -24,6 +24,8 @@ export function Blame(arg1:string,arg2:string,arg3:string):Promise<Array<git.Bla
 
 export function BranchAction(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
+export function BranchCaseTwin(arg1:string,arg2:string,arg3:string):Promise<string>;
+
 export function BranchMap(arg1:string):Promise<app.BranchMap>;
 
 export function BranchMapGroup(arg1:string,arg2:string):Promise<app.MapGroup>;
