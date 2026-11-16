@@ -19,7 +19,7 @@ Releases are built by [`.github/workflows/release.yml`](../.github/workflows/rel
 The workflow then does the following:
 
 1. Stamps the tag's version into the binary (`internal/version.Version`) and into `wails.json`.
-2. Builds the Windows NSIS installer. It is unsigned, so SmartScreen will warn.
+2. Builds the Windows NSIS installer. When the Certum secrets are configured, it signs the app, the uninstaller and the installer.
 3. Builds a universal macOS `.dmg`. When the Apple secrets are configured, it also signs, notarizes and staples it.
 4. Creates the GitHub Release, with notes generated from merged PRs. CHANGELOG.md is the curated record; the generated notes list every PR.
 5. For a stable release, tells [Git-Revenge/packages](https://github.com/Git-Revenge/packages) (the apt and dnf repos at packages.gitrevenge.com) and [Git-Revenge/homebrew-tap](https://github.com/Git-Revenge/homebrew-tap) to update. Both also check every six hours, so a missed notice only delays them.
@@ -32,6 +32,20 @@ Every PR that changes what people see or do adds a line to `## [Unreleased]` in 
 ## Dry runs
 
 PRs that change `release.yml` run the build and packaging steps without signing or publishing. The resulting artifacts are attached to the workflow run.
+
+To test Windows signing without a tag, run the workflow by hand: **Actions → Release → Run workflow**, or `gh workflow run release.yml --ref main -f sign=true`. It builds everything, signs the Windows installer, and attaches the artifacts to the run, versioned `0.0.0-dryrun`. It never publishes a release: that takes a tag.
+
+## Windows signing secrets
+
+The Windows installer is signed with a Certum open source code signing certificate, which lives in Certum's cloud (SimplySign), not in a file. The workflow installs SimplySign Desktop on the runner and signs in with a one-time code it makes from the account's TOTP secret, using [jay0lee/certum-cloud-code-sign](https://github.com/jay0lee/certum-cloud-code-sign), pinned to a commit. The app, the uninstaller and the installer are signed and timestamped through `build/windows/installer/sign.cmd`, which does nothing in local and PR builds. If `CERTUM_USERNAME` or `CERTUM_TOTP_SECRET` is missing, the installer is published unsigned.
+
+| Secret | Value |
+|---|---|
+| `CERTUM_USERNAME` | The e-mail address you sign in to SimplySign with |
+| `CERTUM_TOTP_SECRET` | The secret behind the SimplySign one-time codes, in Base32: the `secret=` value of the `otpauth://` link in the QR code Certum gave you to activate the SimplySign mobile app |
+| `CERTUM_CERT_SHA1` | Optional. The certificate's SHA-1 thumbprint, so the workflow signs only with that certificate. Without it, the code signing certificate SimplySign offers is used |
+
+The TOTP secret, with the e-mail address, is enough to sign as the project for as long as the certificate lasts. If it may have leaked, generate a new QR code in SimplySign, which makes the old secret useless, and update the secret here.
 
 ## macOS signing secrets
 

@@ -194,7 +194,7 @@ Not covered, and free to change in any release:
 ## Distribution
 
 - **Builds.** A GitHub Actions workflow is triggered by `v*` tags.
-  - Windows: an NSIS installer, unsigned for now.
+  - Windows: an NSIS installer, signed with the maintainer's Certum open source code signing certificate.
   - macOS: a universal `.dmg`, signed and notarized with the maintainer's Apple Developer account. A Homebrew tap (`git-revenge/tap`) follows the latest release.
   - Linux: a `.deb` for Ubuntu and Debian, and an `.rpm` each for RHEL 9 and RHEL 10. Signed apt and dnf repositories at packages.gitrevenge.com ([Git-Revenge/packages](https://github.com/Git-Revenge/packages)) follow the latest stable release; a release notifies them and the tap as soon as it's published.
 - **Update check.** At startup the app asks the GitHub API for the latest release (no identifiers beyond a User-Agent) and shows a banner with a download link when it's a newer semver version. A dismissed version isn't announced again. The startup check can be turned off from the command palette; "Check for updates" always runs. There is no auto-update.

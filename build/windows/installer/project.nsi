@@ -70,9 +70,13 @@ ManifestDPIAware true
 
 !insertmacro MUI_LANGUAGE "English" # Set the Language of the installer
 
-## The following two statements can be used to sign the installer and the uninstaller. The path to the binaries are provided in %1
-#!uninstfinalize 'signtool --file "%1"'
-#!finalize 'signtool --file "%1"'
+# Sign the app before it's packed, then the uninstaller and the installer once they're written.
+# sign.cmd does nothing unless GITREVENGE_SIGN_SHA1 is set, which only release builds do.
+!ifdef ARG_WAILS_AMD64_BINARY
+  !system 'sign.cmd "${ARG_WAILS_AMD64_BINARY}"' = 0
+!endif
+!uninstfinalize 'sign.cmd "%1"' = 0
+!finalize 'sign.cmd "%1"' = 0
 
 Name "${INFO_PRODUCTNAME}"
 OutFile "..\..\bin\${INFO_PROJECTNAME}-${ARCH}-installer.exe" # Name of the installer's file.
