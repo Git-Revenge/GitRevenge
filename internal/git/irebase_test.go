@@ -130,7 +130,7 @@ func TestRebaseConflictStopsInProgress(t *testing.T) {
 	if err := repo.InteractiveRebase(context.Background(), base, plan); !errors.Is(err, ErrConflicts) {
 		t.Fatalf("err = %v", err)
 	}
-	if op, _, _ := DetectOperation(fx.Path(".git")); op != Rebase {
+	if op, _, _ := repo.DetectOperation(context.Background(), fx.Path(".git")); op != Rebase {
 		t.Fatalf("operation = %q", op)
 	}
 }

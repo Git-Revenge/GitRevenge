@@ -96,7 +96,7 @@ func TestRevertConflict(t *testing.T) {
 	if !errors.Is(err, ErrConflicts) {
 		t.Fatalf("err = %v", err)
 	}
-	if op, _, _ := DetectOperation(fx.Path(".git")); op != Revert {
+	if op, _, _ := OpenRepo(newTestRunner(t), fx.Dir).DetectOperation(context.Background(), fx.Path(".git")); op != Revert {
 		t.Fatalf("operation = %q", op)
 	}
 }

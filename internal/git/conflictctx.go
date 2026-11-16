@@ -25,7 +25,7 @@ type PlaceOrigin struct {
 // in progress: what the index calls ours (stage 2), the common ancestor (stage 1) and theirs
 // (stage 3). Any of them is "" when it can't be named.
 func (r *Repo) conflictRevs(ctx context.Context, gitDir string) (ours, base, theirs string) {
-	op, _, _ := DetectOperation(gitDir)
+	op, _, _ := r.DetectOperation(ctx, gitDir)
 	parent := func(c string) string {
 		if c == "" {
 			return ""
@@ -42,14 +42,14 @@ func (r *Repo) conflictRevs(ctx context.Context, gitDir string) (ours, base, the
 		}
 	case Rebase:
 		// Each commit is replayed onto HEAD: its parent is where both sides started.
-		theirs = readLine(gitDir, "REBASE_HEAD")
+		theirs = r.pseudoref(ctx, gitDir, "REBASE_HEAD")
 		base = parent(theirs)
 	case CherryPick:
-		theirs = readLine(gitDir, "CHERRY_PICK_HEAD")
+		theirs = r.pseudoref(ctx, gitDir, "CHERRY_PICK_HEAD")
 		base = parent(theirs)
 	case Revert:
 		// A revert applies the commit backwards: its parent is the side coming in.
-		base = readLine(gitDir, "REVERT_HEAD")
+		base = r.pseudoref(ctx, gitDir, "REVERT_HEAD")
 		theirs = parent(base)
 	default:
 		return "", "", ""

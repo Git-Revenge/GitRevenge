@@ -43,9 +43,9 @@ type OperationState struct {
 	Written []string
 }
 
-// DetectOperation reports which operation is in progress, by checking the state files git
-// leaves in gitDir. It works whether the operation was started by the app or elsewhere.
-func DetectOperation(gitDir string) (Operation, int, int) {
+// DetectOperation reports which operation is in progress, by checking the state git leaves
+// in gitDir. It works whether the operation was started by the app or elsewhere.
+func (r *Repo) DetectOperation(ctx context.Context, gitDir string) (Operation, int, int) {
 	exists := func(name string) bool {
 		_, err := os.Stat(filepath.Join(gitDir, name))
 		return err == nil
@@ -59,9 +59,9 @@ func DetectOperation(gitDir string) (Operation, int, int) {
 		return Rebase, readInt(gitDir, "rebase-apply/next"), readInt(gitDir, "rebase-apply/last")
 	case exists("MERGE_HEAD"):
 		return Merge, 0, 0
-	case exists("CHERRY_PICK_HEAD"):
+	case r.pseudoref(ctx, gitDir, "CHERRY_PICK_HEAD") != "":
 		return CherryPick, 0, 0
-	case exists("REVERT_HEAD"):
+	case r.pseudoref(ctx, gitDir, "REVERT_HEAD") != "":
 		return Revert, 0, 0
 	case exists("BISECT_LOG"):
 		return Bisect, 0, 0
@@ -80,7 +80,7 @@ func readInt(gitDir, name string) int {
 
 // OperationState returns the operation in progress and any conflicted paths.
 func (r *Repo) OperationState(ctx context.Context, gitDir string) (OperationState, error) {
-	op, step, total := DetectOperation(gitDir)
+	op, step, total := r.DetectOperation(ctx, gitDir)
 	st := OperationState{Op: op, Step: step, Total: total, Conflicts: []string{}}
 	out, err := r.Read(ctx, "diff", "--name-only", "--diff-filter=U", "-z")
 	if err != nil {
@@ -134,7 +134,7 @@ func (e *ErrActionNotAllowed) Error() string {
 // RunAction continues, skips or aborts the operation in progress. Continuing keeps git's
 // prepared commit message as is (GIT_EDITOR=true): there is no in-app editor yet.
 func (r *Repo) RunAction(ctx context.Context, gitDir string, action Action) error {
-	op, _, _ := DetectOperation(gitDir)
+	op, _, _ := r.DetectOperation(ctx, gitDir)
 	allowed := false
 	for _, a := range op.Actions() {
 		allowed = allowed || a == action

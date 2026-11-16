@@ -191,7 +191,7 @@ func (a *App) StartBisect(path, bad, good string) error {
 		return userError("A bisect needs one commit where it's broken and one where it worked.")
 	}
 	ctx := context.Background()
-	if op, _, _ := git.DetectOperation(r.GitDir); op != git.None {
+	if op, _, _ := r.Git.DetectOperation(ctx, r.GitDir); op != git.None {
 		return userError("Finish or stop the " + string(op) + " in progress first.")
 	}
 	err = r.Git.BisectStart(ctx, bad, good)
@@ -207,7 +207,7 @@ func (a *App) MarkBisect(path, term string) error {
 	if err != nil {
 		return err
 	}
-	if op, _, _ := git.DetectOperation(r.GitDir); op != git.Bisect {
+	if op, _, _ := r.Git.DetectOperation(context.Background(), r.GitDir); op != git.Bisect {
 		return userError("No bisect is in progress.")
 	}
 	switch term {

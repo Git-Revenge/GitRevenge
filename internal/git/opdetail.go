@@ -28,6 +28,21 @@ func readLine(gitDir, name string) string {
 	return strings.TrimSpace(line)
 }
 
+// pseudoref reads one of the refs git writes while an operation is under way, such as
+// CHERRY_PICK_HEAD, or "" when it isn't there. They're files in the git directory, except in a
+// reftable repository (Git 3.0's default), whose ref stack holds all but MERGE_HEAD and
+// FETCH_HEAD. Only then is git asked, so a files repository costs no process.
+func (r *Repo) pseudoref(ctx context.Context, gitDir, name string) string {
+	if v := readLine(gitDir, name); v != "" {
+		return v
+	}
+	if _, err := os.Stat(filepath.Join(gitDir, "reftable")); err != nil {
+		return ""
+	}
+	v, _ := r.ReadString(ctx, "rev-parse", "-q", "--verify", name)
+	return v
+}
+
 // nameOf names a commit the way a person would: a branch, remote branch or tag that points at
 // it, or failing that its short id.
 func (r *Repo) nameOf(ctx context.Context, commit string) string {
@@ -62,7 +77,7 @@ func (r *Repo) describe(ctx context.Context, gitDir string, st *OperationState) 
 		onto := readLine(gitDir, dir+"/onto")
 		st.Theirs = r.nameOf(ctx, onto)
 		st.OrigHead = readLine(gitDir, dir+"/orig-head")
-		st.Commit = readLine(gitDir, "REBASE_HEAD")
+		st.Commit = r.pseudoref(ctx, gitDir, "REBASE_HEAD")
 		if st.Commit == "" {
 			st.Commit = readLine(gitDir, dir+"/stopped-sha")
 		}
@@ -88,9 +103,9 @@ func (r *Repo) describe(ctx context.Context, gitDir string, st *OperationState) 
 			st.OrigHead = first
 		}
 		if st.Op == CherryPick {
-			st.Commit = readLine(gitDir, "CHERRY_PICK_HEAD")
+			st.Commit = r.pseudoref(ctx, gitDir, "CHERRY_PICK_HEAD")
 		} else {
-			st.Commit = readLine(gitDir, "REVERT_HEAD")
+			st.Commit = r.pseudoref(ctx, gitDir, "REVERT_HEAD")
 		}
 	default:
 		return
