@@ -2,7 +2,7 @@
 //
 // The app runs as `wails dev`, which serves the real frontend and Go backend to a browser at
 // http://localhost:34115. This drives Chrome against it with Puppeteer, resets the demo
-// repository (scripts/demo-repo.sh) before each scene, and writes WebP files to docs/img/:
+// repository before each scene, and writes WebP files to docs/img/:
 // stills in a light and a dark version, and animations as animated WebP.
 //
 // To run it (Windows; the paths are what the screenshots show):
@@ -10,8 +10,10 @@
 //   1. Map a drive to an empty folder. Git resolves a mapped drive, so some shots show the
 //      real path: keep it short.
 //        subst T: A:\demo
-//   2. Build the demo once, so its global git config exists:
-//        bash scripts/demo-repo.sh /t/
+//   2. Build the demo once, so its global git config exists. The script lives in
+//      https://github.com/Git-Revenge/demo-repos; this uses the tag DEMO_REPOS_TAG names:
+//        curl -fsSL https://raw.githubusercontent.com/Git-Revenge/demo-repos/v1.0.0/demo-repo.sh -o demo-repo.sh
+//        bash demo-repo.sh /t/
 //   3. Point the app's settings at a scratch folder and its global git config at the demo's,
 //      so your own repositories and config stay out of the shots, and start it:
 //        $env:APPDATA = "C:\some\scratch\appdata"; $env:GIT_CONFIG_GLOBAL = "T:\gitconfig"
@@ -26,8 +28,10 @@
 //
 // It needs Chrome, Git Bash, ffmpeg and ImageMagick (magick). CHROME, BASH_EXE, APP_URL and
 // DEMO override where Chrome and bash are, where the app is served, and the demo folder.
+// DEMO_SCRIPT runs a local demo-repo.sh instead of the pinned one, to try a change to
+// demo-repos before it's tagged.
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -43,6 +47,8 @@ const CHROME = process.env.CHROME ?? 'C:\\Program Files\\Google\\Chrome\\Applica
 // Git's bash, not WSL's, which is also on PATH as bash.exe.
 const BASH = process.env.BASH_EXE ?? 'C:\\Program Files\\Git\\bin\\bash.exe'
 const REPO = path.win32.join(DEMO, 'tidewater')
+// The demo-repos release the docs' pictures are built from. Moving it means retaking them.
+const DEMO_REPOS_TAG = 'v1.0.0'
 const WIDTH = 1280
 const HEIGHT = 800
 
@@ -58,6 +64,20 @@ function run(file, args) {
 }
 
 // ── The demo repository and the app's session ─────────────────────────────────────────
+
+/** The demo-repo.sh to run: DEMO_SCRIPT, or the pinned release, downloaded once and kept. */
+async function demoScript() {
+  if (process.env.DEMO_SCRIPT) return process.env.DEMO_SCRIPT
+  const file = path.join(tmpdir(), 'gitrevenge-demo-repos', DEMO_REPOS_TAG, 'demo-repo.sh')
+  if (existsSync(file)) return file
+  const url = `https://raw.githubusercontent.com/Git-Revenge/demo-repos/${DEMO_REPOS_TAG}/demo-repo.sh`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`${url}: ${res.status}`)
+  mkdirSync(path.dirname(file), { recursive: true })
+  writeFileSync(`${file}.part`, await res.text())
+  renameSync(`${file}.part`, file)
+  return file
+}
 
 /** Closes every tab, rebuilds the demo repositories, and opens the ones named. With clean,
  * tidewater's uncommitted changes are dropped first; with branch, that branch is checked out. */
@@ -85,7 +105,7 @@ async function reset(page, open = ['tidewater'], { clean = false, branch } = {})
   // Git processes the app started can hold the folder for a moment after the tab closes.
   for (let tries = 1; ; tries++) {
     try {
-      run(BASH, [path.join(here, 'demo-repo.sh'), DEMO.replace(/\\/g, '/')])
+      run(BASH, [await demoScript(), DEMO.replace(/\\/g, '/')])
       break
     } catch (e) {
       if (tries === 8 || !/busy|denied/i.test(e.message)) throw e
