@@ -89,7 +89,3 @@ Performance checks run against a large repository of your choice; see [Performan
 ## License
 
 [Apache-2.0](LICENSE)
-
-## About
-
-This is a project by [Chris "Ris" Adams](https://risadams.com).
