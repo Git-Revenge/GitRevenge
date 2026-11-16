@@ -70,15 +70,18 @@ Signing uses a Developer ID Application certificate. Notarization uses an App St
 
 The package is `GitRevenge.GitRevenge`. Its manifest templates are in `build/windows/winget/`, and `build/windows/winget/manifests.sh VERSION OUTDIR` fills them in for a published release, taking the installer's sha256 from the release. `winget validate --manifest <folder>` checks the result.
 
-**The first version is submitted by hand,** because the release job can only update a package winget already has. Fork [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) to the account in the job's `fork-user` (`risadams-bot`), then, once the release is published:
+The package has been in winget since 1.0.0 ([microsoft/winget-pkgs#481763](https://github.com/microsoft/winget-pkgs/pull/481763)), and each stable release updates it. A new version shows up in `winget` a few hours after its pull request merges.
+
+**To submit a version by hand,** when the release job's update fails, use a fork of [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) once the release is published:
 
 ```sh
-git clone https://github.com/risadams-bot/winget-pkgs && cd winget-pkgs
-bash /path/to/GitRevenge/build/windows/winget/manifests.sh 1.0.0 .
-git switch -c GitRevenge.GitRevenge-1.0.0 && git add manifests/g/GitRevenge && git commit -m "New package: GitRevenge.GitRevenge version 1.0.0"
+git clone --depth 1 --filter=blob:none --sparse https://github.com/<you>/winget-pkgs && cd winget-pkgs
+git sparse-checkout set manifests/g/GitRevenge
+bash /path/to/GitRevenge/build/windows/winget/manifests.sh X.Y.Z .
+git switch -c GitRevenge.GitRevenge-X.Y.Z && git add manifests/g/GitRevenge && git commit -m "Update: GitRevenge.GitRevenge to X.Y.Z"
 git push -u origin HEAD && gh pr create --repo microsoft/winget-pkgs --fill
 ```
 
-Fill in the pull request template as it asks. After that, each release updates it.
+Fill in the pull request template as it asks. Microsoft's bot checks every URL in the manifests and rejects one that doesn't return 200, so check the links in `build/windows/winget/` when the website moves.
 
 **`WINGET_TOKEN`** lets the release do that. It must be a **classic** personal access token with the `public_repo` scope, from the account that owns the winget-pkgs fork (the job's `fork-user`), as the winget-releaser action asks. Without it, or when the update fails, the release still publishes, and you can submit by hand as above.
