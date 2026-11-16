@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-16
+
 ### Added
 
 - **Map**, an experimental view with no commits in it: a node for each branch and tag, held around the trunk. A node's size is its commits (for the trunk all of them, for a branch the ones the trunk doesn't have, for a tag the ones since the tag before it) and its distance is how long since it last moved, with rings for this week and last. Zoom changes what the rings mean: all the way in, the map is one week with a ring for each day; out, the rings become weeks, then months, then years (the wheel, **+** and **-**, or the buttons in the corner). A branch with nothing of its own is a hollow ring, one that's only on the remote has a dashed outline, a tag hangs off the branch that holds it, and tags older than the newest six fold into one node. Click a node for its card, which opens the timeline on it or focused on its branch; right-click a branch or tag for its menu. Switch it on under **Settings › Experimental views**. The working tree is a dashed mark against the checked-out branch that says how many files have changed, a branch checked out in another worktree wears the worktree mark, and a stacked branch hangs off the branch under it. A busy repository stays readable: remote-only branches that share a path (`feature/`, `bugfix/`) are one node that says how many it stands for and opens to show them, a switch shows all branches, only local ones or only remote ones, what's older than the last ring is counted on the edge ("43 older") and a click zooms out to it, zoom-out stops at the level that holds the oldest branch, the map opens at the level that fits most of it and remembers the level for each repository, and a name shows only where it has room, local branches first. Drag a node to put it where you want it: it stays there for that repository until you double-click it, or its card lets it go. [Docs](https://gitrevenge.com/docs/guide/experimental-views#map). (#652, #661, #662, #672, #683, #684, #696)
@@ -307,7 +309,8 @@ The foundation: open a repository and read its history fast.
 - Search commits by message, author or SHA.
 - Works with the `git` you have installed, and checks its version.
 
-[Unreleased]: https://github.com/Git-Revenge/GitRevenge/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/Git-Revenge/GitRevenge/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Git-Revenge/GitRevenge/compare/v0.11.0...v1.0.0
 [0.11.0]: https://github.com/Git-Revenge/GitRevenge/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Git-Revenge/GitRevenge/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/Git-Revenge/GitRevenge/compare/v0.9.0...v0.9.1
