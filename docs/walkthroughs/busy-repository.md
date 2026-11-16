@@ -1,6 +1,6 @@
 # Find your way round a busy repository
 
-Maya is back from two weeks away, and Tidewater has moved on without her. Before reading commits, she wants to know what's there: which branches are live, which have gone quiet, and what's been merged. The Map shows that at a glance, and the timeline, cut down to one branch, shows the rest.
+Emily is back from two weeks away, and Tidewater has moved on without her. Before reading commits, she wants to know what's there: which branches are live, which have gone quiet, and what's been merged. The Map shows that at a glance, and the timeline, cut down to one branch, shows the rest.
 
 ![From the Map to a branch: its card, then the timeline focused on it, then everything again](../img/busy-repository-light.webp#gh-light-mode-only)
 ![From the Map to a branch: its card, then the timeline focused on it, then everything again](../img/busy-repository-dark.webp#gh-dark-mode-only)

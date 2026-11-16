@@ -1,6 +1,6 @@
 # Stage and commit
 
-You've changed a file, and want to commit some of it now and keep the rest for later. Here, Maya has reworded the wind alert in `src/alerts.js` and added a small helper in `src/units.js`, which is already staged.
+You've changed a file, and want to commit some of it now and keep the rest for later. Here, Emily has reworded the wind alert in `src/alerts.js` and added a small helper in `src/units.js`, which is already staged.
 
 ![Opening a changed file, staging a hunk, and committing it](../img/stage-and-commit-light.webp#gh-light-mode-only)
 ![Opening a changed file, staging a hunk, and committing it](../img/stage-and-commit-dark.webp#gh-dark-mode-only)

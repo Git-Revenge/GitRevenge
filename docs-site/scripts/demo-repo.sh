@@ -1,43 +1,78 @@
 #!/usr/bin/env bash
-# Builds the demo repository the docs' screenshots are taken from: "Tidewater", a small,
-# made-up weather-station dashboard with a few months of history by four fictional people.
+# Builds Tidewater, the demo repository the docs' screenshots and walkthroughs use: a made-up
+# dashboard for a network of coastal weather stations, with almost two years of history by a
+# small team.
 #
-#   docs-site/scripts/demo-repo.sh <folder>
+#   docs-site/scripts/demo-repo.sh [--git3] <folder>
 #
-# It makes <folder>/tidewater (the repository) and <folder>/origin.git (its remote), and
-# deletes both first if they exist. Dates and authors are fixed, so the graph looks the same
-# every time. Nothing is signed, whatever your git config says.
+# It makes <folder>/tidewater (the repository), <folder>/origin.git (its remote), a linked
+# worktree and two sibling projects, and deletes them first if they exist. Dates and authors
+# are fixed, so the graph looks the same every time. Nothing is signed, whatever your git
+# config says. --git3 builds the same thing as <folder>/tidewater-git3 and friends, the way Git
+# 3.0 makes a new repository: SHA-256 object IDs and reftable refs (needs git 2.45 or later).
 #
-# What it sets up, for the screenshots:
-# - main with merged feature branches, annotated release tags, trailers and a git note;
-# - feature/offline-cache: work in progress with fixup and "wip" commits, for interactive rebase;
-# - feature/metric-units: changes the same lines as main, so merging it conflicts;
-# - a remote with a branch that's ahead, a stash, and uncommitted changes;
-# - for the sidebar: a release folder, a bot branch, a branch whose upstream is gone, and a
-#   linked worktree.
+# What it sets up:
+# - January 2025 to September 2026, made in a second or two with git fast-import: six people
+#   and a dependency bot opening pull requests, merging (and sometimes squashing) them, cutting
+#   releases (0.1.0 to 1.7.0, with release branches and patch releases), reverting the odd
+#   merge, and leaving branches behind: stale ones, merged ones nobody deleted, a stack of
+#   three, open bot bumps. About 1,500 commits. The generator is at the end of this file.
+# - The last few weeks, by hand, for the walkthroughs and screenshots: stations from a CSV
+#   file, the station map and wind alerts (v1.8.0, v1.9.0), git notes and trailers, files for
+#   every rendered preview, feature/offline-cache (work in progress with fixup and "wip"
+#   commits, for interactive rebase) and feature/metric-units (conflicts with main);
+# - a remote with a branch that's ahead and branches only it has, a stash, uncommitted
+#   changes, a release folder, a branch whose upstream is gone and a linked worktree;
+# - two sibling projects, for a group on the start page, and a made-up global config.
 set -euo pipefail
 
-out=${1:?usage: demo-repo.sh <folder>}
+script=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
+
+git3=
+if [ "${1:-}" = --git3 ]; then
+  git3=1
+  shift
+fi
+out=${1:?usage: demo-repo.sh [--git3] <folder>}
 mkdir -p "$out"
 out=$(cd "$out" && pwd)
-repo="$out/tidewater"
+# The Git 3.0 build sits beside the other, every name ending in -git3.
+sfx=${git3:+-git3}
+repo="$out/tidewater$sfx"
+origin="$out/origin$sfx.git"
+hotfix="$out/tidewater$sfx-hotfix"
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+initflags=
+cloneflags=
+if [ -n "$git3" ]; then
+  initflags="--object-format=sha256 --ref-format=reftable"
+  cloneflags="--ref-format=reftable"
+  probe=$(mktemp -d)
+  if ! git init -q $initflags "$probe/r" 2>/dev/null; then
+    echo "demo-repo.sh: --git3 needs git 2.45 or later, for SHA-256 and reftable repositories" >&2
+    rm -rf "$probe"
+    exit 1
+  fi
+  rm -rf "$probe"
+  # Git 3.0 won't look for a bare repository it wasn't told about; nothing here relies on it.
+  export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.bareRepository GIT_CONFIG_VALUE_0=explicit
+fi
 # A running fsmonitor daemon (core.fsmonitor in your own config) keeps a repository's folder
 # open, so stop any before deleting.
-for r in "$repo" "$out/harbour-api" "$out/tide-tables"; do
+for r in "$repo" "$out/harbour-api$sfx" "$out/tide-tables$sfx"; do
   [ -d "$r/.git" ] && git -C "$r" fsmonitor--daemon stop >/dev/null 2>&1 || true
 done
-rm -rf "$repo" "$out/origin.git" "$out/tidewater-hotfix"
+rm -rf "$repo" "$origin" "$hotfix"
 
-export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 day=0
-base=$(date -d 2026-07-01T09:00:00 +%s 2>/dev/null || date -j -f %Y-%m-%dT%H:%M:%S 2026-07-01T09:00:00 +%s)
+base=$(date -d 2026-10-05T09:00:00 +%s 2>/dev/null || date -j -f %Y-%m-%dT%H:%M:%S 2026-10-05T09:00:00 +%s)
 
 who() {
   case $1 in
-    maya) export GIT_AUTHOR_NAME="Maya Okafor" GIT_AUTHOR_EMAIL="maya@tidewater.example" ;;
-    leo) export GIT_AUTHOR_NAME="Leo Brandt" GIT_AUTHOR_EMAIL="leo@tidewater.example" ;;
-    priya) export GIT_AUTHOR_NAME="Priya Raman" GIT_AUTHOR_EMAIL="priya@tidewater.example" ;;
-    sam) export GIT_AUTHOR_NAME="Sam Ortiz" GIT_AUTHOR_EMAIL="sam@tidewater.example" ;;
+    emily) export GIT_AUTHOR_NAME="Emily Carter" GIT_AUTHOR_EMAIL="emily@tidewater.example" ;;
+    marcus) export GIT_AUTHOR_NAME="Marcus Johnson" GIT_AUTHOR_EMAIL="marcus@tidewater.example" ;;
+    sarah) export GIT_AUTHOR_NAME="Sarah Mitchell" GIT_AUTHOR_EMAIL="sarah@tidewater.example" ;;
+    tyler) export GIT_AUTHOR_NAME="Tyler Brooks" GIT_AUTHOR_EMAIL="tyler@tidewater.example" ;;
   esac
   export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME" GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
 }
@@ -66,16 +101,29 @@ tag() {
   git tag -a "$1" -m "$2"
 }
 
-git init -q -b main "$repo"
+# version <x.y.z>: sets package.json's version.
+version() {
+  sed -i.bak "s/\"version\": \"[^\"]*\"/\"version\": \"$1\"/" package.json && rm package.json.bak
+}
+
+# generate <days>: the generated history at the end of this file, from the commit HEAD is on.
+generate() {
+  LC_ALL=C awk -v start=1736121600 -v days="$1" -v root="$(git rev-parse HEAD)" "$(sed -n '/^# ── tidewater-history\.awk/,/^AWK$/{/^AWK$/!p;}' "$script")" |
+    git fast-import --quiet
+  git update-ref -d refs/gen/scratch
+  git reset -q --hard main
+}
+
+git init -q -b main $initflags "$repo"
 cd "$repo"
 git config commit.gpgsign false
 git config tag.gpgsign false
 git config core.fsmonitor false
-# Commits made in the app during the screenshots are Maya's, never whoever runs this.
-git config user.name "Maya Okafor"
-git config user.email maya@tidewater.example
+# Commits made in the app during the screenshots are Emily's, never whoever runs this.
+git config user.name "Emily Carter"
+git config user.email emily@tidewater.example
 
-# ── The first release ──────────────────────────────────────────────────────────────────
+# ── The first commit ───────────────────────────────────────────────────────────────────
 cat > README.md <<'EOF'
 # Tidewater
 
@@ -123,7 +171,16 @@ export const stations = [
 EOF
 printf '{\n  "name": "tidewater",\n  "version": "0.1.0",\n  "type": "module",\n  "scripts": { "start": "node src/server.js" }\n}\n' > package.json
 printf 'node_modules/\n.env\n' > .gitignore
-commit maya "Start Tidewater: a server for station readings" 0
+who emily
+export GIT_AUTHOR_DATE=2025-01-06T14:00:00Z GIT_COMMITTER_DATE=2025-01-06T14:00:00Z
+git add -A
+git commit -q -m "Start Tidewater: a server for station readings"
+
+# ── Twenty months of a team's work ─────────────────────────────────────────────────────
+# From 6 January 2025 to the end of September 2026: see the generator at the end.
+generate 626
+
+# ── Stations from a CSV file (v1.8.0) ──────────────────────────────────────────────────
 
 cat > data/stations.csv <<'EOF'
 id,name,lat,lon,elevation_m
@@ -132,7 +189,7 @@ GUL,Gull Point,50.3381,-4.2210,31
 SAL,Saltmarsh,50.4020,-4.0875,4
 CRG,Craig Head,50.3195,-4.1902,58
 EOF
-commit priya "Add the station list as CSV"
+commit sarah "Add the station list as CSV"
 
 cat > src/stations.js <<'EOF'
 import { readFileSync } from 'node:fs'
@@ -144,7 +201,7 @@ export const stations = rows.map((row) => {
   return { id, name, lat: Number(lat), lon: Number(lon), elevation: Number(elevation) }
 })
 EOF
-commit leo "Read stations from data/stations.csv"
+commit marcus "Read stations from data/stations.csv"
 
 cat > src/readings.js <<'EOF'
 import { stations } from './stations.js'
@@ -165,7 +222,7 @@ export async function fetchStation(id) {
   return { wind: wind_kmh, temp: temp_c, pressure: pressure_hpa }
 }
 EOF
-commit leo "Fetch live readings from the station feed"
+commit marcus "Move the feed client into its own module"
 
 cat > config.yaml <<'EOF'
 server:
@@ -176,8 +233,10 @@ feed:
 alerts:
   wind_kmh: 60
 EOF
-commit maya "Add config.yaml"
-tag v0.1.0 "Tidewater 0.1.0: live readings for four stations"
+commit emily "Move settings into config.yaml"
+version 1.8.0
+commit emily "Release 1.8.0" 2
+tag v1.8.0 "Tidewater 1.8.0: stations from a CSV file"
 
 # ── Station map ────────────────────────────────────────────────────────────────────────
 git checkout -q -b feature/station-map
@@ -189,7 +248,7 @@ cat > public/index.html <<'EOF'
 <main id="map"></main>
 <script type="module" src="map.js"></script>
 EOF
-commit sam "Add a page for the station map"
+commit tyler "Add a page for the station map"
 cat > public/map.js <<'EOF'
 const res = await fetch('/api/readings')
 const stations = await res.json()
@@ -202,9 +261,9 @@ for (const s of stations) {
   document.querySelector('#map').append(pin)
 }
 EOF
-commit sam "Plot each station as a pin"
+commit tyler "Plot each station as a pin"
 printf 'body { margin: 0; font: 15px system-ui; }\n#map { position: relative; height: 100vh; background: #dfe9ee; }\n.pin { position: absolute; width: 12px; height: 12px; border-radius: 50%%; background: #cb0162; }\n' > public/style.css
-commit sam "Style the map and pins"
+commit tyler "Style the map and pins"
 cat > data/stations.geojson <<'EOF'
 {
   "type": "FeatureCollection",
@@ -218,7 +277,7 @@ cat > data/stations.geojson <<'EOF'
   ]
 }
 EOF
-commit sam "Export the stations as GeoJSON" 1
+commit tyler "Export the stations as GeoJSON" 1
 cat > public/about.html <<'EOF'
 <!doctype html>
 <html lang="en">
@@ -258,14 +317,14 @@ cat > public/about.html <<'EOF'
 </body>
 </html>
 EOF
-commit sam "Add an about page" 1
+commit tyler "Add an about page" 1
 git checkout -q main
 cat >> src/server.js <<'EOF'
 
 // Static files for the dashboard live in public/.
 EOF
-commit leo "Note where the dashboard's files live"
-merge maya feature/station-map
+commit marcus "Note where the dashboard's files live"
+merge emily feature/station-map
 git branch -q -d feature/station-map
 
 # ── Alerts ─────────────────────────────────────────────────────────────────────────────
@@ -279,7 +338,7 @@ export function alerts(readings) {
   return readings.filter((r) => r.wind >= limit).map((r) => ({ id: r.id, message: `Gale warning at ${r.name}` }))
 }
 EOF
-commit priya "Raise an alert when wind passes the configured limit"
+commit sarah "Raise an alert when wind passes the configured limit"
 cat > docs/alerts.mmd <<'EOF'
 flowchart LR
   feed[Station feed] --> readings[readings.js]
@@ -287,18 +346,14 @@ flowchart LR
   alerts -->|wind >= limit| page[Dashboard banner]
   alerts -->|wind >= limit| mail[Email to harbour master]
 EOF
-commit priya "Diagram how an alert travels"
+commit sarah "Diagram how an alert travels"
 git checkout -q main
-cat > CHANGELOG.md <<'EOF'
-# Changelog
-
-## 0.2.0
-
-- A map of every station.
-- Wind alerts.
-EOF
-commit maya "Start a changelog"
-merge maya feature/wind-alerts
+{
+  printf '# Changelog\n\n## Unreleased\n\n- A map of every station.\n- Wind alerts.\n\n'
+  tail -n +3 CHANGELOG.md
+} > CHANGELOG.new && mv CHANGELOG.new CHANGELOG.md
+commit emily "Note the map and alerts in the changelog"
+merge emily feature/wind-alerts
 git branch -q -d feature/wind-alerts
 
 cat > src/tides.js <<'EOF'
@@ -308,12 +363,12 @@ export function tideHeight(constants, at) {
   return constants.reduce((h, c) => h + c.amplitude * Math.cos(((c.speed * hours - c.phase) * Math.PI) / 180), 0)
 }
 EOF
-commit leo "Predict tide height from harmonic constants
+commit marcus "Predict tide height from harmonic constants
 
 The four largest constituents (M2, S2, N2, K1) get within 10 cm at Harbour Light,
 which is good enough for the dashboard.
 
-Co-authored-by: Priya Raman <priya@tidewater.example>
+Co-authored-by: Sarah Mitchell <sarah@tidewater.example>
 Closes: #14"
 git notes add -m "Checked against the harbour authority's printed tables for August: worst error 9 cm."
 
@@ -327,7 +382,7 @@ cat > data/constants.json <<'EOF'
   ]
 }
 EOF
-commit leo "Add tidal constants for Harbour Light"
+commit marcus "Add tidal constants for Harbour Light"
 mkdir -p notebooks
 cat > notebooks/wind.ipynb <<'EOF'
 {
@@ -393,16 +448,17 @@ cat > notebooks/wind.ipynb <<'EOF'
  ]
 }
 EOF
-commit leo "Look at a week of wind in a notebook" 2
-sed -i.bak 's/"version": "0.1.0"/"version": "0.2.0"/' package.json && rm package.json.bak
-commit maya "Release 0.2.0"
-tag v0.2.0 "Tidewater 0.2.0: the station map and wind alerts"
+commit marcus "Look at a week of wind in a notebook" 2
+version 1.9.0
+sed -i.bak 's/^## Unreleased/## 1.9.0/' CHANGELOG.md && rm CHANGELOG.md.bak
+commit emily "Release 1.9.0"
+tag v1.9.0 "Tidewater 1.9.0: the station map and wind alerts"
 
 # ── Fixes and polish ───────────────────────────────────────────────────────────────────
 sed -i.bak 's/timeout_s: 5/timeout_s: 10/' config.yaml && rm config.yaml.bak
-commit sam "Give the feed more time on a slow connection"
+commit tyler "Give the feed more time on a slow connection"
 printf 'BRK,Breakwater,50.3590,-4.1611,6\n' >> data/stations.csv
-commit priya "Add the Breakwater station"
+commit sarah "Add the Breakwater station"
 cat > src/feed.js <<'EOF'
 const FEED = process.env.FEED_URL ?? 'https://feed.tidewater.example'
 
@@ -414,7 +470,7 @@ export async function fetchStation(id) {
   return { wind: wind_kmh, temp: temp_c, pressure: pressure_hpa }
 }
 EOF
-commit leo "Time out a station that stops answering"
+commit marcus "Time out a station that stops answering"
 
 # Branches cut from here change feed.js too: metric-units's edit conflicts with the next one
 # on main.
@@ -430,10 +486,10 @@ export async function fetchStation(id) {
   return { wind: Math.round(wind_kmh / 1.852), temp: temp_c, pressure: pressure_hpa }
 }
 EOF
-commit maya "Show wind in knots"
+commit emily "Show wind in knots"
 sed -i.bak 's/wind_kmh: 60/wind_knots: 32/' config.yaml && rm config.yaml.bak
 sed -i.bak 's/wind_kmh/wind_knots/' src/alerts.js && rm src/alerts.js.bak
-commit maya "Set the alert limit in knots too"
+commit emily "Set the alert limit in knots too"
 
 git checkout -q feature/metric-units
 cat > src/feed.js <<'EOF'
@@ -447,14 +503,14 @@ export async function fetchStation(id) {
   return { wind: +(wind_kmh / 3.6).toFixed(1), temp: temp_c, pressure: pressure_hpa }
 }
 EOF
-commit sam "Report wind in metres per second"
+commit tyler "Report wind in metres per second"
 cat >> README.md <<'EOF'
 
 ## Units
 
 Every reading is in SI units: wind in m/s, temperature in °C, pressure in hPa.
 EOF
-commit sam "Document the units"
+commit tyler "Document the units"
 git checkout -q main
 
 # ── Work in progress: offline cache, with a messy history to tidy ──────────────────────
@@ -466,7 +522,7 @@ export function remember(id, reading) {
   cache.set(id, { reading, at: Date.now() })
 }
 EOF
-commit priya "Cache the last reading from each station"
+commit sarah "Cache the last reading from each station"
 cat >> src/cache.js <<'EOF'
 
 export function recall(id, maxAgeMs = 15 * 60_000) {
@@ -474,10 +530,10 @@ export function recall(id, maxAgeMs = 15 * 60_000) {
   return hit && Date.now() - hit.at < maxAgeMs ? hit.reading : undefined
 }
 EOF
-commit priya "wip" 2
+commit sarah "wip" 2
 # The fixup changes a line of the commit it names, not of "wip", so folding it in applies cleanly.
 sed -i.bak 's/^  cache.set(id/  if (reading) cache.set(id/' src/cache.js && rm src/cache.js.bak
-commit priya "fixup! Cache the last reading from each station" 1
+commit sarah "fixup! Cache the last reading from each station" 1
 cat > src/readings.js <<'EOF'
 import { stations } from './stations.js'
 import { fetchStation } from './feed.js'
@@ -497,25 +553,25 @@ export async function readings() {
   )
 }
 EOF
-commit priya "Fall back to the cached reading when a station is down"
+commit sarah "Fall back to the cached reading when a station is down"
 printf 'console.log(cache)\n' >> src/cache.js
-commit priya "debugging" 1
+commit sarah "debugging" 1
 git checkout -q main
 
 # ── A remote, a stash, and uncommitted work ────────────────────────────────────────────
-git clone -q --bare "$repo" "$out/origin.git"
-git remote add origin "$out/origin.git"
+git clone -q --bare $cloneflags "$repo" "$origin"
+git remote add origin "$origin"
 git fetch -q origin
 git branch -q -u origin/main main
 # Someone else pushed a fix to origin/main.
-work="$out/.other"
+work="$out/.other$sfx"
 rm -rf "$work"
-git clone -q "$out/origin.git" "$work"
+git clone -q $cloneflags "$origin" "$work"
 (
   cd "$work"
   git config commit.gpgsign false
   printf 'node_modules/\n.env\n*.log\n' > .gitignore
-  commit sam "Ignore log files" 30
+  commit tyler "Ignore log files" 30
   git push -q origin main
 )
 rm -rf "$work"
@@ -523,28 +579,23 @@ git fetch -q origin
 
 # Branches for the sidebar. They're dated before the work above, so the top of the graph
 # doesn't change.
-git branch release/v0.1 v0.1.0
-git branch release/v0.2 v0.2.0
-git push -q origin release/v0.2
+git branch release/v1.8 v1.8.0
+git branch release/v1.9 v1.9.0
+git push -q origin release/v1.9
 # Merged and deleted on the remote, as a host does after a pull request: its upstream is gone.
 git branch fix/tide-rounding main~3
 git push -q -u origin fix/tide-rounding
 git push -q origin --delete fix/tide-rounding
-# A dependency update from a bot, made without touching the working tree.
-(
-  export GIT_INDEX_FILE="$out/.bot-index"
-  export GIT_AUTHOR_NAME='dependabot[bot]' GIT_AUTHOR_EMAIL='bot@tidewater.example' GIT_AUTHOR_DATE=2026-07-11T08:00:00Z
-  export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME" GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL" GIT_COMMITTER_DATE="$GIT_AUTHOR_DATE"
-  from=$(git rev-parse 'v0.1.0^{commit}')
-  git read-tree "$from"
-  lock=$(printf '{ "name": "tidewater", "lockfileVersion": 3 }\n' | git hash-object -w --stdin)
-  git update-index --add --cacheinfo "100644,$lock,package-lock.json"
-  bump=$(git commit-tree "$(git write-tree)" -p "$from" -m "Bump vite from 7.0 to 7.1")
-  git branch dependabot/npm_and_yarn/vite-7.1 "$bump"
-  rm -f "$GIT_INDEX_FILE"
-)
+# Other people's branches: the oldest fixes are only on the remote, the rest track theirs.
+for b in $(git for-each-ref --format='%(refname:short)' 'refs/heads/fix/*' | head -n 3); do
+  git branch -q -D "$b"
+done
+for b in $(git for-each-ref --format='%(refname:short)' refs/heads/feature refs/heads/fix refs/heads/docs refs/heads/chore refs/heads/refactor); do
+  case $b in feature/offline-cache | feature/metric-units | fix/tide-rounding) continue ;; esac
+  git branch -q -u "origin/$b" "$b"
+done
 # A second working folder, for the Repository panel.
-git worktree add -q -b hotfix/gauge-offset "$out/tidewater-hotfix" main~1
+git worktree add -q -b hotfix/gauge-offset "$hotfix" main~1
 
 # A stash, then changes in the working tree.
 printf '\n## Contributing\n\nOpen an issue first for anything bigger than a typo.\n' >> README.md
@@ -561,44 +612,44 @@ git config core.autocrlf input
 git config alias.ship "push --follow-tags"
 
 # ── Two sibling projects, for a group on the start page ────────────────────────────────
-for name in harbour-api tide-tables; do
+for name in harbour-api$sfx tide-tables$sfx; do
   rm -rf "$out/$name" "$out/$name.git"
-  git init -q -b main "$out/$name"
+  git init -q -b main $initflags "$out/$name"
   (
     cd "$out/$name"
     git config commit.gpgsign false
     git config core.fsmonitor false
-    printf '# %s\n\nPart of Tidewater.\n' "$name" > README.md
-    commit leo "Start $name" 5
+    printf '# %s\n\nPart of Tidewater.\n' "${name%-git3}" > README.md
+    commit marcus "Start ${name%-git3}" 5
     printf 'export const version = 1\n' > index.js
-    commit priya "Add the entry point" 5
-    git clone -q --bare . "$out/$name.git"
+    commit sarah "Add the entry point" 5
+    git clone -q --bare $cloneflags . "$out/$name.git"
     git remote add origin "$out/$name.git"
     git fetch -q origin
     git branch -q -u origin/main main
   )
 done
-printf 'export const version = 2\n' > "$out/tide-tables/index.js"
+printf 'export const version = 2\n' > "$out/tide-tables$sfx/index.js"
 
 # ── A made-up global config, for the Git Config tab ────────────────────────────────────
 # Start the app with GIT_CONFIG_GLOBAL pointing here, so your own config never appears in a
 # screenshot. The token is fake; it shows the masking.
 win() { cygpath -m "$1" 2>/dev/null || echo "$1"; }
-cat > "$out/work.gitconfig" <<EOF
+cat > "$out/work$sfx.gitconfig" <<EOF
 [user]
-	email = maya@harbour-works.example
+	email = emily@harbour-works.example
 EOF
 # Its own global ignore file too, or the Ignore rules tab would show yours, path and all.
-printf '.DS_Store\nThumbs.db\n*.swp\n' > "$out/gitignore"
-cat > "$out/gitconfig" <<EOF
+printf '.DS_Store\nThumbs.db\n*.swp\n' > "$out/gitignore$sfx"
+cat > "$out/gitconfig$sfx" <<EOF
 [user]
-	name = Maya Okafor
-	email = maya@tidewater.example
+	name = Emily Carter
+	email = emily@tidewater.example
 [init]
 	defaultBranch = main
 [core]
 	editor = code --wait
-	excludesFile = $(win "$out")/gitignore
+	excludesFile = $(win "$out")/gitignore$sfx
 [push]
 	autoSetupRemote = true
 [fetch]
@@ -610,10 +661,557 @@ cat > "$out/gitconfig" <<EOF
 	undo = reset --soft HEAD~1
 	wip = "!git add -A && git commit -m \"wip: \${1:-save point}\""
 	log = log --oneline -20
-[url "https://maya:not-a-real-token@git.tidewater.example/"]
+[url "https://emily:not-a-real-token@git.tidewater.example/"]
 	insteadOf = https://git.tidewater.example/
-[includeIf "gitdir:$(win "$out")/harbour-api/"]
-	path = $(win "$out")/work.gitconfig
+[includeIf "gitdir:$(win "$out")/harbour-api$sfx/"]
+	path = $(win "$out")/work$sfx.gitconfig
 EOF
 
-echo "Built $repo"
+echo "Built $repo ($(git -C "$repo" rev-list --count --all) commits)"
+exit 0
+
+# The generator: an awk program that generate() reads out of this file. To bash it's a here-doc
+# that never runs.
+: <<'AWK'
+# ── tidewater-history.awk ─────────────────────────────────────────────────────────────────
+# Writes about twenty months of Tidewater's history as a git fast-import stream: six people
+# and a dependency bot working the way a small team does, with pull requests, squash merges,
+# releases, release branches with patch releases, reverts, stale and abandoned branches and a
+# stack. demo-repo.sh pipes it into `git fast-import`, then adds the last few weeks by hand.
+#
+#   awk -v start=<epoch of the first Monday, 00:00 UTC> -v days=<how many> -v root=<commit> "$program"
+#
+# Everything comes from one seeded generator, so the output is the same on every run and every
+# awk (gawk, mawk, BSD awk). Run it with LC_ALL=C: `data` counts bytes. Nothing here names a
+# hash, so the same stream builds a SHA-1 or a SHA-256 repository.
+
+# ── Randomness and output ───────────────────────────────────────────────────────────────
+
+# Park–Miller: the product stays below 2^53, so every awk computes it exactly.
+function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
+function ri(a, b) { return a + int(rnd() * (b - a + 1)) }
+function chance(p) { return rnd() < p }
+function pick(list,   parts, n) { n = split(list, parts, "|"); return parts[ri(1, n)] }
+
+function datablock(s) { return sprintf("data %d\n%s\n", length(s), s) }
+function mop(path, content) { return sprintf("M 100644 inline %s\n", path) datablock(content) }
+function dop(path) { return sprintf("D %s\n", path) }
+function ident(k, t) { return sprintf("%s <%s> %d %s", pname[k], pmail[k], t, ptz[k]) }
+
+# commit writes a commit on the scratch ref and returns its mark.
+function commit(author, at, committer, ct, msg, from, merge, ops) {
+  marks++
+  printf "commit refs/gen/scratch\nmark :%d\nauthor %s\ncommitter %s\n", marks, ident(author, at), ident(committer, ct)
+  printf "%s", datablock(msg)
+  printf "from %s\n", from
+  if (merge != "") printf "merge %s\n", merge
+  printf "%s\n", ops
+  commits++
+  return ":" marks
+}
+
+# ── Dates ───────────────────────────────────────────────────────────────────────────────
+
+# civil turns days since 1970-01-01 into YYYY-MM-DD (Howard Hinnant's algorithm).
+function civil(z,   era, doe, yoe, y, doy, mp, d, m) {
+  z += 719468
+  era = int(z / 146097)
+  doe = z - era * 146097
+  yoe = int((doe - int(doe / 1460) + int(doe / 36524) - int(doe / 146096)) / 365)
+  y = yoe + era * 400
+  doy = doe - (365 * yoe + int(yoe / 4) - int(yoe / 100))
+  mp = int((5 * doy + 2) / 153)
+  d = doy - int((153 * mp + 2) / 5) + 1
+  m = mp < 10 ? mp + 3 : mp - 9
+  if (m <= 2) y++
+  return sprintf("%04d-%02d-%02d", y, m, d)
+}
+function dateof(day) { return civil(int(start / 86400) + day) }
+function monthname(day,   ymd, parts) {
+  ymd = dateof(day)
+  split(ymd, parts, "-")
+  return mon[parts[2] + 0] " " parts[1]
+}
+function weekday(day) { return day % 7 }  # start is a Monday: 0..4 are working days
+
+# ── Files ───────────────────────────────────────────────────────────────────────────────
+
+
+function addpath(p) {
+  if (!(p in known)) { known[p] = 1; paths[++npaths] = p }
+}
+
+function ident_name(base,   n) { names++; return base names }
+
+function jsblock(   fn, v) {
+  fn = ident_name(pick("parse|scale|format|merge|clamp|smooth|round|pick|group|average|limit|score"))
+  v = pick("reading|gust|level|station|value|sample|window|series")
+  return sprintf("\nexport function %s(%s) {\n  const %sValue = %s?.%s ?? %d\n  return Math.round(%sValue * %d) / %d\n}", fn, v, v, v, pick("wind|temp|pressure|height|speed|count|offset"), ri(0, 60), v, ri(2, 100), ri(2, 20))
+}
+function testblock(   n) {
+  n = ri(1, 90)
+  return sprintf("\ntest('%s %s', () => {\n  assert.equal(subject(%d), %d)\n})", pick("handles|rounds|rejects|keeps|skips|reports"), pick("an empty reading|a gust over the limit|a missing station|midnight|a negative offset|a late sample|duplicate rows"), n, n * ri(1, 4))
+}
+function cssblock() {
+  return sprintf("\n.%s-%d {\n  margin: %dpx %dpx;\n  color: #%02x%02x%02x;\n}", pick("panel|legend|chip|row|badge|axis|tooltip|card"), ri(1, 99), ri(0, 24), ri(0, 24), ri(16, 200), ri(16, 200), ri(16, 200))
+}
+function sentence() {
+  return pick("The feed|Each station|The dashboard|An alert|The tide model|The API|A reading|The archive") " " pick("now keeps|no longer drops|checks|reports|caches|rounds|retries|groups") " " pick("readings older than an hour|gusts above the limit|the last good value|times in UTC|one sample per minute|stations that stop answering|pressure in hPa|every partner station") "."
+}
+function mdblock() {
+  return sprintf("\n## %s\n\n%s %s\n", pick("Setup|Limits|Errors|Examples|Configuration|Troubleshooting|Notes|Changes"), sentence(), sentence())
+}
+function csvrows(day, n,   s, i) {
+  s = ""
+  for (i = 0; i < n; i++)
+    s = s sprintf("\n%sT%02d:%02d:00Z,%s,%.1f,%.1f,%d", dateof(day - ri(0, 27)), ri(0, 23), ri(0, 5) * 10, pick("HBR|GUL|SAL|CRG|BRK"), ri(0, 900) / 10, ri(-40, 280) / 10, ri(985, 1035))
+  return s
+}
+function ymlblock() {
+  return sprintf("\n      - name: %s\n        run: npm run %s", pick("Lint|Test|Build|Check types|Check links"), pick("lint|test|build|check|docs"))
+}
+function shblock() {
+  return sprintf("\n# %s\n%s", pick("Keep a week of backups|Retry once on a timeout|Skip stations that are offline"), pick("sleep " ri(1, 30) "|retries=" ri(1, 5) "|keep_days=" ri(3, 30)))
+}
+
+# first returns the content a new file starts with.
+function first(p, day) {
+  if (p ~ /\.test\.js$/) return sprintf("import { test } from 'vitest'\nimport assert from 'node:assert/strict'\nimport { subject } from '../../%s'\n%s\n", modulefor[p], testblock())
+  if (p ~ /\.js$/) return sprintf("// %s\n%s\n", pick("Part of the readings pipeline.|Used by the dashboard.|Shared by the API and the jobs.|Kept small on purpose."), jsblock())
+  if (p ~ /\.css$/) return sprintf("/* %s */\n%s\n", p, cssblock())
+  if (p ~ /\.md$/) return sprintf("# %s\n\n%s\n%s", title_of[p], sentence(), mdblock())
+  if (p ~ /\.csv$/) return "at,station,wind_kmh,temp_c,pressure_hpa" csvrows(day, ri(20, 40)) "\n"
+  if (p ~ /\.yml$/) return sprintf("name: %s\non: [push, pull_request]\njobs:\n  build:\n    runs-on: ubuntu-24.04\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: %d%s\n", pick("CI|Deploy|Nightly"), pick("20|22"), ymlblock())
+  if (p == "Dockerfile") return "FROM node:22-slim\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --omit=dev\nCOPY . .\nEXPOSE 8080\nCMD [\"node\", \"src/server.js\"]\n"
+  return sprintf("#!/usr/bin/env bash\nset -euo pipefail\n%s\n", shblock())
+}
+
+# grow returns content with one more piece, or with a number changed once a file is long.
+function grow(p, c, day,   L, n, i, x, out) {
+  n = split(c, L, "\n")
+  if (n > 140 || chance(0.25)) {
+    for (i = 0; i < 8; i++) {
+      x = ri(1, n)
+      if (L[x] ~ /[0-9]/ && L[x] !~ /^(import|FROM|#!)/) {
+        sub(/[0-9]+/, ri(2, 99), L[x])
+        out = L[1]
+        for (i = 2; i <= n; i++) out = out "\n" L[i]
+        return out
+      }
+    }
+  }
+  sub(/\n$/, "", c)
+  if (p ~ /\.test\.js$/) return c "\n" testblock() "\n"
+  if (p ~ /\.js$/) return c "\n" jsblock() "\n"
+  if (p ~ /\.css$/) return c "\n" cssblock() "\n"
+  if (p ~ /\.md$/) return c "\n" mdblock()
+  if (p ~ /\.csv$/) return c csvrows(day, ri(5, 15)) "\n"
+  if (p ~ /\.yml$/) return c ymlblock() "\n"
+  return c "\n" shblock() "\n"
+}
+
+# ── package.json and its lock ───────────────────────────────────────────────────────────
+
+function pkgjson(version, bumped, to,   s, j, v) {
+  s = sprintf("{\n  \"name\": \"tidewater\",\n  \"version\": \"%s\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {\n    \"start\": \"node src/server.js\",\n    \"test\": \"vitest run\",\n    \"lint\": \"eslint .\"\n  },\n  \"dependencies\": {", version)
+  for (j = 1; j <= ndeps; j++) {
+    v = j == bumped ? to : dver[j]
+    if (j == ndev + 1) s = s "\n  },\n  \"devDependencies\": {"
+    s = s sprintf("\n    \"%s\": \"^%s\"%s", dname[j], v, (j == ndev || j == ndeps) ? "" : ",")
+  }
+  return s "\n  }\n}\n"
+}
+function lockjson(version, bumped, to,   s, j) {
+  s = sprintf("{\n  \"name\": \"tidewater\",\n  \"version\": \"%s\",\n  \"lockfileVersion\": 3,\n  \"packages\": {", version)
+  for (j = 1; j <= ndeps; j++)
+    s = s sprintf("\n    \"node_modules/%s\": { \"version\": \"%s\" }%s", dname[j], j == bumped ? to : dver[j], j == ndeps ? "" : ",")
+  return s "\n  }\n}\n"
+}
+
+# ── People ──────────────────────────────────────────────────────────────────────────────
+
+function person(k, name, mail, tz, from, to, areas) {
+  pname[k] = name; pmail[k] = mail; ptz[k] = tz; pfrom[k] = from; pto[k] = to; pareas[k] = areas
+}
+function active(k, day) { return day >= pfrom[k] && day <= pto[k] }
+function other(k, day,   j, tries) {
+  if (k != 1 && chance(0.45)) return 1
+  for (tries = 0; tries < 20; tries++) {
+    j = ri(1, people)
+    if (j != k && active(j, day)) return j
+  }
+  return 1
+}
+
+# ── Pull requests ───────────────────────────────────────────────────────────────────────
+
+function slug(s) {
+  s = tolower(s)
+  gsub(/[^a-z0-9]+/, "-", s)
+  sub(/^-/, "", s); sub(/-$/, "", s)
+  # Long titles are cut at a word, as hosts do.
+  while (length(s) > 40 && index(s, "-")) sub(/-[^-]*$/, "", s)
+  return s
+}
+function unique(b) {
+  if (!(b in usedbranch)) { usedbranch[b] = 1; return b }
+  usedbranch[b]++
+  return b "-" usedbranch[b]
+}
+
+function lockable(p) { return !(p in lock) }
+
+# addfile gives feature f path p to work on, creating it on the branch if it's new.
+function addfile(f, p) {
+  if (!lockable(p)) return 0
+  lock[p] = f
+  fn[f]++
+  ffile[f, fn[f]] = p
+  if (p in mc) fc[f, p] = mc[p]
+  return 1
+}
+
+# existing finds an unlocked file under dir (or "" if there's none).
+function existing(dir,   i, tries, p) {
+  for (tries = 0; tries < 30; tries++) {
+    p = paths[ri(1, npaths)]
+    if (index(p, dir) == 1 && (p in mc) && lockable(p) && p !~ /CHANGELOG|package/) return p
+  }
+  return ""
+}
+
+function newmodule(area,   tries, m, p) {
+  for (tries = 0; tries < 10; tries++) {
+    m = pick(modules[area])
+    p = dir[area] m ext[area]
+    if (!(p in mc) && lockable(p)) {
+      modname = m
+      return p
+    }
+  }
+  return ""
+}
+
+# openpr opens a pull request for person k, or returns 0 when nothing's free to work on.
+function openpr(k, day, forced,   f, area, kind, p, q, t, noun, prefix) {
+  f = ++features
+  area = pick(pareas[k])
+  kind = forced != "" ? "feature" : pick("feature|feature|feature|feature|fix|fix|fix|refactor|chore")
+  if (area == "docs") kind = "docs"
+  if (area == "infra" && kind == "feature") kind = "chore"
+  fn[f] = 0
+  noun = pick(nouns[area])
+  if (kind == "feature" || kind == "docs" || area == "data") {
+    if (area == "data") {
+      p = "data/archive/" substr(dateof(day), 1, 7) ".csv"
+      if ((p in mc) || !lockable(p)) p = ""
+      t = "Archive readings for " monthname(day)
+      kind = "chore"
+    } else if (area == "docs") {
+      p = "docs/" pick(docpages) ".md"
+      if (!lockable(p)) p = ""
+      t = (p in mc ? "Expand " : "Write ") pick("the deploy guide|the API reference|the station handbook|the alert guide|the runbook|the FAQ|the architecture notes|the contributor guide")
+      title_of[p] = t
+    } else {
+      p = newmodule(area)
+      if (p == "") { p = existing(dir[area]); kind = "fix" }
+      else t = (forced != "" ? forced : pick("Add|Support|Show|Let people choose") " " noun)
+    }
+    if (p == "" || !addfile(f, p)) return 0
+    if (area != "docs" && area != "data" && area != "infra" && area != "ui" && !(p in mc)) {
+      q = "test/" area "/" modname ".test.js"
+      modulefor[q] = p
+      addfile(f, q)
+    }
+  }
+  if (kind == "fix" || kind == "refactor" || kind == "chore") {
+    if (fn[f] == 0) {
+      p = existing(area == "infra" ? "" : dir[area])
+      if (area == "infra") p = pick(".github/workflows/ci.yml|.github/workflows/deploy.yml|Dockerfile|scripts/backup.sh|scripts/seed.sh")
+      if (p == "" || !addfile(f, p)) return 0
+      if (kind == "refactor" && (q = existing(dir[area])) != "") addfile(f, q)
+    }
+    if (t == "") {
+      if (kind == "fix") t = pick("Fix|Handle") " " pick(bugs[area])
+      else if (kind == "refactor") t = pick("Split up|Simplify|Tidy") " " noun
+      else t = pick("Update|Speed up|Tidy") " " pick(chores)
+    }
+  }
+  # A title that's been used reads better with a place or a reason than with a number.
+  prefix = (kind == "docs" ? "docs" : kind == "refactor" ? "refactor" : kind == "chore" ? "chore" : kind) "/"
+  noun = t
+  for (q = 0; q < 4 && forced == "" && ((prefix slug(t)) in usedbranch); q++)
+    t = noun " " pick("on phones|for partner stations|at Gull Point|at Saltmarsh|at Craig Head|in the export|on the map|for the archive|in Safari|after an outage|for new stations|in the nightly job|with slow feeds|in the tide tables")
+  ftitle[f] = t
+  fkind[f] = kind
+  fowner[f] = k
+  fbranch[f] = forced != "" ? forced_branch : unique(prefix slug(t))
+  fbase[f] = maintip
+  ftip[f] = maintip
+  fplanned[f] = forced != "" ? 3 : 1 + (chance(0.55) ? ri(0, 2) : ri(2, 7))
+  fdone[f] = 0
+  fstate[f] = "open"
+  fsubjects[f] = ""
+  fstart[f] = day
+  pr++
+  fpr[f] = pr
+  current[k] = f
+  return f
+}
+
+function work(f, day, t,   p, i, msg, ops, subject) {
+  i = fdone[f] < fn[f] ? fdone[f] + 1 : ri(1, fn[f])
+  p = ffile[f, i]
+  if ((f, p) in fc) fc[f, p] = grow(p, fc[f, p], day)
+  else fc[f, p] = first(p, day)
+  ops = mop(p, fc[f, p])
+  # A test usually changes with its module.
+  if (fdone[f] > 0 && i == 1 && fn[f] > 1 && ffile[f, 2] ~ /\.test\.js$/ && chance(0.6)) {
+    fc[f, ffile[f, 2]] = (f, ffile[f, 2]) in fc ? grow(ffile[f, 2], fc[f, ffile[f, 2]], day) : first(ffile[f, 2], day)
+    ops = ops mop(ffile[f, 2], fc[f, ffile[f, 2]])
+  }
+  if (fdone[f] == 0) subject = ftitle[f]
+  else subject = pick("Address review comments|Cover the edge cases|Rename for clarity|Fix lint|Handle an empty response|Add tests|Tidy up|Update the docs comment|Keep the old behaviour behind a flag|Simplify the loop|Check the input first|wip")
+  if (chance(0.06)) subject = subject "\n\nCo-authored-by: " pname[other(fowner[f], day)] " <" pmail[other(fowner[f], day)] ">"
+  fsubjects[f] = fsubjects[f] "\n* " (index(subject, "\n") ? substr(subject, 1, index(subject, "\n") - 1) : subject)
+  ftip[f] = commit(fowner[f], t, fowner[f], t, subject "\n", ftip[f], "", ops)
+  fdone[f]++
+  flast[f] = day
+  if (fdone[f] >= fplanned[f]) {
+    fstate[f] = fstacked[f] ? "stacked" : "ready"
+    fready[f] = day + ri(1, 3)
+    if (weekday(fready[f]) >= 5) fready[f] += 7 - weekday(fready[f])
+    current[fowner[f]] = 0
+  }
+}
+
+function release_files(f,   i) { for (i = 1; i <= fn[f]; i++) delete lock[ffile[f, i]] }
+
+function land(f, day, t,   k, i, p, ops, msg, squash, undo, revert, body) {
+  k = other(fowner[f], day)
+  ops = ""
+  undo = ""
+  for (i = 1; i <= fn[f]; i++) {
+    p = ffile[f, i]
+    if (!((f, p) in fc)) continue
+    undo = undo ((p in mc) ? mop(p, mc[p]) : dop(p))
+    mc[p] = fc[f, p]
+    addpath(p)
+    ops = ops mop(p, mc[p])
+  }
+  release_files(f)
+  squash = chance(fdone[f] > 1 ? 0.25 : 0.5)
+  body = ftitle[f]
+  if (fkind[f] == "fix" && pr > 20 && chance(0.5)) body = body "\n\nCloses #" ri(1, pr - 1)
+  if (squash) {
+    msg = sprintf("%s (#%d)\n%s\n", ftitle[f], fpr[f], fdone[f] > 1 ? "\n" substr(fsubjects[f], 2) "\n" : "")
+    maintip = commit(fowner[f], t, k, t, msg, maintip, "", ops)
+  } else {
+    msg = sprintf("Merge pull request #%d from tidewater/%s\n\n%s\n", fpr[f], fbranch[f], body)
+    maintip = commit(k, t, k, t, msg, maintip, ftip[f], ops)
+  }
+  fstate[f] = squash ? "squashed" : "merged"
+  fland[f] = day
+  if (squash) lastsquash[++nsquash] = f
+  else lastmerge[++nmerge] = f
+  if (fkind[f] == "fix") lastfix = fpr[f]
+  notes = notes sprintf("\n- %s (#%d)", ftitle[f], fpr[f])
+  # Now and then a merge breaks something and goes straight back out.
+  if (!squash && (fkind[f] == "feature" || fkind[f] == "fix") && chance(0.04)) {
+    t += ri(20, 90) * 60
+    maintip = commit(k, t, k, t, sprintf("Revert \"%s\"\n\nIt broke %s. Reverts #%d.\n", ftitle[f], pick("the readings page for stations without a feed|the nightly export|alerts for Gull Point|the map on Safari"), fpr[f]), maintip, "", undo)
+    reverts++
+    for (i = 1; i <= fn[f]; i++) {
+      p = ffile[f, i]
+      if (index(undo, "D " p "\n")) delete mc[p]
+    }
+    # Put mc back from the undo ops by replaying what land saved.
+    restore(f)
+  }
+  return t
+}
+
+# restore puts back what the files of f held before it landed (saved in prev[]).
+function restore(f,   i, p) {
+  for (i = 1; i <= fn[f]; i++) {
+    p = ffile[f, i]
+    if ((f, p) in prev) mc[p] = prev[f, p]
+  }
+}
+
+function release(day, t, version,   ops, ch, msg, r, i, p) {
+  curversion = version
+  ch = sprintf("## %s - %s\n%s\n", version, dateof(day), notes == "" ? "\n- Small fixes." : notes)
+  mc["CHANGELOG.md"] = "# Changelog\n\n" ch (("CHANGELOG.md" in body_of) ? "\n" body_of["CHANGELOG.md"] : "")
+  body_of["CHANGELOG.md"] = ch (("CHANGELOG.md" in body_of) ? "\n" body_of["CHANGELOG.md"] : "")
+  addpath("CHANGELOG.md")
+  notes = ""
+  ops = mop("CHANGELOG.md", mc["CHANGELOG.md"]) mop("package.json", pkgjson(version, 0, "")) mop("package-lock.json", lockjson(version, 0, ""))
+  maintip = commit(1, t, 1, t, "Release " version "\n", maintip, "", ops)
+  printf "tag v%s\nfrom %s\ntagger %s\n%s", version, maintip, ident(1, t + 60), datablock("Tidewater " version)
+  if (version ~ /^1\./) {
+    r = ++releases
+    rver[r] = version
+    rtip[r] = maintip
+    rlog[r] = body_of["CHANGELOG.md"]
+    for (i = 1; i <= npaths; i++) {
+      p = paths[i]
+      if ((p in mc) && p ~ /^src\//) { rsnap[r, ++rn[r]] = p; rcontent[r, p] = mc[p] }
+    }
+    if (chance(0.65)) rpatch[r] = day + ri(6, 13)
+  }
+}
+
+function patch(r, day, t,   k, p, ops, parts, v, ch) {
+  k = ri(2, people)
+  if (!active(k, day)) k = 1
+  p = rsnap[r, ri(1, rn[r])]
+  rcontent[r, p] = grow(p, rcontent[r, p], day)
+  rtip[r] = commit(k, t, k, t, sprintf("%s %s (backport of #%d)\n", pick("Fix|Handle"), pick(bugs["api"] "|" bugs["alerts"]), lastfix > 0 ? lastfix : ri(1, pr)), rtip[r], "", mop(p, rcontent[r, p]))
+  split(rver[r], parts, ".")
+  rpatchn[r]++
+  v = parts[1] "." parts[2] "." rpatchn[r]
+  ch = sprintf("## %s - %s\n\n- A backported fix.\n", v, dateof(day))
+  rlog[r] = ch "\n" rlog[r]
+  t += 1800
+  ops = mop("CHANGELOG.md", "# Changelog\n\n" rlog[r]) mop("package.json", pkgjson(v, 0, "")) mop("package-lock.json", lockjson(v, 0, ""))
+  rtip[r] = commit(1, t, 1, t, "Release " v "\n", rtip[r], "", ops)
+  printf "tag v%s\nfrom %s\ntagger %s\n%s", v, rtip[r], ident(1, t + 60), datablock("Tidewater " v)
+  delete rpatch[r]
+  if (rpatchn[r] == 1 && chance(0.3)) rpatch[r] = day + ri(8, 15)
+}
+
+function bump(day, t,   j, parts, to, b, tip, ops) {
+  j = ri(1, ndeps)
+  split(dver[j], parts, ".")
+  to = chance(0.75) ? parts[1] "." parts[2] "." (parts[3] + ri(1, 3)) : parts[1] "." (parts[2] + 1) ".0"
+  b = "dependabot/npm_and_yarn/" dname[j] "-" to
+  pr++
+  ops = mop("package.json", pkgjson(curversion, j, to)) mop("package-lock.json", lockjson(curversion, j, to))
+  tip = commit(bot, t, bot, t, sprintf("Bump %s from %s to %s\n\nBumps [%s](https://www.npmjs.example/package/%s) from %s to %s.\n", dname[j], dver[j], to, dname[j], dname[j], dver[j], to), maintip, "", ops)
+  if (chance(0.8)) {
+    t += ri(30, 180) * 60
+    dver[j] = to
+    maintip = commit(1, t, 1, t, sprintf("Merge pull request #%d from tidewater/%s\n\nBump %s from %s to %s\n", pr, b, dname[j], parts[1] "." parts[2] "." parts[3], to), maintip, tip, ops)
+  } else {
+    nbots++
+    botbranch[nbots] = b; bottip[nbots] = tip; botday[nbots] = day
+  }
+  return t
+}
+
+# ── The simulation ──────────────────────────────────────────────────────────────────────
+
+BEGIN {
+  seed = 20250106
+  split("Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec", mon, " ")
+
+  people = 7
+  person(1, "Emily Carter", "emily@tidewater.example", "-0500", 0, 9999, "api|alerts|ui|docs|infra|tides")
+  person(2, "Marcus Johnson", "marcus@tidewater.example", "-0600", 0, 9999, "api|api|tides|infra")
+  person(3, "Sarah Mitchell", "sarah@tidewater.example", "-0800", 0, 9999, "docs|alerts|alerts|ui")
+  person(4, "Tyler Brooks", "tyler@tidewater.example", "-0500", 90, 9999, "ui|ui|ui|alerts")
+  person(5, "Jessica Nguyen", "jessica@tidewater.example", "-0800", 240, 9999, "data|tides|api|tides")
+  person(6, "David Ramirez", "david@tidewater.example", "-0700", 0, 9999, "infra|api|alerts")
+  person(7, "Kevin Walsh", "kevin@contractors.example", "-0500", 7, 170, "ui|api")
+  bot = 8
+  pname[bot] = "dependabot[bot]"; pmail[bot] = "bot@tidewater.example"; ptz[bot] = "+0000"
+
+  dir["api"] = "src/api/"; dir["alerts"] = "src/alerts/"; dir["tides"] = "src/tides/"; dir["ui"] = "public/js/"
+  dir["docs"] = "docs/"; dir["data"] = "data/archive/"; dir["infra"] = ""
+  ext["api"] = ".js"; ext["alerts"] = ".js"; ext["tides"] = ".js"; ext["ui"] = ".js"
+  modules["api"] = "routes|history|forecasts|health|export|limits|search|keys|paging|errors|partners|metrics|cache-headers|webhooks"
+  modules["alerts"] = "rules|gusts|storms|notify|email|sms|quiet-hours|thresholds|digest|escalation|snooze|channels"
+  modules["tides"] = "harmonics|ports|predict|tables|surge|moon|datum|springs|extremes|offsets"
+  modules["ui"] = "chart|legend|layers|sidebar|filters|theme|shortcuts|timeline|wind-rose|tooltip|search-box|settings|print"
+  nouns["api"] = "gzip on large responses|an endpoint for station metadata|conditional requests|a status page feed|bulk reads for partners|rate limits for the readings API|a health check|paging for the history API|CSV export|forecast data in the API|API keys for partner stations|search across stations|webhooks for partners|cache headers on readings|request metrics"
+  nouns["alerts"] = "push notifications|alert history|a test alert button|lightning alerts|fog alerts|gust alerts|quiet hours for alerts|SMS alerts|storm warnings|per-station thresholds|a daily alert digest|alert escalation|snoozing an alert|alert channels"
+  nouns["tides"] = "tide curves on the chart|a seven-day outlook|tidal stream arrows|spring and neap labels|a tide table page|moon phase in predictions|surge corrections|chart datum offsets|high and low water times|secondary ports"
+  nouns["ui"] = "a compact layout|unit switching|a station comparison view|saved views|a high-contrast theme|a dark theme|a wind rose|station filters|a map legend|keyboard shortcuts|a reading timeline|a settings page|printable tide tables|tooltips on the chart"
+  nouns["docs"] = "the docs"; nouns["data"] = "the archive"; nouns["infra"] = "the build"
+  bugs["api"] = "stale readings after a feed outage|a timeout on the forecast endpoint|an off-by-one in paging|CORS on the readings API|a memory leak in the poller|empty bodies on 204 responses|paging past the last record|time zones in the history export|a crash when a station has no readings|a 500 on an unknown station|duplicate rows in the export|a slow query on the history page"
+  bugs["alerts"] = "alerts for retired stations|the snooze button resetting|alerts with no station name|a race between two alert rules|digest emails sent twice|gust alerts firing twice|alerts during quiet hours|an alert that never clears|emails sent in UTC|a threshold of zero"
+  bugs["tides"] = "the springs label a day early|surge offsets for Craig Head|daylight saving in the tables|a negative tide height|tide times around midnight|a wrong datum at Saltmarsh|predictions across a year boundary|rounding in the tide table"
+  bugs["ui"] = "the wind rose on narrow screens|dark mode in the tooltips|the date picker in Firefox|the filter menu staying open|pins drawn twice after a reload|the chart's axis labels|the map's zoom on phones|a flicker when the theme changes|the legend covering pins|focus after closing a dialog"
+  bugs["docs"] = bugs["api"]; bugs["data"] = bugs["api"]; bugs["infra"] = "a flaky CI step|the Docker build cache|the nightly backup on Sundays"
+  chores = "the CI workflow|the Docker image|the backup script|the seed script|the deploy workflow"
+  docpages = "deploy|api|station-handbook|alert-guide|runbook|faq|architecture|contributing"
+
+  split("chart.js 4.4.1|date-fns 3.6.0|leaflet 1.9.4|pino 9.1.0|undici 6.18.2|zod 3.23.8|vite 5.2.11|vitest 1.6.0|eslint 9.3.0|prettier 3.2.5", tmp, "|")
+  ndeps = 10; ndev = 6
+  for (j = 1; j <= ndeps; j++) { split(tmp[j], nv, " "); dname[j] = nv[1]; dver[j] = nv[2] }
+  curversion = "0.0.1"
+
+  # The releases: monthly while it's young, every eight weeks after 1.0.
+  rel[36] = "0.1.0"; rel[64] = "0.2.0"; rel[92] = "0.3.0"; rel[127] = "0.4.0"; rel[155] = "0.5.0"
+  rel[183] = "1.0.0"; rel[239] = "1.1.0"; rel[295] = "1.2.0"; rel[351] = "1.3.0"; rel[407] = "1.4.0"
+  rel[463] = "1.5.0"; rel[519] = "1.6.0"; rel[575] = "1.7.0"
+
+  maintip = root
+  for (day = 1; day <= days; day++) {
+    wd = weekday(day)
+    base = start + day * 86400
+    # Mornings (from 15:00 UTC, 10:00 on the east coast): the bot, merges, releases.
+    t = base + 15 * 3600 + ri(0, 30) * 60
+    if (wd == 0 && day >= 14) t = bump(day, base + 7 * 3600) + ri(10, 40) * 60
+    if (wd < 5) {
+      for (f = 1; f <= features; f++) {
+        if (fstate[f] == "ready" && fready[f] <= day) {
+          if (chance(0.04) || !active(fowner[f], day)) { fstate[f] = "abandoned"; fland[f] = day; release_files(f); continue }
+          for (i = 1; i <= fn[f]; i++) if (ffile[f, i] in mc) prev[f, ffile[f, i]] = mc[ffile[f, i]]
+          t = land(f, day, t) + ri(15, 50) * 60
+        }
+      }
+      for (r = 1; r <= releases; r++) if ((r in rpatch) && rpatch[r] == day) { patch(r, day, t); t += 3600 }
+      if (day in rel) { release(day, t, rel[day]); t += 1800 }
+      # Now and then a small change straight on main.
+      if (chance(0.06) && (p = existing(pick("docs/|src/api/|src/alerts/|public/js/"))) != "") {
+        mc[p] = grow(p, mc[p], day)
+        maintip = commit(1, t, 1, t, pick("Fix a typo|Tidy a comment|Correct a link|Update a default") " in " p "\n", maintip, "", mop(p, mc[p]))
+      }
+    }
+    # Afternoons (from 18:30 UTC): everyone works on their branch.
+    for (k = 1; k <= people; k++) {
+      if (!active(k, day)) {
+        if (current[k] && day > pto[k]) { fstate[current[k]] = "abandoned"; fland[current[k]] = day; release_files(current[k]); current[k] = 0 }
+        continue
+      }
+      if (wd >= 5 && !chance(0.03)) continue
+      if (wd < 5 && !chance(0.3)) continue
+      if (!current[k]) {
+        # Marcus builds a stack near the end: three branches, each on the one before.
+        if (k == 2 && day >= 560 && stack < 3) {
+          stack++
+          forced_branch = "feature/export-" (stack == 1 ? "api" : stack == 2 ? "csv" : "ui")
+          f = openpr(k, day, stack == 1 ? "Add an export API" : stack == 2 ? "Export readings as CSV" : "Add an export button")
+          if (!f) { stack--; continue }
+          fstacked[f] = 1
+          if (stack > 1) { fbase[f] = stacktip; ftip[f] = stacktip }
+          stackf[stack] = f
+        } else if (!openpr(k, day, "")) continue
+      }
+      f = current[k]
+      n = ri(1, 3)
+      t = base + 18 * 3600 + 1800 + ri(0, 90) * 60
+      for (c = 0; c < n && current[k] == f; c++) {
+        work(f, day, t)
+        t += ri(25, 140) * 60
+      }
+      if (fstacked[f] && fstate[f] == "stacked") stacktip = ftip[f]
+    }
+  }
+
+  # ── What's left as branches ─────────────────────────────────────────────────────────
+  printf "reset refs/heads/main\nfrom %s\n\n", maintip
+  for (f = 1; f <= features; f++) {
+    keep = fstate[f] == "open" || fstate[f] == "ready" || fstate[f] == "stacked"
+    if (fstate[f] == "abandoned" && fdone[f] > 0 && days - fland[f] < 270) keep = 1
+    if (keep) printf "reset refs/heads/%s\nfrom %s\n\n", fbranch[f], ftip[f]
+  }
+  # Merged but never deleted: a host's "delete branch" button not pressed.
+  for (i = nmerge - 2; i <= nmerge; i++) if (i > 0) printf "reset refs/heads/%s\nfrom %s\n\n", fbranch[lastmerge[i]], ftip[lastmerge[i]]
+  for (i = nsquash - 1; i <= nsquash; i++) if (i > 0) printf "reset refs/heads/%s\nfrom %s\n\n", fbranch[lastsquash[i]], ftip[lastsquash[i]]
+  for (r = 1; r <= releases; r++) printf "reset refs/heads/release/v%s\nfrom %s\n\n", substr(rver[r], 1, length(rver[r]) - 2), rtip[r]
+  for (i = 1; i <= nbots; i++) if (days - botday[i] < 35) printf "reset refs/heads/%s\nfrom %s\n\n", botbranch[i], bottip[i]
+}
+AWK

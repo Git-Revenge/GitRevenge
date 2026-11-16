@@ -1,6 +1,6 @@
 # Find what broke it
 
-The station map says the wind at Harbour Light is 12 km/h. The harbour master's own gauge says 22. The map was right in release 0.2.0, so something since then broke it, and Leo doesn't know which commit.
+The station map says the wind at Harbour Light is 12 km/h. The harbour master's own gauge says 22. The map was right in release 1.9.0, so something since then broke it, and Marcus doesn't know which commit.
 
 That's what a bisect is for. You name one commit where it's broken and one where it worked, and git checks out commits in between for you to try. Each answer halves what's left, so even a thousand commits take about ten tries.
 
@@ -15,9 +15,9 @@ Commit or stash what you're working on. A bisect checks out other commits, and g
 
 1. **Start it.** Open the command palette (<kbd>Ctrl</kbd>+<kbd>K</kbd>) and choose **Find the commit that broke it…**. To start from an older commit instead of the one you're on, right-click it in the graph and choose **Find what broke it, up to here…**.
 
-2. **Name the two ends.** **Bad** is the commit where it's broken, and starts as the one you're on. **Good** is a commit, tag or branch where it still worked. The dialog suggests the last tag, here `v0.2.0`, and says how many commits lie between the two and about how many steps that is.
+2. **Name the two ends.** **Bad** is the commit where it's broken, and starts as the one you're on. **Good** is a commit, tag or branch where it still worked. The dialog suggests the last tag, here `v1.9.0`, and says how many commits lie between the two and about how many steps that is.
 
-3. **Try the commit you're given.** Git Revenge checks out a commit from the middle of the range, and a strip under the tabs asks whether it works there. Build it, or run it, and try the thing that's broken. For Leo that means opening the map and reading the wind.
+3. **Try the commit you're given.** Git Revenge checks out a commit from the middle of the range, and a strip under the tabs asks whether it works there. Build it, or run it, and try the thing that's broken. For Marcus that means opening the map and reading the wind.
 
 4. **Answer.**
 

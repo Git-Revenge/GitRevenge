@@ -1,9 +1,9 @@
 # Find a commit
 
-Leo remembers the tide-prediction work closed issue 14, but not when it landed. Search finds it from the trailer alone.
+Marcus remembers the tide-prediction work closed issue 14, but not when it landed. Search finds it from the trailer alone.
 
-![Searching for "Closes: #14", then stepping through every commit by Priya](../img/search-light.webp#gh-light-mode-only)
-![Searching for "Closes: #14", then stepping through every commit by Priya](../img/search-dark.webp#gh-dark-mode-only)
+![Searching for "Closes: #14", then stepping through every commit by Sarah](../img/search-light.webp#gh-light-mode-only)
+![Searching for "Closes: #14", then stepping through every commit by Sarah](../img/search-dark.webp#gh-dark-mode-only)
 
 ## Steps
 
@@ -12,9 +12,9 @@ Leo remembers the tide-prediction work closed issue 14, but not when it landed. 
 2. **Type what you know.** Search looks at:
 
    - the commit **message** (*tide height*),
-   - the **author** (*Priya*),
+   - the **author** (*Sarah*),
    - the **SHA**, or the start of it (*6fd96d0*),
-   - a **trailer**, such as `Closes: #14` or `Co-authored-by: Priya`.
+   - a **trailer**, such as `Closes: #14` or `Co-authored-by: Sarah`.
 
 3. **Step through the matches.** <kbd>Enter</kbd> goes to the next match and <kbd>Shift</kbd>+<kbd>Enter</kbd> to the previous one. The counter in the box shows which match you're on. Commits that don't match fade, so the matches stand out.
 

@@ -1,6 +1,6 @@
 # Tidy a branch before you share it
 
-Priya's `feature/offline-cache` branch works, but its history tells the story of getting there: a commit called *wip*, a *fixup!* for an earlier commit, and a *debugging* commit that should never have been committed. Before she opens a pull request, she wants two clean commits.
+Sarah's `feature/offline-cache` branch works, but its history tells the story of getting there: a commit called *wip*, a *fixup!* for an earlier commit, and a *debugging* commit that should never have been committed. Before she opens a pull request, she wants two clean commits.
 
 That's what interactive rebase is for: it rewrites a branch's recent commits, letting you squash, reword, reorder and drop them.
 
@@ -26,7 +26,7 @@ That's what interactive rebase is for: it rewrites a branch's recent commits, le
    | **Fixup** | Fold it into the commit above it, and keep only that commit's message. |
    | **Drop** | Remove the commit and its changes. |
 
-   For Priya's branch: **Drop** *debugging*, click **Fold it in for me** to put the *fixup!* commit under the commit it names, and **Squash** *wip*. Squash starts the message from both commits, the way git does; **Edit the message** opens it.
+   For Sarah's branch: **Drop** *debugging*, click **Fold it in for me** to put the *fixup!* commit under the commit it names, and **Squash** *wip*. Squash starts the message from both commits, the way git does; **Edit the message** opens it.
 
    Drag a commit by the grip on its left to reorder, or press <kbd>Alt</kbd>+<kbd>↑</kbd> and <kbd>Alt</kbd>+<kbd>↓</kbd>.
 
