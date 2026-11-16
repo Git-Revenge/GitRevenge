@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 ### Fixed
 
 - The clone dialog starts in your home folder when there's no clone folder in Settings and no recent repository. It started empty. (#724)
+- Repositories made the way Git 3.0 will make them by default, with reftable refs and SHA-256 commit IDs (`git init --ref-format=reftable --object-format=sha256` today, with git 2.45 or later), work like any other. Commits, checkouts and new branches made outside the app now show up straight away; a cherry-pick, revert or rebase in progress shows in the strip under the tabs, and the conflict tool says where each side came from; and 64-character commit IDs are shortened and read like 40-character ones. (#732, #733, #734, #740, #741, #742)
 - A commit's notes are rendered as markdown, as its message is, and link the same way: web addresses and your smart links (a ticket key such as `ABC-1234`) are links in a note, with the same right-click menu. A single line break in a note stays a line break. The message's **Raw** switch shows notes as written too. They were plain text. [Docs](https://gitrevenge.com/docs/guide/history#notes). (#681)
 
 ## [0.11.0] - 2026-11-11
