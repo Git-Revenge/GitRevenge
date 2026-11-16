@@ -166,6 +166,12 @@ func TestClassifyGitPath(t *testing.T) {
 		"worktrees/wt/index":     0,
 		"worktrees/wt/ORIG_HEAD": 0,
 		"worktrees/wt/logs/HEAD": 0,
+		// Reftable (Git 3.0's default): one stack holds HEAD, branches and pseudorefs.
+		"reftable/tables.list":                       Head | Refs | State,
+		"reftable/0x000000000001-0x000000000002.ref": Head | Refs | State,
+		"reftable/tables.list.lock":                  0,
+		"worktrees/wt/reftable/tables.list":          Refs,
+		"worktrees/wt/reftable/tables.list.lock":     0,
 	}
 	for path, want := range tests {
 		if got := classifyGitPath(path); got != want {
@@ -176,19 +182,22 @@ func TestClassifyGitPath(t *testing.T) {
 
 func TestClassifyCommonPath(t *testing.T) {
 	tests := map[string]Kind{
-		"HEAD":                  Refs,
-		"refs/heads/x":          Refs,
-		"packed-refs":           Refs,
-		"FETCH_HEAD":            Refs,
-		"config":                Config,
-		"worktrees/other/HEAD":  Refs,
-		"index":                 0,
-		"ORIG_HEAD":             0,
-		"MERGE_HEAD":            0,
-		"rebase-merge/done":     0,
-		"objects/ab/cdef":       0,
-		"refs/heads/x.lock":     0,
-		"worktrees/other/index": 0,
+		"HEAD":                                 Refs,
+		"refs/heads/x":                         Refs,
+		"packed-refs":                          Refs,
+		"FETCH_HEAD":                           Refs,
+		"config":                               Config,
+		"worktrees/other/HEAD":                 Refs,
+		"index":                                0,
+		"ORIG_HEAD":                            0,
+		"MERGE_HEAD":                           0,
+		"rebase-merge/done":                    0,
+		"objects/ab/cdef":                      0,
+		"refs/heads/x.lock":                    0,
+		"worktrees/other/index":                0,
+		"reftable/tables.list":                 Refs,
+		"worktrees/other/reftable/tables.list": Refs,
+		"reftable/tables.list.lock":            0,
 	}
 	for path, want := range tests {
 		if got := classifyCommonPath(path); got != want {
