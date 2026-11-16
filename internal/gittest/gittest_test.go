@@ -21,8 +21,31 @@ func TestIgnoresUserConfig(t *testing.T) {
 	if got := r.Git("config", "user.email"); got != "test@example.com" {
 		t.Fatalf("user.email = %q", got)
 	}
-	if out, _ := r.TryGit("config", "--global", "--list"); out != "protocol.file.allow=always" {
+	want := "protocol.file.allow=always"
+	if Git3() {
+		want += "\ninit.defaultrefformat=reftable\ninit.defaultobjectformat=sha256\ninit.defaultbranch=main\nsafe.barerepository=explicit"
+	}
+	if out, _ := r.TryGit("config", "--global", "--list"); out != want {
 		t.Fatalf("user's global config leaked into test repo: %q", out)
+	}
+}
+
+func TestGit3Defaults(t *testing.T) {
+	r, bare := New(t), NewBare(t)
+	formats := "sha1\nfiles"
+	if Git3() {
+		formats = "sha256\nreftable"
+	}
+	for _, repo := range []*Repo{r, bare} {
+		if got := repo.Git("rev-parse", "--show-object-format", "--show-ref-format"); got != formats {
+			t.Errorf("%s: formats = %q, want %q", repo.Dir, got, formats)
+		}
+	}
+	// A bare remote takes pushes and answers git even with safe.bareRepository=explicit.
+	r.CommitFile("a.txt", "a\n", "first")
+	r.Git("push", bare.Dir, "main")
+	if got, want := bare.Git("rev-parse", "main"), r.Head(); got != want {
+		t.Errorf("bare main = %s, want %s", got, want)
 	}
 }
 

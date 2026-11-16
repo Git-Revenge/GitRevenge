@@ -26,7 +26,19 @@ type Repo struct {
 	Dir   string
 	env   []string
 	clock time.Time
+	bare  bool
 }
+
+// Git3Env names the environment variable that makes every test repository the way Git 3.0
+// will make a new one by default: SHA-256 object IDs, reftable refs and main, with git
+// refusing to find a bare repository it wasn't pointed at. Set it to 1.
+const Git3Env = "GITREVENGE_TEST_GIT3"
+
+// Git3 reports whether the tests run with Git 3.0's defaults (see Git3Env).
+func Git3() bool { return os.Getenv(Git3Env) == "1" }
+
+// git3Config is what Git3 adds to the tests' global config.
+const git3Config = "[init]\n\tdefaultRefFormat = reftable\n\tdefaultObjectFormat = sha256\n\tdefaultBranch = main\n[safe]\n\tbareRepository = explicit\n"
 
 // New initializes an empty repository on branch main.
 func New(t testing.TB) *Repo {
@@ -37,7 +49,11 @@ func New(t testing.TB) *Repo {
 // NewBare initializes an empty bare repository, useful as a remote.
 func NewBare(t testing.TB) *Repo {
 	t.Helper()
-	return newAt(t, t.TempDir(), "init", "--bare", "-b", "main")
+	r := &Repo{t: t, Dir: t.TempDir(), env: isolatedEnv(t), clock: epoch}
+	r.Git("init", "--bare", "-b", "main")
+	r.bare = true
+	r.configure()
+	return r
 }
 
 // Clone clones src into a new temporary directory.
@@ -67,7 +83,11 @@ func isolatedEnv(t testing.TB) []string {
 	global := filepath.Join(t.TempDir(), "gitconfig")
 	// Allow local file:// submodules (blocked by default since git 2.38.1). This must live in
 	// global config because submodule clones run in a child git process.
-	if err := os.WriteFile(global, []byte("[protocol \"file\"]\n\tallow = always\n"), 0o600); err != nil {
+	config := "[protocol \"file\"]\n\tallow = always\n"
+	if Git3() {
+		config += git3Config
+	}
+	if err := os.WriteFile(global, []byte(config), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	env := make([]string, 0, len(os.Environ())+4)
@@ -118,6 +138,11 @@ func (r *Repo) exec(dir string, args ...string) (string, error) {
 	cmd.Dir = dir
 	date := r.clock.Format(time.RFC3339)
 	cmd.Env = slices.Concat(r.env, []string{"GIT_AUTHOR_DATE=" + date, "GIT_COMMITTER_DATE=" + date})
+	if r.bare && dir == r.Dir {
+		// Named outright: with safe.bareRepository=explicit, Git 3.0's default, git won't find
+		// a bare repository from its working directory.
+		cmd.Env = append(cmd.Env, "GIT_DIR="+dir)
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
