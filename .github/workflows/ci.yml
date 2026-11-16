@@ -181,6 +181,46 @@ jobs:
         if: runner.os == 'Linux'
         run: wails build -s -platform linux/amd64 -tags webkit2_41
 
+  # The Go tests again, every repository they make the way Git 3.0 will make a new one: SHA-256
+  # object IDs, reftable refs, main, and safe.bareRepository=explicit (#729).
+  go-git3:
+    name: Go (Git 3.0 defaults)
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-24.04
+    # Some tests fail here until #732, #733 and #734 land; the last of those makes it count.
+    continue-on-error: true
+    env:
+      GITREVENGE_TEST_GIT3: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Install GTK and WebKitGTK
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+      - name: Raise the inotify limits
+        run: |
+          sudo sysctl -w fs.inotify.max_user_instances=1024
+          sudo sysctl -w fs.inotify.max_user_watches=524288
+      - name: Build frontend
+        working-directory: frontend
+        run: npm ci && npm run build
+      # SHA-256 and reftable repositories need git 2.45 or later.
+      - name: git version
+        run: |
+          git --version
+          git init -q --object-format=sha256 --ref-format=reftable "$RUNNER_TEMP/probe"
+      - name: go test
+        run: go test ./...
+
   rhel:
     # AlmaLinux stands in for RHEL. Each version gets its own package, because RHEL 9 only has
     # WebKitGTK 4.0, a separate code path in Wails, and RHEL 10 only has 4.1, from EPEL.
