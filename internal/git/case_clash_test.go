@@ -68,6 +68,35 @@ func TestMarkCaseClashes(t *testing.T) {
 		}
 	})
 
+	// The index lists a conflicted file once per stage, which isn't two names.
+	t.Run("leaves a conflicted file alone", func(t *testing.T) {
+		fx := gittest.New(t)
+		fx.Git("config", "core.ignorecase", "true")
+		fx.CommitFile("sub/file.txt", "base\n", "base")
+		trunk := trimNL(fx.Git("branch", "--show-current"))
+		fx.Branch("topic")
+		fx.CommitFile("sub/file.txt", "topic\n", "topic")
+		fx.Checkout(trunk)
+		fx.CommitFile("sub/file.txt", "trunk\n", "trunk")
+		if err := fx.Merge("topic"); err == nil {
+			t.Fatal("the merge didn't stop on a conflict")
+		}
+		g := OpenRepo(newTestRunner(t), fx.Dir)
+		st, err := g.Status(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(st.Files) == 0 {
+			t.Fatal("the status has no files")
+		}
+		g.MarkCaseClashes(ctx, &st)
+		for _, f := range st.Files {
+			if f.CaseClash {
+				t.Errorf("%s was flagged", f.Path)
+			}
+		}
+	})
+
 	t.Run("has nothing to do with no changes", func(t *testing.T) {
 		fx, g := clashing(t)
 		fx.Git("config", "core.ignorecase", "true")
