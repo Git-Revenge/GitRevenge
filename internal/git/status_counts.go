@@ -69,9 +69,12 @@ func (r *Repo) MarkCaseClashes(ctx context.Context, st *Status) {
 	if err != nil {
 		return
 	}
+	// A conflicted file is listed once per stage, so count each spelling once.
+	seen := map[string]bool{}
 	names := map[string]int{}
 	for name := range strings.SplitSeq(out, "\x00") {
-		if name != "" {
+		if name != "" && !seen[name] {
+			seen[name] = true
 			names[strings.ToLower(name)]++
 		}
 	}
