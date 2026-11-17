@@ -117,8 +117,9 @@ func (a *App) runNetwork(path, op string, fn func(ctx context.Context, r *sessio
 	if err != nil {
 		return err
 	}
-	return a.track(r.Path, r.Path, op, "Another fetch, pull or push is already running in this repository.",
+	err = a.track(r.Path, r.Path, op, "Another fetch, pull or push is already running in this repository.",
 		func(ctx context.Context, o git.NetOptions) error { return fn(ctx, r, o) })
+	return ownLinksOnly(err, func() []string { return remoteHosts(context.Background(), r.Git) })
 }
 
 // track runs fn as the network operation registered under key (busy is the message when one

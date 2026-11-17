@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -15,18 +16,32 @@ import (
 // LatestURL is the GitHub API endpoint for the newest published, non-pre-release release.
 const LatestURL = "https://api.github.com/repos/Git-Revenge/GitRevenge/releases/latest"
 
+// ReleasesPage is where releases are published. The page the app sends people to is always
+// under it, whatever the API answered.
+const ReleasesPage = "https://github.com/Git-Revenge/GitRevenge/releases/"
+
 // Release is the newest published release.
 type Release struct {
 	Version string `json:"version"`
-	URL     string `json:"url"`
+	// URL is the release's page, made from its version and not taken from the response.
+	URL string `json:"url"`
 }
 
-// Latest fetches the newest release from url. It sends no identifiers beyond the
+// pageFor is the page of the release tagged tag, or the newest release's page when the tag
+// isn't a version.
+func pageFor(tag string) string {
+	if _, ok := parse(tag); !ok {
+		return ReleasesPage + "latest"
+	}
+	return ReleasesPage + "tag/" + url.PathEscape(strings.TrimSpace(tag))
+}
+
+// Latest fetches the newest release from endpoint. It sends no identifiers beyond the
 // User-Agent GitHub's API requires.
-func Latest(ctx context.Context, client *http.Client, url, current string) (Release, error) {
+func Latest(ctx context.Context, client *http.Client, endpoint, current string) (Release, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return Release{}, err
 	}
@@ -42,12 +57,11 @@ func Latest(ctx context.Context, client *http.Client, url, current string) (Rele
 	}
 	var body struct {
 		TagName string `json:"tag_name"`
-		HTMLURL string `json:"html_url"`
 	}
 	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
 		return Release{}, err
 	}
-	return Release{Version: strings.TrimPrefix(body.TagName, "v"), URL: body.HTMLURL}, nil
+	return Release{Version: strings.TrimPrefix(body.TagName, "v"), URL: pageFor(body.TagName)}, nil
 }
 
 // Newer reports whether version a is newer than b. Both are semver, with or without a

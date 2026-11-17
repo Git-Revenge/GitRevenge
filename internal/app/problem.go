@@ -1,8 +1,11 @@
 package app
 
 import (
+	"context"
 	"errors"
+	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 
@@ -187,6 +190,44 @@ func remoteHost(stderr string) string {
 		return m[1]
 	}
 	return "the remote"
+}
+
+// ownLinksOnly takes the "open-url" actions off a Problem unless they lead to one of the
+// repository's own remotes. The address comes from what the server printed, and a server can
+// print anything, so it's only offered as a button when it leads back to a server the
+// repository is set up to talk to; any other stays as text in the details. hosts is asked for
+// only when there is such an action. It returns err as it came.
+func ownLinksOnly(err error, hosts func() []string) error {
+	var pe *problemErr
+	if !errors.As(err, &pe) || !slices.ContainsFunc(pe.p.Actions, func(a ProblemAction) bool { return a.Kind == "open-url" }) {
+		return err
+	}
+	own := hosts()
+	pe.p.Actions = slices.DeleteFunc(pe.p.Actions, func(a ProblemAction) bool {
+		if a.Kind != "open-url" {
+			return false
+		}
+		u, perr := url.Parse(a.URL)
+		return perr != nil || u.Scheme != "https" || u.User != nil || !slices.Contains(own, strings.ToLower(u.Hostname()))
+	})
+	return err
+}
+
+// remoteHosts lists the servers a repository's remotes are on, fetch and push addresses both.
+func remoteHosts(ctx context.Context, g *git.Repo) []string {
+	remotes, err := g.Remotes(ctx)
+	if err != nil {
+		return nil
+	}
+	var hosts []string
+	for _, r := range remotes {
+		for _, u := range []string{r.FetchURL, r.PushURL} {
+			if h := git.RemoteHost(u); h != "" && !slices.Contains(hosts, h) {
+				hosts = append(hosts, h)
+			}
+		}
+	}
+	return hosts
 }
 
 // sentenceStart capitalises a sentence that starts with a host or "the remote".

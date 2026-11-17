@@ -302,6 +302,13 @@ func IssueURL(remoteURL string) string {
 	return ""
 }
 
+// RemoteHost returns the server a remote URL is on, in lower case and without a port, or ""
+// when the URL names none (a folder on this machine, say).
+func RemoteHost(remoteURL string) string {
+	host, _ := webLocation(remoteURL)
+	return host
+}
+
 // webLocation extracts the host and "owner/repo" path from an https, ssh or scp-style
 // (git@host:owner/repo.git) remote URL.
 func webLocation(remoteURL string) (host, path string) {

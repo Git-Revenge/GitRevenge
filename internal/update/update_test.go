@@ -2,6 +2,7 @@ package update
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -50,6 +51,29 @@ func TestLatest(t *testing.T) {
 	}
 	if gotUA != "GitRevenge/0.6.0" || gotAccept != "application/vnd.github+json" {
 		t.Errorf("headers: User-Agent %q, Accept %q", gotUA, gotAccept)
+	}
+}
+
+// The page to open is made from the version. Whatever address the response gives is ignored.
+func TestLatestIgnoresTheResponsesAddress(t *testing.T) {
+	for tag, want := range map[string]string{
+		"v99.0.0":        "https://github.com/Git-Revenge/GitRevenge/releases/tag/v99.0.0",
+		"v1.2.0-rc.1":    "https://github.com/Git-Revenge/GitRevenge/releases/tag/v1.2.0-rc.1",
+		"v1.0.0-a/../..": "https://github.com/Git-Revenge/GitRevenge/releases/tag/v1.0.0-a%2F..%2F..",
+		"nightly":        "https://github.com/Git-Revenge/GitRevenge/releases/latest",
+		"":               "https://github.com/Git-Revenge/GitRevenge/releases/latest",
+	} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_ = json.NewEncoder(w).Encode(map[string]string{"tag_name": tag, "html_url": "https://attacker.example/download"})
+		}))
+		rel, err := Latest(context.Background(), srv.Client(), srv.URL, "0.6.0")
+		srv.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if rel.URL != want {
+			t.Errorf("tag %q: URL = %q, want %q", tag, rel.URL, want)
+		}
 	}
 }
 

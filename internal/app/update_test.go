@@ -24,7 +24,7 @@ func TestCheckForUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !info.Available || info.Latest != "99.0.0" || info.URL != "https://example.test/r" || info.Current != version.Version {
+	if !info.Available || info.Latest != "99.0.0" || info.URL != "https://github.com/Git-Revenge/GitRevenge/releases/tag/v99.0.0" || info.Current != version.Version {
 		t.Fatalf("info = %+v", info)
 	}
 

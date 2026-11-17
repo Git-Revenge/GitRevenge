@@ -166,6 +166,23 @@ func TestPushRejectedAndForceWithLease(t *testing.T) {
 	}
 }
 
+func TestRemoteHost(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		"https://GitHub.com/Git-Revenge/GitRevenge.git":  "github.com",
+		"git@github.com:Git-Revenge/GitRevenge.git":      "github.com",
+		"https://user:token@github.com/o/r.git":          "github.com",
+		"ssh://git@gitlab.example.com:2222/team/app.git": "gitlab.example.com",
+		"/srv/git/local.git":                             "",
+		"":                                               "",
+	}
+	for in, want := range cases {
+		if got := RemoteHost(in); got != want {
+			t.Errorf("RemoteHost(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestIssueURL(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{

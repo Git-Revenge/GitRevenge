@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ## [Unreleased]
 
+### Security
+
+- Two buttons no longer open an address the app didn't check. **See the rules**, on a refused push, is only offered when the link the server printed leads to one of the repository's own remotes; any other link stays as text in the details. **Download**, on the update banner, always opens the release's page on the project's GitHub releases, made from the version number. (GHSA-m5wc-fwpc-79qr)
+
 ## [1.0.0] - 2026-11-16
 
 ### Added
