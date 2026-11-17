@@ -4,17 +4,14 @@
   import { EventsOn } from '../../wailsjs/runtime/runtime.js'
   import InkButton from './ui/InkButton.svelte'
   import Modal from './ui/Modal.svelte'
-
-  /** A credential or host-key prompt relayed from git/ssh (app.Prompt in Go). */
-  interface Prompt {
-    id: string
-    text: string
-    kind: 'text' | 'secret' | 'hostkey'
-  }
+  import { askedDuring, unexpectedHost, type Prompt } from './promptOrigin'
 
   // Prompts can arrive back to back (username, then password); show them in order.
   let queue = $state<Prompt[]>([])
   let current = $derived(queue[0])
+  // The app's own account of who is asking. The prompt's words can be a server's.
+  let origin = $derived(current ? askedDuring(current) : '')
+  let stranger = $derived(current ? unexpectedHost(current) : '')
   let value = $state('')
 
   function answer(ok: boolean) {
@@ -51,9 +48,11 @@
           answer(true)
         }}
       >
+        {#if origin}<p class="form-note origin">{origin}</p>{/if}
         {#if current.kind === 'hostkey'}
           <!-- ssh's own wording, including the key fingerprint to compare. -->
           <pre>{current.text}</pre>
+          {#if stranger}<p class="form-warning" role="alert">{stranger}</p>{/if}
           <p class="form-note">Only continue if the fingerprint matches the one your Git host publishes. The key is then saved to known_hosts.</p>
           <div class="form-actions">
             <InkButton variant="secondary" onclick={() => answer(false)}>Cancel</InkButton>
@@ -68,7 +67,8 @@
               <input bind:value autocomplete="off" />
             {/if}
           </label>
-          <p class="form-note">Git Revenge passes this to git and doesn't store it.</p>
+          {#if stranger}<p class="form-warning" role="alert">{stranger}</p>{/if}
+          <p class="form-note">The question above is written by git or by the server. Git Revenge passes your answer to git and doesn't store it.</p>
           <div class="form-actions">
             <InkButton variant="secondary" onclick={() => answer(false)}>Cancel</InkButton>
             <InkButton type="submit">Continue</InkButton>
@@ -80,6 +80,10 @@
 {/if}
 
 <style>
+  .origin {
+    color: var(--ink-soft);
+  }
+
   form {
     display: flex;
     flex-direction: column;

@@ -5,10 +5,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -21,6 +23,11 @@ func TestClassify(t *testing.T) {
 		"Enter passphrase for key '/home/u/.ssh/id_ed25519': ":                  Secret,
 		"Are you sure you want to continue connecting (yes/no/[fingerprint])? ": HostKey,
 		"something unexpected":                                                  Secret,
+		// ssh's whole question, as it arrives.
+		"The authenticity of host 'github.com (140.82.121.4)' can't be established.\nED25519 key fingerprint is SHA256:abc.\nAre you sure you want to continue connecting (yes/no/[fingerprint])? ": HostKey,
+		"Are you sure you want to continue connecting (yes/no)? ": HostKey,
+		// A server's own prompt that only borrows the words is a password field, never a "yes" button.
+		"To continue connecting, enter your GitHub password: ": Secret,
 	}
 	for prompt, want := range cases {
 		if got := Classify(prompt); got != want {
@@ -32,9 +39,9 @@ func TestClassify(t *testing.T) {
 func TestClientServerRoundTrip(t *testing.T) {
 	var got []string
 	var mu sync.Mutex
-	s, err := Listen(func(_ context.Context, prompt string, kind Kind) (string, bool) {
+	s, err := Listen(func(_ context.Context, prompt string, kind Kind, from any) (string, bool) {
 		mu.Lock()
-		got = append(got, string(kind)+":"+prompt)
+		got = append(got, fmt.Sprint(from)+":"+string(kind)+":"+prompt)
 		mu.Unlock()
 		if strings.Contains(prompt, "cancel") {
 			return "", false
@@ -45,10 +52,23 @@ func TestClientServerRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	env := map[string]string{}
-	for _, kv := range s.Env("exe") {
-		k, v, _ := strings.Cut(kv, "=")
-		env[k] = v
+	open := func(from string) (map[string]string, func()) {
+		vars, done, err := s.Open("exe", from)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env := map[string]string{}
+		for _, kv := range vars {
+			k, v, _ := strings.Cut(kv, "=")
+			env[k] = v
+		}
+		return env, done
+	}
+	env, done := open("fetch")
+	other, otherDone := open("push")
+	defer otherDone()
+	if env[EnvToken] == other[EnvToken] {
+		t.Fatal("two operations share a token")
 	}
 
 	ans, err := Client(env[EnvAddr], env[EnvToken], "Password: ")
@@ -61,10 +81,23 @@ func TestClientServerRoundTrip(t *testing.T) {
 	if _, err := Client(env[EnvAddr], "wrong-token", "Password: "); err == nil {
 		t.Fatal("a wrong token must not get an answer")
 	}
+	// Each prompt arrives with what its own operation was opened as.
+	if _, err := Client(other[EnvAddr], other[EnvToken], "Password: "); err != nil {
+		t.Fatal(err)
+	}
+	// An operation that has ended gets no more answers, and the other one still does.
+	done()
+	if _, err := Client(env[EnvAddr], env[EnvToken], "Password: "); err == nil {
+		t.Fatal("a finished operation's token must not get an answer")
+	}
+	if _, err := Client(other[EnvAddr], other[EnvToken], "Password: "); err != nil {
+		t.Fatalf("the other operation stopped being answered: %v", err)
+	}
 	mu.Lock()
 	defer mu.Unlock()
-	if len(got) != 2 || got[0] != "secret:Password: " {
-		t.Fatalf("handler saw %v", got)
+	want := []string{"fetch:secret:Password: ", "fetch:secret:please cancel", "push:secret:Password: ", "push:secret:Password: "}
+	if !slices.Equal(got, want) {
+		t.Fatalf("handler saw %v, want %v", got, want)
 	}
 }
 
@@ -85,7 +118,7 @@ func TestGitUsesHelper(t *testing.T) {
 
 	// Generated per run so the source holds no credential-looking literals.
 	user, pass := "user-"+randomHex(t), "pass-"+randomHex(t)
-	s, err := Listen(func(_ context.Context, _ string, kind Kind) (string, bool) {
+	s, err := Listen(func(_ context.Context, _ string, kind Kind, _ any) (string, bool) {
 		if kind == Text {
 			return user, true
 		}
@@ -102,7 +135,12 @@ func TestGitUsesHelper(t *testing.T) {
 	global := filepath.Join(t.TempDir(), "gitconfig")
 	_ = os.WriteFile(global, nil, 0o600)
 	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+global, "GIT_CONFIG_NOSYSTEM=1", "GIT_TERMINAL_PROMPT=0")
-	cmd.Env = append(cmd.Env, s.Env(helper)...)
+	env, done, err := s.Open(helper, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer done()
+	cmd.Env = append(cmd.Env, env...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("credential fill: %v\n%s", err, out)

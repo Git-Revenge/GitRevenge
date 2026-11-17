@@ -190,10 +190,6 @@ func (a *App) GroupBatch(name, op string) ([]BatchResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	env, err := a.askEnv()
-	if err != nil {
-		return nil, err
-	}
 	results := make([]BatchResult, len(paths))
 	forEach(paths, func(i int, p string) {
 		res := BatchResult{Path: p}
@@ -202,6 +198,13 @@ func (a *App) GroupBatch(name, op string) ([]BatchResult, error) {
 		if err == nil {
 			res.Message = skipReason(ctx, g, op)
 			res.Skipped = res.Message != ""
+		}
+		var env []string
+		if err == nil && !res.Skipped {
+			var done func()
+			if env, done, err = a.askEnv(promptOrigin{Op: op, Path: p, Hosts: func() []string { return remoteHosts(ctx, g) }}); err == nil {
+				defer done()
+			}
 		}
 		if err == nil && !res.Skipped {
 			o := git.NetOptions{Env: env}

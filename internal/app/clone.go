@@ -50,7 +50,8 @@ func (a *App) Clone(url, parent, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	err = a.track(cloneKey, dir, "clone", "A clone is already running.", func(ctx context.Context, o git.NetOptions) error {
+	hosts := func() []string { return []string{git.RemoteHost(url)} }
+	err = a.track(cloneKey, dir, "clone", hosts, "A clone is already running.", func(ctx context.Context, o git.NetOptions) error {
 		return git.Clone(ctx, runner, url, dir, o)
 	})
 	if err != nil {

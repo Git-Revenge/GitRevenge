@@ -32,12 +32,21 @@ type promptAnswer struct {
 	ok     bool
 }
 
-// Prompt is the payload of the "askpass:prompt" event.
+// Prompt is the payload of the "askpass:prompt" event. Text is what git, ssh or the server
+// wrote; the rest is what the app knows about where the prompt came from.
 type Prompt struct {
 	ID     string `json:"id"`
 	Text   string `json:"text"`
 	Kind   string `json:"kind"`
 	Expiry int64  `json:"expiry"`
+	// Op is the operation that's running: "fetch", "pull", "push" or "clone".
+	Op string `json:"op"`
+	// Repo is the name of the repository's folder.
+	Repo string `json:"repo"`
+	// Host is the server the prompt names, or "".
+	Host string `json:"host"`
+	// Unexpected means Host isn't a server the operation was set up to talk to.
+	Unexpected bool `json:"unexpected"`
 }
 
 // NetProgress is the payload of the "net:progress" event.
@@ -49,8 +58,9 @@ type NetProgress struct {
 	Line    string `json:"line"`
 }
 
-// askEnv returns the environment that routes credential prompts to this app.
-func (a *App) askEnv() ([]string, error) {
+// askEnv returns the environment that routes an operation's credential prompts to this app,
+// and done, to call when the operation ends: its prompts are answered only until then.
+func (a *App) askEnv(from promptOrigin) (env []string, done func(), err error) {
 	n := &a.net
 	n.once.Do(func() {
 		n.prompts = map[string]chan promptAnswer{}
@@ -64,13 +74,13 @@ func (a *App) askEnv() ([]string, error) {
 		n.server, n.initErr = askpass.Listen(a.handlePrompt)
 	})
 	if n.initErr != nil {
-		return nil, n.initErr
+		return nil, nil, n.initErr
 	}
-	return n.server.Env(n.exe), nil
+	return n.server.Open(n.exe, from)
 }
 
 // handlePrompt shows a prompt in the UI and waits for AnswerPrompt.
-func (a *App) handlePrompt(ctx context.Context, text string, kind askpass.Kind) (string, bool) {
+func (a *App) handlePrompt(ctx context.Context, text string, kind askpass.Kind, from any) (string, bool) {
 	if a.promptHook != nil {
 		return a.promptHook(text, kind)
 	}
@@ -90,7 +100,11 @@ func (a *App) handlePrompt(ctx context.Context, text string, kind askpass.Kind) 
 		a.net.mu.Unlock()
 	}()
 	deadline, _ := ctx.Deadline()
-	a.emit("askpass:prompt", Prompt{ID: id, Text: strings.TrimSpace(text), Kind: string(kind), Expiry: deadline.Unix()})
+	p := Prompt{ID: id, Text: strings.TrimSpace(text), Kind: string(kind), Expiry: deadline.Unix()}
+	if o, ok := from.(promptOrigin); ok {
+		o.describe(&p)
+	}
+	a.emit("askpass:prompt", p)
 	select {
 	case ans := <-ch:
 		return ans.answer, ans.ok
@@ -117,18 +131,21 @@ func (a *App) runNetwork(path, op string, fn func(ctx context.Context, r *sessio
 	if err != nil {
 		return err
 	}
-	err = a.track(r.Path, r.Path, op, "Another fetch, pull or push is already running in this repository.",
+	hosts := func() []string { return remoteHosts(context.Background(), r.Git) }
+	err = a.track(r.Path, r.Path, op, hosts, "Another fetch, pull or push is already running in this repository.",
 		func(ctx context.Context, o git.NetOptions) error { return fn(ctx, r, o) })
-	return ownLinksOnly(err, func() []string { return remoteHosts(context.Background(), r.Git) })
+	return ownLinksOnly(err, hosts)
 }
 
 // track runs fn as the network operation registered under key (busy is the message when one
-// is already running there), reporting progress as "net:progress" events for path.
-func (a *App) track(key, path, op string, busy userError, fn func(ctx context.Context, o git.NetOptions) error) error {
-	env, err := a.askEnv()
+// is already running there), reporting progress as "net:progress" events for path. hosts
+// lists the servers it's set up to talk to, for its credential prompts.
+func (a *App) track(key, path, op string, hosts func() []string, busy userError, fn func(ctx context.Context, o git.NetOptions) error) error {
+	env, done, err := a.askEnv(promptOrigin{Op: op, Path: path, Hosts: hosts})
 	if err != nil {
 		return err
 	}
+	defer done()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	a.net.mu.Lock()

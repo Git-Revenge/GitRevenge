@@ -3,7 +3,9 @@
 // Network commands run with GIT_ASKPASS and SSH_ASKPASS pointing at the gitrevenge
 // executable. Started that way, the executable runs Client: it sends the prompt to the
 // app's Server over a loopback connection, prints the answer for git, and exits. The
-// server is protected by a random token passed only in the child's environment.
+// server is protected by a random token passed only in the child's environment. Each
+// operation gets a token of its own, which stops working when the operation ends, so the
+// server knows which operation a prompt belongs to without taking the helper's word for it.
 package askpass
 
 import (
@@ -18,6 +20,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -42,11 +45,16 @@ const (
 	HostKey Kind = "hostkey"
 )
 
+// hostKeyQuestion is how OpenSSH ends its question about a server's key. Only a prompt that
+// ends this way is answered "yes" by a button; the two words alone, somewhere in a prompt a
+// server wrote, aren't enough.
+var hostKeyQuestion = regexp.MustCompile(`(?i)are you sure you want to continue connecting \(yes/no(/\[fingerprint\])?\)\?\s*$`)
+
 // Classify decides how to present a prompt from git or ssh.
 func Classify(prompt string) Kind {
 	p := strings.ToLower(prompt)
 	switch {
-	case strings.Contains(p, "continue connecting"):
+	case hostKeyQuestion.MatchString(prompt):
 		return HostKey
 	case strings.HasPrefix(p, "username"):
 		return Text
@@ -56,15 +64,18 @@ func Classify(prompt string) Kind {
 	}
 }
 
-// Handler answers a prompt. ok=false means the user cancelled.
-type Handler func(ctx context.Context, prompt string, kind Kind) (answer string, ok bool)
+// Handler answers a prompt. from is what Open was given for the operation the prompt came
+// from. ok=false means the user cancelled.
+type Handler func(ctx context.Context, prompt string, kind Kind, from any) (answer string, ok bool)
 
 // Server accepts prompts from helper processes.
 type Server struct {
 	ln      net.Listener
-	token   string
 	handler Handler
 	wg      sync.WaitGroup
+
+	mu     sync.Mutex
+	tokens map[string]any // what each open operation's token stands for
 }
 
 // Listen starts a server on a random loopback port.
@@ -73,19 +84,29 @@ func Listen(handler Handler) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	tok := make([]byte, 32)
-	if _, err := rand.Read(tok); err != nil {
-		_ = ln.Close()
-		return nil, err
-	}
-	s := &Server{ln: ln, token: hex.EncodeToString(tok), handler: handler}
+	s := &Server{ln: ln, handler: handler, tokens: map[string]any{}}
 	s.wg.Go(s.serve)
 	return s, nil
 }
 
-// Env returns the environment for a git command whose prompts should reach this server.
-// exe is the path of the gitrevenge executable.
-func (s *Server) Env(exe string) []string {
+// Open starts an operation whose prompts should reach this server. It returns the
+// environment for the operation's git commands, and done, which must be called when the
+// operation ends: after that its token gets no answers. exe is the path of the gitrevenge
+// executable, and from is handed to the Handler with each of the operation's prompts.
+func (s *Server) Open(exe string, from any) (env []string, done func(), err error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return nil, nil, err
+	}
+	token := hex.EncodeToString(raw)
+	s.mu.Lock()
+	s.tokens[token] = from
+	s.mu.Unlock()
+	done = func() {
+		s.mu.Lock()
+		delete(s.tokens, token)
+		s.mu.Unlock()
+	}
 	return []string{
 		"GIT_ASKPASS=" + exe,
 		"SSH_ASKPASS=" + exe,
@@ -94,8 +115,20 @@ func (s *Server) Env(exe string) []string {
 		"SSH_ASKPASS_REQUIRE=force",
 		"DISPLAY=:0",
 		EnvAddr + "=" + s.ln.Addr().String(),
-		EnvToken + "=" + s.token,
+		EnvToken + "=" + token,
+	}, done, nil
+}
+
+// opened returns what an open operation's token stands for.
+func (s *Server) opened(token string) (from any, ok bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for t, f := range s.tokens {
+		if subtle.ConstantTimeCompare([]byte(token), []byte(t)) == 1 {
+			return f, true
+		}
 	}
+	return nil, false
 }
 
 // Close stops accepting prompts and waits for in-flight ones to finish.
@@ -135,12 +168,13 @@ func (s *Server) handle(conn net.Conn) {
 	if err := json.NewDecoder(bufio.NewReader(io.LimitReader(conn, 64<<10))).Decode(&req); err != nil {
 		return
 	}
-	if subtle.ConstantTimeCompare([]byte(req.Token), []byte(s.token)) != 1 {
+	from, ok := s.opened(req.Token)
+	if !ok {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), promptTimeout)
 	defer cancel()
-	answer, ok := s.handler(ctx, req.Prompt, Classify(req.Prompt))
+	answer, ok := s.handler(ctx, req.Prompt, Classify(req.Prompt), from)
 	_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	_ = json.NewEncoder(conn).Encode(response{Answer: answer, OK: ok})
 }
