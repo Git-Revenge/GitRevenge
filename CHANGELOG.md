@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 - Two buttons no longer open an address the app didn't check. **See the rules**, on a refused push, is only offered when the link the server printed leads to one of the repository's own remotes; any other link stays as text in the details. **Download**, on the update banner, always opens the release's page on the project's GitHub releases, made from the version number. (GHSA-m5wc-fwpc-79qr)
 - A credential prompt now says where it came from. The question in the dialog is written by git, or by the server, which can word it as it likes, so the dialog adds a line of its own: which fetch, pull, push or clone is asking, and in which repository. It warns when the question names a server that isn't one of the repository's remotes. The **Trust and connect** button only shows for SSH's own host-key question, not for any prompt that borrows its words. Behind it, each operation's prompts are answered only while that operation runs. (GHSA-w5mm-xpwv-w4hw)
+- Files are no longer read, written or deleted outside the repository through a symbolic link in the working tree. A file that is a link shows as where it points, which is what git stores for it, and discarding lines in one is refused; staging it stages the link. Nothing under a linked folder that leads out of the repository is touched. A `.gitignore` or `.gitattributes` that is a link is left alone, as git itself doesn't read one. (GHSA-3r48-xh64-538c)
 
 ## [1.0.0] - 2026-11-16
 

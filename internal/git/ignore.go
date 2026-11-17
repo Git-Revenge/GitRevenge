@@ -114,6 +114,17 @@ func (r *Repo) excludeFile(ctx context.Context) (string, error) {
 	return filepath.Clean(p), nil
 }
 
+// ownIgnoreFile refuses a .gitignore in the work tree that is a symbolic link: git doesn't
+// read one, and writing to it would change the file it points at. The exclude file and the
+// global file aren't checked: those are the user's own, and a linked one (kept in a dotfiles
+// folder, say) is common.
+func (r *Repo) ownIgnoreFile(t IgnoreTarget, p string) error {
+	if (t.Scope == IgnoreRoot || t.Scope == IgnoreDir) && isLink(p) {
+		return fmt.Errorf("%s %w, which git doesn't read as an ignore file", r.sourceName(p), ErrSymlink)
+	}
+	return nil
+}
+
 // ignoreFile returns the absolute path of an ignore file.
 func (r *Repo) ignoreFile(ctx context.Context, t IgnoreTarget) (string, error) {
 	switch t.Scope {
@@ -156,6 +167,9 @@ func (r *Repo) sourceFile(ctx context.Context, source string) (abs, base string,
 			p, err := r.inside(source)
 			if err != nil {
 				return "", "", err
+			}
+			if isLink(p) {
+				return "", "", fmt.Errorf("%s %w, which git doesn't read as an ignore file", filepath.ToSlash(source), ErrSymlink)
 			}
 			base = path.Dir(filepath.ToSlash(source))
 			if base == "." {
@@ -226,6 +240,9 @@ func (r *Repo) AddIgnoreRule(ctx context.Context, t IgnoreTarget, pattern string
 	}
 	p, err := r.ignoreFile(ctx, t)
 	if err != nil {
+		return IgnoreLine{}, err
+	}
+	if err := r.ownIgnoreFile(t, p); err != nil {
 		return IgnoreLine{}, err
 	}
 	lines, eol, err := readLines(p)

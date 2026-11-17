@@ -52,8 +52,8 @@ func (r *Repo) IgnoreSources(ctx context.Context) ([]IgnoreSource, error) {
 	list := make([]IgnoreSource, 0, len(rels)+2)
 	for _, rel := range rels {
 		abs, err := r.inside(rel)
-		if err != nil {
-			continue
+		if err != nil || isLink(abs) {
+			continue // git doesn't read one that's a symbolic link either
 		}
 		dir := path.Dir(rel)
 		if dir == "." {

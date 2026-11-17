@@ -55,8 +55,8 @@ func (r *Repo) lfsPatterns(ctx context.Context) ([]LFSPattern, error) {
 	}
 	for _, rel := range rels {
 		abs, err := r.inside(rel)
-		if err != nil {
-			continue
+		if err != nil || isLink(abs) {
+			continue // git doesn't read one that's a symbolic link either
 		}
 		dir := path.Dir(rel)
 		if dir == "." {

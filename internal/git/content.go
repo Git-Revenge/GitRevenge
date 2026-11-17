@@ -104,12 +104,22 @@ func (r *Repo) readSide(ctx context.Context, v FileRef, limit int64) (Side, []by
 		if err != nil {
 			return Side{}, nil, err
 		}
-		info, err := os.Stat(p)
+		info, err := os.Lstat(p)
 		if errors.Is(err, os.ErrNotExist) {
 			return Side{}, nil, nil
 		}
 		if err != nil {
 			return Side{}, nil, err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			// A link's content is where it points, as git stores it. The file it points
+			// at may be anywhere, and isn't this repository's to show.
+			target, err := os.Readlink(p)
+			if err != nil {
+				return Side{}, nil, err
+			}
+			b := []byte(filepath.ToSlash(target))
+			return Side{Exists: true, Size: int64(len(b))}, b, nil
 		}
 		s := Side{Exists: true, Size: info.Size()}
 		if s.Size > limit {
@@ -147,17 +157,51 @@ func isBinary(b []byte) bool {
 	return bytes.IndexByte(b[:min(len(b), 8000)], 0) >= 0
 }
 
-// inside resolves a work-tree relative path, refusing anything outside the repository.
+// ErrSymlink means a path is a symbolic link, where a file's content was to be written.
+var ErrSymlink = errors.New("is a symbolic link")
+
+// inside resolves a work-tree relative path, refusing anything outside the repository: by its
+// spelling ("../x"), or because a folder on the way to it is a symbolic link that leads out.
+// The last part of the path isn't followed, so a caller about to read or write through it
+// checks that itself (see isLink).
 func (r *Repo) inside(rel string) (string, error) {
 	root, err := filepath.Abs(r.dir)
 	if err != nil {
 		return "", err
 	}
 	p := filepath.Join(root, filepath.FromSlash(rel))
-	if back, err := filepath.Rel(root, p); err != nil || back == ".." || strings.HasPrefix(back, ".."+string(filepath.Separator)) {
+	if !within(root, p) {
 		return "", fmt.Errorf("%q is outside the repository", rel)
 	}
+	// The folder the path is in, with every link followed, must still be in the repository.
+	// A folder that doesn't exist leads nowhere, so there's nothing to follow yet.
+	parent, err := filepath.EvalSymlinks(filepath.Dir(p))
+	if errors.Is(err, os.ErrNotExist) {
+		return p, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", err
+	}
+	if !within(realRoot, parent) {
+		return "", fmt.Errorf("%q is outside the repository: a folder in its path is a link that leads out of it", rel)
+	}
 	return p, nil
+}
+
+// within reports whether p is dir or somewhere under it. Both are absolute.
+func within(dir, p string) bool {
+	back, err := filepath.Rel(dir, p)
+	return err == nil && back != ".." && !strings.HasPrefix(back, ".."+string(filepath.Separator))
+}
+
+// isLink reports whether the file at p is itself a symbolic link.
+func isLink(p string) bool {
+	info, err := os.Lstat(p)
+	return err == nil && info.Mode()&os.ModeSymlink != 0
 }
 
 // SetIndexContent replaces a file's staged content. content is in work-tree form; git's
@@ -194,18 +238,26 @@ func (r *Repo) indexMode(ctx context.Context, path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if info, err := os.Stat(p); err == nil && info.Mode()&0o111 != 0 {
+	info, err := os.Lstat(p)
+	switch {
+	case err == nil && info.Mode()&os.ModeSymlink != 0:
+		return "120000", nil
+	case err == nil && info.Mode()&0o111 != 0:
 		return "100755", nil
 	}
 	return "100644", nil
 }
 
 // SetWorkTreeContent overwrites a file on disk, keeping its permissions. Used to discard
-// selected hunks or lines. This cannot be undone.
+// selected hunks or lines. This cannot be undone. A symbolic link is refused with ErrSymlink:
+// writing to it would change the file it points at, which may be outside the repository.
 func (r *Repo) SetWorkTreeContent(path string, content string) error {
 	p, err := r.inside(path)
 	if err != nil {
 		return err
+	}
+	if isLink(p) {
+		return fmt.Errorf("%s %w", path, ErrSymlink)
 	}
 	mode := os.FileMode(0o644)
 	if info, err := os.Stat(p); err == nil {
