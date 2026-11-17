@@ -21,6 +21,9 @@ permissions:
 env:
   WAILS_VERSION: v2.17.0
   NFPM_VERSION: v2.48.0
+  # The Chocolatey package that builds the Windows installer. Bumped by hand: Dependabot doesn't
+  # follow Chocolatey. A package version there can't be replaced once it's published.
+  NSIS_VERSION: 3.13.0
 
 jobs:
   build:
@@ -88,13 +91,13 @@ jobs:
           if [ "${{ matrix.name }}" = "el10" ]; then dnf install -y epel-release; fi
           dnf install -y git tar gzip xz gcc pkgconf-pkg-config gtk3-devel ${{ matrix.webkit_devel }}
 
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
 
@@ -123,9 +126,13 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          choco install nsis -y --no-progress
+          choco install nsis --version="$NSIS_VERSION" -y --no-progress
           # Chocolatey doesn't update PATH for later steps, and Wails only warns if makensis is missing.
           echo "C:\Program Files (x86)\NSIS" >> "$GITHUB_PATH"
+          # The installer must be built by the version asked for, not one already on the runner.
+          # makensis prints 3.13.0 as "v3.13".
+          got=$("/c/Program Files (x86)/NSIS/makensis.exe" -VERSION)
+          if [ "$got" != "v${NSIS_VERSION%.0}" ]; then echo "::error::makensis is $got, not v${NSIS_VERSION%.0}"; exit 1; fi
 
       - name: Build
         shell: bash
@@ -287,7 +294,7 @@ jobs:
           xcrun stapler staple "$dmg"
           spctl --assess --type open --context context:primary-signature --verbose "$dmg"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-${{ matrix.name }}
           path: dist/*
@@ -316,7 +323,7 @@ jobs:
     runs-on: ubuntu-24.04
     container: ${{ matrix.image }}
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ${{ matrix.artifact }}
           path: dist
@@ -372,7 +379,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           merge-multiple: true
