@@ -214,8 +214,8 @@ const installs = [
   },
   {
     os: 'Windows',
-    how: 'Run the installer from the latest release. It isn’t signed yet, so SmartScreen asks first.',
-    code: 'GitRevenge-<version>-windows-amd64-installer.exe',
+    how: 'With winget, which keeps it up to date, or the signed installer from the latest release.',
+    code: 'winget install GitRevenge.GitRevenge',
   },
   {
     os: 'Linux',
