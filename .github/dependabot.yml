@@ -3,7 +3,7 @@
 # folder; major bumps come one PR each, since they need reading.
 version: 2
 updates:
-  # Workflow actions, including the third-party ones pinned to commit SHAs (Dependabot
+  # Workflow actions, all pinned to commit SHAs (Dependabot
   # updates the SHA and its version comment together).
   - package-ecosystem: github-actions
     directory: /
