@@ -171,10 +171,12 @@ class Session {
   private async onChange(c: RepoChange) {
     this.revision[c.path] = (this.revision[c.path] ?? 0) + 1
     if (c.kinds.includes('head') || c.kinds.includes('refs')) {
-      const i = this.tabs.findIndex((t) => t.path === c.path)
-      if (i < 0) return
+      if (!this.tabs.some((t) => t.path === c.path)) return
       const tab = await this.run(() => RepoInfo(c.path))
-      if (tab) this.tabs[i] = tab
+      // Found again by its path: a tab closed while that was being read moves the ones after
+      // it, and the answer would land on a neighbour.
+      const i = this.tabs.findIndex((t) => t.path === c.path)
+      if (tab && i >= 0) this.tabs[i] = tab
     }
   }
 
