@@ -94,7 +94,9 @@ type Settings struct {
 // Trusts reports whether any of paths is a trusted repository.
 func (s *Settings) Trusts(paths ...string) bool {
 	return slices.ContainsFunc(paths, func(p string) bool {
-		return p != "" && slices.ContainsFunc(s.TrustedRepos, func(t string) bool { return fsutil.SamePath(t, p) })
+		// However each is spelled: git reports a folder's real path, and a path saved before
+		// (a group's, say) or reached through a link may spell the same folder another way.
+		return p != "" && slices.ContainsFunc(s.TrustedRepos, func(t string) bool { return fsutil.SameFolder(t, p) })
 	})
 }
 

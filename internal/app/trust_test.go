@@ -41,7 +41,7 @@ func TestARepositoryThatRunsProgramsAsksFirst(t *testing.T) {
 	}
 
 	q := a.TakeTrustQuestion()
-	if q == nil || !fsutil.SamePath(q.Path, fx.Dir) || q.Name != filepath.Base(fx.Dir) {
+	if q == nil || !fsutil.SameFolder(q.Path, fx.Dir) || q.Name != filepath.Base(fx.Dir) {
 		t.Fatalf("question = %+v", q)
 	}
 	if len(q.Findings) != 1 || q.Findings[0].Name != "core.fsmonitor" || !strings.Contains(q.Findings[0].Value, "echo ran") || q.Findings[0].Why == "" {
@@ -70,7 +70,7 @@ func TestARepositoryThatRunsProgramsAsksFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	tab, err := a.OpenRepo(fx.Dir)
-	if err != nil || !fsutil.SamePath(tab.Path, fx.Dir) {
+	if err != nil || !fsutil.SameFolder(tab.Path, fx.Dir) {
 		t.Fatalf("after trusting: %+v, %v", tab, err)
 	}
 	if a.TakeTrustQuestion() != nil {
