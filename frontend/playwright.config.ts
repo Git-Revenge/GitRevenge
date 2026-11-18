@@ -1,9 +1,10 @@
 import { defineConfig } from '@playwright/test'
 
 // Real components in a real browser against a stubbed Go backend (see e2e/harness.ts), so these
-// run without wails dev. Locally they use Edge, which every Windows machine has; CI installs
-// Chromium. Set PLAYWRIGHT_CHANNEL to use something else.
-const channel = process.env.PLAYWRIGHT_CHANNEL ?? (process.env.CI ? undefined : 'msedge')
+// run without wails dev. On Windows they use Edge, which every Windows machine has; anywhere
+// else, and in CI, Playwright's own Chromium (`npx playwright install chromium`). Set
+// PLAYWRIGHT_CHANNEL to use something else.
+const channel = process.env.PLAYWRIGHT_CHANNEL ?? (process.env.CI || process.platform !== 'win32' ? undefined : 'msedge')
 
 export default defineConfig({
   testDir: 'e2e',
