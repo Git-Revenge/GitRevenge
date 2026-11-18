@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-18
+
 ### Added
 
 - Every file in a release now comes with a build provenance attestation: a signed statement that the project's release workflow built that exact file from the release's tag. `gh attestation verify <file> --repo Git-Revenge/GitRevenge` checks it. The sha256 on the release page says a file hasn't changed since it was published; this says where it was built. [How to verify a download](https://github.com/Git-Revenge/GitRevenge/blob/main/SECURITY.md#verifying-what-you-download). (#761)
@@ -323,7 +325,8 @@ The foundation: open a repository and read its history fast.
 - Search commits by message, author or SHA.
 - Works with the `git` you have installed, and checks its version.
 
-[Unreleased]: https://github.com/Git-Revenge/GitRevenge/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Git-Revenge/GitRevenge/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/Git-Revenge/GitRevenge/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Git-Revenge/GitRevenge/compare/v0.11.0...v1.0.0
 [0.11.0]: https://github.com/Git-Revenge/GitRevenge/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Git-Revenge/GitRevenge/compare/v0.9.1...v0.10.0
