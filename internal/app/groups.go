@@ -210,7 +210,7 @@ func (a *App) GroupBatch(name, op string) ([]BatchResult, error) {
 			o := git.NetOptions{Env: env}
 			a.upstreams.remember(ctx, p, g)
 			if op == "fetch" {
-				err = g.Fetch(ctx, "", o)
+				_, err = fetchRemotes(ctx, g, "", o)
 			} else {
 				// Only fast-forwards: a batch must never create merges or rebase silently.
 				err = g.Pull(ctx, git.PullFFOnly, o)

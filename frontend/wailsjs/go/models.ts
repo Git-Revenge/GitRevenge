@@ -1103,6 +1103,7 @@ export namespace app {
 	    kind: string;
 	    label: string;
 	    url: string;
+	    names: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ProblemAction(source);
@@ -1113,6 +1114,7 @@ export namespace app {
 	        this.kind = source["kind"];
 	        this.label = source["label"];
 	        this.url = source["url"];
+	        this.names = source["names"];
 	    }
 	}
 	export class Problem {

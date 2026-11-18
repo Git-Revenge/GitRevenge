@@ -27,6 +27,7 @@ A strip under the tabs says what failed and why in one line, then where that lea
 - **Pull, then push** or **Force push…** when the remote has commits you don't have.
 - **Push to a new branch…** when the server refuses the branch, for example one that only takes changes through a pull request. It starts a branch at your current commit, switches to it and pushes it; the branch you were on stays as it is. **See the rules** opens the page the server pointed to.
 - **Try again** after a sign-in or connection problem.
+- **Remove them…** when a fetch of all your remotes found no repository behind some of them, such as a fork that has since been deleted. It names the remotes and asks before removing them, along with the remote branches fetched from them. The remotes that did answer were fetched all the same, and the strip says so.
 
 **Details** shows what git itself said, without its progress lines, and **Copy everything** copies all of git's output for a bug report.
 

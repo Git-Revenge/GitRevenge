@@ -98,6 +98,51 @@ test.describe('error banner', () => {
     await expect(banner(page)).toContainText("couldn't reach github.com")
   })
 
+  // #806: a fetch that found no repository behind some remotes offers to remove them.
+  const missed = {
+    ...refused,
+    title: "Fetch couldn't find 2 of your 3 remotes",
+    detail: "No repository was found for ghsa-one and ghsa-two. They may have been deleted, or your account can't see them. Your other remote was fetched.",
+    actions: [{ kind: 'remove-remotes', label: 'Remove them…', url: '', names: ['ghsa-one', 'ghsa-two'] }],
+  }
+  const missing = { failures: { Fetch: `${missed.title}\n${missed.detail}` }, responses: { TakeProblem: missed } }
+
+  test('Remove them removes the remotes a fetch could not find, once confirmed', async ({ page }) => {
+    await open(page, 'errorBanner', missing)
+    await call(page, 'Fetch', '/r', '')
+    await expect(banner(page)).toContainText(missed.title)
+    await banner(page).getByRole('button', { name: 'Remove them…' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Remove 2 remotes' })
+    await expect(dialog).toContainText('Removes the remotes ghsa-one, ghsa-two from this repository, along with the remote branches fetched from them.')
+    expect(await calls(page, 'RemoteAction')).toEqual([])
+    await dialog.getByRole('button', { name: 'Remove' }).click()
+    await expect(dialog).toHaveCount(0)
+    expect(await calls(page, 'RemoteAction')).toEqual([
+      ['/r', 'remove', ['ghsa-one']],
+      ['/r', 'remove', ['ghsa-two']],
+    ])
+    await expect(banner(page)).toHaveCount(0)
+  })
+
+  test('cancelling leaves the remotes, and a removal that fails says why', async ({ page }) => {
+    await open(page, 'errorBanner', { ...missing, failures: { ...missing.failures, RemoteAction: 'Another git process is running in this repository.' } })
+    await call(page, 'Fetch', '/r', '')
+    await banner(page).getByRole('button', { name: 'Remove them…' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Remove 2 remotes' })
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dialog).toHaveCount(0)
+    expect(await calls(page, 'RemoteAction')).toEqual([])
+    await expect(banner(page)).toContainText(missed.title)
+
+    await banner(page).getByRole('button', { name: 'Remove them…' }).click()
+    await dialog.getByRole('button', { name: 'Remove' }).click()
+    await expect(dialog).toContainText('Another git process is running in this repository.')
+    // The banner is still there to come back to once the dialog is closed.
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dialog).toHaveCount(0)
+    await expect(banner(page)).toContainText(missed.title)
+  })
+
   test('Pull, then push runs the toolbar commands in turn', async ({ page }) => {
     const behind = { ...refused, title: "Push refused: github.com has commits you don't have", detail: 'Pull first, then push again. Nothing was pushed.', actions: [{ kind: 'pull-then-push', label: 'Pull, then push', url: '' }, { kind: 'force-push', label: 'Force push…', url: '' }] }
     await open(page, 'errorBanner', { toolbar: true, failures: { PushCurrent: `${behind.title}\n${behind.detail}` }, responses: { TakeProblem: behind } })

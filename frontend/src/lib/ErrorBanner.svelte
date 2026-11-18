@@ -1,7 +1,7 @@
 <script lang="ts">
   // The error banner under the tabs: one headline, one line on where that leaves you, at most
   // two next steps, and git's own words behind Details (#614).
-  import { BranchAction, Pull, PushBranch, PushCurrent } from '../../wailsjs/go/app/App.js'
+  import { BranchAction, Pull, PushBranch, PushCurrent, RemoteAction } from '../../wailsjs/go/app/App.js'
   import { BrowserOpenURL, ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
   import { commands } from './commands.svelte'
   import Dialog, { type DialogSpec } from './Dialog.svelte'
@@ -58,6 +58,31 @@
       case 'push-new-branch':
         dialog = pushNewBranch(path)
         return
+      case 'remove-remotes':
+        if (a.names?.length) dialog = removeRemotes(path, a.names)
+        return
+    }
+  }
+
+  /** Removes remotes a fetch found no repository behind, after saying what goes with them. */
+  function removeRemotes(path: string, names: string[]): DialogSpec {
+    const one = names.length === 1
+    return {
+      title: one ? `Remove ${names[0]}` : `Remove ${names.length} remotes`,
+      message: `${one ? `Removes the remote ${names[0]}` : `Removes the remotes ${names.join(', ')}`} from this repository, along with the remote branches fetched from ${one ? 'it' : 'them'}. Your own branches and commits stay as they are.`,
+      submit: 'Remove',
+      danger: true,
+      run: async () => {
+        // One at a time: each is its own change to the repository's config.
+        for (const name of names) {
+          try {
+            await RemoteAction(path, 'remove', [name])
+          } catch (e) {
+            return errorText(e)
+          }
+        }
+        session.error = ''
+      },
     }
   }
 

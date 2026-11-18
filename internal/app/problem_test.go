@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -46,7 +47,7 @@ func TestRuleRefusalIsShortAndSaysWhatToDo(t *testing.T) {
 		{Kind: "push-new-branch", Label: "Push to a new branch…"},
 		{Kind: "open-url", Label: "See the rules", URL: "https://github.com/Git-Revenge/GitRevenge/rules?ref=refs%2Fheads%2Fmain"},
 	}
-	if len(p.Actions) != len(want) || p.Actions[0] != want[0] || p.Actions[1] != want[1] {
+	if !reflect.DeepEqual(p.Actions, want) {
 		t.Errorf("Actions = %+v, want %+v", p.Actions, want)
 	}
 	wantOutput := "remote: error: GH013: Repository rule violations found for refs/heads/main.\n" +

@@ -3,10 +3,12 @@
 // understands (Problem in Go); any other error is text, read into the same shape here.
 
 export interface ProblemAction {
-  /** "push-new-branch", "open-url", "pull-then-push", "force-push" or "retry". */
+  /** "push-new-branch", "open-url", "pull-then-push", "force-push", "remove-remotes" or "retry". */
   kind: string
   label: string
   url?: string
+  /** The remotes "remove-remotes" offers to remove. */
+  names?: string[] | null
 }
 
 export interface Problem {
