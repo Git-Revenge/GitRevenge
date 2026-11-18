@@ -56,6 +56,16 @@ func (r *Repo) InteractiveRebase(ctx context.Context, base string, items []Rebas
 	if len(items) == 0 {
 		return errors.New("nothing to rebase")
 	}
+	// Each commit becomes a line of the todo file, where a line break would start a line of
+	// its own, and "exec" is a line git runs. Only whole commit ids go in.
+	for _, it := range items {
+		if !isObjectID(it.Commit) {
+			return fmt.Errorf("%q isn't a commit id", it.Commit)
+		}
+	}
+	if base == "" || strings.HasPrefix(base, "-") || strings.ContainsAny(base, " \t\r\n") {
+		return fmt.Errorf("%q isn't a commit to rebase from", base)
+	}
 	dir, err := os.MkdirTemp("", "gitrevenge-rebase-")
 	if err != nil {
 		return err
@@ -109,6 +119,20 @@ func (r *Repo) InteractiveRebase(ctx context.Context, base string, items []Rebas
 			"GIT_EDITOR=true",
 		},
 	})
+}
+
+// isObjectID reports whether s is a whole object id as git prints it: 40 lower-case hex digits
+// (SHA-1) or 64 (SHA-256).
+func isObjectID(s string) bool {
+	if len(s) != 40 && len(s) != 64 {
+		return false
+	}
+	for _, c := range []byte(s) {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 // shellQuote quotes a path for the sh that git uses to run editors and exec lines. Forward

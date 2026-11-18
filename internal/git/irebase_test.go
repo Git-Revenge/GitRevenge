@@ -3,6 +3,7 @@ package git
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
@@ -132,5 +133,39 @@ func TestRebaseConflictStopsInProgress(t *testing.T) {
 	}
 	if op, _, _ := repo.DetectOperation(context.Background(), fx.Path(".git")); op != Rebase {
 		t.Fatalf("operation = %q", op)
+	}
+}
+
+// A commit in the plan becomes a line of the todo file. Anything but a whole commit id is
+// refused, so no line of the caller's making (an "exec", say) gets in.
+func TestRebaseRefusesAnythingButCommitIDs(t *testing.T) {
+	t.Parallel()
+	fx, repo, base, plan := fourCommits(t)
+	ctx := context.Background()
+	before := fx.Git("rev-parse", "HEAD")
+	proof := fx.Path("ran.txt")
+	for _, commit := range []string{
+		plan[0].Commit + "\nexec echo ran > ran.txt",
+		"HEAD\nexec echo ran > ran.txt",
+		"HEAD",
+		plan[0].Commit[:12],
+		"",
+	} {
+		bad := append([]RebaseItem(nil), plan...)
+		bad[0].Commit = commit
+		if err := repo.InteractiveRebase(ctx, base, bad); err == nil {
+			t.Errorf("commit %q was accepted", commit)
+		}
+	}
+	for _, from := range []string{"--exec=echo ran > ran.txt", "HEAD~3\nexec echo ran > ran.txt", ""} {
+		if err := repo.InteractiveRebase(ctx, from, plan); err == nil {
+			t.Errorf("base %q was accepted", from)
+		}
+	}
+	if _, err := os.Stat(proof); err == nil {
+		t.Error("a command from the plan ran")
+	}
+	if after := fx.Git("rev-parse", "HEAD"); after != before {
+		t.Errorf("HEAD moved from %s to %s", before, after)
 	}
 }

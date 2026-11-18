@@ -170,7 +170,10 @@ func TestGitConfigFileText(t *testing.T) {
 	if got, err := a.GitConfigFileText(global); err != nil || got != "[user]\n\tname = A\n" {
 		t.Errorf("text = %q, %v; want LF line endings", got, err)
 	}
-	if got, err := a.GitConfigFileText(filepath.Join(t.TempDir(), "missing")); err != nil || got != "" {
+	// A config file the app found that isn't there yet reads as empty.
+	missing := filepath.Join(t.TempDir(), "missing")
+	a.configs.know(missing)
+	if got, err := a.GitConfigFileText(missing); err != nil || got != "" {
 		t.Errorf("missing file = %q, %v", got, err)
 	}
 }
@@ -184,4 +187,53 @@ func sameFileT(t *testing.T, a, b string) bool {
 	ia, err1 := os.Stat(a)
 	ib, err2 := os.Stat(b)
 	return err1 == nil && err2 == nil && os.SameFile(ia, ib)
+}
+
+// The config methods read and write the file they're given, so they only take a file the app
+// itself found: the global file, a repository's own, or one git read settings from.
+func TestGitConfigOnlyOpensFilesItFound(t *testing.T) {
+	a, global := newConfigTestApp(t)
+	other := filepath.Join(t.TempDir(), "passwords.txt")
+	if err := os.WriteFile(other, []byte("secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if text, err := a.GitConfigFileText(other); err == nil {
+		t.Errorf("read a file that isn't a config file: %q", text)
+	}
+	if _, err := a.OpenGitConfig(other); err == nil {
+		t.Error("opened a file that isn't a config file for editing")
+	}
+	if _, err := a.RestoreGitConfig(other, "x"); err == nil || !strings.Contains(err.Error(), "isn't one of the git config files") {
+		t.Errorf("RestoreGitConfig err = %v, want the file refused", err)
+	}
+
+	// The global file needs no introduction.
+	if text, err := a.GitConfigFileText(global); err != nil || !strings.Contains(text, "name = Global") {
+		t.Errorf("global file: %q, %v", text, err)
+	}
+
+	// A repository's own file opens once the app has named it, and so does a file it includes.
+	fx := gittest.New(t)
+	fx.Linear(1)
+	included := filepath.Join(t.TempDir(), "team.gitconfig")
+	if err := os.WriteFile(included, []byte("[core]\n\tautocrlf = input\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fx.Git("config", "include.path", filepath.ToSlash(included))
+	scopes, err := a.GitConfigScopes(fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.OpenGitConfig(scopes.Local); err != nil {
+		t.Errorf("the repository's own file: %v", err)
+	}
+	if _, err := a.OpenGitConfig(included); err == nil {
+		t.Error("opened an included file before the app had listed it")
+	}
+	if _, err := a.EffectiveGitConfig(fx.Dir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.OpenGitConfig(included); err != nil {
+		t.Errorf("an included file the app listed: %v", err)
+	}
 }

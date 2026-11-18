@@ -22,6 +22,19 @@ type Harness = Window &
   }
 
 const win = window as Harness
+
+// The harness page carries the app's Content-Security-Policy (see vite.config.ts). Anything
+// the policy stops fails the test, as an uncaught error does: either the app needs it and the
+// policy is wrong, or something got into the page that shouldn't have.
+document.addEventListener('securitypolicyviolation', (e) => {
+  // The HTML preview parses a repository's page with DOMParser before cleaning it. The parsed
+  // page runs nothing, but the browser still reports each on… attribute it reads there as
+  // stopped. That report is the policy and the cleaning agreeing, not something to fix.
+  if (e.violatedDirective === 'script-src-attr' && /\/previews\/html\.ts/.test(e.sourceFile ?? '')) return
+  setTimeout(() => {
+    throw new Error(`Content-Security-Policy stopped ${e.violatedDirective}: ${e.blockedURI || 'inline'}${e.sourceFile ? ` (${e.sourceFile}:${e.lineNumber})` : ''}`)
+  })
+})
 const scenario = win.__scenario ?? {}
 const responses: Record<string, unknown> = { ...scenario.responses }
 win.__calls = []

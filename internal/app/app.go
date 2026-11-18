@@ -32,6 +32,8 @@ type App struct {
 	// upstreams remembers where branches' upstreams were before fetches prune them, for
 	// cleanup on pull.
 	upstreams upstreamMemory
+	// chosen holds the files picked in a file dialog (see chosenFiles).
+	chosen chosenFiles
 	// promptHook answers credential prompts in tests instead of the UI.
 	promptHook func(text string, kind askpass.Kind) (string, bool)
 	// emitHook receives events in tests, where there is no Wails runtime to send them to.

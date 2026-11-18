@@ -25,6 +25,47 @@ type gitConfigs struct {
 	docs    map[string]*gitconfig.Doc
 	backups *gitconfig.Backups
 	watcher *gitconfig.Watcher
+
+	// known holds the config files the app itself has named to the frontend: a repository's
+	// own file, and every file git read settings from. Together with the global file, these
+	// are the only paths the frontend may ask to read, open or restore. A path is otherwise
+	// only the frontend's word, and these methods read and write whatever file they're given.
+	knownMu sync.Mutex
+	known   map[string]bool
+}
+
+// know records config files the app has named to the frontend.
+func (c *gitConfigs) know(paths ...string) {
+	c.knownMu.Lock()
+	defer c.knownMu.Unlock()
+	if c.known == nil {
+		c.known = map[string]bool{}
+	}
+	for _, p := range paths {
+		if p != "" {
+			c.known[gitconfig.Normalize(p)] = true
+		}
+	}
+}
+
+// errNotConfig is returned for a path that isn't a config file the app named.
+const errNotConfig = userError("That isn't one of the git config files Git Revenge found, so it won't be opened here.")
+
+// check refuses a path that isn't the global config file or one the app has named.
+func (c *gitConfigs) check(path string) error {
+	id := gitconfig.Normalize(path)
+	c.knownMu.Lock()
+	ok := c.known[id]
+	c.knownMu.Unlock()
+	if ok {
+		return nil
+	}
+	if global, alt, err := c.runner.GlobalConfigPath(context.Background()); err == nil {
+		if id == gitconfig.Normalize(global) || alt != "" && id == gitconfig.Normalize(alt) {
+			return nil
+		}
+	}
+	return errNotConfig
 }
 
 // ConfigScopes are the config files the Git Config tab can edit.
@@ -162,6 +203,7 @@ func (a *App) GitConfigScopes(repoPath string) (ConfigScopes, error) {
 			return ConfigScopes{}, err
 		}
 	}
+	c.know(s.Global, s.GlobalAlt, s.Local)
 	return s, nil
 }
 
@@ -184,6 +226,9 @@ func (a *App) EffectiveGitConfig(repoPath string) ([]git.ConfigEntry, error) {
 	if entries == nil {
 		entries = []git.ConfigEntry{}
 	}
+	for _, e := range entries {
+		c.know(e.File) // included files open from here
+	}
 	return entries, err
 }
 
@@ -203,6 +248,9 @@ func (a *App) repoGit(ctx context.Context, path string) (*git.Repo, string, erro
 func (a *App) OpenGitConfig(path string) (ConfigDoc, error) {
 	c, err := a.gitConfig()
 	if err != nil {
+		return ConfigDoc{}, err
+	}
+	if err := c.check(path); err != nil {
 		return ConfigDoc{}, err
 	}
 	c.mu.Lock()
@@ -488,7 +536,11 @@ func (a *App) GitConfigBackupText(path, id string) (string, error) {
 // GitConfigFileText returns a config file as it is on disk now, with "\n" line endings, or
 // "" if it doesn't exist. History compares backups with it.
 func (a *App) GitConfigFileText(path string) (string, error) {
-	if _, err := a.gitConfig(); err != nil {
+	c, err := a.gitConfig()
+	if err != nil {
+		return "", err
+	}
+	if err := c.check(path); err != nil {
 		return "", err
 	}
 	b, err := os.ReadFile(path)
@@ -503,6 +555,9 @@ func (a *App) GitConfigFileText(path string) (string, error) {
 func (a *App) RestoreGitConfig(path, id string) (ConfigDoc, error) {
 	c, err := a.gitConfig()
 	if err != nil {
+		return ConfigDoc{}, err
+	}
+	if err := c.check(path); err != nil {
 		return ConfigDoc{}, err
 	}
 	c.mu.Lock()

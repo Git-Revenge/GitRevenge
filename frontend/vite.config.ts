@@ -1,10 +1,26 @@
-import {defineConfig} from 'vite'
+import {defineConfig, type Plugin} from 'vite'
 import {svelte} from '@sveltejs/vite-plugin-svelte'
 import {VERSION as svelteVersion} from 'svelte/compiler'
+import {contentPolicy} from './src/lib/contentPolicy'
+
+// Writes the page's Content-Security-Policy into every HTML entry (the app's page, and the
+// browser tests' harness, so they run under the policy the app ships with).
+function pagePolicy(): Plugin {
+  let dev = false
+  return {
+    name: 'gitrevenge-content-policy',
+    configResolved(config) {
+      dev = config.command === 'serve'
+    },
+    transformIndexHtml() {
+      return [{ tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: contentPolicy(dev) }, injectTo: 'head-prepend' }]
+    },
+  }
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [svelte()],
+  plugins: [svelte(), pagePolicy()],
   define: {
     // The Svelte version this build was compiled with, for the About dialog's credits.
     __SVELTE_VERSION__: JSON.stringify(svelteVersion),

@@ -147,9 +147,12 @@ func (a *App) TryLinkRule(path string, rule links.Rule) (LinkTry, error) {
 	return res, nil
 }
 
-// ImportLinkRules reads rules exported as JSON from a file and saves them into one config,
+// ImportLinkRules reads rules exported as JSON from a file the user picked with ChooseFile and saves them into one config,
 // replacing rules of the same name there. It returns how many it saved.
 func (a *App) ImportLinkRules(path, file, scope string) (int, error) {
+	if !a.chosen.has(file) {
+		return 0, userError("Choose the file to import with the file dialog.")
+	}
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return 0, err

@@ -85,6 +85,11 @@ func TestLinkRulesDriveShippedReferences(t *testing.T) {
 	if err := os.WriteFile(file, []byte(`[{"name":"Jira","pattern":"\\bABC-\\d+\\b","url":"https://new.example/{0}","in":["message"],"shipped":false,"enabled":true}]`), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	// Only a file picked in the file dialog is read.
+	if _, err := a.ImportLinkRules(tab.Path, file, links.Local); err == nil {
+		t.Fatal("imported a file that was never chosen in the file dialog")
+	}
+	a.chosen.add(file)
 	if n, err := a.ImportLinkRules(tab.Path, file, links.Local); err != nil || n != 1 {
 		t.Fatalf("import = %d, %v", n, err)
 	}

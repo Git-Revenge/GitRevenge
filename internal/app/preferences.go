@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/settings"
@@ -143,7 +144,37 @@ func (a *App) SetPreferences(p Preferences) error {
 
 // ChooseFile shows a file picker and returns the chosen path, or "" if cancelled.
 func (a *App) ChooseFile(title string) (string, error) {
-	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{Title: title})
+	file, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{Title: title})
+	if err == nil {
+		a.chosen.add(file)
+	}
+	return file, err
+}
+
+// chosenFiles are the files the user picked in a file dialog this session. A method that
+// reads a file the frontend names takes only these: the path comes back through the
+// frontend, and the dialog is the proof that a person chose it.
+type chosenFiles struct {
+	mu    sync.Mutex
+	paths map[string]bool
+}
+
+func (c *chosenFiles) add(file string) {
+	if file == "" {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.paths == nil {
+		c.paths = map[string]bool{}
+	}
+	c.paths[filepath.Clean(file)] = true
+}
+
+func (c *chosenFiles) has(file string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return file != "" && c.paths[filepath.Clean(file)]
 }
 
 // Keybindings returns the shortcuts the user has changed, by command id ("" for unbound).
