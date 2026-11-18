@@ -17,29 +17,74 @@ type Repo struct {
 	dir    string
 	// writes is a one-slot semaphore. A channel rather than a mutex so waiting respects ctx.
 	writes chan struct{}
+	// open ends when the Repo is closed, which stops the reads still running (see Close).
+	open   context.Context
+	closed context.CancelFunc
 }
 
 // OpenRepo returns a Repo rooted at dir. It does not validate that dir is a repository.
 func OpenRepo(r *Runner, dir string) *Repo {
-	return &Repo{runner: r, dir: dir, writes: make(chan struct{}, 1)}
+	open, closed := context.WithCancel(context.Background())
+	return &Repo{runner: r, dir: dir, writes: make(chan struct{}, 1), open: open, closed: closed}
 }
 
 // Dir returns the repository's working directory.
 func (r *Repo) Dir() string { return r.dir }
 
+// Close stops the reads still running in the repository, and any started later fail at once:
+// a blame or a file's history on a big repository can outlast the tab that asked for it by
+// minutes. Writes are left to finish, since a git command killed halfway leaves its lock
+// file and half its work behind. Closing is optional; a Repo holds nothing else.
+func (r *Repo) Close() { r.closed() }
+
+// reading returns ctx for a read: it also ends when the Repo closes. Call done when the
+// read is over.
+func (r *Repo) reading(ctx context.Context) (reading context.Context, done func()) {
+	reading, cancel := context.WithCancel(ctx)
+	if r.open.Err() != nil {
+		// Already closed. AfterFunc would say so from a goroutine of its own, a moment after
+		// a quick command had started and finished.
+		cancel()
+		return reading, func() {}
+	}
+	stop := context.AfterFunc(r.open, cancel)
+	return reading, func() {
+		stop()
+		cancel()
+	}
+}
+
+// readCmd runs c in the repository as a read, for one that needs more than arguments (an
+// environment, or input).
+func (r *Repo) readCmd(ctx context.Context, c Cmd) ([]byte, error) {
+	ctx, done := r.reading(ctx)
+	defer done()
+	c.Dir, c.ReadOnly = r.dir, true
+	return r.runner.Run(ctx, c)
+}
+
+// streamCmd is readCmd for output read as it arrives.
+func (r *Repo) streamCmd(ctx context.Context, c Cmd, consume func(io.Reader) error) error {
+	ctx, done := r.reading(ctx)
+	defer done()
+	c.Dir, c.ReadOnly = r.dir, true
+	return r.runner.Stream(ctx, c, consume)
+}
+
 // Read runs a read-only git command and returns its stdout.
 func (r *Repo) Read(ctx context.Context, args ...string) ([]byte, error) {
-	return r.runner.Run(ctx, Cmd{Dir: r.dir, Args: args, ReadOnly: true})
+	return r.readCmd(ctx, Cmd{Args: args})
 }
 
 // ReadString runs a read-only git command and returns trimmed stdout.
 func (r *Repo) ReadString(ctx context.Context, args ...string) (string, error) {
-	return r.runner.Output(ctx, Cmd{Dir: r.dir, Args: args, ReadOnly: true})
+	out, err := r.readCmd(ctx, Cmd{Args: args})
+	return strings.TrimSpace(string(out)), err
 }
 
 // Stream runs a read-only git command and passes its stdout to consume as it arrives.
 func (r *Repo) Stream(ctx context.Context, consume func(io.Reader) error, args ...string) error {
-	return r.runner.Stream(ctx, Cmd{Dir: r.dir, Args: args, ReadOnly: true}, consume)
+	return r.streamCmd(ctx, Cmd{Args: args}, consume)
 }
 
 // lockRetryDelays is how long Write waits before each retry while another process holds a
@@ -119,12 +164,7 @@ func (r *Repo) NotIgnored(ctx context.Context, paths []string) ([]string, error)
 		return nil, nil
 	}
 	in := strings.Join(paths, "\x00") + "\x00"
-	out, err := r.runner.Run(ctx, Cmd{
-		Dir:      r.dir,
-		Args:     []string{"check-ignore", "--stdin", "-z"},
-		Stdin:    strings.NewReader(in),
-		ReadOnly: true,
-	})
+	out, err := r.readCmd(ctx, Cmd{Args: []string{"check-ignore", "--stdin", "-z"}, Stdin: strings.NewReader(in)})
 	// Exit status 1 means none of the paths are ignored.
 	var gerr *Error
 	if errors.As(err, &gerr) && gerr.ExitCode == 1 && gerr.Stderr == "" {

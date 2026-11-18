@@ -148,7 +148,7 @@ func (a *App) SearchGraph(path, query string) (graph.SearchResult, error) {
 		return rowsOf(g, ids, maxSearchRows), nil
 	}
 	if q, ok := git.ParseTrailerQuery(query); ok {
-		ctx, done := a.searches.start(path)
+		ctx, done := a.latest.start("search", path)
 		defer done()
 		ids, err := r.Git.CommitsWithTrailer(ctx, q)
 		if errors.Is(err, context.Canceled) {
@@ -162,33 +162,38 @@ func (a *App) SearchGraph(path, query string) (graph.SearchResult, error) {
 	return g.Search(query, maxSearchRows), nil
 }
 
-// searches cancels a repository's previous trailer search when a new one starts: the search
-// box searches on each keystroke, and a trailer search reads every commit message.
-type searches struct {
+// latest cancels a repository's previous read of some kind when a new one of that kind
+// starts, for reads only the newest of which is wanted and which take long enough to pile
+// up: the search box searches on each keystroke, and a trailer search reads every commit
+// message; a blame or a file's history on a big repository can run for seconds after the
+// view has moved to another file. The view asking has to be the only one that asks for that
+// kind, and has to drop an answer it's no longer waiting for.
+type latest struct {
 	mu      sync.Mutex
 	running map[string]*context.CancelFunc
 }
 
-// start returns the context for a new search on path, cancelling the one before it, and the
-// function to call when the search ends.
-func (s *searches) start(path string) (context.Context, func()) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.running == nil {
-		s.running = map[string]*context.CancelFunc{}
+// start returns the context for a new read of kind in the repository at path, cancelling the
+// one before it, and the function to call when the read ends.
+func (l *latest) start(kind, path string) (context.Context, func()) {
+	key := kind + "\x00" + path
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.running == nil {
+		l.running = map[string]*context.CancelFunc{}
 	}
-	if prev := s.running[path]; prev != nil {
+	if prev := l.running[key]; prev != nil {
 		(*prev)()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	mine := &cancel
-	s.running[path] = mine
+	l.running[key] = mine
 	return ctx, func() {
-		s.mu.Lock()
-		defer s.mu.Unlock()
+		l.mu.Lock()
+		defer l.mu.Unlock()
 		cancel()
-		if s.running[path] == mine { // a newer search may have replaced it
-			delete(s.running, path)
+		if l.running[key] == mine { // a newer read may have replaced it
+			delete(l.running, key)
 		}
 	}
 }

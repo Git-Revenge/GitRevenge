@@ -387,12 +387,7 @@ func (r *Repo) checkIgnore(ctx context.Context, paths []string, noIndex bool, pr
 	if noIndex {
 		args = append(args, "--no-index")
 	}
-	out, err := r.runner.Run(ctx, Cmd{
-		Dir:      r.dir,
-		Args:     args,
-		Stdin:    strings.NewReader(strings.Join(paths, "\x00") + "\x00"),
-		ReadOnly: true,
-	})
+	out, err := r.readCmd(ctx, Cmd{Args: args, Stdin: strings.NewReader(strings.Join(paths, "\x00") + "\x00")})
 	var gerr *Error
 	if errors.As(err, &gerr) && gerr.ExitCode == 1 && gerr.Stderr == "" {
 		err = nil

@@ -118,23 +118,25 @@ func TestSearchGraphByTrailer(t *testing.T) {
 	}
 }
 
-func TestSearchesCancelThePreviousOne(t *testing.T) {
+func TestTheLatestReadCancelsThePreviousOne(t *testing.T) {
 	t.Parallel()
-	var s searches
-	first, doneFirst := s.start("/r")
-	second, doneSecond := s.start("/r")
+	var l latest
+	first, doneFirst := l.start("search", "/r")
+	second, doneSecond := l.start("search", "/r")
 	if first.Err() == nil {
 		t.Fatal("starting a second search didn't cancel the first")
 	}
-	other, doneOther := s.start("/other")
+	other, doneOther := l.start("search", "/other")
+	blame, doneBlame := l.start("blame", "/r")
 	doneFirst() // finishing the superseded search must not drop the newer one
-	if second.Err() != nil || other.Err() != nil {
-		t.Fatal("a search was cancelled by another repo's or an older one's end")
+	if second.Err() != nil || other.Err() != nil || blame.Err() != nil {
+		t.Fatal("a read was cancelled by another repo's, another kind's or an older one's end")
 	}
 	doneSecond()
 	doneOther()
-	if len(s.running) != 0 {
-		t.Fatalf("searches left running: %v", s.running)
+	doneBlame()
+	if len(l.running) != 0 {
+		t.Fatalf("reads left running: %v", l.running)
 	}
 }
 

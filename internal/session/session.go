@@ -158,6 +158,8 @@ func Rules(rs settings.RepoSettings) branchkind.Rules {
 }
 
 func (r *Repo) close() {
+	// First, so that what's still being read for the tab stops now.
+	r.Git.Close()
 	if r.watcher != nil {
 		r.watcher.Close()
 	}

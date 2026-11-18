@@ -42,7 +42,7 @@ type App struct {
 	emitHook func(name string, data any)
 	// updateURL overrides the GitHub releases endpoint; tests use it.
 	updateURL string
-	searches  searches
+	latest    latest
 	sigs      sigCache
 	configs   gitConfigs
 	conflicts conflictChecks
