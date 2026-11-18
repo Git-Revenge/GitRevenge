@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 - Staging or unstaging single lines no longer joins two lines when the file's last line has no line ending. Staging only a line added after it used to write the two as one line that was in neither version. (#773)
 - A tab's label no longer lands on the tab next to it when another tab closes at the same moment. (#774)
 - A bare repository says it isn't supported, where with `safe.bareRepository=explicit` it showed git's own error. (#775)
+- Insights says when its fetch failed, where the error used to be cleared before it showed, and no longer shows one scope's releases or thresholds, or loses its results, when the scope is changed while it's still reading the last one. (#782)
+- The Ignore rules tab no longer shows a file from the repository it was on before, when that one was slow to read. (#782)
 
 ## [1.0.1] - 2026-11-18
 
