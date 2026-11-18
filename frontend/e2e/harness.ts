@@ -5,6 +5,7 @@ import { mount } from 'svelte'
 import '../src/style.css'
 import type { Scenario } from './support'
 import { guardLinks } from '../src/lib/linkGuard'
+import * as bindings from '../wailsjs/go/app/App.js'
 
 type Harness = Window &
   typeof globalThis & {
@@ -37,9 +38,25 @@ document.addEventListener('securitypolicyviolation', (e) => {
   })
 })
 const scenario = win.__scenario ?? {}
+
+// A test that answers for a method the Go API doesn't have has drifted from the backend: the
+// method was renamed or removed, nothing calls the old name, and the test would go on passing
+// against an answer nobody asks for. The generated bindings say what the methods are.
+const SCENARIO_DATA = new Set(['File', 'Images', 'lazy'])
+function checkMethods(what: string, names: string[]) {
+  const unknown = names.filter((n) => !(n in bindings) && !SCENARIO_DATA.has(n))
+  if (unknown.length) throw new Error(`The test's ${what} include ${unknown.join(', ')}, which the Go API (wailsjs/go/app/App) doesn't have.`)
+}
+checkMethods('responses', Object.keys(scenario.responses ?? {}))
+checkMethods('failures', Object.keys(scenario.failures ?? {}))
+checkMethods('delays', Object.keys(scenario.delays ?? {}))
+
 const responses: Record<string, unknown> = { ...scenario.responses }
 win.__calls = []
-win.__respond = (r) => void Object.assign(responses, r)
+win.__respond = (r) => {
+  checkMethods('responses', Object.keys(r))
+  Object.assign(responses, r)
+}
 win.__changed = () => {}
 win.__events = []
 

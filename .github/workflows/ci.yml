@@ -180,6 +180,18 @@ jobs:
       - name: Wails build (Linux)
         if: runner.os == 'Linux'
         run: wails build -s -platform linux/amd64 -tags webkit2_41
+      # frontend/wailsjs is generated from the Go API, and the build has just written it again.
+      # If that changed it, what's committed is out of date: the frontend would call methods as
+      # they were, and svelte-check, which reads the committed files, wouldn't notice. A pull
+      # request that only touches Go skips the frontend job, so this is where it's caught.
+      # Wails writes the files executable, which isn't a change.
+      - name: The generated bindings are the ones committed
+        if: runner.os == 'Linux'
+        run: |
+          if ! git -c core.fileMode=false diff --exit-code -- frontend/wailsjs; then
+            echo "::error::frontend/wailsjs doesn't match the Go API. Run 'wails generate module' and commit what it writes."
+            exit 1
+          fi
 
   # The Go tests again, every repository they make the way Git 3.0 will make a new one: SHA-256
   # object IDs, reftable refs, main, and safe.bareRepository=explicit (#729).
