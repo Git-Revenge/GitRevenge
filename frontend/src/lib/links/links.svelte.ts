@@ -1,6 +1,6 @@
 import { LinkRules } from '../../../wailsjs/go/app/App.js'
 import type { links } from '../../../wailsjs/go/models'
-import { EventsOn } from '../../../wailsjs/runtime/runtime.js'
+import { onBackend } from '../events'
 import { makeLinker, webOnly, type Linker } from './links'
 
 /** Each repository's smart links, read from git config ('' for global only), and the
@@ -36,7 +36,7 @@ class LinksStore {
     if (this.#listening) return
     this.#listening = true
     try {
-      EventsOn('gitconfig:changed', () => {
+      onBackend('gitconfig:changed', () => {
         for (const p of Object.keys(this.configs)) void this.load(p)
       })
     } catch {

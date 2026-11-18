@@ -2,7 +2,7 @@
   import { onMount } from 'svelte'
   import { GroupBatch, GroupDashboard } from '../../wailsjs/go/app/App.js'
   import type { app } from '../../wailsjs/go/models'
-  import { EventsOn } from '../../wailsjs/runtime/runtime.js'
+  import { onBackend } from './events'
   import { formatTime } from './graph/draw'
   import { session } from './session.svelte'
   import Icon from './ui/Icon.svelte'
@@ -38,7 +38,7 @@
   onMount(() => {
     void refresh()
     // Show each repository's result as soon as it finishes.
-    return EventsOn('group:progress', (p: app.BatchResult & { group: string }) => {
+    return onBackend('group:progress', (p) => {
       if (p.group === name) results[p.path] = p
     })
   })

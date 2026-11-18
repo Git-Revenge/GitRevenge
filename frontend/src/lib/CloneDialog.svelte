@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { CancelClone, ChooseFolder, Clone, CloneName, HomeDir } from '../../wailsjs/go/app/App.js'
-  import { EventsOn } from '../../wailsjs/runtime/runtime.js'
+  import { onBackend } from './events'
   import { errorText } from './errors'
   import { prefs } from './prefs.svelte'
   import { session } from './session.svelte'
@@ -67,7 +67,7 @@
   })
 
   onMount(() =>
-    EventsOn('net:progress', (p: { op: string; phase: string; percent: number; line: string }) => {
+    onBackend('net:progress', (p) => {
       if (p.op !== 'clone') return
       progress = p.phase ? `${p.phase} ${p.percent}%` : p.line
     }),

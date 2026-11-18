@@ -12,16 +12,9 @@ import {
   TrustRepo,
 } from '../../wailsjs/go/app/App.js'
 import type { app } from '../../wailsjs/go/models'
-import { EventsOn } from '../../wailsjs/runtime/runtime.js'
 import { errorText } from './errors'
+import { onBackend, type BackendEvents } from './events'
 import { fromText, type Problem } from './problem'
-
-/** Payload of the "repo:changed" event (RepoChange in Go). Events aren't bindings, so
- * Wails doesn't generate this type. */
-interface RepoChange {
-  path: string
-  kinds: Array<'head' | 'refs' | 'index' | 'state' | 'config' | 'worktree'>
-}
 
 /** Open tabs, the active tab and recent repos, mirrored from the Go session manager. */
 class Session {
@@ -63,15 +56,15 @@ class Session {
   activeTab = $derived(this.tabs.find((t) => t.path === this.active))
 
   async restore() {
-    EventsOn('repo:changed', (c: RepoChange) => void this.onChange(c))
+    onBackend('repo:changed', (c) => void this.onChange(c))
     // The watcher can report an operation before its undo entry exists, so undo history
     // has its own event.
-    EventsOn('undo:changed', (c: { path: string }) => {
+    onBackend('undo:changed', (c) => {
       this.undoRevision[c.path] = (this.undoRevision[c.path] ?? 0) + 1
     })
     // Global and included config apply to every repository, so a change refreshes them all:
     // signing, identity, and pull and merge defaults are read again.
-    EventsOn('gitconfig:changed', () => {
+    onBackend('gitconfig:changed', () => {
       for (const t of this.tabs) this.revision[t.path] = (this.revision[t.path] ?? 0) + 1
     })
     const st = await this.run(() => RestoreSession())
@@ -168,7 +161,7 @@ class Session {
   }
 
   /** Handles a change detected on disk by the backend watcher. */
-  private async onChange(c: RepoChange) {
+  private async onChange(c: BackendEvents['repo:changed']) {
     this.revision[c.path] = (this.revision[c.path] ?? 0) + 1
     if (c.kinds.includes('head') || c.kinds.includes('refs')) {
       if (!this.tabs.some((t) => t.path === c.path)) return

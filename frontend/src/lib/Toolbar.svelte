@@ -8,7 +8,7 @@
   import type { Ref } from './graph/rowCache'
   import InkButton from './ui/InkButton.svelte'
   import Modal from './ui/Modal.svelte'
-  import { EventsOn } from '../../wailsjs/runtime/runtime.js'
+  import { onBackend } from './events'
   import { formatShortcut, isMac, provideCommands, type Command } from './commands.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
   import { session } from './session.svelte'
@@ -133,7 +133,7 @@
   }
 
   onMount(() =>
-    EventsOn('net:progress', (p: { path: string; phase: string; percent: number; line: string }) => {
+    onBackend('net:progress', (p) => {
       if (p.path !== path) return
       progress = p.phase ? `${p.phase} ${p.percent}%` : p.line
     }),

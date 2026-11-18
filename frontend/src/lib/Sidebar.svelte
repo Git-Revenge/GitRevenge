@@ -1,6 +1,6 @@
 <script lang="ts">
   import { DeletableBranches, DeleteMergedBranches, MergedBranches, Refs, SetShowHidden, ShowingHidden } from '../../wailsjs/go/app/App.js'
-  import { EventsOn } from '../../wailsjs/runtime/runtime.js'
+  import { onBackend } from './events'
   import { onMount, tick, untrack } from 'svelte'
   import type { DialogSpec } from './Dialog.svelte'
   import type { Ref } from './graph/rowCache'
@@ -318,7 +318,7 @@
     void load()
     // Refs are re-read with every graph reload.
     // A reload of a large history pauses instead of finishing, and reset marks its swap.
-    return EventsOn('graph:progress', (p: { path: string; done: boolean; reset?: boolean }) => {
+    return onBackend('graph:progress', (p) => {
       if (p.path === path && (p.done || p.reset)) void load()
     })
   })
