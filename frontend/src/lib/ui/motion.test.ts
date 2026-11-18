@@ -106,3 +106,25 @@ describe('exits and reveals', () => {
     for (const t of [scrim(node), menuOut(node), reveal(node), reveal(node, { out: true })]) expect(t.duration).toBe(0)
   })
 })
+
+describe('reducedMotion', () => {
+  it('asks the system once, and follows it from then on', async () => {
+    const { reducedMotion } = await import('./motion')
+    const query = { matches: false }
+    const matchMedia = vi.fn(() => query)
+    vi.stubGlobal('window', { matchMedia })
+    expect(reducedMotion()).toBe(false)
+    // The graph asks for every row of every frame: the answer is read, not asked for again.
+    for (let i = 0; i < 50; i++) reducedMotion()
+    expect(matchMedia).toHaveBeenCalledTimes(1)
+    // The setting changed while the app was open.
+    query.matches = true
+    expect(reducedMotion()).toBe(true)
+  })
+
+  it('is false where there is no window to ask', async () => {
+    const { reducedMotion } = await import('./motion')
+    vi.stubGlobal('window', undefined)
+    expect(reducedMotion()).toBe(false)
+  })
+})

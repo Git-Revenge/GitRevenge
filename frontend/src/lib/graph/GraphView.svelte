@@ -1030,11 +1030,24 @@
     (e) => (rowError = e === null ? '' : errorText(e)),
   )
 
+  /** The colours the canvas paints with, as last read from the page's tokens: see theme(). */
+  let themeColors: Theme | null = null
+
+  /** Reads the theme's colours again before the next frame, which is then drawn in them. */
+  function repaintInTheme() {
+    themeColors = null
+    schedule()
+  }
+
+  /** The theme's colours for a canvas, which can't read CSS variables. Reading them makes the
+   * browser work out the page's styles, and every frame used to: now they're read once and
+   * kept until the theme changes (see repaintInTheme). */
   function theme(): Theme {
+    if (themeColors) return themeColors
     const css = getComputedStyle(document.documentElement)
     const token = (name: string) => css.getPropertyValue(name).trim()
     setLaneColors(Array.from({ length: LANE_COUNT }, (_, i) => token(`--lane-${i}`)))
-    return {
+    return (themeColors = {
       bg: token('--paper'),
       fg: token('--ink'),
       soft: token('--ink-soft'),
@@ -1052,7 +1065,7 @@
       teal: token('--accent-a'),
       note: token('--accent-c'),
       edge: token('--paper-edge'),
-    }
+    })
   }
 
   // The commits with a git note, in any notes ref: one listing when the repository opens and
@@ -1632,7 +1645,7 @@
   // The canvas holds painted colours, so a theme change needs a repaint.
   $effect(() => {
     void colorTheme.resolved
-    schedule()
+    repaintInTheme()
   })
 
   // Switching density keeps the same commit at the top of the view.
@@ -1647,6 +1660,10 @@
   onMount(() => {
     const ro = new ResizeObserver(schedule)
     ro.observe(scroller)
+    // The tokens hang off the page's root: its theme, and anything else set on it. Whatever
+    // changes there, and however, the colours are read again.
+    const themed = new MutationObserver(repaintInTheme)
+    themed.observe(document.documentElement, { attributes: true })
     // Not passive: a scaled history handles the wheel itself.
     scroller.addEventListener('wheel', onWheel, { passive: false })
     // The canvas paints with the bundled fonts; repaint once they finish loading.
@@ -1685,6 +1702,7 @@
     cache.ensure(0, 200)
     return () => {
       ro.disconnect()
+      themed.disconnect()
       scroller.removeEventListener('wheel', onWheel)
       document.fonts.removeEventListener('loadingdone', schedule)
       off()
