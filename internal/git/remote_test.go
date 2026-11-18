@@ -108,6 +108,60 @@ func TestFetchPullPush(t *testing.T) {
 	}
 }
 
+func TestFetchFailuresReadsBothOfGitsWordings(t *testing.T) {
+	t.Parallel()
+	const gone = "ERROR: Repository not found.\nfatal: Could not read from remote repository.\n\n" +
+		"Please make sure you have the correct access rights\nand the repository exists.\n"
+	const offline = "ssh: Could not resolve hostname example.org: Name or service not known\nfatal: Could not read from remote repository.\n"
+	for name, stderr := range map[string]string{
+		"together": gone + "could not fetch 'ghsa-m5wc' (exit code: 128)\n" + offline + "could not fetch 'it's' (exit code: 128)\n",
+		"in turn":  "From github.com:a/b\n   1111111..2222222  main       -> origin/main\n" + gone + "error: could not fetch ghsa-m5wc\n" + offline + "error: could not fetch it's\n",
+		"old git":  gone + "error: Could not fetch ghsa-m5wc\r\n" + offline + "error: Could not fetch it's\r\n",
+	} {
+		got := FetchFailures(&Error{Stderr: stderr})
+		if len(got) != 2 || got[0].Remote != "ghsa-m5wc" || got[1].Remote != "it's" {
+			t.Errorf("%s: failures = %+v", name, got)
+			continue
+		}
+		if !strings.Contains(got[0].Output, "Repository not found") || strings.Contains(got[0].Output, "resolve hostname") {
+			t.Errorf("%s: first remote's output = %q", name, got[0].Output)
+		}
+		if !strings.HasPrefix(got[1].Output, "ssh: Could not resolve hostname") || strings.Contains(got[1].Output, "Repository not found") {
+			t.Errorf("%s: second remote's output = %q", name, got[1].Output)
+		}
+	}
+	// One remote fails without git naming it, and other errors aren't fetches at all.
+	for _, err := range []error{&Error{Stderr: gone}, errors.New("could not fetch 'x' (exit code: 1)"), nil} {
+		if got := FetchFailures(err); len(got) != 0 {
+			t.Errorf("FetchFailures(%v) = %+v, want none", err, got)
+		}
+	}
+}
+
+// Git's own output for a fetch of every remote, taken in turn and together.
+func TestFetchFailuresFromGit(t *testing.T) {
+	t.Parallel()
+	for _, parallel := range []string{"1", "0"} {
+		local, _ := gittest.WithRemote(t, 1)
+		local.Git("remote", "add", "gone", local.Dir+"-nowhere.git")
+		local.Git("remote", "add", "parked", local.Dir+"-parked.git")
+		local.Git("config", "remote.parked.skipFetchAll", "true")
+		local.Git("config", "fetch.parallel", parallel)
+		repo := OpenRepo(newTestRunner(t), local.Dir)
+		ctx := context.Background()
+
+		err := repo.Fetch(ctx, "", NetOptions{})
+		got := FetchFailures(err)
+		if len(got) != 1 || got[0].Remote != "gone" || !strings.Contains(got[0].Output, "does not appear to be a git repository") {
+			t.Errorf("fetch.parallel=%s: failures = %+v (err %v)", parallel, got, err)
+		}
+		asked, err := repo.FetchAllRemotes(ctx)
+		if err != nil || strings.Join(asked, ",") != "gone,origin" {
+			t.Errorf("FetchAllRemotes = %v, %v, want gone and origin", asked, err)
+		}
+	}
+}
+
 func TestPushNewBranchSetsUpstreamAndTags(t *testing.T) {
 	t.Parallel()
 	local, remote := gittest.WithRemote(t, 1)

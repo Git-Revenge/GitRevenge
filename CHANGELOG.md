@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Fixed
 
+- Fetching all remotes no longer reports the whole fetch as failed when some of them are gone, such as a fork deleted after its work was merged. It says which remotes it couldn't find or reach and that the others were fetched, offers to remove the ones with no repository behind them, and still syncs notes from the remotes that answered. A group's fetch says the same in the repository's row. (#806, #807)
 - Staging or unstaging single lines no longer joins two lines when the file's last line has no line ending. Staging only a line added after it used to write the two as one line that was in neither version. (#773)
 - A tab's label no longer lands on the tab next to it when another tab closes at the same moment. (#774)
 - A bare repository says it isn't supported, where with `safe.bareRepository=explicit` it showed git's own error. (#775)

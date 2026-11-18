@@ -199,11 +199,10 @@ func (a *App) cancelNetwork(key string) {
 func (a *App) Fetch(path, remote string) error {
 	return a.runNetwork(path, "fetch", func(ctx context.Context, r *session.Repo, o git.NetOptions) error {
 		a.upstreams.remember(ctx, r.Path, r.Git)
-		if err := r.Git.Fetch(ctx, remote, o); err != nil {
-			return err
-		}
-		a.syncNotesIn(ctx, r, remotesFor(ctx, r.Git, remote), o)
-		return nil
+		reached, err := fetchRemotes(ctx, r.Git, remote, o)
+		// Notes come from the remotes that answered, whether or not all of them did.
+		a.syncNotesIn(ctx, r, reached, o)
+		return err
 	})
 }
 

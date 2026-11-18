@@ -153,6 +153,69 @@ func (r *Repo) Fetch(ctx context.Context, remote string, o NetOptions) error {
 	return err
 }
 
+// FetchFailure is a remote that a fetch of every remote couldn't fetch.
+type FetchFailure struct {
+	Remote string
+	// Output is what git said about it.
+	Output string
+}
+
+// couldNotFetch is the line git closes a failed remote with when it fetches several: one
+// wording when it takes them in turn, another when fetch.parallel has it take them together.
+var couldNotFetch = regexp.MustCompile(`(?m)^(?:error: [Cc]ould not fetch (.+?)|could not fetch '(.+)' \(exit code: -?\d+\))\r?$`)
+
+// FetchFailures lists the remotes a failed fetch of every remote says it couldn't fetch, each
+// with what git printed before saying so. It's empty for any other error, and for a
+// repository with one remote, which git fetches without naming it.
+func FetchFailures(err error) []FetchFailure {
+	var gerr *Error
+	if !errors.As(err, &gerr) {
+		return nil
+	}
+	var failed []FetchFailure
+	last := 0
+	for _, m := range couldNotFetch.FindAllStringSubmatchIndex(gerr.Stderr, -1) {
+		name := m[2:4]
+		if name[0] < 0 {
+			name = m[4:6]
+		}
+		failed = append(failed, FetchFailure{
+			Remote: gerr.Stderr[name[0]:name[1]],
+			Output: strings.TrimSpace(gerr.Stderr[last:m[0]]),
+		})
+		last = m[1]
+	}
+	return failed
+}
+
+// FetchAllRemotes names the remotes a fetch of every remote asks: all of them but those whose
+// config (skipFetchAll, skipDefaultUpdate) keeps them out of it.
+func (r *Repo) FetchAllRemotes(ctx context.Context) ([]string, error) {
+	remotes, err := r.Remotes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// Exits 1 when no remote sets either, which leaves nothing to skip.
+	out, _ := r.ReadString(ctx, "config", "--type=bool", "--get-regexp", `^remote\..*\.skip(fetchall|defaultupdate)$`)
+	skip := map[string]bool{}
+	for line := range strings.SplitSeq(out, "\n") {
+		// "remote.<name>.skipfetchall true"; git reads both keys into one setting, last one wins.
+		key, value, ok := strings.Cut(strings.TrimSpace(line), " ")
+		if !ok {
+			continue
+		}
+		name := strings.TrimPrefix(key[:strings.LastIndex(key, ".")], "remote.")
+		skip[name] = value == "true"
+	}
+	names := make([]string, 0, len(remotes))
+	for _, rm := range remotes {
+		if !skip[rm.Name] {
+			names = append(names, rm.Name)
+		}
+	}
+	return names, nil
+}
+
 // PullMode chooses how pull integrates upstream changes.
 type PullMode string
 

@@ -39,11 +39,14 @@ type Problem struct {
 
 // ProblemAction is one next step. The frontend knows how to do each kind.
 type ProblemAction struct {
-	// Kind is "push-new-branch", "open-url", "pull-then-push", "force-push" or "retry".
+	// Kind is "push-new-branch", "open-url", "pull-then-push", "force-push", "remove-remotes"
+	// or "retry".
 	Kind  string `json:"kind"`
 	Label string `json:"label"`
 	// URL is where "open-url" goes.
 	URL string `json:"url"`
+	// Names are the remotes "remove-remotes" offers to remove.
+	Names []string `json:"names"`
 }
 
 // Text is the problem as a message: its title, then its detail and git's last word.
@@ -268,9 +271,7 @@ func netProblem(op string, err error) error {
 	case strings.Contains(s, "Host key verification failed"):
 		p.Title = titled(op, "stopped", host+"'s SSH host key isn't trusted", host)
 		p.Detail = "The connection was stopped before anything was sent."
-	case strings.Contains(s, "Repository not found"), strings.Contains(s, "' does not exist"),
-		strings.Contains(s, "does not appear to be a git repository"),
-		strings.Contains(s, "repository '") && strings.Contains(s, "' not found"):
+	case noRepository(s):
 		p.Title = titled(op, "failed", "no repository was found at that URL", host)
 		p.Detail = "Check the URL, and that your account can access the repository."
 	case strings.Contains(s, "Could not resolve host"), strings.Contains(s, "unable to access"):
