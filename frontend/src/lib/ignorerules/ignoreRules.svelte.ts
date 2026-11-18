@@ -111,7 +111,10 @@ class IgnoreRulesTab {
   async ensureDoc() {
     const src = this.source?.source
     if (!src || this.docs[src]) return
-    const text = await ReadIgnoreFile(this.repo, src)
+    const repo = this.repo
+    const text = await ReadIgnoreFile(repo, src)
+    // Another repository was chosen while that was read, and may have a file of the same name.
+    if (repo !== this.repo || this.docs[src]) return
     this.docs[src] = { base: text, text }
   }
 

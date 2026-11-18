@@ -188,12 +188,15 @@ class InsightsTab {
 
   async close() {
     this.open = false
+    clearTimeout(this.timer)
     if (session.active === session.insightsTabId) await session.select(session.tabs.at(-1)?.path ?? '')
     void SetInsightsTab('').catch(() => {})
   }
 
   async setScope(s: Scope | null) {
     this.scope = s
+    // A recompute still waiting was for the scope before this one.
+    clearTimeout(this.timer)
     if (!s) return
     // Only remembers the tab for next time.
     void SetInsightsTab(encode(s)).catch(() => {})
@@ -201,15 +204,19 @@ class InsightsTab {
     if (s.kind === 'group' && this.window === 'releases') this.window = '14d'
     if (s.kind === 'repo') {
       const [tags, branches] = await Promise.all([InsightsTags(s.id).catch(() => null), InsightsReleaseBranches(s.id, '').catch(() => null)])
+      // Another scope was chosen while those were read: what follows is its to set.
+      if (this.scope !== s) return
       this.tags = [...(tags ?? []), ...(branches ?? []).map((b) => ({ name: b.name, time: b.forkTime, branch: true }))].sort((a, b) => b.time - a.time || a.name.localeCompare(b.name))
     } else {
       this.tags = []
     }
     // Falling back to the defaults changes what's flagged, so it has to be said.
-    this.thresholds = (await InsightsThresholds(encode(s)).catch((e) => {
+    const thresholds = (await InsightsThresholds(encode(s)).catch((e) => {
       session.error = `Using the default thresholds: ${errorText(e)}`
       return null
     })) ?? ({ ...DEFAULT_THRESHOLDS } as app.Thresholds)
+    if (this.scope !== s) return
+    this.thresholds = thresholds
     await this.load()
   }
 
@@ -302,15 +309,19 @@ class InsightsTab {
   async fetch() {
     if (!this.scope) return
     this.fetching = true
+    let failed = ''
     try {
       if (this.scope.kind === 'group') await GroupBatch(this.scope.id, 'fetch')
       else await Fetch(this.scope.id, '')
     } catch (e) {
-      this.error = errorText(e)
+      failed = errorText(e)
     } finally {
       this.fetching = false
     }
     await this.load()
+    // Said after the recompute, which clears the error as it starts: the results are of what
+    // was there before the fetch, and that's worth knowing.
+    if (failed) this.error = failed
   }
 
   private listen() {
@@ -330,10 +341,13 @@ class InsightsTab {
     onBackend('repo:changed', (c) => {
       // Config holds the smart links that decide Shipped's references.
       if (!this.open || !(c.kinds.includes('refs') || c.kinds.includes('head') || c.kinds.includes('config'))) return
-      const repo = this.repos.find((r) => samePath(r, c.path))
-      if (!repo) return
+      if (!this.repos.some((r) => samePath(r, c.path))) return
       clearTimeout(this.timer)
-      this.timer = setTimeout(() => void this.load(this.scope?.kind === 'group' ? undefined : [repo]), 500)
+      this.timer = setTimeout(() => {
+        // The scope may have changed while this waited, and then the repository isn't its.
+        const repo = this.repos.find((r) => samePath(r, c.path))
+        if (this.open && repo) void this.load(this.scope?.kind === 'group' ? undefined : [repo])
+      }, 500)
     })
   }
 }
