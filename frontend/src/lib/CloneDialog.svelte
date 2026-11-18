@@ -55,15 +55,18 @@
 
   /** Cancel stops a running clone (its error then shows here); otherwise it closes. */
   function cancel() {
-    if (running) CancelClone()
+    if (running) void CancelClone()
     else onClose()
   }
 
   onMount(() => {
     if (!parent)
-      HomeDir().then((home) => {
-        if (!parent && home) parent = home
-      })
+      HomeDir()
+        .then((home) => {
+          if (!parent && home) parent = home
+        })
+        // Without an answer, the folder just starts empty.
+        .catch(() => {})
   })
 
   onMount(() =>

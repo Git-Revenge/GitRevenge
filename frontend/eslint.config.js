@@ -24,4 +24,16 @@ export default ts.config(
       },
     },
   },
+  {
+    // Nearly everything the app does is a call to the backend, which is a promise. One that's
+    // dropped loses its failure, and one handed to something that expects a plain function
+    // (an event handler, a callback) isn't waited for. These rules need types, so they run
+    // where the project's tsconfig reaches. A promise left to itself on purpose says `void`.
+    files: ['src/**/*.ts', 'src/**/*.svelte', 'e2e/**/*.ts'],
+    languageOptions: { parserOptions: { projectService: true, extraFileExtensions: ['.svelte'] } },
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+    },
+  },
 )
