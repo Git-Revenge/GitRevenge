@@ -34,8 +34,8 @@
     TrailerHints,
     Undo,
     UndoState,
-    WorkingTree,
   } from '../../wailsjs/go/app/App.js'
+  import { repoReads } from './repoReads'
   import { ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
   import type { app, git } from '../../wailsjs/go/models'
   import type { DiffTarget } from './diff/DiffView.svelte'
@@ -150,7 +150,7 @@
 
   async function refresh() {
     if (showIgnored) void loadIgnored()
-    const res = await session.run(() => WorkingTree(path))
+    const res = await session.run(() => repoReads(path).workingTree())
     const waiting = commitWaiting
     commitWaiting = false
     if (!res) return
