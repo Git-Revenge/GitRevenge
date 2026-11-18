@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Every file in a release now comes with a build provenance attestation: a signed statement that the project's release workflow built that exact file from the release's tag. `gh attestation verify <file> --repo Git-Revenge/GitRevenge` checks it. The sha256 on the release page says a file hasn't changed since it was published; this says where it was built. [How to verify a download](https://github.com/Git-Revenge/GitRevenge/blob/main/SECURITY.md#verifying-what-you-download). (#761)
+
 ### Security
 
 - Opening a repository no longer runs programs it names before you've agreed to them. Git takes orders from a repository's own `.git/config` and hooks, and a repository that arrives with its `.git` folder already made (an archive, a shared drive) has whatever its maker put there: with `core.fsmonitor` set to a command, opening it ran that command at once. Now, the first time you open a repository the app didn't clone or create, it reads the config and lists the hooks without running anything there. If any would run a program, pull in other settings or send pushes elsewhere, it shows each one with what it does and asks; **Don't open** leaves it closed with nothing run. Repositories with none open as before, Git LFS's own filter and hooks aren't asked about, and repositories you'd already opened are trusted as they stand. [Docs](https://gitrevenge.com/docs/guide/repositories#a-repository-that-runs-programs-of-its-own). (GHSA-r6gg-5grh-qv76)

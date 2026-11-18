@@ -46,6 +46,7 @@ Out of scope:
 ## Verifying what you download
 
 - **Every release asset** has a sha256 digest on the release page. Releases are immutable: once published, an asset or tag can't be replaced.
+- **Every release asset from 1.0.1 on** also has a build provenance attestation: a statement, signed for the run that made it, that the project's release workflow built that exact file from the release's tag. With the [GitHub CLI](https://cli.github.com), `gh attestation verify <file> --repo Git-Revenge/GitRevenge` checks it and prints the workflow and commit. The digest says a file hasn't changed since it was published; the attestation says where it was built.
 - **The Windows installer**, and the app and uninstaller in it, are signed and timestamped with the maintainer's Certum open source code signing certificate (issued by Certum Code Signing 2021 CA). Check it under the file's **Properties → Digital Signatures**, or with `Get-AuthenticodeSignature` in PowerShell, which should say `Valid`.
 - **The macOS disk image** is signed with a Developer ID certificate and notarized by Apple.
 - **winget** pins the installer's sha256 in its manifest.
