@@ -6,7 +6,8 @@
   import { ALONE_STEPS, searchPlaceholder, SQUEEZE, squeezeFor } from '../barSqueeze'
   import { ArrivedCommits, CommitNotes, CommitRow, CommitSignatures, GraphFocus, HeadCommit, OwnMoveAge, GraphRows, NotedCommits, Refs, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView } from '../../../wailsjs/go/app/App.js'
   import { session } from '../session.svelte'
-  import { ClipboardSetText, EventsOn } from '../../../wailsjs/runtime/runtime.js'
+  import { ClipboardSetText } from '../../../wailsjs/runtime/runtime.js'
+  import { onBackend } from '../events'
   import { theme as colorTheme } from '../theme.svelte'
   import { formatShortcut, provideCommands } from '../commands.svelte'
   import Icon from '../ui/Icon.svelte'
@@ -20,7 +21,7 @@
   import { bisectRow, DAY_H, dayCountLabel, dayLineLabel, dayLineSpoken, drawDayLine, drawFoldLine, drawRow, FOLD_H, FOLLOWER_H, gapLabel, sameDay, sealOf, startsRun, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { branchMove, headAway, headLabel, isOwnMove, LANDING, moveAnnouncement, tipsOf, type Tips } from './follow'
   import { loadLabelWidth, nextLabelWidth, REFIT_AFTER_MS, saveLabelWidth } from './labelColumn'
-  import { RowCache, type GraphProgress, type Page, type Ref, type Row } from './rowCache'
+  import { RowCache, type Page, type Ref, type Row } from './rowCache'
   import { anchorAt, anchorFor, anchorForBottom, clampToEnd, compareAnchors, distance, endAnchor, layout, moveBy, ownHeight, position, rowAt as viewRowAt, START, yOf, type Anchor, type SlotRow, type Slots, type ViewRow } from './rows'
   import { boxFor, monthAt, monthLabel, percentThrough, placeTicks, positionFor, RULER_W, tickAt, tickSummary, unreadFrom, type MonthMark, type Tick } from './ruler'
   import { scrollMap } from './scrollMap'
@@ -1652,7 +1653,7 @@
     void loadMarks()
     void loadFocus()
     void loadNoted()
-    const off = EventsOn('graph:progress', (p: GraphProgress) => {
+    const off = onBackend('graph:progress', (p) => {
       if (p.path !== path) return
       if (p.done) void loadNoted()
       // The ruler's marks follow the history as it's read, a couple of seconds apart at most.

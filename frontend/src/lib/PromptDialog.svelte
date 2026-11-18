@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { AnswerPrompt } from '../../wailsjs/go/app/App.js'
-  import { EventsOn } from '../../wailsjs/runtime/runtime.js'
+  import { onBackend } from './events'
   import InkButton from './ui/InkButton.svelte'
   import Modal from './ui/Modal.svelte'
   import { askedDuring, unexpectedHost, type Prompt } from './promptOrigin'
@@ -23,8 +23,8 @@
   }
 
   onMount(() => {
-    const offPrompt = EventsOn('askpass:prompt', (p: Prompt) => (queue = [...queue, p]))
-    const offExpired = EventsOn('askpass:expired', (id: string) => (queue = queue.filter((p) => p.id !== id)))
+    const offPrompt = onBackend('askpass:prompt', (p) => (queue = [...queue, p]))
+    const offExpired = onBackend('askpass:expired', (id) => (queue = queue.filter((p) => p.id !== id)))
     return () => {
       offPrompt()
       offExpired()

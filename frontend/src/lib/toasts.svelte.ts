@@ -1,4 +1,4 @@
-import { EventsOn } from '../../wailsjs/runtime/runtime.js'
+import { onBackend } from './events'
 import { Undo, UndoState } from '../../wailsjs/go/app/App.js'
 import { session } from './session.svelte'
 
@@ -31,12 +31,12 @@ export const toasts = new Toasts()
 
 /** Something worth knowing that isn't an error in what the user asked for, such as notes
  * that couldn't sync. */
-EventsOn('notice', (e: { path: string; message: string }) => {
+onBackend('notice', (e) => {
   toasts.show(e.message)
 })
 
 /** Cleanup on pull: say what was deleted, with Undo while it's still the next undo. */
-EventsOn('branches:cleaned', (e: { path: string; branches: string[]; undoLabel: string; merged: boolean }) => {
+onBackend('branches:cleaned', (e) => {
   const n = e.branches.length
   const names = n <= 3 ? e.branches.join(', ') : `${e.branches.slice(0, 2).join(', ')} and ${n - 2} more`
   const kind = e.merged ? 'merged branch' : 'branch'

@@ -14,7 +14,7 @@ import {
   SetInsightsThresholds,
 } from '../../../wailsjs/go/app/App.js'
 import type { app, git, settings } from '../../../wailsjs/go/models'
-import { EventsOn } from '../../../wailsjs/runtime/runtime.js'
+import { onBackend } from '../events'
 import { errorText } from '../errors'
 import { samePath } from '../gitconfig/rows'
 import { session } from '../session.svelte'
@@ -316,18 +316,18 @@ class InsightsTab {
   private listen() {
     if (this.listening) return
     this.listening = true
-    EventsOn('insights:conflict', (c: ConflictInfo) => {
+    onBackend('insights:conflict', (c) => {
       this.conflicts[`${c.targetSha}:${c.sha}`] = c
     })
     // A repository's refs moved (a commit, merge or fetch): compute it again. The backend
     // cache makes repositories that didn't change free.
     // The global config may hold smart links, which decide Shipped's references.
-    EventsOn('gitconfig:changed', () => {
+    onBackend('gitconfig:changed', () => {
       if (!this.open) return
       clearTimeout(this.timer)
       this.timer = setTimeout(() => void this.load(), 500)
     })
-    EventsOn('repo:changed', (c: { path: string; kinds: string[] }) => {
+    onBackend('repo:changed', (c) => {
       // Config holds the smart links that decide Shipped's references.
       if (!this.open || !(c.kinds.includes('refs') || c.kinds.includes('head') || c.kinds.includes('config'))) return
       const repo = this.repos.find((r) => samePath(r, c.path))

@@ -1,16 +1,11 @@
 import { CloseGitConfig, EffectiveGitConfig, GitConfigScopes, OpenGitConfig, ReloadGitConfig, SaveGitConfig, SetGitConfigTab } from '../../../wailsjs/go/app/App.js'
 import type { app, git } from '../../../wailsjs/go/models'
-import { EventsOn } from '../../../wailsjs/runtime/runtime.js'
+import { onBackend } from '../events'
 import { errorText } from '../errors'
 import { session } from '../session.svelte'
 import { canonicalKey } from './catalog'
 import { samePath } from './rows'
 import { scopeLabel, type Scope } from './scopes'
-
-/** Payload of the "gitconfig:changed" event (ConfigChange in Go). */
-interface ConfigChange {
-  path: string
-}
 
 /** The views of a config file, in the order the rail lists them. */
 export type View = 'settings' | 'aliases' | 'raw' | 'history'
@@ -236,8 +231,8 @@ class GitConfigTab {
   private listen() {
     if (this.listening) return
     this.listening = true
-    EventsOn('gitconfig:changed', (c: ConfigChange) => void this.onDisk(c.path))
-    EventsOn('repo:changed', (c: { path: string; kinds: string[] }) => {
+    onBackend('gitconfig:changed', (c) => void this.onDisk(c.path))
+    onBackend('repo:changed', (c) => {
       if (c.kinds.includes('config')) this.onRepoConfig(c.path)
     })
   }
