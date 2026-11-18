@@ -1,5 +1,6 @@
 import { kindInfo, type KindInfo } from '../branchKinds'
 import { PATHS, type IconName } from '../ui/icons'
+import { eachPass } from './pass'
 import type { Ref, Row, Seg } from './rowCache'
 
 /** Row density: the two-line timeline, or single-line rows that fit twice as many commits. */
@@ -183,18 +184,27 @@ function drawPassing(ctx: CanvasRenderingContext2D, below: Row, near: Near, y: n
   ctx.rect(lay.refW, y, lay.graphW, h)
   ctx.clip()
   ctx.lineCap = 'butt'
-  for (const s of below.up) {
-    const x = lay.refW + laneX(s.from - lay.firstLane, lay.m)
-    const active = s.kind === 'trunk' || laneActive(s.from, below, near)
-    ctx.globalAlpha = (s.kind === 'docs' ? MUTED : 1) * (active ? 1 : QUIET_ALPHA)
+  const line = (col: number, color: number, kind: string | undefined) => {
+    const x = lay.refW + laneX(col - lay.firstLane, lay.m)
+    const active = kind === 'trunk' || laneActive(col, below, near)
+    ctx.globalAlpha = (kind === 'docs' ? MUTED : 1) * (active ? 1 : QUIET_ALPHA)
     ctx.lineWidth = active ? LINE_WIDTH : QUIET_WIDTH
-    ctx.strokeStyle = laneColor(s.color)
+    ctx.strokeStyle = laneColor(color)
     ctx.beginPath()
     ctx.moveTo(x, y)
     ctx.lineTo(x, y + h)
     ctx.stroke()
   }
+  for (const s of below.up) line(s.from, s.color, s.kind)
+  const [first, last] = lanesInView(lay)
+  eachPass(below, first, last, line)
   ctx.restore()
+}
+
+/** The lane columns whose lines can fall inside the graph column, and never fewer. */
+function lanesInView(lay: Layout): [number, number] {
+  const { laneW, pad } = lay.m
+  return [Math.max(0, lay.firstLane - Math.ceil((pad + laneW / 2) / laneW)), lay.firstLane + Math.ceil(lay.graphW / laneW)]
 }
 
 /** How tall a fold's line is: a lane's machine commits of one day, as one row. */
@@ -933,14 +943,14 @@ export function drawRow(
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   // Docs lanes (a published site, not code) draw muted.
-  const strength = (s: Seg) => before * (s.kind === 'docs' ? MUTED : 1)
-  const straight = (s: Seg, y1: number, y2: number, strongEnd: number | null) => {
-    const sx = lx(s.from)
+  const strength = (kind: string | undefined) => before * (kind === 'docs' ? MUTED : 1)
+  const straight = (col: number, lane: number, kind: string | undefined, y1: number, y2: number, strongEnd: number | null) => {
+    const sx = lx(col)
     if (sx < graphLeft || sx > graphRight) return
-    const active = s.kind === 'trunk' || laneActive(s.from, row, near)
-    ctx.globalAlpha = strength(s) * (active ? 1 : QUIET_ALPHA)
+    const active = kind === 'trunk' || laneActive(col, row, near)
+    ctx.globalAlpha = strength(kind) * (active ? 1 : QUIET_ALPHA)
     ctx.lineWidth = active ? LINE_WIDTH : QUIET_WIDTH
-    ctx.strokeStyle = laneColor(s.color)
+    ctx.strokeStyle = laneColor(lane)
     ctx.beginPath()
     ctx.moveTo(sx, y1)
     ctx.lineTo(sx, y2)
@@ -950,9 +960,9 @@ export function drawRow(
     if (active || strongEnd === null) return
     const into = strongEnd === y1 ? Math.min(y2, y1 + LINE_FADE) : Math.max(y1, y2 - LINE_FADE)
     const fade = ctx.createLinearGradient(0, strongEnd, 0, into)
-    fade.addColorStop(0, laneColor(s.color))
+    fade.addColorStop(0, laneColor(lane))
     fade.addColorStop(1, 'transparent')
-    ctx.globalAlpha = strength(s)
+    ctx.globalAlpha = strength(kind)
     ctx.lineWidth = LINE_WIDTH
     ctx.strokeStyle = fade
     ctx.beginPath()
@@ -973,13 +983,17 @@ export function drawRow(
   }
   const link = (s: Seg, y1: number, y2: number, leaving: boolean) => {
     const e = elbow(lx(s.from), y1, lx(s.to), y2, leaving)
-    ctx.globalAlpha = strength(s)
+    ctx.globalAlpha = strength(s.kind)
     stroke(e, HALO_WIDTH, theme.bg)
     washOver(() => stroke(e, HALO_WIDTH, wash))
     stroke(e, LINE_WIDTH, laneColor(s.color))
   }
-  for (const s of row.up) if (s.from === s.to) straight(s, y, mid, strongAbove(s.from, near) ? y : null)
-  for (const s of row.down) if (s.from === s.to) straight(s, mid, y + h, strongBelow(s.from, near) ? y + h : null)
+  // The lanes that pass straight through arrive packed, and only the ones in view are read.
+  const [firstCol, lastCol] = lanesInView(lay)
+  for (const s of row.up) if (s.from === s.to) straight(s.from, s.color, s.kind, y, mid, strongAbove(s.from, near) ? y : null)
+  eachPass(row, firstCol, lastCol, (col, lane, kind) => straight(col, lane, kind, y, mid, strongAbove(col, near) ? y : null))
+  for (const s of row.down) if (s.from === s.to) straight(s.from, s.color, s.kind, mid, y + h, strongBelow(s.from, near) ? y + h : null)
+  eachPass(row, firstCol, lastCol, (col, lane, kind) => straight(col, lane, kind, mid, y + h, strongBelow(col, near) ? y + h : null))
   for (const s of row.up) if (s.from !== s.to) link(s, y, mid, false)
   for (const s of row.down) if (s.from !== s.to) link(s, mid, y + h, true)
   ctx.globalAlpha = before

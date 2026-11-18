@@ -2773,6 +2773,8 @@ export namespace graph {
 	    color: number;
 	    up: Seg[];
 	    down: Seg[];
+	    pass?: number[];
+	    passKind?: string[];
 	    width: number;
 	    kind?: string;
 	    id: string;
@@ -2792,6 +2794,8 @@ export namespace graph {
 	        this.color = source["color"];
 	        this.up = this.convertValues(source["up"], Seg);
 	        this.down = this.convertValues(source["down"], Seg);
+	        this.pass = source["pass"];
+	        this.passKind = source["passKind"];
 	        this.width = source["width"];
 	        this.kind = source["kind"];
 	        this.id = source["id"];

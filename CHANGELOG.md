@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- A very wide history scrolls more smoothly. The lanes that only pass through a row are sent to the graph packed together, which makes a page of an 800-lane history about a sixteenth the size it was. (#776)
+
 ### Fixed
 
 - Staging or unstaging single lines no longer joins two lines when the file's last line has no line ending. Staging only a line added after it used to write the two as one line that was in neither version. (#773)
