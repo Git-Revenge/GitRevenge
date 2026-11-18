@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { CHUNK, RowCache, type Page, type Row } from './rowCache'
+import { CHUNK, MAX_CHUNKS, RowCache, type Page, type Row } from './rowCache'
 
 function rows(start: number, count: number): Row[] {
   return Array.from({ length: count }, (_, i) => ({
@@ -102,5 +102,52 @@ describe('RowCache', () => {
     cache.invalidate()
     await flush()
     expect(cache.get(0)).toBeUndefined()
+  })
+})
+
+describe('a long scroll', () => {
+  /** Scrolls a view of 60 rows down through the history a chunk at a time, to row `to`. */
+  async function scrollTo(cache: RowCache, from: number, to: number) {
+    for (let at = from; at <= to; at += CHUNK) {
+      cache.ensure(at, at + 60)
+      await flush()
+    }
+  }
+
+  it('keeps only the chunks near the view, however far it has come', async () => {
+    const { fetch } = backend(1_000_000)
+    const cache = new RowCache(fetch, () => {})
+    const far = (MAX_CHUNKS + 120) * CHUNK
+    await scrollTo(cache, 0, far)
+    let kept = 0
+    for (let c = 0; c * CHUNK <= far; c++) if (cache.get(c * CHUNK)) kept++
+    expect(kept).toBe(MAX_CHUNKS)
+    // What's around the view is there, and what was dropped is the far end of the way here.
+    expect(cache.get(far)?.index).toBe(far)
+    expect(cache.get(far - 100 * CHUNK)?.index).toBe(far - 100 * CHUNK)
+    expect(cache.get(0)).toBeUndefined()
+  })
+
+  it('fetches a dropped chunk again when the view goes back to it', async () => {
+    const { fetch } = backend(1_000_000)
+    const cache = new RowCache(fetch, () => {})
+    await scrollTo(cache, 0, (MAX_CHUNKS + 20) * CHUNK)
+    expect(cache.get(0)).toBeUndefined()
+    const before = fetch.mock.calls.length
+    cache.ensure(0, 60)
+    await flush()
+    expect(cache.get(0)?.index).toBe(0)
+    expect(fetch.mock.calls.length).toBe(before + 1)
+    // Room for it came from the far end, which is now the furthest from the view.
+    expect(cache.get((MAX_CHUNKS + 20) * CHUNK)).toBeUndefined()
+    expect(cache.get(21 * CHUNK)?.index).toBe(21 * CHUNK)
+  })
+
+  it('drops nothing short of the limit', async () => {
+    const { fetch } = backend(1_000_000)
+    const cache = new RowCache(fetch, () => {})
+    await scrollTo(cache, 0, (MAX_CHUNKS - 1) * CHUNK)
+    expect(cache.get(0)?.index).toBe(0)
+    expect(fetch).toHaveBeenCalledTimes(MAX_CHUNKS)
   })
 })

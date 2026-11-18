@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 - A very wide history scrolls more smoothly. The lanes that only pass through a row are sent to the graph packed together, which makes a page of an 800-lane history about a sixteenth the size it was. (#776)
 - A commit or a working tree with tens of thousands of files stays quick: the file lists draw only the rows in view. (#777)
 - Closing a tab stops what was still being read for it, and asking for another file's blame or history stops the one before. (#778)
+- Scrolling a long way down a big history no longer keeps every row it passed in memory. (#784)
 
 ### Fixed
 
