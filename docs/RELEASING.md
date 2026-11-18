@@ -21,9 +21,10 @@ The workflow then does the following:
 1. Stamps the tag's version into the binary (`internal/version.Version`) and into `wails.json`.
 2. Builds the Windows NSIS installer. When the Certum secrets are configured, it signs the app, the uninstaller and the installer.
 3. Builds a universal macOS `.dmg`. When the Apple secrets are configured, it also signs, notarizes and staples it.
-4. Creates the GitHub Release, with notes generated from merged PRs. CHANGELOG.md is the curated record; the generated notes list every PR.
-5. For a stable release, tells [Git-Revenge/packages](https://github.com/Git-Revenge/packages) (the apt and dnf repos at packages.gitrevenge.com) and [Git-Revenge/homebrew-tap](https://github.com/Git-Revenge/homebrew-tap) to update. Both also check every six hours, so a missed notice only delays them.
-6. For a stable release, opens a pull request on [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) to update `GitRevenge.GitRevenge`. Microsoft's checks and reviewers take it from there, usually within a day or two.
+4. Attests each file's build provenance: a signed statement that this workflow built it from the tag's commit, which anyone can check with `gh attestation verify <file> --repo Git-Revenge/GitRevenge`. A file that can't be attested stops the release before it's published.
+5. Creates the GitHub Release, with notes generated from merged PRs. CHANGELOG.md is the curated record; the generated notes list every PR.
+6. For a stable release, tells [Git-Revenge/packages](https://github.com/Git-Revenge/packages) (the apt and dnf repos at packages.gitrevenge.com) and [Git-Revenge/homebrew-tap](https://github.com/Git-Revenge/homebrew-tap) to update. Both also check every six hours, so a missed notice only delays them.
+7. For a stable release, opens a pull request on [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) to update `GitRevenge.GitRevenge`. Microsoft's checks and reviewers take it from there, usually within a day or two.
 
 ## Keeping the changelog
 

@@ -378,11 +378,22 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # For the provenance attestation: a signing identity for this run, and leave to store
+      # what it signs. Only this job has them; the build jobs don't.
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           merge-multiple: true
+      # A signed statement, for each file about to be published, that this workflow built it
+      # from this tag's commit. `gh attestation verify <file> --repo <this repo>` checks it.
+      # Before the release is created: a file that can't be attested isn't published.
+      - name: Attest where the files were built
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
