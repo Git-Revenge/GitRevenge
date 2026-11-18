@@ -203,13 +203,23 @@ function lineBefore(ops: Op[], start: number, side: 'old' | 'new'): number {
  * is true. Applying everything yields the new side; applying nothing yields the old side.
  */
 export function applyChanges(ops: Op[], oldLines: string[], newLines: string[], apply: (i: number) => boolean): string {
+  // A file's last line may have no line ending, on either side. Kept with a line after it, it
+  // would run into that line: "b" and an added "c" would be the one line "bc", which is in
+  // neither version. So a line that turns out not to be last is given the ending the file uses.
+  const eol = [...oldLines, ...newLines].some((l) => l.endsWith('\r\n')) ? '\r\n' : '\n'
   let out = ''
+  let open = false
+  const add = (line: string) => {
+    if (open) out += eol
+    out += line
+    open = !line.endsWith('\n')
+  }
   for (let i = 0; i < ops.length; i++) {
     const op = ops[i]
-    if (op.kind === 'eq') out += oldLines[op.oldIndex]
+    if (op.kind === 'eq') add(oldLines[op.oldIndex])
     else if (op.kind === 'del') {
-      if (!apply(i)) out += oldLines[op.oldIndex]
-    } else if (apply(i)) out += newLines[op.newIndex]
+      if (!apply(i)) add(oldLines[op.oldIndex])
+    } else if (apply(i)) add(newLines[op.newIndex])
   }
   return out
 }

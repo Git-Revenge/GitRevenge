@@ -78,3 +78,70 @@ describe('applyChanges for partial staging', () => {
     expect(applyChanges(ops, index, work, (i) => i !== four)).toBe('ONE\ntwo\nTHREE\n')
   })
 })
+
+// A file whose last line has no line ending: staging part of a change after it used to join
+// that line to the next ("b" and "c" as "bc"), a line in neither version.
+describe('applyChanges where a side has no final newline', () => {
+  const pick = (ops: Op[], lines: string[], kind: Op['kind'], text: string) => ops.findIndex((o) => o.kind === kind && lines[kind === 'add' ? o.newIndex : o.oldIndex] === text)
+  const every = (oldText: string, newText: string) => {
+    const [a, b] = [splitLines(oldText), splitLines(newText)]
+    const ops = diffLines(a, b)
+    const changes = ops.flatMap((o, i) => (o.kind === 'eq' ? [] : [i]))
+    // Every way of choosing among the changes.
+    return Array.from({ length: 1 << changes.length }, (_, mask) => {
+      const chosen = new Set(changes.filter((_, k) => mask & (1 << k)))
+      return applyChanges(ops, a, b, (i) => chosen.has(i))
+    })
+  }
+
+  it('staging a line added after the old last line ends that line first', () => {
+    const [a, b] = [splitLines('a\nb'), splitLines('a\nb\nc\n')]
+    const ops = diffLines(a, b)
+    const c = pick(ops, b, 'add', 'c\n')
+    expect(applyChanges(ops, a, b, (i) => i === c)).toBe('a\nb\nc\n')
+  })
+
+  it('keeping an old line after a new last line that has no ending ends that line too', () => {
+    // Whichever order the changes come in, no two lines may share one.
+    for (const out of every('a\nb\nc\n', 'a\nB')) {
+      for (const line of splitLines(out)) expect(['a\n', 'b\n', 'c\n', 'B\n', 'B']).toContain(line)
+    }
+  })
+
+  it('uses the file’s own line ending', () => {
+    const [a, b] = [splitLines('a\r\nb'), splitLines('a\r\nb\r\nc\r\n')]
+    const ops = diffLines(a, b)
+    const c = pick(ops, b, 'add', 'c\r\n')
+    expect(applyChanges(ops, a, b, (i) => i === c)).toBe('a\r\nb\r\nc\r\n')
+  })
+
+  it('still gives back each side exactly when all or none of it is applied', () => {
+    for (const [oldText, newText] of [
+      ['a\nb', 'a\nb\nc\n'],
+      ['a\nb\n', 'a\nb'],
+      ['a\nb', 'a\nB'],
+      ['', 'a'],
+      ['a', ''],
+      ['a\nb\nc', 'x\nb\ny'],
+    ]) {
+      const [a, b] = [splitLines(oldText), splitLines(newText)]
+      const ops = diffLines(a, b)
+      expect(applyChanges(ops, a, b, () => true)).toBe(newText)
+      expect(applyChanges(ops, a, b, () => false)).toBe(oldText)
+    }
+  })
+
+  it('never makes a line that neither side has, whatever is chosen', () => {
+    for (const [oldText, newText] of [
+      ['a\nb', 'a\nb\nc\n'],
+      ['a\nb', 'a\nb\nc'],
+      ['a\nb\nc', 'a\nc'],
+      ['one\ntwo', 'ONE\ntwo\nthree'],
+    ]) {
+      const known = new Set([...splitLines(oldText), ...splitLines(newText)].map((l) => l.replace(/\n$/, '')))
+      for (const out of every(oldText, newText)) {
+        for (const line of out.split('\n')) if (line !== '') expect(known).toContain(line)
+      }
+    }
+  })
+})
