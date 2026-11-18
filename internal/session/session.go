@@ -288,8 +288,14 @@ func (m *Manager) resolve(ctx context.Context, path string) (root, gitDir, commo
 	})
 	if err != nil {
 		var gerr *git.Error
-		if errors.As(err, &gerr) && strings.Contains(gerr.Stderr, "not a git repository") {
+		switch {
+		case !errors.As(err, &gerr):
+		case strings.Contains(gerr.Stderr, "not a git repository"):
 			return "", "", "", fmt.Errorf("%s: %w", abs, ErrNotRepo)
+		case strings.Contains(gerr.Stderr, "cannot use bare repository"):
+			// With safe.bareRepository=explicit, Git 3.0's default, git won't look inside a
+			// bare repository it wasn't pointed at, and says so instead of answering.
+			return "", "", "", fmt.Errorf("%s: %w", abs, ErrBare)
 		}
 		return "", "", "", err
 	}
