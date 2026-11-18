@@ -142,6 +142,18 @@ jobs:
           if [ -n "${{ matrix.tags }}" ]; then args+=(-tags "${{ matrix.tags }}"); fi
           wails build "${args[@]}"
 
+      # The digest of the app as built, kept to compare with what the installer puts on disk
+      # (see "Upgrade a 0.11.0 install"). It's the Authenticode digest, which leaves a
+      # signature out, so it's the same before and after signing; a plain sha256 isn't.
+      - name: Record the app that was built
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $hash = "$((Get-AppLockerFileInformation -Path build\bin\gitrevenge.exe).Hash)"
+          if ($hash -notmatch '^SHA256 0x[0-9A-F]{64}$') { throw "Couldn't take the built app's digest: '$hash'" }
+          Write-Host "built: $hash"
+          "BUILT_APP_HASH=$hash" >> $env:GITHUB_ENV
+
       # Signing waits until the build is done, so no npm or Go install step runs while the
       # SimplySign session is open. The action installs SimplySign Desktop, signs in with a
       # one-time code made from the TOTP secret, and puts signtool on the PATH.
@@ -211,6 +223,10 @@ jobs:
           $new = Get-ChildItem dist\*-windows-amd64-installer.exe | Select-Object -First 1
           Start-Process $new.FullName -ArgumentList '/S' -Wait
           Check (Test-Path "$newDir\gitrevenge.exe") 'installed in Program Files\Git Revenge'
+          # The app the installer put on disk is the one the build step made (see "Record the
+          # app that was built"): nothing swapped it on the way through signing and packing.
+          $installed = "$((Get-AppLockerFileInformation -Path "$newDir\gitrevenge.exe").Hash)"
+          Check ($installed -match '^SHA256 0x[0-9A-F]{64}$' -and $installed -eq $env:BUILT_APP_HASH) "the installed app is the one that was built ($installed)"
           Check (Test-Path "$uninstall\GitRevenge") 'registered under the GitRevenge key'
           Check (-not (Test-Path "$uninstall\Ris AdamsGit Revenge")) 'old key removed'
           Check (-not (Test-Path $oldDir)) 'old folder removed'
