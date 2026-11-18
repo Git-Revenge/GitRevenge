@@ -159,6 +159,9 @@ func (r *Repo) count(ctx context.Context, args ...string) int {
 
 // ForecastMerge says what merging theirs into ours would do.
 func (r *Repo) ForecastMerge(ctx context.Context, ours, theirs string) (MergeForecast, error) {
+	if err := CheckRevs(ours, theirs); err != nil {
+		return MergeForecast{}, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, ForecastTimeout)
 	defer cancel()
 	var f MergeForecast
@@ -236,6 +239,9 @@ var forecastIdentity = []string{
 // the branch's commits in memory on top of the one before, as a rebase would, and reports
 // the first that doesn't apply. Merge commits are left out, as a plain rebase leaves them.
 func (r *Repo) ForecastRebase(ctx context.Context, branch, onto string) (RebaseForecast, error) {
+	if err := CheckRevs(branch, onto); err != nil {
+		return RebaseForecast{}, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, ForecastTimeout)
 	defer cancel()
 	var f RebaseForecast

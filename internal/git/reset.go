@@ -21,6 +21,9 @@ const (
 
 // Reset moves the current branch (or detached HEAD) to target.
 func (r *Repo) Reset(ctx context.Context, target string, mode ResetMode) error {
+	if err := CheckRevs(target); err != nil {
+		return err
+	}
 	switch mode {
 	case ResetSoft, ResetMixed, ResetHard:
 	default:
@@ -33,6 +36,9 @@ func (r *Repo) Reset(ctx context.Context, target string, mode ResetMode) error {
 // Revert creates a commit undoing commit. For a merge commit, mainline (1-based) picks the
 // parent whose side is kept; it is ignored for ordinary commits.
 func (r *Repo) Revert(ctx context.Context, commit string, mainline int) error {
+	if err := CheckRevs(commit); err != nil {
+		return err
+	}
 	args := []string{"revert", "--no-edit"}
 	if mainline > 0 {
 		args = append(args, "-m", strconv.Itoa(mainline))

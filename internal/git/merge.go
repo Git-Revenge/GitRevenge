@@ -27,6 +27,9 @@ const (
 
 // Merge merges ref into the current branch, keeping git's default merge message.
 func (r *Repo) Merge(ctx context.Context, ref string, mode MergeMode) error {
+	if err := CheckRevs(ref); err != nil {
+		return err
+	}
 	args := []string{"merge", "--no-edit"}
 	switch mode {
 	case MergeNoFF:
@@ -42,23 +45,35 @@ func (r *Repo) Merge(ctx context.Context, ref string, mode MergeMode) error {
 
 // CherryPick applies commits (oldest first) onto the current branch.
 func (r *Repo) CherryPick(ctx context.Context, commits ...string) error {
+	if err := CheckRevs(commits...); err != nil {
+		return err
+	}
 	return r.conflictAware(ctx, Cmd{Args: append([]string{"cherry-pick"}, commits...), Env: []string{"GIT_EDITOR=true"}})
 }
 
 // RebaseOnto moves the current branch's commits after upstream onto onto: `git rebase
 // --onto onto upstream`. Restacking uses it to drop a merged parent's old commits.
 func (r *Repo) RebaseOnto(ctx context.Context, onto, upstream string) error {
+	if err := CheckRevs(onto, upstream); err != nil {
+		return err
+	}
 	return r.conflictAware(ctx, Cmd{Args: []string{"rebase", "--onto", onto, upstream}, Env: []string{"GIT_EDITOR=true"}})
 }
 
 // RebaseStack moves top's commits after upstream onto onto, and every branch among them along
 // with it: `git rebase --update-refs --onto onto upstream top`. It leaves top checked out.
 func (r *Repo) RebaseStack(ctx context.Context, onto, upstream, top string) error {
+	if err := CheckRevs(onto, upstream, top); err != nil {
+		return err
+	}
 	return r.conflictAware(ctx, Cmd{Args: []string{"rebase", "--update-refs", "--onto", onto, upstream, top}, Env: []string{"GIT_EDITOR=true"}})
 }
 
 // Rebase replays the current branch's commits onto ref.
 func (r *Repo) Rebase(ctx context.Context, onto string) error {
+	if err := CheckRevs(onto); err != nil {
+		return err
+	}
 	return r.conflictAware(ctx, Cmd{Args: []string{"rebase", onto}, Env: []string{"GIT_EDITOR=true"}})
 }
 
@@ -66,6 +81,9 @@ func (r *Repo) Rebase(ctx context.Context, onto string) error {
 // squash! commit into the commit it names. Before git 2.44 --autosquash needs an interactive
 // rebase, so it runs one with the todo list accepted as git wrote it.
 func (r *Repo) RebaseAutosquash(ctx context.Context, onto string) error {
+	if err := CheckRevs(onto); err != nil {
+		return err
+	}
 	return r.conflictAware(ctx, Cmd{Args: []string{"rebase", "-i", "--autosquash", onto}, Env: []string{"GIT_EDITOR=true", "GIT_SEQUENCE_EDITOR=true"}})
 }
 

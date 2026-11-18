@@ -45,6 +45,9 @@ type OpenBranch struct {
 // nil, leaves out branches by their name without the remote (such as Docs branches), before
 // the limit applies.
 func (r *Repo) OpenBranches(ctx context.Context, target string, limit int, skip func(name string) bool) ([]OpenBranch, error) {
+	if err := CheckRevs(target); err != nil {
+		return nil, err
+	}
 	targetRef, err := r.ReadString(ctx, "rev-parse", "--symbolic-full-name", target)
 	if err != nil {
 		return nil, err
@@ -183,6 +186,9 @@ type Conflict struct {
 // WouldConflict merges branch into target in memory (git merge-tree), touching nothing on
 // disk, and reports whether it conflicts and where.
 func (r *Repo) WouldConflict(ctx context.Context, target, branch string) (Conflict, error) {
+	if err := CheckRevs(target, branch); err != nil {
+		return Conflict{}, err
+	}
 	args := append(pinned(target),
 		"-c", "merge.renames=true", "-c", "merge.directoryRenames=conflict",
 		"merge-tree", "--write-tree", "--name-only", "--no-messages", target, branch)
@@ -217,6 +223,9 @@ type HotFile struct {
 // HotFiles totals the files changed by the shipped items of q, most changed first
 // (ties by path). Renames count against the new path.
 func (r *Repo) HotFiles(ctx context.Context, q ShippedQuery) ([]HotFile, error) {
+	if err := CheckRevs(q.Target, q.Range); err != nil {
+		return nil, err
+	}
 	args := append(pinned(q.Target),
 		"log", "--first-parent", "--diff-merges=first-parent", "--numstat", "-M",
 		"--no-textconv", "--no-ext-diff", "--format=%x1e%ct%x1d")

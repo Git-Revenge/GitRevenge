@@ -34,6 +34,9 @@ type BranchMerge struct {
 // make merging them conflict. Anything that goes wrong reads as "not known to be merged",
 // since the answer decides whether deleting the branch asks first.
 func (r *Repo) BranchMergeState(ctx context.Context, branch string, targets []string) BranchMerge {
+	if err := CheckRevs(append([]string{branch}, targets...)...); err != nil {
+		return BranchMerge{}
+	}
 	targets = r.distinctTargets(ctx, targets)
 	first := r.mergeIntoAny(ctx, "refs/heads/"+branch, targets)
 	if first.How != "" || len(targets) == 0 {
@@ -295,6 +298,9 @@ func countCherry(out string) (missing, landed int) {
 // stacks, because a branch inside one that's merged needs no merging of its own to check, and
 // each check can take a second on a big repository. It returns what it has if ctx runs out.
 func (r *Repo) MergedBranches(ctx context.Context, names, targets []string) map[string]BranchMerge {
+	if err := CheckRevs(append(slices.Clone(names), targets...)...); err != nil {
+		return nil
+	}
 	merged := map[string]BranchMerge{}
 	for name, state := range r.BranchStates(ctx, names, targets) {
 		if state.How != "" {
@@ -307,6 +313,9 @@ func (r *Repo) MergedBranches(ctx context.Context, names, targets []string) map[
 // BranchStates is MergedBranches with the branches it found not merged too, and how many of
 // their commits aren't. A branch it had no time for isn't there.
 func (r *Repo) BranchStates(ctx context.Context, names, targets []string) map[string]BranchMerge {
+	if err := CheckRevs(append(slices.Clone(names), targets...)...); err != nil {
+		return nil
+	}
 	merged := map[string]BranchMerge{}
 	if len(targets) == 0 {
 		return merged

@@ -52,6 +52,9 @@ func (a *App) PushedUndo(path string, undo bool) (SharedCommits, error) {
 	if upstream == "" {
 		return SharedCommits{}, nil
 	}
+	if git.CheckRevs(expect.Commit, upstream) != nil {
+		return SharedCommits{}, nil
+	}
 	// What's on both the branch and its upstream ends at where they meet.
 	out, err := r.Git.ReadString(ctx, "merge-base", expect.Commit, upstream)
 	if err != nil {
@@ -105,7 +108,7 @@ func (a *App) ForcePushLoss(path string) (SharedCommits, error) {
 // Otherwise it's err. An upstream still in the branch's history doesn't count, however much
 // the reflog remembers it: that's the remote having moved on since the last fetch.
 func pushRefusal(ctx context.Context, g *git.Repo, branch, upstream string, err error) error {
-	if upstream == "" || !isRejectedPush(err) {
+	if upstream == "" || !isRejectedPush(err) || git.CheckRevs(upstream) != nil {
 		return err
 	}
 	tip, tipErr := g.ReadString(ctx, "rev-parse", upstream)

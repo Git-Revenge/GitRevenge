@@ -73,12 +73,18 @@ func (r *Repo) AddRemote(ctx context.Context, name, url string) error {
 
 // RemoveRemote deletes a remote and its remote-tracking branches.
 func (r *Repo) RemoveRemote(ctx context.Context, name string) error {
+	if err := CheckRevs(name); err != nil {
+		return err
+	}
 	_, err := r.Write(ctx, Cmd{Args: []string{"remote", "remove", name}})
 	return err
 }
 
 // RenameRemote renames a remote, updating its remote-tracking branches and upstreams.
 func (r *Repo) RenameRemote(ctx context.Context, from, to string) error {
+	if err := CheckRevs(from); err != nil {
+		return err
+	}
 	if err := r.checkRemoteName(ctx, to); err != nil {
 		return err
 	}
@@ -132,6 +138,9 @@ func (o NetOptions) cmd(args ...string) Cmd {
 // remote-tracking branches that no longer exist. It only updates refs/remotes and tags,
 // so it runs alongside other operations rather than waiting in the write queue.
 func (r *Repo) Fetch(ctx context.Context, remote string, o NetOptions) error {
+	if err := CheckRevs(remote); err != nil {
+		return err
+	}
 	args := []string{"fetch", "--progress", "--prune"}
 	if remote == "" {
 		args = append(args, "--all")
@@ -202,12 +211,19 @@ func (r *Repo) BranchUpstream(ctx context.Context, branch string) (remote, merge
 // it was and where it is now. Only the ref moves, so the working tree and index aren't touched.
 // A branch that only has commits of its own has nothing to pull, which isn't an error.
 func (r *Repo) PullBranch(ctx context.Context, branch string, o NetOptions) (from, to string, err error) {
+	if err := CheckRevs(branch); err != nil {
+		return "", "", err
+	}
 	remote, merge, err := r.BranchUpstream(ctx, branch)
 	if err != nil {
 		return "", "", err
 	}
 	ref := "refs/heads/" + branch
 	if from, err = r.ReadString(ctx, "rev-parse", "--verify", "-q", ref); err != nil {
+		return "", "", err
+	}
+	// The remote's name comes from config, and reaches fetch as a plain argument.
+	if err := CheckRevs(remote, merge); err != nil {
 		return "", "", err
 	}
 	// No leading + in the refspec: git itself refuses anything but a fast-forward, or a branch
@@ -237,6 +253,9 @@ func (r *Repo) PullBranch(ctx context.Context, branch string, o NetOptions) (fro
 
 // MoveBranch points a branch that isn't checked out at target, if it's still at expect.
 func (r *Repo) MoveBranch(ctx context.Context, branch, expect, target string) error {
+	if err := CheckRevs(branch, expect, target); err != nil {
+		return err
+	}
 	tip, err := r.ReadString(ctx, "rev-parse", "--verify", "-q", "refs/heads/"+branch)
 	if err != nil || tip != expect {
 		return ErrBranchMoved

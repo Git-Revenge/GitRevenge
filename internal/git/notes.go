@@ -18,6 +18,9 @@ const DefaultNotesRef = "refs/notes/commits"
 
 // Notes returns the commit's notes from every notes ref, the default ref first.
 func (r *Repo) Notes(ctx context.Context, commit string) ([]Note, error) {
+	if err := CheckRevs(commit); err != nil {
+		return nil, err
+	}
 	out, err := r.ReadString(ctx, "for-each-ref", "--format=%(refname)", "refs/notes/")
 	if err != nil {
 		return nil, err
@@ -72,6 +75,9 @@ func (r *Repo) NotedCommits(ctx context.Context) ([]string, error) {
 
 // SetNote adds or replaces the commit's note in ref, or removes it when text is empty.
 func (r *Repo) SetNote(ctx context.Context, ref, commit, text string) error {
+	if err := CheckRevs(commit); err != nil {
+		return err
+	}
 	if !strings.HasPrefix(ref, "refs/notes/") {
 		ref = "refs/notes/" + ref
 	}
@@ -91,6 +97,9 @@ func notesMirror(remote string) string { return "refs/notes-remote/" + remote + 
 // FetchNotes fetches remote's notes refs into their mirror under refs/notes-remote/. The
 // mirror is forced: it's a copy of the remote, not a place anyone writes.
 func (r *Repo) FetchNotes(ctx context.Context, remote string, o NetOptions) error {
+	if err := CheckRevs(remote); err != nil {
+		return err
+	}
 	c := o.cmd("fetch", "--progress", "--prune", "--no-tags", remote, "+refs/notes/*:"+notesMirror(remote)+"*")
 	c.Dir = r.dir
 	_, err := r.runner.Run(ctx, c)
@@ -102,6 +111,9 @@ func (r *Repo) FetchNotes(ctx context.Context, remote string, o NetOptions) erro
 // remote doesn't have, and the remote has notes this one doesn't, has diverged: it's
 // left alone and returned, since merging notes is for the user to choose.
 func (r *Repo) IntegrateNotes(ctx context.Context, remote string) (diverged []string, err error) {
+	if err := CheckRevs(remote); err != nil {
+		return nil, err
+	}
 	mirror := notesMirror(remote)
 	out, err := r.ReadString(ctx, "for-each-ref", "--format=%(refname) %(objectname)", mirror)
 	if err != nil {
@@ -146,6 +158,9 @@ func (r *Repo) isAncestor(ctx context.Context, a, b string) bool {
 // PushNotes pushes every notes ref to remote, without forcing: a ref the remote has moved
 // on from is rejected rather than overwritten. Refs already up to date send nothing.
 func (r *Repo) PushNotes(ctx context.Context, remote string, o NetOptions) error {
+	if err := CheckRevs(remote); err != nil {
+		return err
+	}
 	if out, err := r.ReadString(ctx, "for-each-ref", "--count=1", "--format=%(refname)", "refs/notes/"); err != nil || strings.TrimSpace(out) == "" {
 		return err
 	}

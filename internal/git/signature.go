@@ -38,6 +38,9 @@ func statusOf(code string) string {
 // VerifySignatures checks the signatures of the given commits with git's own verification,
 // which uses the user's gpg, gpg.ssh.allowedSignersFile and gpgsm configuration.
 func (r *Repo) VerifySignatures(ctx context.Context, ids []string) (map[string]SignatureCheck, error) {
+	if err := CheckRevs(ids...); err != nil {
+		return nil, err
+	}
 	out := make(map[string]SignatureCheck, len(ids))
 	if len(ids) == 0 {
 		return out, nil

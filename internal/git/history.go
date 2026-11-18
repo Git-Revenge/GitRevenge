@@ -90,6 +90,9 @@ type BlameLine struct {
 // Blame attributes each line of path (at rev, or the work tree when rev is "") to the
 // commit that last changed it.
 func (r *Repo) Blame(ctx context.Context, path, rev string) ([]BlameLine, error) {
+	if err := CheckRevs(rev); err != nil {
+		return nil, err
+	}
 	args := []string{"blame", "--porcelain"}
 	if rev != "" {
 		args = append(args, rev)

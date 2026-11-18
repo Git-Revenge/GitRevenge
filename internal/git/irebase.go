@@ -26,6 +26,9 @@ var ErrMergesInRange = errors.New("range contains merge commits")
 
 // RebasePlan lists the commits after base up to HEAD, oldest first, each set to pick.
 func (r *Repo) RebasePlan(ctx context.Context, base string) ([]RebaseItem, error) {
+	if err := CheckRevs(base); err != nil {
+		return nil, err
+	}
 	if merges, err := r.ReadString(ctx, "rev-list", "--merges", base+"..HEAD"); err != nil {
 		return nil, err
 	} else if merges != "" {

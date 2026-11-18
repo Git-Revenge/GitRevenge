@@ -21,6 +21,9 @@ func (r *Repo) Head(ctx context.Context) HeadState {
 // ResetKeep moves HEAD to target like a hard reset, but refuses if that would overwrite
 // local changes in files that differ between HEAD and target.
 func (r *Repo) ResetKeep(ctx context.Context, target string) error {
+	if err := CheckRevs(target); err != nil {
+		return err
+	}
 	_, err := r.Write(ctx, Cmd{Args: []string{"reset", "-q", "--keep", target, "--"}})
 	return err
 }

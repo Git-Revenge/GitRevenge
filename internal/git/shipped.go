@@ -55,6 +55,9 @@ type TipInfo struct {
 
 // ForkPoint returns where branch left target: their merge base, with its committer date.
 func (r *Repo) ForkPoint(ctx context.Context, branch, target string) (TipInfo, error) {
+	if err := CheckRevs(branch, target); err != nil {
+		return TipInfo{}, err
+	}
 	base, err := r.ReadString(ctx, "merge-base", branch, target)
 	if err != nil {
 		return TipInfo{}, err
@@ -64,6 +67,9 @@ func (r *Repo) ForkPoint(ctx context.Context, branch, target string) (TipInfo, e
 
 // Tip resolves rev to its commit and committer date.
 func (r *Repo) Tip(ctx context.Context, rev string) (TipInfo, error) {
+	if err := CheckRevs(rev); err != nil {
+		return TipInfo{}, err
+	}
 	out, err := r.ReadString(ctx, "log", "-1", "--format=%H %ct", rev+"^{commit}", "--")
 	if err != nil {
 		return TipInfo{}, err
@@ -145,6 +151,9 @@ type ShippedItem struct {
 
 // Shipped lists the items of q, newest first, as they appear on the first-parent line.
 func (r *Repo) Shipped(ctx context.Context, q ShippedQuery) ([]ShippedItem, error) {
+	if err := CheckRevs(q.Target, q.Range); err != nil {
+		return nil, err
+	}
 	args := append(pinned(q.Target),
 		"log", "--first-parent", "--diff-merges=first-parent", "--numstat", "-M",
 		"--no-textconv", "--no-ext-diff",

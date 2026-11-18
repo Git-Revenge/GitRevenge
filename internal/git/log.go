@@ -55,6 +55,9 @@ const logFormat = "%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%s"
 // repository has a commit-graph file (`git commit-graph write`, or fetch.writeCommitGraph).
 // Without one, git must walk the whole history before printing anything.
 func (r *Repo) Log(ctx context.Context, opts LogOptions, fn func(LogCommit) error) error {
+	if err := CheckRevs(append(slices.Clone(opts.Revs), opts.Extra...)...); err != nil {
+		return err
+	}
 	args := []string{"log", "--date-order", "-z", "--format=" + logFormat, "--no-show-signature"}
 	if opts.MaxCount > 0 {
 		args = append(args, "--max-count="+strconv.Itoa(opts.MaxCount))
@@ -161,6 +164,9 @@ func (r *Repo) tagTips(ctx context.Context) []string {
 // CountCommits counts the commits Log would list for opts, ignoring MaxCount. It is cheap
 // with a commit-graph file, and gives the graph a size before the history has loaded.
 func (r *Repo) CountCommits(ctx context.Context, opts LogOptions) (int, error) {
+	if err := CheckRevs(append(slices.Clone(opts.Revs), opts.Extra...)...); err != nil {
+		return 0, err
+	}
 	out, err := r.ReadString(ctx, append([]string{"rev-list", "--count"}, r.logRevs(ctx, opts)...)...)
 	if isEmptyRepoLogError(err) {
 		return 0, nil

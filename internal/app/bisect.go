@@ -81,7 +81,7 @@ func (a *App) bisectRepo(path string) (*session.Repo, error) {
 // subjects returns the subject line of each commit, by id. Commits it can't read are left out.
 func subjects(ctx context.Context, g *git.Repo, ids []string) map[string]string {
 	out := map[string]string{}
-	if len(ids) == 0 {
+	if len(ids) == 0 || git.CheckRevs(ids...) != nil {
 		return out
 	}
 	b, err := g.Read(ctx, append([]string{"log", "--no-walk=unsorted", "--format=%H%x00%s"}, ids...)...)
@@ -138,6 +138,9 @@ func (a *App) PlanBisect(path, bad, good string) (BisectPlan, error) {
 	}
 	var plan BisectPlan
 	resolve := func(rev string) string {
+		if git.CheckRevs(rev) != nil {
+			return ""
+		}
 		id, err := r.Git.ReadString(ctx, "rev-parse", "--verify", "--quiet", rev+"^{commit}")
 		if err != nil {
 			return ""

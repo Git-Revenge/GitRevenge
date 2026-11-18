@@ -30,6 +30,9 @@ func (r *Repo) CheckBranchName(ctx context.Context, name string) error {
 // CreateBranch creates a branch at start (a commit, branch or tag; empty means HEAD) and
 // optionally checks it out.
 func (r *Repo) CreateBranch(ctx context.Context, name, start string, checkout bool) error {
+	if err := CheckRevs(start); err != nil {
+		return err
+	}
 	if err := r.CheckBranchName(ctx, name); err != nil {
 		return err
 	}
@@ -46,6 +49,9 @@ func (r *Repo) CreateBranch(ctx context.Context, name, start string, checkout bo
 
 // RenameBranch renames a local branch, keeping its upstream and reflog.
 func (r *Repo) RenameBranch(ctx context.Context, from, to string) error {
+	if err := CheckRevs(from); err != nil {
+		return err
+	}
 	if err := r.CheckBranchName(ctx, to); err != nil {
 		return err
 	}
@@ -56,6 +62,9 @@ func (r *Repo) RenameBranch(ctx context.Context, from, to string) error {
 // DeleteBranch deletes a local branch. Without force, git refuses branches whose commits
 // would be lost, reported as ErrNotMerged.
 func (r *Repo) DeleteBranch(ctx context.Context, name string, force bool) error {
+	if err := CheckRevs(name); err != nil {
+		return err
+	}
 	flag := "-d"
 	if force {
 		flag = "-D"
@@ -77,6 +86,9 @@ func (r *Repo) DeleteBranch(ctx context.Context, name string, force bool) error 
 // branch (e.g. "origin/feature") checks out the local branch of the same name, creating it
 // to track the remote if needed. Anything else (a commit or tag) detaches HEAD.
 func (r *Repo) Checkout(ctx context.Context, ref string) error {
+	if err := CheckRevs(ref); err != nil {
+		return err
+	}
 	if r.refExists(ctx, "refs/heads/"+ref) {
 		_, err := r.Write(ctx, Cmd{Args: []string{"switch", ref}})
 		return err
@@ -104,6 +116,9 @@ func (r *Repo) refExists(ctx context.Context, full string) bool {
 
 // SetUpstream makes branch track upstream (e.g. "origin/main"). An empty upstream unsets it.
 func (r *Repo) SetUpstream(ctx context.Context, branch, upstream string) error {
+	if err := CheckRevs(branch); err != nil {
+		return err
+	}
 	args := []string{"branch", "--set-upstream-to=" + upstream, branch}
 	if upstream == "" {
 		args = []string{"branch", "--unset-upstream", branch}
@@ -115,6 +130,9 @@ func (r *Repo) SetUpstream(ctx context.Context, branch, upstream string) error {
 // CreateTag creates a tag at target (empty means HEAD). With a message the tag is annotated
 // (and signed if tag.gpgSign is set); without one it is lightweight.
 func (r *Repo) CreateTag(ctx context.Context, name, target, message string) error {
+	if err := CheckRevs(target); err != nil {
+		return err
+	}
 	if strings.TrimSpace(name) == "" || strings.HasPrefix(name, "-") {
 		return fmt.Errorf("%q: %w", name, ErrInvalidName)
 	}
@@ -140,6 +158,9 @@ func (r *Repo) CreateTag(ctx context.Context, name, target, message string) erro
 
 // DeleteTag deletes a local tag.
 func (r *Repo) DeleteTag(ctx context.Context, name string) error {
+	if err := CheckRevs(name); err != nil {
+		return err
+	}
 	_, err := r.Write(ctx, Cmd{Args: []string{"tag", "-d", name}})
 	return err
 }
@@ -180,6 +201,9 @@ func (r *Repo) BranchTrackings(ctx context.Context) map[string]BranchTracking {
 // SetBranchTracking restores what BranchTrackings read. Unlike SetUpstream, it works when the
 // remote branch no longer exists, and before the branch does.
 func (r *Repo) SetBranchTracking(ctx context.Context, name string, t BranchTracking) error {
+	if err := CheckRevs(t.Remote, t.Merge); err != nil {
+		return err
+	}
 	if t.Remote == "" || t.Merge == "" {
 		return nil
 	}

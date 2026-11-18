@@ -98,6 +98,9 @@ func (a *App) BranchMap(path string) (BranchMap, error) {
 		return out, nil
 	}
 	count := func(rng string) (int, error) {
+		if err := git.CheckRevs(rng); err != nil {
+			return 0, err
+		}
 		s, err := r.Git.ReadString(ctx, "rev-list", "--count", rng, "--")
 		if err != nil {
 			return 0, err

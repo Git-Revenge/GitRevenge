@@ -231,6 +231,9 @@ func bisectLeft(n int) (remaining, steps int) {
 // BisectRange says how many commits lie between a good and a bad commit, and about how many
 // answers a bisect of them takes.
 func (r *Repo) BisectRange(ctx context.Context, bad, good string) (commits, steps int, err error) {
+	if err := CheckRevs(bad, good); err != nil {
+		return 0, 0, err
+	}
 	out, err := r.ReadString(ctx, "rev-list", "--count", good+".."+bad)
 	if err != nil {
 		return 0, 0, err
@@ -251,6 +254,9 @@ var ErrBisectOrder = errors.New("the good commit isn't in the bad commit's histo
 // BisectStart begins a bisect between a bad commit and a good one, and checks out the first
 // commit to test. If it can't get going, the repository is put back as it was.
 func (r *Repo) BisectStart(ctx context.Context, bad, good string) error {
+	if err := CheckRevs(bad, good); err != nil {
+		return err
+	}
 	if _, err := r.Read(ctx, "merge-base", "--is-ancestor", good, bad); err != nil {
 		var gerr *Error
 		if errors.As(err, &gerr) && gerr.ExitCode == 1 {
@@ -335,9 +341,13 @@ func (r *Repo) BisectUndo(ctx context.Context, gitDir string) error {
 // BisectSuggestGood proposes a commit to call good when bisecting from bad: the nearest tag
 // before it. It returns the tag's name, or "" when there isn't one.
 func (r *Repo) BisectSuggestGood(ctx context.Context, bad string) string {
+	if err := CheckRevs(bad); err != nil {
+		return ""
+	}
 	// A tag on the bad commit itself is no use: start from its parent.
 	tag, err := r.ReadString(ctx, "describe", "--tags", "--abbrev=0", bad+"^")
-	if err != nil {
+	// A tag whose name git would read as an option is no suggestion to make.
+	if err != nil || CheckRevs(tag) != nil {
 		return ""
 	}
 	return tag

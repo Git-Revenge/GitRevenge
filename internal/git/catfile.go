@@ -109,6 +109,10 @@ func (o *ObjectReader) do(command, rev string, read func(*bufio.Reader) error) e
 }
 
 func (o *ObjectReader) requestLocked(command, rev string, read func(*bufio.Reader) error) error {
+	// One request is one line: a line break in rev would start a request of its own.
+	if strings.ContainsAny(rev, "\r\n\x00") {
+		return fmt.Errorf("%q isn't an object name", rev)
+	}
 	if _, err := io.WriteString(o.stdin, command+" "+rev+"\n"); err != nil {
 		return err
 	}

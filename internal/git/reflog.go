@@ -21,6 +21,9 @@ type ReflogEntry struct {
 // Reflog lists ref's reflog, newest first, at most limit entries. A ref without a reflog
 // has no entries.
 func (r *Repo) Reflog(ctx context.Context, ref string, limit int) ([]ReflogEntry, error) {
+	if err := CheckRevs(ref); err != nil {
+		return nil, err
+	}
 	out, err := r.ReadString(ctx, "reflog", "show", "--date=unix", "--format=%H%x1f%gd%x1f%gs%x1e", "-n", strconv.Itoa(limit), ref, "--")
 	entries := []ReflogEntry{}
 	if err != nil {

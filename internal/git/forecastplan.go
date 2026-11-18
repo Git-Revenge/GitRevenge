@@ -106,6 +106,9 @@ func (r *Repo) dropped(ctx context.Context, commit string) DroppedCommit {
 // items plan it: in that order, without the dropped commits. A squash or a fixup changes the
 // same files as a pick, so it's tried the same way.
 func (r *Repo) ForecastPlan(ctx context.Context, base string, items []RebaseItem) (PlanForecast, error) {
+	if err := CheckRevs(base); err != nil {
+		return PlanForecast{}, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, ForecastTimeout)
 	defer cancel()
 	var f PlanForecast

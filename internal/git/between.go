@@ -20,6 +20,9 @@ type CommitLine struct {
 // CommitsBetween lists up to limit commits reachable from include but not exclude, newest
 // first, and how many there are in all.
 func (r *Repo) CommitsBetween(ctx context.Context, exclude, include string, limit int) ([]CommitLine, int, error) {
+	if err := CheckRevs(exclude, include); err != nil {
+		return nil, 0, err
+	}
 	span := exclude + ".." + include
 	out, err := r.ReadString(ctx, "rev-list", "--count", span)
 	if err != nil {
@@ -52,6 +55,9 @@ func parseCommitLines(out string) []CommitLine {
 // CommitsOnlyOn is CommitsBetween leaving out commits whose change exclude has anyway, as it
 // does for its own commits after a rebase. What's left would really be lost.
 func (r *Repo) CommitsOnlyOn(ctx context.Context, exclude, include string, limit int) ([]CommitLine, int, error) {
+	if err := CheckRevs(exclude, include); err != nil {
+		return nil, 0, err
+	}
 	span := exclude + "..." + include
 	out, err := r.ReadString(ctx, "rev-list", "--count", "--cherry-pick", "--right-only", span)
 	if err != nil {
@@ -71,6 +77,9 @@ func (r *Repo) CommitsOnlyOn(ctx context.Context, exclude, include string, limit
 // UpstreamOf returns the short name of branch's upstream, or "" if it has none, or none that
 // exists any more.
 func (r *Repo) UpstreamOf(ctx context.Context, branch string) string {
+	if err := CheckRevs(branch); err != nil {
+		return ""
+	}
 	out, err := r.ReadString(ctx, "rev-parse", "--abbrev-ref", branch+"@{upstream}")
 	if err != nil {
 		return ""
@@ -84,6 +93,9 @@ const reflogDepth = "2000"
 // WasOnBranch reports whether the ref points at commit, or has pointed at it recently enough
 // for its reflog to remember.
 func (r *Repo) WasOnBranch(ctx context.Context, branch, commit string) bool {
+	if err := CheckRevs(branch, commit); err != nil {
+		return false
+	}
 	out, err := r.ReadString(ctx, "log", "-g", "-n", reflogDepth, "--format=%H", "refs/heads/"+branch)
 	if err != nil {
 		return false
