@@ -17,7 +17,7 @@
   function answer(ok: boolean) {
     if (!current) return
     const p = current
-    AnswerPrompt(p.id, p.kind === 'hostkey' ? 'yes' : value, ok)
+    void AnswerPrompt(p.id, p.kind === 'hostkey' ? 'yes' : value, ok)
     value = ''
     queue = queue.slice(1)
   }

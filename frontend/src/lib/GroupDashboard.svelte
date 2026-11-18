@@ -80,7 +80,7 @@
             class:missing={!r.exists}
             class:openable={r.exists}
             onclick={(e) => {
-              if (r.exists && !(e.target as HTMLElement).closest('button')) session.open(r.path)
+              if (r.exists && !(e.target as HTMLElement).closest('button')) void session.open(r.path)
             }}
           >
             <td class="repo" title={r.path}>{r.name}</td>
