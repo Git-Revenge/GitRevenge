@@ -32,6 +32,8 @@ type App struct {
 	// upstreams remembers where branches' upstreams were before fetches prune them, for
 	// cleanup on pull.
 	upstreams upstreamMemory
+	// trustAsk holds the question to put to the user about a repository (see TakeTrustQuestion).
+	trustAsk trustQuestions
 	// chosen holds the files picked in a file dialog (see chosenFiles).
 	chosen chosenFiles
 	// promptHook answers credential prompts in tests instead of the UI.

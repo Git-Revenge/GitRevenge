@@ -58,6 +58,8 @@ func (a *App) Clone(url, parent, name string) (string, error) {
 		removeClone(dir, existed)
 		return "", err
 	}
+	// A clone holds only what git and the user's own settings put in its config and hooks.
+	a.trustNew(dir)
 	return dir, nil
 }
 
@@ -88,6 +90,7 @@ func (a *App) Init(dir, branch string) (string, error) {
 		}
 		return "", err
 	}
+	a.trustNew(dir)
 	return dir, nil
 }
 

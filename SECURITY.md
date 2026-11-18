@@ -32,7 +32,7 @@ Git Revenge is maintained by volunteers and has no bug bounty. What we do with a
 Areas where a report matters most:
 
 - **Credentials**, including the askpass bridge ([ADR 0004](docs/adr/0004-askpass-bridge.md)) and anything written to disk or logs.
-- **Running git**, including how repository content, refs, file names and config reach the command line.
+- **Running git**, including how repository content, refs, file names and config reach the command line. Before a repository the app didn't clone or create is opened for the first time, the app asks if its own config or hooks would run programs ([how](docs/guide/repositories.md#a-repository-that-runs-programs-of-its-own)); a way to get one run without that question is worth a report.
 - **Repository content in the UI**: diffs, commit messages, notes, and the rendered previews of Markdown, HTML, notebooks, AsciiDoc, reStructuredText, PDFs, diagrams, GeoJSON, audio and video. Content from a repository must never run scripts, and a preview must never fetch anything from the network. The app's page has a Content-Security-Policy as a second line of defence (`frontend/src/lib/contentPolicy.ts`); a way around it is worth a report too.
 - **What we ship**: the release artifacts, the update check, the apt and dnf repositories at packages.gitrevenge.com ([Git-Revenge/packages](https://github.com/Git-Revenge/packages)), and the Homebrew tap ([Git-Revenge/homebrew-tap](https://github.com/Git-Revenge/homebrew-tap)).
 - **The website**, gitrevenge.com.

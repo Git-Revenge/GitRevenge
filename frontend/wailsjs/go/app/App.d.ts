@@ -356,9 +356,13 @@ export function TakeConflictSide(arg1:string,arg2:string,arg3:string):Promise<vo
 
 export function TakeProblem(arg1:string):Promise<app.Problem>;
 
+export function TakeTrustQuestion():Promise<app.TrustQuestion>;
+
 export function Theme():Promise<string>;
 
 export function TrailerHints(arg1:string):Promise<git.TrailerHints>;
+
+export function TrustRepo(arg1:string):Promise<void>;
 
 export function TryLinkRule(arg1:string,arg2:links.Rule):Promise<app.LinkTry>;
 

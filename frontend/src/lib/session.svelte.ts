@@ -8,6 +8,8 @@ import {
   RestoreSession,
   SetActiveRepo,
   TakeProblem,
+  TakeTrustQuestion,
+  TrustRepo,
 } from '../../wailsjs/go/app/App.js'
 import type { app } from '../../wailsjs/go/models'
 import { EventsOn } from '../../wailsjs/runtime/runtime.js'
@@ -89,13 +91,46 @@ class Session {
   }
 
   async choose() {
-    const tab = await this.run(() => ChooseAndOpenRepo())
+    const tab = await this.opening(() => ChooseAndOpenRepo())
     if (tab) this.add(tab)
   }
 
   async open(path: string) {
-    const tab = await this.run(() => OpenRepo(path))
+    const tab = await this.opening(() => OpenRepo(path))
     if (tab) this.add(tab)
+  }
+
+  /**
+   * A repository that wasn't opened because its own git config or hooks would run programs,
+   * and what they are, for TrustDialog to ask about. Nothing has run in it yet.
+   */
+  trustQuestion = $state<app.TrustQuestion | null>(null)
+
+  /** Opens a repository. If the app refused it for want of trust, that's a question to ask,
+   * not an error to show. */
+  private async opening<T>(fn: () => Promise<T>): Promise<T | undefined> {
+    try {
+      return await fn()
+    } catch (e) {
+      const question = await TakeTrustQuestion().catch(() => null)
+      if (!question) return this.run(() => Promise.reject(e))
+      this.trustQuestion = question
+      return undefined
+    }
+  }
+
+  /** The user agrees: remember that, and open the repository. */
+  async trustAndOpen() {
+    const question = this.trustQuestion
+    if (!question) return
+    this.trustQuestion = null
+    const trusted = await this.run(() => TrustRepo(question.path).then(() => true))
+    if (trusted) await this.open(question.path)
+  }
+
+  /** The user doesn't: the repository stays closed, and nothing in it has run. */
+  declineTrust() {
+    this.trustQuestion = null
   }
 
   async close(path: string) {

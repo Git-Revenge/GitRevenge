@@ -183,9 +183,12 @@ func (a *App) OpenRepo(path string) (RepoTab, error) {
 		return RepoTab{}, err
 	}
 	ctx := context.Background()
+	// Only opening asks: the question is for the repository being opened now, not one that
+	// was refused in passing.
+	a.TakeTrustQuestion()
 	r, err := m.Open(ctx, path)
 	if err != nil {
-		return RepoTab{}, friendly(err)
+		return RepoTab{}, friendly(a.askTrust(err))
 	}
 	a.syncRepoConfigSoon(r.Path)
 	return tabFor(ctx, r), nil
@@ -261,6 +264,10 @@ func friendly(err error) error {
 		return userError("That folder isn't a git repository.")
 	case errors.Is(err, session.ErrBare):
 		return userError("Bare repositories aren't supported, because they have no working files to show.")
+	}
+	var untrusted *session.UntrustedError
+	if errors.As(err, &untrusted) {
+		return userError(filepath.Base(untrusted.Root) + untrustedSuffix)
 	}
 	return err
 }

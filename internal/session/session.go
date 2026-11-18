@@ -18,6 +18,7 @@ import (
 	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/graph"
 	"github.com/git-revenge/gitrevenge/internal/settings"
+	"github.com/git-revenge/gitrevenge/internal/trust"
 	"github.com/git-revenge/gitrevenge/internal/watch"
 )
 
@@ -207,7 +208,53 @@ func (m *Manager) OnWatchFailed(fn func(path string, err error)) {
 
 // NewManager returns a Manager with no open repositories.
 func NewManager(runner *git.Runner, store *settings.Store) *Manager {
+	// Repositories from before trust was asked about are trusted as they stand.
+	if !store.Get().TrustSeeded {
+		_ = store.Update(func(s *settings.Settings) { s.SeedTrust() })
+	}
 	return &Manager{runner: runner, settings: store, now: time.Now, startWatch: watch.New}
+}
+
+// UntrustedError means a repository's own config or hooks would make git run programs, and
+// the user hasn't agreed to that for this repository. Nothing has been run in it beyond
+// finding where it is.
+type UntrustedError struct {
+	// Root is the work tree root.
+	Root string
+	// Findings are what it would run.
+	Findings []trust.Finding
+}
+
+func (e *UntrustedError) Error() string {
+	return fmt.Sprintf("%s: its own git config or hooks would run programs, and it hasn't been trusted to", e.Root)
+}
+
+// vet lets a repository through if the user trusts it, or if its config and hooks name
+// nothing to run. Otherwise it returns an *UntrustedError, before any git command that
+// would act on that config has run there.
+func (m *Manager) vet(ctx context.Context, root, gitDir, commonDir string) error {
+	if s := m.settings.Get(); s.Trusts(root, commonDir) {
+		return nil
+	}
+	found, err := trust.Scan(ctx, m.runner, gitDir, commonDir)
+	if err != nil {
+		return err
+	}
+	if len(found) > 0 {
+		return &UntrustedError{Root: root, Findings: found}
+	}
+	return nil
+}
+
+// Trust records that the user agrees the repository containing path may run what its config
+// and hooks name, and returns its root. Linked worktrees share the main one's git folder, so
+// trusting one covers them all.
+func (m *Manager) Trust(ctx context.Context, path string) (string, error) {
+	root, _, commonDir, err := m.resolve(ctx, path)
+	if err != nil {
+		return "", err
+	}
+	return root, m.settings.Update(func(s *settings.Settings) { s.Trust(root, commonDir) })
 }
 
 // SetReadAhead sets how many rows the graph reader loads past the furthest row requested
@@ -280,6 +327,11 @@ func (m *Manager) Open(ctx context.Context, path string) (*Repo, error) {
 	if err != nil {
 		return nil, err
 	}
+	if m.Get(root) == nil {
+		if err := m.vet(ctx, root, gitDir, commonDir); err != nil {
+			return nil, err
+		}
+	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -313,6 +365,9 @@ func (m *Manager) Open(ctx context.Context, path string) (*Repo, error) {
 		s.AddRecent(root, m.now())
 		s.OpenTabs = m.pathsLocked()
 		s.ActiveTab = root
+		// Opened once, it's the user's from here on: a hook manager or Git LFS they set up
+		// in it later doesn't stop its tab coming back. The question is for first contact.
+		s.Trust(root, commonDir)
 	})
 	return r, err
 }
@@ -496,12 +551,15 @@ func (m *Manager) watchLocked(r *Repo) *watch.Watcher {
 // GitFor returns a git handle for the repository containing path: the open tab's (sharing
 // its write queue) if there is one, otherwise a fresh handle with no watcher or graph.
 func (m *Manager) GitFor(ctx context.Context, path string) (*git.Repo, string, error) {
-	root, err := m.Resolve(ctx, path)
+	root, gitDir, commonDir, err := m.resolve(ctx, path)
 	if err != nil {
 		return nil, "", err
 	}
 	if r := m.Get(root); r != nil {
 		return r.Git, root, nil
+	}
+	if err := m.vet(ctx, root, gitDir, commonDir); err != nil {
+		return nil, "", err
 	}
 	return git.OpenRepo(m.runner, root), root, nil
 }

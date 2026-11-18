@@ -13,6 +13,21 @@ The start page has three ways in:
 
 Repositories you open are listed under **Recent**, so you can get back to them in one click.
 
+### A repository that runs programs of its own
+
+Git takes orders from a repository's own `.git/config` and hooks: a program to run whenever files are checked for changes, a filter for every file, a script on each commit. A clone never brings these along, so in a repository you cloned they are there only if you put them there. A repository that reaches you with its `.git` folder already made, in an archive or on a shared drive, has whatever its maker put there, and opening it in any git tool runs them.
+
+So the first time you open a repository that Git Revenge didn't clone or create, it reads the repository's config and lists its hooks before running anything there. If it finds none of these, the repository opens as usual. If it finds some, it shows each one, with what it does, and asks:
+
+- **Don't open** leaves the repository closed. Nothing in it has been run.
+- **Trust and open** opens it, and remembers your answer for that repository.
+
+It asks once, at first contact. A repository you've opened is yours from then on: a hook manager or Git LFS you set up in it later doesn't bring the question back.
+
+What it asks about: settings that name a program (such as `core.fsmonitor`, `core.sshCommand`, `core.hooksPath`, filters, merge and diff drivers, credential helpers), settings that pull in other config files or send fetches and pushes somewhere else (`include.path`, `url.<base>.insteadOf`), and hook scripts. Git LFS's own filter and hooks aren't asked about. Repositories you had already opened before this was added are trusted as they stand.
+
+The repositories you've opened or trusted are listed in `settings.json` under `trustedRepos`; see [where your data lives](install.md#where-your-data-lives). Remove a line to be asked again.
+
 ## Tabs
 
 Every repository opens in its own tab, and the tabs come back when you restart the app.

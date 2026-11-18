@@ -29,6 +29,8 @@ export interface Scenario {
   wip?: { changes: number | null }
   /** Mounts the toolbar under the error banner, for the commands its actions run. */
   toolbar?: boolean
+  /** A repository the backend won't open until it's trusted, and what it would ask (a TrustQuestion). */
+  untrusted?: { path: string; name: string; findings: { kind: string; name: string; value: string; why: string }[] }
 }
 
 /** Opens one real component against the stub, and fails on any uncaught error. */

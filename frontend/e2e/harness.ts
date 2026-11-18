@@ -59,8 +59,29 @@ const graphRow = (i: number) => ({
 
 type Group = { name: string; paths: string[] }
 
+// The untrusted repository's state, as the backend keeps it: refused until TrustRepo is called,
+// with the question to ask handed over once after each refusal.
+let trusted = false
+let asking = false
+
 // Behaviour the stub has to get right for a test to mean anything; everything else just answers.
 const behaviours: Record<string, (...args: never[]) => unknown> = {
+  OpenRepo: (path: string) => {
+    if (scenario.untrusted?.path === path && !trusted) {
+      asking = true
+      throw new Error(`${scenario.untrusted.name} has git settings or hooks of its own that run programs, and you haven't said it may.`)
+    }
+    asking = false
+    return 'OpenRepo' in responses ? structuredClone(responses.OpenRepo) : { path, name: path.split('/').pop(), head: 'main' }
+  },
+  TakeTrustQuestion: () => {
+    const question = asking ? structuredClone(scenario.untrusted) : null
+    asking = false
+    return question
+  },
+  TrustRepo: (path: string) => {
+    if (scenario.untrusted?.path === path) trusted = true
+  },
   GraphRows: (_path: string, start: number, count: number) => {
     const total = scenario.graphData?.length ?? scenario.graphRows ?? 0
     return { rows: Array.from({ length: Math.max(0, Math.min(count, total - start)) }, (_, k) => scenario.graphData?.[start + k] ?? graphRow(start + k)), refs: scenario.graphRefs ?? {}, total, loading: false, paused: false, estimate: total }
@@ -312,6 +333,13 @@ const mounts = {
     const { default: SettingsDialog } = await import('../src/lib/SettingsDialog.svelte')
     mount(SettingsDialog, { target: host, props: { onClose: record('close') } })
   },
+  // Opening a repository the app refuses for want of trust, then the dialog that asks.
+  async trustDialog() {
+    const { default: TrustDialog } = await import('../src/lib/TrustDialog.svelte')
+    const { session } = await import('../src/lib/session.svelte')
+    mount(TrustDialog, { target: host })
+    Object.assign(win, { __open: (path: string) => session.open(path), __tabs: () => session.tabs.map((t) => t.path), __problem: () => session.problem?.text ?? '' })
+  },
   async about() {
     const { default: AboutDialog } = await import('../src/lib/about/AboutDialog.svelte')
     mount(AboutDialog, { target: host, props: { version: '0.11.0', onClose: record('close') } })
@@ -369,6 +397,9 @@ const mounts = {
 switch (new URLSearchParams(location.search).get('mount')) {
   case 'about':
     await mounts.about()
+    break
+  case 'trustDialog':
+    await mounts.trustDialog()
     break
   case 'settings':
     await mounts.settings()

@@ -12,6 +12,7 @@
   import Lazy from './lib/ui/Lazy.svelte'
   import OperationBanner from './lib/OperationBanner.svelte'
   import PromptDialog from './lib/PromptDialog.svelte'
+  import TrustDialog from './lib/TrustDialog.svelte'
   import RepoView from './lib/RepoView.svelte'
   import { session } from './lib/session.svelte'
   import StartPage from './lib/StartPage.svelte'
@@ -143,6 +144,7 @@
 <svelte:window onkeydown={onKey} />
 
 <PromptDialog />
+<TrustDialog />
 <InkFilters />
 <Toasts />
 <CommandPalette />

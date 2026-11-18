@@ -81,6 +81,49 @@ type Settings struct {
 	Keybindings map[string]string `json:"keybindings,omitempty"`
 	// Repos holds settings that belong to one repository, such as its branch kinds.
 	Repos []RepoSettings `json:"repos,omitempty"`
+	// TrustedRepos are repositories that may run the programs their own git config and
+	// hooks name: work tree roots and git folders. A repository gets here by being opened
+	// as a tab, which the user is asked about first if it would run anything, or by being
+	// cloned or created in the app.
+	TrustedRepos []string `json:"trustedRepos,omitempty"`
+	// TrustSeeded is set once the repositories known before trust was asked about (recent,
+	// open, grouped) have been added to TrustedRepos, so an update doesn't ask about each.
+	TrustSeeded bool `json:"trustSeeded,omitempty"`
+}
+
+// Trusts reports whether any of paths is a trusted repository.
+func (s *Settings) Trusts(paths ...string) bool {
+	return slices.ContainsFunc(paths, func(p string) bool {
+		return p != "" && slices.ContainsFunc(s.TrustedRepos, func(t string) bool { return fsutil.SamePath(t, p) })
+	})
+}
+
+// Trust adds paths to the trusted repositories.
+func (s *Settings) Trust(paths ...string) {
+	for _, p := range paths {
+		if p != "" && !s.Trusts(p) {
+			s.TrustedRepos = append(s.TrustedRepos, filepath.Clean(p))
+		}
+	}
+}
+
+// SeedTrust trusts every repository the settings already know, once. They were opened
+// before the app asked, so whatever their config runs has run already.
+func (s *Settings) SeedTrust() {
+	if s.TrustSeeded {
+		return
+	}
+	s.TrustSeeded = true
+	for _, r := range s.Recent {
+		s.Trust(r.Path)
+	}
+	s.Trust(s.OpenTabs...)
+	for _, g := range s.Groups {
+		s.Trust(g.Paths...)
+	}
+	for _, r := range s.Repos {
+		s.Trust(r.Path)
+	}
 }
 
 // RepoSettings are one repository's own settings (ADR 0009).
@@ -170,6 +213,7 @@ func defaults() Settings {
 func (s Settings) clone() Settings {
 	s.Recent = slices.Clone(s.Recent)
 	s.OpenTabs = slices.Clone(s.OpenTabs)
+	s.TrustedRepos = slices.Clone(s.TrustedRepos)
 	s.ExperimentalViews = slices.Clone(s.ExperimentalViews)
 	groups := make([]Group, len(s.Groups))
 	for i, g := range s.Groups {

@@ -220,6 +220,10 @@ func TestGitConfigOnlyOpensFilesItFound(t *testing.T) {
 		t.Fatal(err)
 	}
 	fx.Git("config", "include.path", filepath.ToSlash(included))
+	// A config that pulls in another file is one the app asks about before opening.
+	if err := a.TrustRepo(fx.Dir); err != nil {
+		t.Fatal(err)
+	}
 	scopes, err := a.GitConfigScopes(fx.Dir)
 	if err != nil {
 		t.Fatal(err)
