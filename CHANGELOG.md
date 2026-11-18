@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Changed
 
+- Only the repository on screen is watched for changes. A tab behind it used to refresh every time something changed in its repository, with nobody looking, and on Linux each open tab held a watch for every folder in its tree. Now a tab is brought up to date when you switch to it: its files, branches and operation are read as it opens, and its graph is read again only if a branch, tag or HEAD has moved. The Insights and Ignore rules tabs watch the repositories they're showing. A tab's label can show the branch it was on until you switch to it. (#780)
+- Starting with several tabs open is quicker: the tab on screen loads its graph first and the others load behind it one at a time, where they all used to start at once. (#780)
 - A very wide history scrolls more smoothly. The lanes that only pass through a row are sent to the graph packed together, which makes a page of an 800-lane history about a sixteenth the size it was. (#776)
 - A commit or a working tree with tens of thousands of files stays quick: the file lists draw only the rows in view. (#777)
 - Closing a tab stops what was still being read for it, and asking for another file's blame or history stops the one before. (#778)

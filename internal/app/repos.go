@@ -7,10 +7,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/git-revenge/gitrevenge/internal/fsutil"
 	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/session"
 	"github.com/git-revenge/gitrevenge/internal/settings"
@@ -87,6 +89,17 @@ func (a *App) sessions() (*session.Manager, error) {
 		}
 		a.sess.OnGraph(a.emitGraphProgress)
 		a.sess.OnWatchFailed(func(path string, err error) { a.notice(path, watchFailedMessage(err)) })
+		a.sess.OnShown(func(path string, late bool) {
+			// The repository's own settings live in its config, which nothing was watching.
+			a.syncRepoConfigSoon(path)
+			// The active tab's view opens after its repository is watched, and reads
+			// everything as it does. Any other view of the repository (the Insights or Ignore
+			// rules tab) was open already, as was that one if the watcher was late: those are
+			// told to read it again.
+			if late || !fsutil.SamePath(a.sess.Settings().Get().ActiveTab, path) {
+				a.emit("repo:changed", RepoChange{Path: path, Kinds: watch.All.Names()})
+			}
+		})
 		a.sess.OnChange(func(path string, k watch.Kind) {
 			// The repository's own settings live in its config.
 			if k&watch.Config != 0 {
@@ -152,10 +165,15 @@ func (a *App) RestoreSession() (SessionState, error) {
 		IgnoreTab:     m.Settings().Get().IgnoreTab,
 		IgnoreTabID:   settings.IgnoreTabID,
 	}
-	for _, r := range m.List() {
-		st.Tabs = append(st.Tabs, tabFor(ctx, r))
+	// A tab's label is a git call or two: all of them at once, rather than one after another.
+	repos := m.List()
+	st.Tabs = make([]RepoTab, len(repos))
+	var wg sync.WaitGroup
+	for i, r := range repos {
+		wg.Go(func() { st.Tabs[i] = tabFor(ctx, r) })
 		a.syncRepoConfigSoon(r.Path)
 	}
+	wg.Wait()
 	for p, err := range failed {
 		st.Failed = append(st.Failed, FailedRepo{Path: p, Error: err.Error()})
 	}
@@ -204,7 +222,9 @@ func (a *App) CloseRepo(path string) error {
 	return m.Close(path)
 }
 
-// SetActiveRepo records the selected tab; an empty path means the start page.
+// SetActiveRepo records the selected tab; an empty path means the start page. The repository
+// it shows is watched from here on, in place of the last tab's, and has been by the time this
+// returns unless that takes unusually long (see session.Manager.OnShown).
 func (a *App) SetActiveRepo(path string) error {
 	m, err := a.sessions()
 	if err != nil {

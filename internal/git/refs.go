@@ -4,11 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // RefKind classifies a ref.
@@ -81,6 +84,42 @@ const upstreamFormat = "%(refname)%00%(upstream:short)%00%(upstream:track)"
 var maxUpstreamPatternBytes = 16 * 1024
 
 var trackRE = regexp.MustCompile(`(ahead|behind) (\d+)`)
+
+// RefsState is a fingerprint of where HEAD and every ref point: the same string as long as
+// none of them has moved, been added or been removed, and HEAD is on the same branch. It
+// costs two short git calls, so it answers "has anything the commit graph shows changed?"
+// without reading the history again.
+func (r *Repo) RefsState(ctx context.Context) (string, error) {
+	var (
+		wg      sync.WaitGroup
+		branch  string
+		refs    []byte
+		refsErr error
+	)
+	// Which branch HEAD is on: two branches at one commit look the same below. It fails when
+	// HEAD is detached, and then the list below has the commit it's at.
+	wg.Go(func() { branch, _ = r.ReadString(ctx, "symbolic-ref", "-q", "HEAD") })
+	wg.Go(func() {
+		refs, refsErr = r.Read(ctx, "show-ref", "--head")
+		// Exit status 1 with nothing said is a repository with no commits and no refs.
+		var gerr *Error
+		if errors.As(refsErr, &gerr) && gerr.ExitCode == 1 && gerr.Stderr == "" {
+			refsErr = nil
+		}
+	})
+	wg.Wait()
+	if refsErr != nil {
+		return "", refsErr
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	h := sha256.New()
+	h.Write([]byte(branch))
+	h.Write([]byte{0})
+	h.Write(refs)
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
 
 // Refs lists branches, remote-tracking branches, tags and stashes. Symbolic refs such as
 // refs/remotes/origin/HEAD are skipped.

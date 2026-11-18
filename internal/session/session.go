@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/git-revenge/gitrevenge/internal/branchkind"
@@ -39,9 +40,11 @@ type Repo struct {
 	CommonDir string
 	Git       *git.Repo
 	Objects   *git.ObjectReader
-	watcher   *watch.Watcher
-	graph     *graphLoader
-	changes   changeGate
+	// watcher runs only while the repository is on screen (see Manager.rewatch), which
+	// guards it with watchMu.
+	watcher *watch.Watcher
+	graph   *graphLoader
+	changes changeGate
 }
 
 // changeGate holds back reports of changes while an operation runs.
@@ -127,8 +130,8 @@ func (r *Repo) FullGraph(ctx context.Context) (*graph.Graph, error) {
 func (r *Repo) Name() string { return filepath.Base(r.Path) }
 
 // ReloadGraph reloads the commit graph, for a change git can't see, such as new hide
-// patterns.
-func (r *Repo) ReloadGraph() { r.graph.reload() }
+// patterns. A graph that hasn't loaded yet reads them when it does.
+func (r *Repo) ReloadGraph() { r.graph.reloadStarted() }
 
 // SetShowHidden shows the repository's hidden branches again (or hides them), for this
 // session only, and reloads the graph.
@@ -157,12 +160,9 @@ func Rules(rs settings.RepoSettings) branchkind.Rules {
 	return branchkind.New(overrides, rs.Hide).HidingKinds(hidden)
 }
 
+// close stops the repository's background work. Its watcher is the manager's to stop.
 func (r *Repo) close() {
-	// First, so that what's still being read for the tab stops now.
 	r.Git.Close()
-	if r.watcher != nil {
-		r.watcher.Close()
-	}
 	r.graph.stop()
 	_ = r.Objects.Close()
 }
@@ -175,13 +175,33 @@ type Manager struct {
 
 	mu            sync.Mutex
 	repos         []*Repo // tab order
+	closed        bool
 	onChange      func(path string, k watch.Kind)
 	onWatchFailed func(path string, err error)
+	onShown       func(path string, late bool)
 	// startWatch is watch.New, except in tests.
 	startWatch func(watch.Options) (*watch.Watcher, error)
 	onGraph    func(path string, p GraphProgress)
 	// readAhead overrides DefaultReadAhead; tests use it.
 	readAhead int
+	// wait is watchWait, except in tests.
+	wait time.Duration
+
+	// saveMu orders the writes of the open tabs to settings, so the last one written lists
+	// them as they are. It's taken before mu, never while holding it: saving syncs a file
+	// to disk, and every call for every tab waits on mu.
+	saveMu sync.Mutex
+
+	// watchMu guards watching and each Repo's watcher. Starting a watcher can take a while
+	// on a big tree, so it isn't done under mu either.
+	watchMu sync.Mutex
+	// watching are the repositories on screen, which are the ones watched (see rewatch).
+	watching []*Repo
+
+	// life ends when the manager closes, and work holds what it started on its own.
+	life context.Context
+	end  context.CancelFunc
+	work sync.WaitGroup
 }
 
 // OnGraph registers fn to receive commit graph loading progress for open repositories.
@@ -208,13 +228,43 @@ func (m *Manager) OnWatchFailed(fn func(path string, err error)) {
 	m.onWatchFailed = fn
 }
 
+// OnShown registers fn to be called (from a background goroutine) when a repository comes on
+// screen and is watched from then on. Nothing reported what changed in it while it was off
+// screen, so whatever fn's caller keeps about it wants reading again. late means something
+// may have read the repository already, before it was watched: the watcher took so long to
+// start that the caller of SetActive or Open went on without it, or the repository was on
+// screen all along and its watcher had to restart. Call it before opening repositories.
+func (m *Manager) OnShown(fn func(path string, late bool)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.onShown = fn
+}
+
 // NewManager returns a Manager with no open repositories.
 func NewManager(runner *git.Runner, store *settings.Store) *Manager {
 	// Repositories from before trust was asked about are trusted as they stand.
 	if !store.Get().TrustSeeded {
 		_ = store.Update(func(s *settings.Settings) { s.SeedTrust() })
 	}
-	return &Manager{runner: runner, settings: store, now: time.Now, startWatch: watch.New}
+	life, end := context.WithCancel(context.Background())
+	return &Manager{runner: runner, settings: store, now: time.Now, startWatch: watch.New, wait: watchWait, life: life, end: end}
+}
+
+// spawn runs fn on its own goroutine, which CloseAll waits for. It reports false, without
+// running fn, once the manager has closed.
+func (m *Manager) spawn(fn func()) bool {
+	m.mu.Lock()
+	if m.closed {
+		m.mu.Unlock()
+		return false
+	}
+	m.work.Add(1)
+	m.mu.Unlock()
+	go func() {
+		defer m.work.Done()
+		fn()
+	}()
+	return true
 }
 
 // UntrustedError means a repository's own config or hooks would make git run programs, and
@@ -340,102 +390,218 @@ func (m *Manager) Open(ctx context.Context, path string) (*Repo, error) {
 			return nil, err
 		}
 	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	r := m.findLocked(root)
-	if r == nil {
-		r = &Repo{
-			Path:      root,
-			GitDir:    gitDir,
-			CommonDir: commonDir,
-			Git:       git.OpenRepo(m.runner, root),
-			Objects:   git.NewObjectReader(m.runner, root),
-		}
-		onGraph := m.onGraph
-		ahead := m.readAhead
-		if ahead <= 0 {
-			ahead = DefaultReadAhead
-		}
-		r.graph = newGraphLoader(r.Git, ahead, func(p GraphProgress) {
-			if onGraph != nil {
-				onGraph(root, p)
-			}
-		})
-		store := m.settings
-		r.graph.rules = func() branchkind.Rules { return Rules(store.Get().Repo(root)) }
-		r.graph.stackOverrides = func() map[string]string { return store.Get().Repo(root).StackParents }
-		r.graph.reload()
-		r.watcher = m.watchLocked(r)
-		m.repos = append(m.repos, r)
-	}
-	err = m.settings.Update(func(s *settings.Settings) {
+	r := m.add(root, gitDir, commonDir)
+	r.graph.start()
+	err = m.saveTabs(func(s *settings.Settings) {
 		s.AddRecent(root, m.now())
-		s.OpenTabs = m.pathsLocked()
 		s.ActiveTab = root
 		// Opened once, it's the user's from here on: a hook manager or Git LFS they set up
 		// in it later doesn't stop its tab coming back. The question is for first contact.
 		s.Trust(root, commonDir)
 	})
+	m.rewatch(m.wait)
 	return r, err
+}
+
+// add returns the open repository at root, adding it as the last tab if it isn't open. A new
+// one loads nothing and isn't watched until it's asked to.
+func (m *Manager) add(root, gitDir, commonDir string) *Repo {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if r := m.findLocked(root); r != nil {
+		return r
+	}
+	r := &Repo{
+		Path:      root,
+		GitDir:    gitDir,
+		CommonDir: commonDir,
+		Git:       git.OpenRepo(m.runner, root),
+		Objects:   git.NewObjectReader(m.runner, root),
+	}
+	onGraph := m.onGraph
+	ahead := m.readAhead
+	if ahead <= 0 {
+		ahead = DefaultReadAhead
+	}
+	r.graph = newGraphLoader(r.Git, ahead, func(p GraphProgress) {
+		if onGraph != nil {
+			onGraph(root, p)
+		}
+	})
+	store := m.settings
+	r.graph.rules = func() branchkind.Rules { return Rules(store.Get().Repo(root)) }
+	r.graph.stackOverrides = func() map[string]string { return store.Get().Repo(root).StackParents }
+	onChange := m.onChange
+	r.changes.deliver = func(k watch.Kind) {
+		if k.Has(watch.Head) || k.Has(watch.Refs) {
+			r.graph.reloadStarted()
+		}
+		if onChange != nil {
+			onChange(r.Path, k)
+		}
+	}
+	m.repos = append(m.repos, r)
+	return r
+}
+
+// saveTabs writes the open tabs to settings, with change's edits in the same write.
+func (m *Manager) saveTabs(change func(s *settings.Settings)) error {
+	m.saveMu.Lock()
+	defer m.saveMu.Unlock()
+	m.mu.Lock()
+	paths := m.pathsLocked()
+	m.mu.Unlock()
+	return m.settings.Update(func(s *settings.Settings) {
+		s.OpenTabs = paths
+		if change != nil {
+			change(s)
+		}
+	})
 }
 
 // Close closes the tab for path. Closing a path that isn't open is not an error.
 func (m *Manager) Close(path string) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	i := slices.IndexFunc(m.repos, func(r *Repo) bool { return fsutil.SamePath(r.Path, path) })
 	if i < 0 {
+		m.mu.Unlock()
 		return nil
 	}
 	closed := m.repos[i]
-	closed.close()
 	m.repos = slices.Delete(m.repos, i, i+1)
-	// The file watching library keeps one tree of watches for the whole process. Stopping a watch
-	// inside another one, as a linked worktree's git folder is inside the main repository's, also
-	// silences the outer one. Starting them again brings them back, but only once all of them
-	// have stopped, or stopping a later one would silence one already started.
-	var restart []*Repo
-	for _, r := range m.repos {
-		if r.watcher != nil && watchesOverlap(closed, r) {
-			r.watcher.Close()
-			restart = append(restart, r)
-		}
+	next := ""
+	if len(m.repos) > 0 {
+		next = m.repos[min(i, len(m.repos)-1)].Path
 	}
-	for _, r := range restart {
-		r.watcher = m.watchLocked(r)
-	}
-	return m.settings.Update(func(s *settings.Settings) {
-		s.OpenTabs = m.pathsLocked()
+	m.mu.Unlock()
+	err := m.saveTabs(func(s *settings.Settings) {
 		if fsutil.SamePath(s.ActiveTab, path) {
-			s.ActiveTab = ""
-			if len(m.repos) > 0 {
-				s.ActiveTab = m.repos[min(i, len(m.repos)-1)].Path
-			}
+			s.ActiveTab = next
 		}
 	})
+	// However long it takes: once this returns, nothing of the app's is holding the folder,
+	// which on Windows would stop it being moved or deleted.
+	m.rewatch(0)
+	closed.close()
+	return err
 }
 
-// watchesOverlap reports whether one repository's watched folders are inside the other's, as
-// with a linked worktree or a submodule and the repository holding it.
-func watchesOverlap(a, b *Repo) bool {
-	inside := func(dir, base string) bool {
-		rel, err := filepath.Rel(base, dir)
-		return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
-	}
-	for _, x := range []string{a.Path, a.GitDir, a.CommonDir} {
-		for _, y := range []string{b.Path, b.GitDir, b.CommonDir} {
-			if inside(x, y) || inside(y, x) {
-				return true
+// watchWait is how long Open and SetActive wait for the repository coming on screen to be
+// watched. Their caller reads it once they return, and a change between that read and the
+// watcher starting would go unseen, so the watcher is given the time it nearly always needs
+// (a few milliseconds; one watch per folder on Linux can take longer in a big tree). Past
+// that the caller goes on, and OnShown says the repository wants reading again.
+const watchWait = 100 * time.Millisecond
+
+// shown lists the open repositories on screen: the active tab's, or the ones the Ignore
+// rules or Insights tab is showing. The start page and the Git Config tab show none (config
+// files are watched on their own).
+func (m *Manager) shown() []*Repo {
+	s := m.settings.Get()
+	var paths []string
+	switch s.ActiveTab {
+	case "", settings.ConfigTabID:
+	case settings.IgnoreTabID:
+		paths = []string{s.IgnoreTab}
+	case settings.InsightsTabID:
+		switch kind, id, _ := strings.Cut(s.InsightsTab, ":"); kind {
+		case "repo":
+			paths = []string{id}
+		case "group":
+			for _, g := range s.Groups {
+				if g.Name == id {
+					paths = g.Paths
+				}
 			}
 		}
+	default:
+		paths = []string{s.ActiveTab}
 	}
-	return false
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var repos []*Repo
+	for _, p := range paths {
+		if r := m.findLocked(p); r != nil && !slices.Contains(repos, r) {
+			repos = append(repos, r)
+		}
+	}
+	return repos
 }
 
-// SetActive records which tab is selected. An empty path means the start page.
+// Rewatch brings what's watched in line with what's on screen, after a change to what a tab
+// shows that the manager didn't make: the Insights tab's scope, the Ignore rules tab's
+// repository, or a group's repositories.
+func (m *Manager) Rewatch() { m.rewatch(m.wait) }
+
+// rewatch watches the repositories on screen and no others. A repository off screen has
+// nothing to refresh, and a watcher for each open tab costs a subscription (on Linux, a
+// watch for every folder in the tree) and a round of git calls on every change, for tabs
+// nobody is looking at. One that comes on screen is brought up to date instead (see watch).
+//
+// It waits up to wait for the watchers to be in place, or however long that takes if wait
+// is 0.
+func (m *Manager) rewatch(wait time.Duration) {
+	var late atomic.Bool
+	done := make(chan struct{})
+	if !m.spawn(func() {
+		defer close(done)
+		m.watchShown(&late)
+	}) {
+		return
+	}
+	if wait <= 0 {
+		<-done
+		return
+	}
+	t := time.NewTimer(wait)
+	defer t.Stop()
+	select {
+	case <-done:
+	case <-t.C:
+		late.Store(true)
+	}
+}
+
+// watchShown is rewatch's work. late is set once rewatch's caller has stopped waiting.
+func (m *Manager) watchShown(late *atomic.Bool) {
+	m.watchMu.Lock()
+	defer m.watchMu.Unlock()
+	want := m.shown()
+	if slices.Equal(want, m.watching) {
+		return
+	}
+	// The file watching library keeps one tree of watches for the whole process. Stopping a
+	// watch inside another one, as a linked worktree's git folder is inside the main
+	// repository's, also silences the outer one, and starting it again only brings it back
+	// once all of them have stopped. So a change stops every watcher before starting any.
+	was := m.watching
+	for _, r := range was {
+		if r.watcher != nil {
+			r.watcher.Close()
+			r.watcher = nil
+		}
+	}
+	m.watching = want
+	m.mu.Lock()
+	onShown := m.onShown
+	m.mu.Unlock()
+	for _, r := range want {
+		r.watcher = m.watch(r)
+		// One that was watched until a moment ago missed only that moment, but can't tell
+		// what was in it, so it's brought up to date like one that's new on screen.
+		m.spawn(func() { r.graph.refresh(m.life) })
+		if onShown != nil {
+			onShown(r.Path, late.Load() || slices.Contains(was, r))
+		}
+	}
+}
+
+// SetActive records which tab is selected, and watches what it shows in place of what the
+// last one did. An empty path means the start page.
 func (m *Manager) SetActive(path string) error {
-	return m.settings.Update(func(s *settings.Settings) { s.ActiveTab = path })
+	err := m.settings.Update(func(s *settings.Settings) { s.ActiveTab = path })
+	m.rewatch(m.wait)
+	return err
 }
 
 // Get returns the open repository at path, or nil.
@@ -452,20 +618,53 @@ func (m *Manager) List() []*Repo {
 	return slices.Clone(m.repos)
 }
 
+// restoreParallel is how many saved tabs Restore looks at at once.
+const restoreParallel = 4
+
 // Restore reopens the tabs saved in settings. Repositories that no longer open are
 // dropped and returned with the reason. The saved active tab (or the start page, "") is
 // kept if possible; if the active repo failed to reopen, the first tab is selected.
+//
+// Only the tab on screen loads its graph straight away. The others load after it, one at a
+// time, so a window full of tabs doesn't start a `git log` each at once and make the one
+// being looked at wait.
 func (m *Manager) Restore(ctx context.Context) (active string, failed map[string]error) {
 	saved := m.settings.Get()
 	failed = map[string]error{}
-	for _, p := range saved.OpenTabs {
-		if _, err := m.Open(ctx, p); err != nil {
-			failed[p] = err
+	// Finding a repository and checking it's trusted is a few git calls: several tabs at a
+	// time, and opened in their saved order whichever answers first.
+	type place struct {
+		root, gitDir, commonDir string
+		err                     error
+	}
+	places := make([]place, len(saved.OpenTabs))
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, restoreParallel)
+	for i, p := range saved.OpenTabs {
+		wg.Go(func() {
+			slots <- struct{}{}
+			defer func() { <-slots }()
+			pl := &places[i]
+			if pl.root, pl.gitDir, pl.commonDir, pl.err = m.resolve(ctx, p); pl.err == nil {
+				pl.err = m.vet(ctx, pl.root, pl.gitDir, pl.commonDir)
+			}
+		})
+	}
+	wg.Wait()
+	var opened []*Repo
+	for i, pl := range places {
+		if pl.err != nil {
+			failed[saved.OpenTabs[i]] = pl.err
+			continue
+		}
+		if r := m.add(pl.root, pl.gitDir, pl.commonDir); !slices.Contains(opened, r) {
+			opened = append(opened, r)
 		}
 	}
+
 	m.mu.Lock()
-	defer m.mu.Unlock()
-	switch r := m.findLocked(saved.ActiveTab); {
+	shown := m.findLocked(saved.ActiveTab)
+	switch {
 	case saved.ActiveTab == "":
 	case saved.ActiveTab == settings.ConfigTabID && saved.ConfigTab != "":
 		active = settings.ConfigTabID
@@ -473,30 +672,74 @@ func (m *Manager) Restore(ctx context.Context) (active string, failed map[string
 		active = settings.InsightsTabID
 	case saved.ActiveTab == settings.IgnoreTabID && saved.IgnoreTab != "":
 		active = settings.IgnoreTabID
-	case r != nil:
-		active = r.Path
+	case shown != nil:
+		active = shown.Path
 	case len(m.repos) > 0:
-		active = m.repos[0].Path
+		shown = m.repos[0]
+		active = shown.Path
 	}
+	m.mu.Unlock()
 	// Rewrite tabs even if nothing reopened, so failed paths aren't retried forever.
-	if err := m.settings.Update(func(s *settings.Settings) {
-		s.OpenTabs = m.pathsLocked()
+	if err := m.saveTabs(func(s *settings.Settings) {
+		for _, r := range opened {
+			s.AddRecent(r.Path, m.now())
+			s.Trust(r.Path, r.CommonDir)
+		}
 		s.ActiveTab = active
 	}); err != nil {
 		failed[""] = err
 	}
+	m.warm(shown, opened)
+	m.rewatch(m.wait)
 	return active, failed
+}
+
+// warm loads the graph of first now, if there is one, and then those of the rest in order,
+// each once the one before has loaded as far as it will for now. A tab that's asked for
+// before its turn loads then.
+func (m *Manager) warm(first *Repo, rest []*Repo) {
+	if first != nil {
+		first.graph.start()
+	}
+	m.spawn(func() {
+		if first != nil && !first.graph.settled(m.life) {
+			return
+		}
+		for _, r := range rest {
+			r.graph.start()
+			if !r.graph.settled(m.life) {
+				return
+			}
+		}
+	})
 }
 
 // CloseAll stops every repository's background processes. Settings are left as they are,
 // so the tabs come back on next launch.
 func (m *Manager) CloseAll() {
 	m.mu.Lock()
+	m.closed = true
+	m.mu.Unlock()
+	m.end()
+	m.work.Wait()
+	m.watchMu.Lock()
+	for _, r := range m.watching {
+		if r.watcher != nil {
+			r.watcher.Close()
+			r.watcher = nil
+		}
+	}
+	m.watching = nil
+	m.watchMu.Unlock()
+	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, r := range m.repos {
 		r.close()
 	}
 	m.repos = nil
+	// Ready to open repositories again, as Restore does in tests.
+	m.life, m.end = context.WithCancel(context.Background())
+	m.closed = false
 }
 
 func (m *Manager) findLocked(path string) *Repo {
@@ -519,20 +762,9 @@ func (m *Manager) pathsLocked() []string {
 // Settings returns the settings store the manager keeps in sync.
 func (m *Manager) Settings() *settings.Store { return m.settings }
 
-// watchLocked starts the change watcher for r. A watcher that fails to start is not fatal:
-// the repo still works, it just won't refresh on its own.
-func (m *Manager) watchLocked(r *Repo) *watch.Watcher {
-	onChange := m.onChange
-	r.changes.mu.Lock()
-	r.changes.deliver = func(k watch.Kind) {
-		if k.Has(watch.Head) || k.Has(watch.Refs) {
-			r.graph.reload()
-		}
-		if onChange != nil {
-			onChange(r.Path, k)
-		}
-	}
-	r.changes.mu.Unlock()
+// watch starts the change watcher for r. A watcher that fails to start is not fatal: the
+// repo still works, it just won't refresh on its own.
+func (m *Manager) watch(r *Repo) *watch.Watcher {
 	w, err := m.startWatch(watch.Options{
 		Root:      r.Path,
 		GitDir:    r.GitDir,
@@ -548,8 +780,11 @@ func (m *Manager) watchLocked(r *Repo) *watch.Watcher {
 	})
 	if err != nil {
 		log.Printf("watching %s: %v", r.Path, err)
-		if m.onWatchFailed != nil {
-			m.onWatchFailed(r.Path, err)
+		m.mu.Lock()
+		failed := m.onWatchFailed
+		m.mu.Unlock()
+		if failed != nil {
+			failed(r.Path, err)
 		}
 		return nil
 	}

@@ -117,7 +117,10 @@ func (a *App) SetInsightsTab(scope string) error {
 	if err != nil {
 		return err
 	}
-	return m.Settings().Update(func(s *settings.Settings) { s.InsightsTab = scope })
+	err = m.Settings().Update(func(s *settings.Settings) { s.InsightsTab = scope })
+	// The repositories on screen are the ones the scope covers.
+	m.Rewatch()
+	return err
 }
 
 // InsightsThresholds returns the thresholds saved for a scope, with defaults for any not set.

@@ -29,6 +29,9 @@ func newManager(t *testing.T) (*Manager, *settings.Store) {
 		t.Fatal(err)
 	}
 	m := NewManager(git.NewRunner(bin), store)
+	// However busy the machine, a test finds the watchers in place when a call returns. What
+	// happens when one is slow to start has a test of its own.
+	m.wait = time.Minute
 	t.Cleanup(m.CloseAll)
 	return m, store
 }

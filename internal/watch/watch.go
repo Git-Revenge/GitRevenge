@@ -42,6 +42,9 @@ const (
 	WorkTree
 )
 
+// All is every kind: what to assume changed when nothing was watching.
+const All = Head | Refs | Index | State | Config | WorkTree
+
 // Has reports whether k includes all of other.
 func (k Kind) Has(other Kind) bool { return k&other == other }
 
