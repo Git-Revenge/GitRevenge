@@ -63,10 +63,14 @@ function middle(a: string[], b: string[], a0: number, a1: number, b0: number, b1
   const max = Math.min(n + m, MAX_EDIT_DISTANCE)
   const offset = max + 1
   const v = new Int32Array(2 * max + 3)
+  // For walking back afterwards: how far each diagonal had got before each round. Round d only
+  // looks at the 2d-1 diagonals the rounds before it reached, so that's all that's kept of it,
+  // and the whole trace is d² numbers. Keeping all of v every round made it d times v's full
+  // width: 128 MB for two long files with nothing in common, and 6 MB for 200 changed lines.
   const trace: Int32Array[] = []
   let found = -1
   for (let d = 0; d <= max && found < 0; d++) {
-    trace.push(v.slice())
+    trace.push(v.slice(offset - d + 1, offset + d))
     for (let k = -d; k <= d; k += 2) {
       let x = k === -d || (k !== d && v[offset + k - 1] < v[offset + k + 1]) ? v[offset + k + 1] : v[offset + k - 1] + 1
       let y = x - k
@@ -88,10 +92,12 @@ function middle(a: string[], b: string[], a0: number, a1: number, b0: number, b1
   let x = n
   let y = m
   for (let d = found; d > 0; d--) {
+    // Diagonal k of round d's trace is at k + d - 1: it starts at diagonal -(d-1).
     const vd = trace[d]
+    const at = d - 1
     const k = x - y
-    const prevK = k === -d || (k !== d && vd[offset + k - 1] < vd[offset + k + 1]) ? k + 1 : k - 1
-    const prevX = vd[offset + prevK]
+    const prevK = k === -d || (k !== d && vd[at + k - 1] < vd[at + k + 1]) ? k + 1 : k - 1
+    const prevX = vd[at + prevK]
     const prevY = prevX - prevK
     while (x > prevX && y > prevY) {
       x--
