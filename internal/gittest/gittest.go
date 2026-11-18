@@ -74,6 +74,51 @@ func newAt(t testing.TB, dir string, args ...string) *Repo {
 	return r
 }
 
+// globalConfig is the global git config every test runs with, in place of the user's.
+func globalConfig() string {
+	// Allow local file:// submodules (blocked by default since git 2.38.1). This must live in
+	// global config because submodule clones run in a child git process.
+	config := "[protocol \"file\"]\n\tallow = always\n"
+	if Git3() {
+		config += git3Config
+	}
+	return config
+}
+
+// Main runs a package's tests with git's global and system config replaced by the tests' own.
+// Call it from TestMain in any package whose tests run git:
+//
+//	func TestMain(m *testing.M) { gittest.Main(m) }
+//
+// A Repo's own git calls are isolated already, but the code under test runs git through its
+// own Runner, which would otherwise read the config of whoever runs the tests: a global
+// core.hooksPath, for one, stops a test's hooks from running. It's set for the whole process
+// because tests run in parallel, where t.Setenv isn't allowed.
+func Main(m *testing.M) {
+	os.Exit(run(m))
+}
+
+func run(m *testing.M) int {
+	dir, err := os.MkdirTemp("", "gitrevenge-test-")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "gittest:", err)
+		return 1
+	}
+	defer func() { _ = os.RemoveAll(dir) }()
+	global := filepath.Join(dir, "gitconfig")
+	if err := os.WriteFile(global, []byte(globalConfig()), 0o600); err != nil {
+		fmt.Fprintln(os.Stderr, "gittest:", err)
+		return 1
+	}
+	for k, v := range map[string]string{"GIT_CONFIG_GLOBAL": global, "GIT_CONFIG_NOSYSTEM": "1"} {
+		if err := os.Setenv(k, v); err != nil {
+			fmt.Fprintln(os.Stderr, "gittest:", err)
+			return 1
+		}
+	}
+	return m.Run()
+}
+
 // isolatedEnv returns an environment that ignores the user's git config and never prompts.
 func isolatedEnv(t testing.TB) []string {
 	t.Helper()
@@ -81,13 +126,7 @@ func isolatedEnv(t testing.TB) []string {
 		t.Skip("git not installed")
 	}
 	global := filepath.Join(t.TempDir(), "gitconfig")
-	// Allow local file:// submodules (blocked by default since git 2.38.1). This must live in
-	// global config because submodule clones run in a child git process.
-	config := "[protocol \"file\"]\n\tallow = always\n"
-	if Git3() {
-		config += git3Config
-	}
-	if err := os.WriteFile(global, []byte(config), 0o600); err != nil {
+	if err := os.WriteFile(global, []byte(globalConfig()), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	env := make([]string, 0, len(os.Environ())+4)
