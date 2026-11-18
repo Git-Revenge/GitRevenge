@@ -375,11 +375,25 @@ func TestAWorktreesTabNoticesTheMainWorktreeSwitchingBranch(t *testing.T) {
 	waitForWorktree(t, a, path, "next", true)
 }
 
-func TestTheMainTabStillNoticesThingsWithAWorktreeTabOpen(t *testing.T) {
+// show switches to the tab at path, as clicking it does.
+func show(t *testing.T, a *App, path string) {
+	t.Helper()
+	if err := a.SetActiveRepo(path); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Only the tab on screen is watched. One behind it catches up when it's shown again.
+func TestTheMainTabCatchesUpWhenShownAfterAWorktreeTab(t *testing.T) {
 	a, fx, path, dir := worktreeFixture(t)
-	openWorktreeTab(t, a, dir)
+	other := openWorktreeTab(t, a, dir)
 	fx.Git("branch", "made-outside")
+	waitForBranch(t, a, other, "made-outside")
+	show(t, a, path)
 	waitForBranch(t, a, path, "made-outside")
+	// And it's the one watched from then on.
+	fx.Git("branch", "made-later")
+	waitForBranch(t, a, path, "made-later")
 }
 
 func TestClosingOneWorktreesTabKeepsAnothersWatching(t *testing.T) {
@@ -395,8 +409,8 @@ func TestClosingOneWorktreesTabKeepsAnothersWatching(t *testing.T) {
 	waitForBranch(t, a, staying, "made-outside")
 }
 
-// A session can restore tabs in any order, so the inner watch can start first.
-func TestTheMainTabOpenedAfterAWorktreesTabBothWatch(t *testing.T) {
+// The watch moves between a repository and a worktree inside its git folder in either order.
+func TestTheMainTabOpenedAfterAWorktreesTabIsWatched(t *testing.T) {
 	a, fx, path, dir := worktreeFixture(t)
 	other := openWorktreeTab(t, a, dir)
 	if err := a.CloseRepo(path); err != nil {
@@ -405,10 +419,13 @@ func TestTheMainTabOpenedAfterAWorktreesTabBothWatch(t *testing.T) {
 	path = openWorktreeTab(t, a, fx.Dir)
 	fx.Git("branch", "made-outside")
 	waitForBranch(t, a, path, "made-outside")
+	show(t, a, other)
 	waitForBranch(t, a, other, "made-outside")
+	fx.Git("branch", "made-later")
+	waitForBranch(t, a, other, "made-later")
 }
 
-func TestClosingOneOfThreeTabsKeepsTheOtherTwoWatching(t *testing.T) {
+func TestClosingOneOfThreeTabsLeavesTheShownOneWatched(t *testing.T) {
 	a, fx, path, dir := worktreeFixture(t)
 	second := filepath.Join(t.TempDir(), "second-wt")
 	fx.Git("worktree", "add", "-b", "second", second)
@@ -418,11 +435,23 @@ func TestClosingOneOfThreeTabsKeepsTheOtherTwoWatching(t *testing.T) {
 		t.Fatal(err)
 	}
 	fx.Git("branch", "made-outside")
-	waitForBranch(t, a, path, "made-outside")
 	waitForBranch(t, a, staying, "made-outside")
+	show(t, a, path)
+	waitForBranch(t, a, path, "made-outside")
 }
 
-func TestReopeningAWorktreesTabKeepsEveryTabWatching(t *testing.T) {
+// Closing the tab on screen shows the one that slides into its place, which is watched then.
+func TestClosingTheShownTabWatchesTheOneThatTakesItsPlace(t *testing.T) {
+	a, fx, path, dir := worktreeFixture(t)
+	other := openWorktreeTab(t, a, dir)
+	if err := a.CloseRepo(other); err != nil {
+		t.Fatal(err)
+	}
+	fx.Git("branch", "made-outside")
+	waitForBranch(t, a, path, "made-outside")
+}
+
+func TestReopeningAWorktreesTabWatchesItAgain(t *testing.T) {
 	a, fx, path, dir := worktreeFixture(t)
 	other := openWorktreeTab(t, a, dir)
 	if err := a.CloseRepo(other); err != nil {
@@ -430,8 +459,9 @@ func TestReopeningAWorktreesTabKeepsEveryTabWatching(t *testing.T) {
 	}
 	other = openWorktreeTab(t, a, dir)
 	fx.Git("branch", "made-outside")
-	waitForBranch(t, a, path, "made-outside")
 	waitForBranch(t, a, other, "made-outside")
+	show(t, a, path)
+	waitForBranch(t, a, path, "made-outside")
 }
 
 func waitForWorktree(t *testing.T, a *App, path, name string, want bool) {

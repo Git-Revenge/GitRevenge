@@ -33,7 +33,9 @@ class Session {
   set error(text: string) {
     this.problem = text ? fromText(text) : null
   }
-  /** Per-repo counter bumped on every change on disk; views re-fetch when it moves. */
+  /** Per-repo counter bumped on every change on disk; views re-fetch when it moves. Only the
+   * repository on screen is watched, so it only moves for that one: a tab that's switched to
+   * reads everything as its view opens. */
   revision = $state<Record<string, number>>({})
   /** Per-repo counter bumped when its undo or redo history changes. */
   undoRevision = $state<Record<string, number>>({})
@@ -132,8 +134,10 @@ class Session {
     await this.run(() => CloseRepo(path))
     this.tabs = this.tabs.filter((t) => t.path !== path)
     if (this.active === path) {
-      // Same rule as the backend: select the tab that slid into this position.
+      // Same rule as the backend, which is watching that one now: select the tab that slid
+      // into this position.
       this.active = this.tabs[Math.min(i, this.tabs.length - 1)]?.path ?? ''
+      if (this.active) void this.refreshTab(this.active)
     }
   }
 
@@ -146,9 +150,34 @@ class Session {
     if (leftover) this.error = `The worktree is gone, but its folder couldn't be deleted because something is using it: ${leftover}`
   }
 
-  async select(path: string) {
-    this.active = path
-    await this.run(() => SetActiveRepo(path))
+  /** Switches of tab still on their way to the backend, in the order they were asked for. */
+  private selecting: Promise<void> = Promise.resolve()
+
+  /**
+   * Switches to a tab. The backend watches only the repository on screen, so it's told first
+   * and the view opens once it has started watching: everything the view reads as it opens is
+   * then already covered, and nothing can change unseen in between. That's a few milliseconds.
+   * Switches go to the backend one at a time, so the last tab asked for is the one it ends up
+   * watching however fast they come.
+   */
+  select(path: string): Promise<void> {
+    const switched = this.selecting.then(async () => {
+      await this.run(() => SetActiveRepo(path))
+      this.active = path
+      // Its branch may have changed while it wasn't being watched.
+      if (this.tabs.some((t) => t.path === path)) void this.refreshTab(path)
+    })
+    this.selecting = switched
+    return switched
+  }
+
+  /** Reads a tab's label again. */
+  private async refreshTab(path: string) {
+    const tab = await RepoInfo(path).catch(() => null)
+    if (!tab) return
+    // The tabs may have moved or closed while that was being read.
+    const i = this.tabs.findIndex((t) => t.path === path)
+    if (i >= 0) this.tabs[i] = tab
   }
 
   async forget(path: string) {

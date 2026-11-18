@@ -43,7 +43,7 @@ This document records the decisions from the initial requirements session (2026-
 - **Per-repo operation queue.** Mutating operations are serialized, and reads run concurrently. If `index.lock` is held by another process, the app retries briefly and then reports it clearly.
 - **Commit graph.** The lane layout is computed incrementally in Go while commits stream from `git log`. Only compact row data is sent to the UI.
 - **Progressive loading.** The `git log` reader pauses once the graph is a set number of rows (20–50k, tunable) past the furthest row the UI has requested, and resumes as the user scrolls, so memory follows how far someone has scrolled, not repo size. Jump-to-commit, search and ref clicks load up to their target. The scrollbar total comes from `git rev-list --count`.
-- **Watching for external changes.** Each repo gets one native recursive file-system subscription (`ReadDirectoryChangesW` on Windows, FSEvents on macOS). Changes are classified and debounced to about 150ms, and ignored files are filtered out. Where `core.fsmonitor` is enabled, it speeds up the `git status` that follows.
+- **Watching for external changes.** The repo on screen gets one native recursive file-system subscription (`ReadDirectoryChangesW` on Windows, FSEvents on macOS). Changes are classified and debounced to about 150ms, and ignored files are filtered out. Where `core.fsmonitor` is enabled, it speeds up the `git status` that follows. A repo in a tab behind isn't watched: it's brought up to date when its tab is shown, and its graph is read again only if a ref has moved ([ADR-0005](adr/0005-local-state-and-external-changes.md)).
 - **In-progress operations.** A merge, rebase, cherry-pick, revert or bisect that is in progress is detected even if it started outside the app.
 
 ### Frontend
@@ -54,7 +54,7 @@ This document records the decisions from the initial requirements session (2026-
 
 ## Multi-repo
 
-- **Tabs.** Each open repo gets a tab and keeps warm backend state. Open tabs are restored on launch.
+- **Tabs.** Each open repo gets a tab and keeps warm backend state. Open tabs are restored on launch: the one on screen loads first, and the others load behind it one at a time.
 - **Project groups.** A group is a named, local collection of repo paths, and a repo can be in several groups. A group offers a dashboard (branch, ahead/behind, dirty state, last fetch), batch fetch, batch pull (fast-forward only), and an action to open every repo in the group as tabs.
 - **Not in v1:** cross-repo branch operations and cross-repo commits.
 

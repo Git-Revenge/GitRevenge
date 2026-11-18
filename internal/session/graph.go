@@ -50,6 +50,15 @@ type graphLoader struct {
 	stackOverrides func() map[string]string
 
 	mu sync.Mutex
+	// started is set once a first load has been asked for. A tab restored at launch isn't
+	// loaded until it's shown or its turn comes to warm up (see Manager.warm).
+	started bool
+	// sig is where the refs stood just before the latest load read them (git.RefsState), or
+	// "" while that isn't known; sigReady is closed once it is. See refresh.
+	sig      string
+	sigReady chan struct{}
+	// stopped is set by stop: the repository is closing, and nothing loads after that.
+	stopped bool
 	// showHidden puts hidden branches back in the graph, for this session only.
 	showHidden bool
 	// focus narrows the graph to one branch or stack, for this session only.
@@ -74,12 +83,15 @@ type graphLoader struct {
 }
 
 func newGraphLoader(repo *git.Repo, ahead int, onProgress func(GraphProgress)) *graphLoader {
+	ready := make(chan struct{})
+	close(ready)
 	return &graphLoader{
 		repo:       repo,
 		onProgress: onProgress,
 		ahead:      ahead,
 		wake:       make(chan struct{}, 1),
 		changed:    make(chan struct{}),
+		sigReady:   ready,
 	}
 }
 
@@ -205,8 +217,91 @@ type refResult struct {
 	err error
 }
 
+// start begins the first load, unless one has begun.
+func (l *graphLoader) start() {
+	l.mu.Lock()
+	first := !l.started
+	l.started = true
+	l.mu.Unlock()
+	if first {
+		l.reload()
+	}
+}
+
+// reloadStarted reloads a graph that has loaded before. One that hasn't will read
+// everything as it is when its first load comes.
+func (l *graphLoader) reloadStarted() {
+	l.mu.Lock()
+	started := l.started
+	l.mu.Unlock()
+	if started {
+		l.reload()
+	}
+}
+
+// refresh brings up to date a graph that nothing has been keeping so: a repository is only
+// watched while it's on screen, so its refs may have moved since its graph loaded. It loads
+// a graph that never has, and reloads one only if HEAD or a ref isn't where the last load
+// found it, which two short git calls can say. Reading the history again is the expensive
+// part, and a tab that hasn't changed should come back as it was.
+func (l *graphLoader) refresh(ctx context.Context) {
+	l.mu.Lock()
+	first := !l.started
+	l.started = true
+	l.mu.Unlock()
+	if first {
+		l.reload()
+		return
+	}
+	var was string
+	for {
+		// A load that has only just begun hasn't said where the refs stood yet.
+		l.mu.Lock()
+		ready := l.sigReady
+		l.mu.Unlock()
+		select {
+		case <-ready:
+		case <-ctx.Done():
+			return
+		}
+		l.mu.Lock()
+		latest := l.sigReady == ready
+		was = l.sig
+		l.mu.Unlock()
+		if latest {
+			break
+		}
+	}
+	if was != "" {
+		now, err := l.repo.RefsState(ctx)
+		if ctx.Err() != nil || (err == nil && now == was) {
+			return
+		}
+	}
+	l.reload()
+}
+
+// settled waits until the graph has loaded as far as it will for now: to the end, or to
+// where the reader pauses ahead of the viewport. It reports false if ctx ended first.
+func (l *graphLoader) settled(ctx context.Context) bool {
+	l.mu.Lock()
+	for l.loading && !l.paused {
+		changed := l.changed
+		l.mu.Unlock()
+		select {
+		case <-changed:
+		case <-ctx.Done():
+			return false
+		}
+		l.mu.Lock()
+	}
+	l.mu.Unlock()
+	return true
+}
+
 // Refs returns the refs matching the displayed graph.
 func (l *graphLoader) Refs() *RefIndex {
+	l.start()
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.refs == nil {
@@ -216,8 +311,9 @@ func (l *graphLoader) Refs() *RefIndex {
 }
 
 // Graph returns the graph to display and whether more of it may still load (it is reading
-// or paused). The graph may be partial; it is nil only before the first load starts.
+// or paused). The graph may be partial. Asking starts the first load, if nothing has.
 func (l *graphLoader) Graph() (*graph.Graph, bool) {
+	l.start()
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.current, l.loading
@@ -226,6 +322,7 @@ func (l *graphLoader) Graph() (*graph.Graph, bool) {
 // Status reports whether the reader is paused ahead of the viewport, and the estimated
 // size of the whole history (0 until known).
 func (l *graphLoader) Status() (paused bool, estimate int) {
+	l.start()
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.paused, l.estimate
@@ -233,6 +330,7 @@ func (l *graphLoader) Status() (paused bool, estimate int) {
 
 // Demand records that the UI wants rows up to row, so a paused reader reads on.
 func (l *graphLoader) Demand(row int) {
+	l.start()
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if row > l.want {
@@ -245,6 +343,7 @@ func (l *graphLoader) Demand(row int) {
 // the displayed graph or the history ends, and returns that graph. A background reload
 // keeps the old graph displayed, so found may be satisfied by it.
 func (l *graphLoader) LoadUntil(ctx context.Context, found func(*graph.Graph) bool) (*graph.Graph, error) {
+	l.start()
 	l.mu.Lock()
 	l.unbounded++
 	l.nudgeLocked()
@@ -295,6 +394,12 @@ func (l *graphLoader) report(p GraphProgress) {
 // refresh never blanks the view.
 func (l *graphLoader) reload() {
 	l.mu.Lock()
+	if l.stopped {
+		// A reload asked for as the tab closes: by a change the watcher saw a moment before,
+		// or by the refresh that follows coming on screen.
+		l.mu.Unlock()
+		return
+	}
 	if l.cancel != nil {
 		l.cancel()
 	}
@@ -305,21 +410,44 @@ func (l *graphLoader) reload() {
 		l.current = g
 	}
 	l.loading = true
+	l.started = true
+	l.sig = ""
+	sigReady := make(chan struct{})
+	l.sigReady = sigReady
 	show := l.showHidden
 	focus := l.focus
+	// Counted before the lock is let go, so that stop, which takes it to say nothing more
+	// loads, never starts waiting with a load about to be added.
+	l.wg.Add(1)
 	l.mu.Unlock()
 	rules := branchkind.New(nil, nil)
 	if l.rules != nil {
 		rules = l.rules()
 	}
 
-	l.wg.Go(func() {
+	go func() {
+		defer l.wg.Done()
+		// Where the refs stand, taken before anything below reads them, so what this load
+		// shows is at least that new (see refresh). It runs beside the one read that doesn't
+		// look at refs, so the first rows don't wait for it.
+		sigCh := make(chan string, 1)
+		go func() {
+			sig, _ := l.repo.RefsState(ctx)
+			sigCh <- sig
+		}()
 		var remotes []string
 		if rs, err := l.repo.Remotes(ctx); err == nil {
 			for _, r := range rs {
 				remotes = append(remotes, r.Name)
 			}
 		}
+		sig := <-sigCh
+		l.mu.Lock()
+		if ctx.Err() == nil {
+			l.sig = sig
+		}
+		l.mu.Unlock()
+		close(sigReady)
 
 		var focused map[string]bool
 		if focus != (Focus{}) {
@@ -470,7 +598,7 @@ func (l *graphLoader) reload() {
 		l.notifyLocked()
 		l.mu.Unlock()
 		l.report(GraphProgress{Rows: g.Len(), Done: true, Estimate: g.Len(), Err: err})
-	})
+	}()
 }
 
 // pauseIfAhead blocks the reader while g has n rows and is far enough ahead of what the
@@ -511,6 +639,7 @@ func (l *graphLoader) pauseIfAhead(ctx context.Context, g *graph.Graph, n int, a
 // waiting in LoadUntil is released.
 func (l *graphLoader) stop() {
 	l.mu.Lock()
+	l.stopped = true
 	if l.cancel != nil {
 		l.cancel()
 		l.cancel = nil

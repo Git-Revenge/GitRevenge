@@ -67,5 +67,8 @@ func (a *App) SetIgnoreTab(repo string) error {
 	if err != nil {
 		return err
 	}
-	return m.Settings().Update(func(s *settings.Settings) { s.IgnoreTab = repo })
+	err = m.Settings().Update(func(s *settings.Settings) { s.IgnoreTab = repo })
+	// The repository on screen is the one whose rules are showing.
+	m.Rewatch()
+	return err
 }
