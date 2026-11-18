@@ -4,6 +4,7 @@
 import { mount } from 'svelte'
 import '../src/style.css'
 import type { Scenario } from './support'
+import { guardLinks } from '../src/lib/linkGuard'
 
 type Harness = Window &
   typeof globalThis & {
@@ -131,6 +132,8 @@ const EventsOnMultiple = (name: string, listen: (data: unknown) => void) => {
 }
 const BrowserOpenURL = (url: string) => void win.__events.push(['open-url', url])
 const ClipboardSetText = async (text: string) => (win.__events.push(['copy', text]), true)
+// As main.ts does for the app.
+guardLinks(window, BrowserOpenURL)
 win.runtime = new Proxy({ EventsOnMultiple, BrowserOpenURL, ClipboardSetText } as Record<string, unknown>, { get: (o, k: string) => o[k] ?? (() => {}) })
 
 const record =

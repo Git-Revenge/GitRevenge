@@ -41,16 +41,29 @@
 
   let tokens = $derived(math ? mathMarked.lexer(text) : marked.lexer(text, { gfm: true, breaks }))
 
-  const WEB_LINK = /^(https?:|mailto:)/i
+  import { WEB_ADDRESS as WEB_LINK } from './linkGuard'
   /** A relative path: no scheme, not protocol-relative, not just a fragment. */
   const RELATIVE = /^(?![a-z][a-z0-9+.-]*:|\/\/|#)/i
   /** An image the caller can load: a path in the repository, or a notebook cell's attachment. */
   const LOADABLE = (href: string) => RELATIVE.test(href) || /^attachment:/i.test(href)
 
-  function open(e: MouseEvent, href: string) {
+  function open(e: Event, href: string) {
     e.preventDefault()
     if (WEB_LINK.test(href)) BrowserOpenURL(href)
     else if (RELATIVE.test(href)) onLink?.(href)
+  }
+
+  /**
+   * The address a link element carries. A document's links are its author's to write, and an
+   * address on the element is one the web view can follow by itself (a middle click, a drag),
+   * so only a web address goes there. Any other link keeps its words and its tooltip, and
+   * opens through open() alone.
+   */
+  const followable = (href: string) => (WEB_LINK.test(href) ? href : undefined)
+
+  /** Enter on a link that carries no address, which the browser wouldn't treat as a click. */
+  function key(e: KeyboardEvent, href: string) {
+    if (e.key === 'Enter' && !followable(href)) open(e, href)
   }
 
   /** Heading level in a document (h2 down, under the view's own heading), or h3 in a message. */
@@ -74,14 +87,23 @@
       >{:else if t.type === 'em'}<em>{@render inline((t as Tokens.Em).tokens, inLink)}</em>{:else if t.type === 'del'}<del
         >{@render inline((t as Tokens.Del).tokens, inLink)}</del
       >{:else if t.type === 'codespan'}<code>{t.text}</code>{:else if t.type === 'br'}<br />{:else if t.type === 'link'}<a
-        href={(t as Tokens.Link).href}
+        href={followable((t as Tokens.Link).href)}
+        role={followable((t as Tokens.Link).href) ? undefined : 'link'}
+        tabindex={followable((t as Tokens.Link).href) ? undefined : 0}
         title={(t as Tokens.Link).href}
-        onclick={(e) => open(e, (t as Tokens.Link).href)}>{@render inline((t as Tokens.Link).tokens, true)}</a
+        onclick={(e) => open(e, (t as Tokens.Link).href)}
+        onkeydown={(e) => key(e, (t as Tokens.Link).href)}>{@render inline((t as Tokens.Link).tokens, true)}</a
       >{:else if t.type === 'image'}{#if resolveImage && LOADABLE((t as Tokens.Image).href)}<MarkdownImage
           src={(t as Tokens.Image).href}
           alt={(t as Tokens.Image).text}
           resolve={resolveImage}
-        />{:else if inLink}{(t as Tokens.Image).text || (t as Tokens.Image).href}{:else}<a href={(t as Tokens.Image).href} title="Image (not loaded)" onclick={(e) => open(e, (t as Tokens.Image).href)}
+        />{:else if inLink}{(t as Tokens.Image).text || (t as Tokens.Image).href}{:else}<a
+          href={followable((t as Tokens.Image).href)}
+          role={followable((t as Tokens.Image).href) ? undefined : 'link'}
+          tabindex={followable((t as Tokens.Image).href) ? undefined : 0}
+          title="Image (not loaded)"
+          onclick={(e) => open(e, (t as Tokens.Image).href)}
+          onkeydown={(e) => key(e, (t as Tokens.Image).href)}
           >{(t as Tokens.Image).text || (t as Tokens.Image).href}</a
         >{/if}{:else if t.type === 'checkbox'}<input type="checkbox" checked={(t as Tokens.Checkbox).checked} disabled />{:else if t.type === 'math'}<MathView
           tex={(t as unknown as MathToken).text}
