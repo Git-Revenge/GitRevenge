@@ -40,9 +40,10 @@
   import type { app, git } from '../../wailsjs/go/models'
   import type { DiffTarget } from './diff/DiffView.svelte'
   import { provideCommands } from './commands.svelte'
-  import { adjacentFile, FILTER_FROM, fileName, fileRows, moveThroughRows, readTreeChoice } from './fileList'
+  import { adjacentFile, FILTER_FROM, fileName, fileRows, readTreeChoice, type FileRow } from './fileList'
   import FileListTools from './FileListTools.svelte'
   import IgnoreDialog, { type IgnoreSubject } from './IgnoreDialog.svelte'
+  import { ListWindow } from './listWindow.svelte'
   import { anchored, escapeName, extension, plural as count, sourceName, type IgnoreScope, type IgnoreTarget } from './ignore'
   import PushedUndoDialog from './PushedUndoDialog.svelte'
   import type { MenuItem } from './ContextMenu.svelte'
@@ -199,6 +200,12 @@
   function toggleFolder(p: string) {
     closedFolders = new Set(closedFolders.has(p) ? [...closedFolders].filter((c) => c !== p) : [...closedFolders, p])
   }
+
+  /** A row's height in pixels: a file, a folder of the tree, or a folder heading. Each row is
+   * given its height from here, so what's drawn can't drift from what the window works out. */
+  const rowHeight = (r: FileRow<unknown>) => (r.type === 'file' ? 30 : r.collapsible ? 28 : 24)
+  // Only the rows in view are in the DOM, so tens of thousands of changed files stay quick.
+  const fileWindow = new ListWindow(() => rows, rowHeight)
 
   // Moving between files while reading their diffs.
   provideCommands(() => {
@@ -416,6 +423,14 @@
       { query: fileQuery, tree: fileTree, closed: closedFolders },
     ),
   )
+  // An ignored file has no status glyph, and its row is a pixel shorter for it.
+  const ignoredHeight = (r: FileRow<unknown>) => (r.type === 'file' ? 29 : rowHeight(r))
+  const ignoredWindow = new ListWindow(() => ignoredRows, ignoredHeight)
+  // The ignored list is under the files, so it moves when they change.
+  $effect(() => {
+    void rows
+    ignoredWindow.measure()
+  })
   const sameRule = (a: git.IgnoreLine, b: git.IgnoreLine) => a.source === b.source && a.line === b.line
 
   async function stopIgnoring(item: git.IgnoredFile, except: boolean) {
@@ -590,10 +605,11 @@
   }
 </script>
 
-{#snippet fileRow(f: git.FileStatus, depth: number)}
+{#snippet fileRow(r: Extract<FileRow<git.FileStatus>, { type: 'file' }>, index: number)}
+  {@const f = r.file}
   {@const st = status(f, !isUnstaged(f))}
   {@const tick = tickOf(f)}
-  <li class:active={isOpen(f)} class:going={tick !== 'none'} class:landed={landed?.has(f.path)} style:--depth={depth}>
+  <li class:active={isOpen(f)} class:going={tick !== 'none'} class:landed={landed?.has(f.path)} data-row={index} aria-posinset={index + 1} aria-setsize={rows.length} style:--depth={r.depth} style:top="{fileWindow.tops[index]}px" style:height="{rowHeight(r)}px">
     <input type="checkbox" class="tick" aria-label="Include {f.path} in the commit" checked={tick === 'all'} indeterminate={tick === 'part'} disabled={busy} onchange={(e) => tickChanged(e, f)} />
     <button class="name" data-file-row onkeydown={rowKey} onclick={() => show(f)} oncontextmenu={(e) => fileMenu(e, f)} title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}>
       <span class="code s-{st.kind}" title={st.label}><Icon name={st.icon} size={14} /><span class="visually-hidden">{st.label}</span></span>
@@ -720,11 +736,11 @@
         {#if listed.length >= FILTER_FROM}
           <div class="file-tools"><FileListTools bind:query={fileQuery} bind:tree={fileTree} /></div>
         {/if}
-        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-        <ul onkeydown={(e) => moveThroughRows(e, e.currentTarget)}>
-          {#each rows as r (r.key)}
+        <ul class="windowed" use:fileWindow.follow style:height="{fileWindow.height}px">
+          {#each fileWindow.drawn as index (rows[index].key)}
+            {@const r = rows[index]}
             {#if r.type === 'folder'}
-              <li class="folder-row" style:--depth={r.depth}>
+              <li class="folder-row" data-row={index} aria-posinset={index + 1} aria-setsize={rows.length} style:--depth={r.depth} style:top="{fileWindow.tops[index]}px" style:height="{rowHeight(r)}px">
                 {#if r.collapsible}
                   <button class="folder" aria-expanded={r.open} title={r.path} onclick={() => toggleFolder(r.path)} oncontextmenu={(e) => folderMenu(e, r.path)}><Icon name="chevron" size={12} />{r.name}/</button>
                 {:else}
@@ -733,7 +749,7 @@
                 {/if}
               </li>
             {:else}
-              {@render fileRow(r.file, r.depth)}
+              {@render fileRow(r, index)}
             {/if}
           {/each}
         </ul>
@@ -751,11 +767,11 @@
         {:else if !ignoredList.files.length}
           <Empty note="nothing hidden" compact>Nothing here is ignored.</Empty>
         {:else}
-          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-          <ul onkeydown={(e) => moveThroughRows(e, e.currentTarget)}>
-            {#each ignoredRows as r (r.key)}
+          <ul class="windowed" use:ignoredWindow.follow style:height="{ignoredWindow.height}px">
+            {#each ignoredWindow.drawn as index (ignoredRows[index].key)}
+              {@const r = ignoredRows[index]}
               {#if r.type === 'folder'}
-                <li class="folder-row" style:--depth={r.depth}>
+                <li class="folder-row" data-row={index} aria-posinset={index + 1} aria-setsize={ignoredRows.length} style:--depth={r.depth} style:top="{ignoredWindow.tops[index]}px" style:height="{ignoredHeight(r)}px">
                   {#if r.collapsible}
                     <button class="folder" aria-expanded={r.open} title={r.path} onclick={() => toggleFolder(r.path)}><Icon name="chevron" size={12} />{r.name}/</button>
                   {:else}
@@ -764,7 +780,7 @@
                 </li>
               {:else}
                 {@const item = r.file.item}
-                <li style:--depth={r.depth}>
+                <li data-row={index} aria-posinset={index + 1} aria-setsize={ignoredRows.length} style:--depth={r.depth} style:top="{ignoredWindow.tops[index]}px" style:height="{ignoredHeight(r)}px">
                   <button class="name ig" data-file-row title="{item.path}: ignored by {item.rule.pattern} ({where(item.rule.source)} line {item.rule.line})" oncontextmenu={(e) => ignoredMenu(e, item)}>
                     <span class="path">{fileName(r.file.path)}{item.path.endsWith('/') ? '/' : ''}</span>
                     <code class="why">{item.rule.pattern}</code>
@@ -1166,6 +1182,18 @@
 
   li.active {
     background: var(--selected);
+  }
+
+  /* A windowed list places each row itself, at the height the row was given: see ListWindow. */
+  .windowed {
+    position: relative;
+  }
+
+  .windowed li {
+    position: absolute;
+    left: 0;
+    right: 0;
+    box-sizing: border-box;
   }
 
   button {

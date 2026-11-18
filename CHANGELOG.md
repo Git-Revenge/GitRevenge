@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 ### Changed
 
 - A very wide history scrolls more smoothly. The lanes that only pass through a row are sent to the graph packed together, which makes a page of an 800-lane history about a sixteenth the size it was. (#776)
+- A commit or a working tree with tens of thousands of files stays quick: the file lists draw only the rows in view. (#777)
 
 ### Fixed
 

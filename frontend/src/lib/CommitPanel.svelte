@@ -8,8 +8,9 @@
   import type { app, git } from '../../wailsjs/go/models'
   import { BrowserOpenURL, ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
   import { provideCommands } from './commands.svelte'
-  import { adjacentFile, FILTER_FROM, fileName, fileRows, moveThroughRows, readTreeChoice } from './fileList'
+  import { adjacentFile, FILTER_FROM, fileName, fileRows, readTreeChoice, type FileRow } from './fileList'
   import FileListTools from './FileListTools.svelte'
+  import { ListWindow } from './listWindow.svelte'
   import { TWO_COLUMNS } from './rightPanel'
   import { formatTime, type RefLabel } from './graph/draw'
   import RefChip from './graph/RefChip.svelte'
@@ -111,6 +112,16 @@
   function toggleFolder(path: string) {
     closedFolders = new Set(closedFolders.has(path) ? [...closedFolders].filter((p) => p !== path) : [...closedFolders, path])
   }
+  /** A row's height in pixels: a file, a folder of the tree, or a folder heading, each with the
+   * line under it. Each row is given its height from here, so what's drawn can't drift from
+   * what the window works out. */
+  const rowHeight = (r: FileRow<unknown>) => (r.type === 'file' ? 29 : r.collapsible ? 31 : 25)
+  // Only the rows in view are in the DOM, so a commit of tens of thousands of files stays quick.
+  const fileWindow = new ListWindow(() => rows, rowHeight)
+  /** A folder at the top of the list has space above it (8px over a heading, 2px over a tree's
+   * folder), which used to fold into the 6px under the filter box. Rows placed by the list
+   * don't do that, so the list is pulled up by what would have folded away. */
+  let toolsGap = $derived((info?.files.length ?? 0) >= FILTER_FROM && rows[0]?.type === 'folder' ? `${rows[0].collapsible ? -2 : -6}px` : undefined)
   // A filter is for the commit it was typed on.
   $effect(() => {
     void commitId
@@ -335,12 +346,12 @@
   {#if (info?.files.length ?? 0) >= FILTER_FROM}
     <div class="file-tools"><FileListTools bind:query={fileQuery} bind:tree={fileTree} /></div>
   {/if}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="files" onkeydown={(e) => moveThroughRows(e, e.currentTarget)}>
-    <ul>
-      {#each rows as r (r.key)}
+  <div class="files" style:margin-top={toolsGap}>
+    <ul use:fileWindow.follow style:height="{fileWindow.height}px">
+      {#each fileWindow.drawn as index (rows[index].key)}
+        {@const r = rows[index]}
         {#if r.type === 'folder'}
-          <li class="folder-row" style:--depth={r.depth}>
+          <li class="folder-row" data-row={index} aria-posinset={index + 1} aria-setsize={rows.length} style:--depth={r.depth} style:top="{fileWindow.tops[index]}px" style:height="{rowHeight(r)}px">
             {#if r.collapsible}
               <button class="folder" aria-expanded={r.open} title={r.path} onclick={() => toggleFolder(r.path)}><Icon name="chevron" size={12} />{r.name}/</button>
             {:else}
@@ -349,7 +360,7 @@
           </li>
         {:else}
           {@const f = r.file}
-          <li style:--depth={r.depth}>
+          <li data-row={index} aria-posinset={index + 1} aria-setsize={rows.length} style:--depth={r.depth} style:top="{fileWindow.tops[index]}px" style:height="{rowHeight(r)}px">
             <button
               class="file-row"
               data-file-row
@@ -742,7 +753,12 @@
     margin-right: 12px;
   }
 
+  /* The list places each row itself, at the height the row was given: see ListWindow. */
   .files li {
+    position: absolute;
+    left: 0;
+    right: 0;
+    box-sizing: border-box;
     padding-left: calc(var(--depth, 0) * 14px);
   }
 
@@ -783,6 +799,7 @@
   }
 
   .files ul {
+    position: relative;
     list-style: none;
     margin: 0;
     padding: 0;
