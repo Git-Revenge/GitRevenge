@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -549,5 +550,263 @@ func TestLaneStartOfThePinnedTrunk(t *testing.T) {
 	}
 	if row, tip, ok := g.LaneStart(rows[0].Color); !ok || row != 0 || !tip {
 		t.Fatalf("feature lane starts at %d (tip %v, ok %v)", row, tip, ok)
+	}
+}
+
+// packAfter packs rows the long way, from the Segs of rows that weren't packed as they were
+// laid out: a lane that is a straight line of one colour and kind in both halves moves to
+// Pass. It is what Page's rows are checked against.
+func packAfter(rows []Row) {
+	var downAt []int // per column, where its straight line is in Down, or -1
+	for i := range rows {
+		r := &rows[i]
+		downAt = downAt[:0]
+		for j, s := range r.Down {
+			if s.From != s.To {
+				continue
+			}
+			for len(downAt) <= s.From {
+				downAt = append(downAt, -1)
+			}
+			if downAt[s.From] < 0 {
+				downAt[s.From] = j
+			}
+		}
+		up := r.Up[:0]
+		moved := 0
+		last, run := -2, -1 // the column of the lane before, and where its run's length is
+		for _, s := range r.Up {
+			j := -1
+			if s.From == s.To && s.From < len(downAt) {
+				j = downAt[s.From]
+			}
+			if j < 0 || r.Down[j].Color != s.Color || r.Down[j].Kind != s.Kind {
+				up = append(up, s)
+				continue
+			}
+			r.Down[j].From = -1 // marks it as moved
+			moved++
+			if run < 0 || s.From != last+1 || r.PassKind[len(r.PassKind)-1] != s.Kind {
+				run = len(r.Pass) + 1
+				r.Pass = append(r.Pass, s.From, 0)
+				r.PassKind = append(r.PassKind, s.Kind)
+			}
+			r.Pass[run]++
+			r.Pass = append(r.Pass, s.Color)
+			last = s.From
+		}
+		r.Up = up
+		if moved == 0 {
+			continue
+		}
+		down := r.Down[:0]
+		for _, s := range r.Down {
+			if s.From >= 0 {
+				down = append(down, s)
+			}
+		}
+		r.Down = down
+	}
+}
+
+// unpacked puts a packed row's Pass lanes back as the Segs they were, in each half.
+func unpacked(t *testing.T, r Row) (up, down []Seg) {
+	t.Helper()
+	up, down = slices.Clone(r.Up), slices.Clone(r.Down)
+	last := -1
+	for i, run := 0, 0; i < len(r.Pass); run++ {
+		if i+2 > len(r.Pass) || run >= len(r.PassKind) {
+			t.Fatalf("row %d: Pass %v doesn't parse with %d kinds", r.Index, r.Pass, len(r.PassKind))
+		}
+		col, n := r.Pass[i], r.Pass[i+1]
+		if n < 1 || i+2+n > len(r.Pass) {
+			t.Fatalf("row %d: a run of %d lanes in Pass %v", r.Index, n, r.Pass)
+		}
+		if col <= last {
+			t.Fatalf("row %d: Pass isn't in column order: %v", r.Index, r.Pass)
+		}
+		for k := range n {
+			s := Seg{From: col + k, To: col + k, Color: r.Pass[i+2+k], Kind: r.PassKind[run]}
+			up, down = append(up, s), append(down, s)
+		}
+		last = col + n - 1
+		i += 2 + n
+	}
+	return up, down
+}
+
+func sortedSegs(segs []Seg) []Seg {
+	out := slices.Clone(segs)
+	slices.SortFunc(out, func(a, b Seg) int {
+		return cmp.Or(cmp.Compare(a.From, b.From), cmp.Compare(a.To, b.To), cmp.Compare(a.Color, b.Color), cmp.Compare(a.Kind, b.Kind))
+	})
+	return out
+}
+
+// sameLines checks that packed rows draw the lines plain ones do, and returns how many runs
+// of lanes they pack.
+func sameLines(t *testing.T, what string, plain, packed []Row) (runs int) {
+	t.Helper()
+	if len(packed) != len(plain) {
+		t.Fatalf("%s: %d rows, want %d", what, len(packed), len(plain))
+	}
+	for i, want := range plain {
+		got := packed[i]
+		if got.Up == nil || got.Down == nil {
+			t.Fatalf("%s row %d: a packed row has a nil half, which is null to the UI", what, i)
+		}
+		if got.Col != want.Col || got.Color != want.Color || got.Width != want.Width || got.Kind != want.Kind || got.ID != want.ID {
+			t.Fatalf("%s row %d: the commit is %+v, want %+v", what, i, got, want)
+		}
+		up, down := unpacked(t, got)
+		if !slices.Equal(sortedSegs(up), sortedSegs(want.Up)) {
+			t.Fatalf("%s row %d up:\n got %v (pass %v %q)\nwant %v", what, i, sortedSegs(up), got.Pass, got.PassKind, sortedSegs(want.Up))
+		}
+		if !slices.Equal(sortedSegs(down), sortedSegs(want.Down)) {
+			t.Fatalf("%s row %d down:\n got %v (pass %v %q)\nwant %v", what, i, sortedSegs(down), got.Pass, got.PassKind, sortedSegs(want.Down))
+		}
+		runs += len(got.PassKind)
+	}
+	return runs
+}
+
+// packedLikePlain checks Page against Rows over the whole of g, and against packing Rows
+// afterwards, which must leave no straight lane behind.
+func packedLikePlain(t *testing.T, g *Graph) (runs int) {
+	t.Helper()
+	plain := g.Rows(0, g.Len())
+	after := g.Rows(0, g.Len())
+	packAfter(after)
+	sameLines(t, "packed afterwards", plain, after)
+	for i, r := range after {
+		for _, s := range r.Up {
+			if s.From == s.To && slices.Contains(r.Down, s) {
+				t.Fatalf("row %d: lane %d runs straight through but wasn't packed", i, s.From)
+			}
+		}
+	}
+	// A window that starts mid-graph replays from a checkpoint, as scrolling does.
+	if g.Len() > 700 {
+		sameLines(t, "a window", g.Rows(513, 150), g.Page(513, 150))
+	}
+	return sameLines(t, "Page", plain, g.Page(0, g.Len()))
+}
+
+func TestPageDrawsTheLinesRowsDoes(t *testing.T) {
+	for seed, shape := range []struct {
+		pins  []int
+		kinds map[int]string
+	}{
+		{},
+		// Trunk pins and kinds change which lanes share a colour and a kind across a row, and
+		// a pinned lane takes its column from whatever was passing through it.
+		{pins: []int{0, 7}, kinds: map[int]string{3: "docs", 11: "release", 40: "bot"}},
+		{pins: []int{5, 2, 90}, kinds: map[int]string{0: "feature", 1: "feature", 2: "trunk", 9: "docs"}},
+	} {
+		g := New()
+		var pins []string
+		for _, p := range shape.pins {
+			pins = append(pins, fakeID(p))
+		}
+		g.Pin(pins)
+		kinds := map[string]string{}
+		for c, k := range shape.kinds {
+			kinds[fakeID(c)] = k
+		}
+		g.SetTipKinds(kinds)
+		for i, ps := range randomDAG(3000+seed, 4) {
+			c := git.LogCommit{ID: fakeID(i), AuthorName: "a", Subject: "s"}
+			for _, p := range ps {
+				c.Parents = append(c.Parents, fakeID(p))
+			}
+			if err := g.Add(c); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if packedLikePlain(t, g) == 0 {
+			t.Fatal("nothing was packed in a graph with lanes passing through")
+		}
+	}
+}
+
+// No history lays out this way, but the layout allows for it: a pinned lane's tip arriving
+// while another lane holds its column. That lane's line stops at the commit, and must still
+// be drawn down to it.
+func TestPageKeepsTheLineOfALaneThatIsReplaced(t *testing.T) {
+	var passing, tip, parent oid
+	passing[0], tip[0], parent[0] = 1, 2, 3
+	cfg := layout{pins: &pinning{tips: map[oid]int{tip: 0}, n: 1}}
+	lanes := func() *state {
+		return &state{lanes: []lane{{want: passing, color: 4, used: true}, {want: passing, color: 5, used: true}}, nextColor: 6}
+	}
+	plain, packed := Row{Up: []Seg{}, Down: []Seg{}}, Row{Up: []Seg{}, Down: []Seg{}}
+	step(lanes(), &cfg, tip, []oid{parent}, 0, &plain, false)
+	step(lanes(), &cfg, tip, []oid{parent}, 0, &packed, true)
+	if !slices.Contains(plain.Up, Seg{From: 0, To: 0, Color: 4}) || slices.Contains(plain.Down, Seg{From: 0, To: 0, Color: 4}) {
+		t.Fatalf("the replaced lane should stop at the commit: up %v, down %v", plain.Up, plain.Down)
+	}
+	sameLines(t, "a replaced lane", []Row{plain}, []Row{packed})
+}
+
+// wideGraph is w lines of history side by side: every row has w-1 lanes passing through.
+func wideGraph(tb testing.TB, n, w int) *Graph {
+	tb.Helper()
+	g := New()
+	for i := range n {
+		c := git.LogCommit{ID: fakeID(i), AuthorName: "Some Author", Subject: "A commit subject of ordinary length, about sixty chars"}
+		if i+w < n {
+			c.Parents = []string{fakeID(i + w)}
+		}
+		if err := g.Add(c); err != nil {
+			tb.Fatal(err)
+		}
+	}
+	return g
+}
+
+func TestPageOfAWideGraphIsSmall(t *testing.T) {
+	const w = 800
+	g := wideGraph(t, 4000, w)
+	packedLikePlain(t, g)
+	before, err := json.Marshal(g.Rows(1000, 200))
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := json.Marshal(g.Page(1000, 200))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(after), "null") {
+		t.Fatal("a page's JSON contains null")
+	}
+	t.Logf("200 rows, %d lanes: %d kB as Segs, %d kB packed", w, len(before)/1000, len(after)/1000)
+	if len(after)*8 > len(before) {
+		t.Fatalf("packing saved too little: %d bytes from %d", len(after), len(before))
+	}
+}
+
+// BenchmarkPageJSON is what one 200-row page costs the backend, laid out and encoded, by how
+// many lanes wide the history is: as Segs (what was sent before lanes were packed) and packed.
+// It reports the size of the JSON, which the UI then has to parse.
+func BenchmarkPageJSON(b *testing.B) {
+	for _, w := range []int{4, 30, 100, 800, 2000} {
+		g := wideGraph(b, 12000, w)
+		for _, form := range []struct {
+			name string
+			rows func(start, count int) []Row
+		}{{"segs", g.Rows}, {"packed", g.Page}} {
+			b.Run(fmt.Sprintf("lanes=%d/%s", w, form.name), func(b *testing.B) {
+				b.ReportAllocs()
+				var size int
+				for i := 0; b.Loop(); i++ {
+					out, err := json.Marshal(form.rows(5000+(i%20)*200, 200))
+					if err != nil {
+						b.Fatal(err)
+					}
+					size = len(out)
+				}
+				b.ReportMetric(float64(size)/1e6, "MB/page")
+			})
+		}
 	}
 }

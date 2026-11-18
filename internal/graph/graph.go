@@ -65,6 +65,10 @@ type Row struct {
 	Color int   `json:"color"`
 	Up    []Seg `json:"up"`
 	Down  []Seg `json:"down"`
+	// Pass and PassKind hold the lanes that run straight through the row, in a row from Page
+	// (see there), and nothing in one from Rows.
+	Pass     []int    `json:"pass,omitempty"`
+	PassKind []string `json:"passKind,omitempty"`
 	// Width is the number of lane columns used by this row.
 	Width int `json:"width"`
 	// Kind is the branch kind of the lane the commit sits on, or "" (see SetTipKinds).
@@ -298,7 +302,7 @@ func (g *Graph) Add(c git.LogCommit) error {
 	g.subjects = append(g.subjects, c.Subject)
 
 	before := g.cur.nextColor
-	col, color := step(&g.cur, &g.cfg, id, ps, base, nil)
+	col, color := step(&g.cur, &g.cfg, id, ps, base, nil, false)
 	for range g.cur.nextColor - before {
 		g.laneStart = append(g.laneStart, int32(row))
 	}
@@ -375,8 +379,22 @@ func (g *Graph) RowOf(id string) (int, bool) {
 	return int(r), ok
 }
 
-// Rows returns up to count rows starting at start, with full edge data.
-func (g *Graph) Rows(start, count int) []Row {
+// Rows returns up to count rows starting at start, with full edge data: every line of every
+// row is a Seg in Up or Down.
+func (g *Graph) Rows(start, count int) []Row { return g.rows(start, count, false) }
+
+// Page returns the same rows as Rows, packed for sending to the UI: the lanes that run
+// straight through a row are left out of its Up and Down and listed in Pass. In a wide
+// history nearly every lane of every row is one of those, other branches' lines on their way
+// past. As a Seg in each half they are most of what would be sent (a 200-row page of an
+// 800-lane graph is 320,000 of them, 11 MB of JSON), though the UI draws only the few dozen
+// columns that fit.
+//
+// Pass is runs of neighbouring lanes of one kind, in column order: each run is its first
+// column, how many lanes, then a colour for each. PassKind has each run's kind.
+func (g *Graph) Page(start, count int) []Row { return g.rows(start, count, true) }
+
+func (g *Graph) rows(start, count int, pack bool) []Row {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	n := len(g.ids)
@@ -396,12 +414,12 @@ func (g *Graph) Rows(start, count int) []Row {
 	for i := cp.row; i < end; i++ {
 		ps := g.parents[g.parentStart[i]:g.parentStart[i+1]]
 		if i < start {
-			step(&st, &g.cfg, g.ids[i], ps, g.parentStart[i], nil)
+			step(&st, &g.cfg, g.ids[i], ps, g.parentStart[i], nil, false)
 			continue
 		}
 		// Empty, not nil: the frontend iterates these, and nil marshals to JSON null.
 		r := Row{Index: i, Up: []Seg{}, Down: []Seg{}}
-		r.Col, r.Color = step(&st, &g.cfg, g.ids[i], ps, g.parentStart[i], &r)
+		r.Col, r.Color = step(&st, &g.cfg, g.ids[i], ps, g.parentStart[i], &r, pack)
 		r.ID = hex.EncodeToString(g.ids[i][:g.hashLen])
 		r.Parents = len(ps)
 		r.Author = g.authors[g.authorIdx[i]]
@@ -416,11 +434,17 @@ func (g *Graph) Rows(start, count int) []Row {
 // starts in Graph.parents. If row is non-nil,
 // the segments drawn in this row are recorded in it. It returns the node column and color.
 //
+// With pack, a lane that isn't this commit's and isn't waiting for it goes in row.Pass, once,
+// where otherwise it is a Seg in Up and another in Down (see Page). Such a lane is the same
+// in both halves, since a row leaves alone every lane that's waiting for another commit. If a
+// new lane were ever started in the column of one, its line is recorded in Up alone, as it is
+// unpacked.
+//
 // Lanes keep their column while active, so lines run straight down; a freed column is
 // reused by the next new lane. With pins, the leftmost columns belong to Trunk lanes: a
 // Trunk tip takes its column even if a branch above reached it first, its first parent
 // always continues there, and other lanes start to the right.
-func step(st *state, cfg *layout, id oid, ps []oid, base int32, row *Row) (col, color int) {
+func step(st *state, cfg *layout, id oid, ps []oid, base int32, row *Row, pack bool) (col, color int) {
 	pins := cfg.pins
 	reserved := pins.reserved()
 	col = -1
@@ -470,9 +494,17 @@ func step(st *state, cfg *layout, id oid, ps []oid, base int32, row *Row) (col, 
 				row.Up = append(row.Up, Seg{From: i, To: col, Color: l.color, Kind: cfg.name(l.kind)})
 			}
 			st.lanes[i] = lane{}
-		} else if row != nil {
+		} else if row != nil && !pack {
 			row.Up = append(row.Up, Seg{From: i, To: i, Color: l.color, Kind: cfg.name(l.kind)})
 		}
+	}
+	// start puts a new lane in a column. Packed, a lane it replaces there has only the top
+	// half of its line in this row, which nothing else will record.
+	start := func(at int, l lane) {
+		if old := st.lanes[at]; pack && row != nil && old.used {
+			row.Up = append(row.Up, Seg{From: at, To: at, Color: old.color, Kind: cfg.name(old.kind)})
+		}
+		st.lanes[at] = l
 	}
 
 	// Lines leaving downward: one per parent. A parent another lane already waits for joins
@@ -486,7 +518,7 @@ func step(st *state, cfg *layout, id oid, ps []oid, base int32, row *Row) (col, 
 			target, tcolor = col, color
 			// The Up pass cleared this column, so the lane starts again here for the parent.
 			if l := st.lanes[col]; !l.used || l.want != p {
-				st.lanes[target] = lane{want: p, pos: base + int32(pi), color: tcolor, kind: kind, used: true}
+				start(target, lane{want: p, pos: base + int32(pi), color: tcolor, kind: kind, used: true})
 				created = append(created, target)
 			}
 			if row != nil {
@@ -508,7 +540,7 @@ func step(st *state, cfg *layout, id oid, ps []oid, base int32, row *Row) (col, 
 			} else {
 				target, tcolor = st.freeSlot(max(col+1, reserved)), st.newColor()
 			}
-			st.lanes[target] = lane{want: p, pos: base + int32(pi), color: tcolor, kind: tkind, used: true}
+			start(target, lane{want: p, pos: base + int32(pi), color: tcolor, kind: tkind, used: true})
 			created = append(created, target)
 		}
 		if row != nil {
@@ -520,10 +552,23 @@ func step(st *state, cfg *layout, id oid, ps []oid, base int32, row *Row) (col, 
 		}
 	}
 	if row != nil {
+		last, run := -2, -1 // the column of the lane packed before, and where its run's length is
 		for i, l := range st.lanes {
-			if l.used && !slices.Contains(created, i) {
-				row.Down = append(row.Down, Seg{From: i, To: i, Color: l.color, Kind: cfg.name(l.kind)})
+			if !l.used || slices.Contains(created, i) {
+				continue
 			}
+			if !pack {
+				row.Down = append(row.Down, Seg{From: i, To: i, Color: l.color, Kind: cfg.name(l.kind)})
+				continue
+			}
+			if kind := cfg.name(l.kind); run < 0 || i != last+1 || row.PassKind[len(row.PassKind)-1] != kind {
+				run = len(row.Pass) + 1
+				row.Pass = append(row.Pass, i, 0)
+				row.PassKind = append(row.PassKind, kind)
+			}
+			row.Pass[run]++
+			row.Pass = append(row.Pass, l.color)
+			last = i
 		}
 		row.Width = len(st.lanes)
 		if col+1 > row.Width {

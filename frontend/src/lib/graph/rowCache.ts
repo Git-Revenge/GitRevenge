@@ -13,6 +13,10 @@ export interface Row {
   color: number
   up: Seg[]
   down: Seg[]
+  /** The lanes that run straight through the row, packed, with a kind for each run of them:
+   * read them with eachPass. They aren't in up or down. */
+  pass?: number[]
+  passKind?: string[]
   width: number
   /** The branch kind of the lane the commit sits on, if any. */
   kind?: string

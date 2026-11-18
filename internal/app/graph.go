@@ -62,7 +62,7 @@ func (a *App) GraphRows(path string, start, count int) (GraphPage, error) {
 		return GraphPage{Rows: []graph.Row{}, Refs: map[string][]git.Ref{}, Loading: true}, nil
 	}
 	paused, estimate := r.GraphStatus()
-	rows := g.Rows(start, count)
+	rows := g.Page(start, count)
 	idx := r.Refs()
 	refs := map[string][]git.Ref{}
 	for _, row := range rows {
