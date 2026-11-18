@@ -34,7 +34,7 @@ On Linux, the app needs GTK and WebKitGTK to build (on Ubuntu or Debian: `sudo a
 ## Guidelines
 
 - **Tests.** Go tests build fixture repositories on the fly with real git. Frontend logic is covered with Vitest. Anything about how a screen renders or responds is covered in `frontend/e2e` with Playwright, which mounts the real component in a real browser against a stubbed Go backend, so it doesn't need `wails dev`: add a mount to `harness.ts` if the component needs one, then a test. Add a test with each fix or feature.
-- **Wails bindings.** `frontend/wailsjs` is generated from the Go API. Commit exactly what `wails generate module` writes, and don't reorder it by hand.
+- **Wails bindings.** `frontend/wailsjs` is generated from the Go API. Commit exactly what `wails generate module` writes, and don't reorder it by hand. CI fails if they don't match the Go code.
 - **Git calls** go through the git layer in `internal/git`, which runs the system git ([ADR 0002](docs/adr/0002-system-git-cli.md)). Don't shell out elsewhere.
 - **Match the surrounding code**: naming, comment density and idiom.
 - **Accessibility.** UI changes must work with the keyboard and in both themes. See [ACCESSIBILITY.md](ACCESSIBILITY.md).
