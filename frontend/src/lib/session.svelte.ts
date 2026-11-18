@@ -15,6 +15,7 @@ import type { app } from '../../wailsjs/go/models'
 import { errorText } from './errors'
 import { onBackend, type BackendEvents } from './events'
 import { fromText, type Problem } from './problem'
+import { forgetRepoReads } from './repoReads'
 
 /** Open tabs, the active tab and recent repos, mirrored from the Go session manager. */
 class Session {
@@ -37,6 +38,9 @@ class Session {
    * repository on screen is watched, so it only moves for that one: a tab that's switched to
    * reads everything as its view opens. */
   revision = $state<Record<string, number>>({})
+  /** The same, for a view that only cares about the repository's git config. Most changes
+   * are saves in the working tree, which that view can sit out. */
+  configRevision = $state<Record<string, number>>({})
   /** Per-repo counter bumped when its undo or redo history changes. */
   undoRevision = $state<Record<string, number>>({})
   /** Branches whose work is already on another branch, by repository and name, with that
@@ -67,7 +71,10 @@ class Session {
     // Global and included config apply to every repository, so a change refreshes them all:
     // signing, identity, and pull and merge defaults are read again.
     onBackend('gitconfig:changed', () => {
-      for (const t of this.tabs) this.revision[t.path] = (this.revision[t.path] ?? 0) + 1
+      for (const t of this.tabs) {
+        this.revision[t.path] = (this.revision[t.path] ?? 0) + 1
+        this.configRevision[t.path] = (this.configRevision[t.path] ?? 0) + 1
+      }
     })
     const st = await this.run(() => RestoreSession())
     if (!st) return
@@ -132,6 +139,7 @@ class Session {
     const i = this.tabs.findIndex((t) => t.path === path)
     if (i < 0) return
     await this.run(() => CloseRepo(path))
+    forgetRepoReads(path)
     this.tabs = this.tabs.filter((t) => t.path !== path)
     if (this.active === path) {
       // Same rule as the backend, which is watching that one now: select the tab that slid
@@ -192,6 +200,7 @@ class Session {
   /** Handles a change detected on disk by the backend watcher. */
   private async onChange(c: BackendEvents['repo:changed']) {
     this.revision[c.path] = (this.revision[c.path] ?? 0) + 1
+    if (c.kinds.includes('config')) this.configRevision[c.path] = (this.configRevision[c.path] ?? 0) + 1
     if (c.kinds.includes('head') || c.kinds.includes('refs')) {
       if (!this.tabs.some((t) => t.path === c.path)) return
       const tab = await this.run(() => RepoInfo(c.path))

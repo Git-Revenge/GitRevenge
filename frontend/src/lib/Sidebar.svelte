@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { DeletableBranches, DeleteMergedBranches, MergedBranches, Refs, SetShowHidden, ShowingHidden } from '../../wailsjs/go/app/App.js'
+  import { DeletableBranches, DeleteMergedBranches, MergedBranches, SetShowHidden, ShowingHidden } from '../../wailsjs/go/app/App.js'
+  import { repoReads } from './repoReads'
   import { onBackend } from './events'
   import { onMount, tick, untrack } from 'svelte'
   import type { DialogSpec } from './Dialog.svelte'
@@ -309,7 +310,7 @@
   }
 
   async function load() {
-    refs = ((await session.run(() => Refs(path))) as Ref[] | undefined) ?? []
+    refs = ((await session.run(() => repoReads(path).refs())) as Ref[] | undefined) ?? []
     void loadMerged()
     showingHidden = (await session.run(() => ShowingHidden(path))) ?? false
   }

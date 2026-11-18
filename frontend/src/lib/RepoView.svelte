@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import { CommitRow, WorkingTree } from '../../wailsjs/go/app/App.js'
+  import { CommitRow } from '../../wailsjs/go/app/App.js'
+  import { repoReads } from './repoReads'
   import { provideCommands } from './commands.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
   import Dialog, { type DialogSpec } from './Dialog.svelte'
@@ -32,7 +33,7 @@
 
   // Smart links come from git config: read again whenever the repository's config changes.
   $effect(() => {
-    void session.revision[path]
+    void session.configRevision[path]
     void linkStore.load(path)
   })
   let windowWidth = $state(0)
@@ -151,7 +152,7 @@
   let checkedInitial = false
 
   async function refreshCount() {
-    const wt = await session.run(() => WorkingTree(path))
+    const wt = await session.run(() => repoReads(path).workingTree())
     if (!wt) return
     changes = wt.status.files.length
     // Open on the changes when there are any.

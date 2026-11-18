@@ -4,10 +4,11 @@
   import { errorText } from '../errors'
   import { onMount, tick, untrack, type Snippet } from 'svelte'
   import { ALONE_STEPS, searchPlaceholder, SQUEEZE, squeezeFor } from '../barSqueeze'
-  import { ArrivedCommits, CommitNotes, CommitRow, CommitSignatures, GraphFocus, HeadCommit, OwnMoveAge, GraphRows, NotedCommits, Refs, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView } from '../../../wailsjs/go/app/App.js'
+  import { ArrivedCommits, CommitNotes, CommitRow, CommitSignatures, GraphFocus, HeadCommit, OwnMoveAge, GraphRows, NotedCommits, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView } from '../../../wailsjs/go/app/App.js'
   import { session } from '../session.svelte'
   import { ClipboardSetText } from '../../../wailsjs/runtime/runtime.js'
   import { onBackend } from '../events'
+  import { repoReads } from '../repoReads'
   import { theme as colorTheme } from '../theme.svelte'
   import { formatShortcut, provideCommands } from '../commands.svelte'
   import Icon from '../ui/Icon.svelte'
@@ -78,7 +79,9 @@
   async function loadKinds() {
     const [refs, prefs] = await Promise.all([
       // The filter is optional: without these answers it just doesn't show.
-      Refs(path).catch(() => []),
+      repoReads(path)
+        .refs()
+        .catch(() => []),
       RepoPreferences(path).catch(() => null),
     ])
     remote = mainRemote(refs as Ref[])
