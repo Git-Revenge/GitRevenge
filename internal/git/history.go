@@ -27,16 +27,14 @@ const MaxFileHistory = 5000
 
 // FileHistory lists the commits that changed path, newest first, following renames.
 func (r *Repo) FileHistory(ctx context.Context, path string) ([]FileCommit, error) {
-	out, err := r.runner.Run(ctx, Cmd{
-		Dir: r.dir,
+	out, err := r.readCmd(ctx, Cmd{
 		Args: []string{
 			"log", "--follow", "--name-status", "-z",
 			"--max-count=" + strconv.Itoa(MaxFileHistory),
 			"--format=%x1e%H%x1f%an%x1f%at%x1f%s",
 			"--", path,
 		},
-		ReadOnly: true,
-		Env:      []string{"GIT_LITERAL_PATHSPECS=1"},
+		Env: []string{"GIT_LITERAL_PATHSPECS=1"},
 	})
 	if err != nil {
 		return nil, err
@@ -99,7 +97,7 @@ func (r *Repo) Blame(ctx context.Context, path, rev string) ([]BlameLine, error)
 	}
 	args = append(args, "--", path)
 	var lines []BlameLine
-	err := r.runner.Stream(ctx, Cmd{Dir: r.dir, Args: args, ReadOnly: true}, func(rd io.Reader) error {
+	err := r.streamCmd(ctx, Cmd{Args: args}, func(rd io.Reader) error {
 		var err error
 		lines, err = parseBlame(rd)
 		return err

@@ -227,7 +227,8 @@ func (r *Repo) SetIndexContent(ctx context.Context, path string, content string)
 // indexMode returns the file's mode in the index, or one derived from the work tree for a
 // file not yet tracked.
 func (r *Repo) indexMode(ctx context.Context, path string) (string, error) {
-	out, err := r.runner.Output(ctx, Cmd{Dir: r.dir, Args: []string{"ls-files", "-s", "--", path}, ReadOnly: true, Env: []string{"GIT_LITERAL_PATHSPECS=1"}})
+	raw, err := r.readCmd(ctx, Cmd{Args: []string{"ls-files", "-s", "--", path}, Env: []string{"GIT_LITERAL_PATHSPECS=1"}})
+	out := strings.TrimSpace(string(raw))
 	if err != nil {
 		return "", err
 	}
