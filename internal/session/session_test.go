@@ -93,6 +93,21 @@ func TestOpenRejectsNonRepoAndBare(t *testing.T) {
 	}
 }
 
+// With safe.bareRepository=explicit, Git 3.0's default, git won't say whether a folder it
+// wasn't pointed at is a bare repository: it refuses to look.
+func TestOpenRejectsABareRepositoryGitWontLookInto(t *testing.T) {
+	global := filepath.Join(t.TempDir(), "gitconfig")
+	if err := os.WriteFile(global, []byte("[safe]\n\tbareRepository = explicit\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", global)
+	m, _ := newManager(t)
+	bare := gittest.NewBare(t)
+	if _, err := m.Open(context.Background(), bare.Dir); !errors.Is(err, ErrBare) {
+		t.Fatalf("bare repo: err = %v, want ErrBare", err)
+	}
+}
+
 func TestCloseMovesActiveToNeighbour(t *testing.T) {
 	m, store := newManager(t)
 	var paths []string
