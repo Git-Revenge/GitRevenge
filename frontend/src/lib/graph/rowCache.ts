@@ -84,9 +84,16 @@ export interface GraphProgress {
 
 export const CHUNK = 200
 
+/** How many chunks are kept: 50,000 rows, far more than a view shows, so rows scrolled past
+ * are still there when the view goes back to them. Without a limit, a long scroll through a
+ * big history keeps every row it passed, and the backend already has them all. */
+export const MAX_CHUNKS = 250
+
 /**
  * Caches graph rows in fixed-size chunks fetched on demand. A chunk that came back short
- * (the graph was still loading) is refetched once more rows exist.
+ * (the graph was still loading) is refetched once more rows exist. Past MAX_CHUNKS, the
+ * chunks furthest from the rows last asked for are dropped, and fetched again if they're
+ * wanted.
  */
 export class RowCache {
   private chunks = new Map<number, Row[]>()
@@ -102,6 +109,8 @@ export class RowCache {
 
   /** Whether the last fetch failed, so only a change is reported. */
   private failing = false
+  /** The chunk in the middle of the rows last asked for, which the cache keeps what's near. */
+  private near = 0
 
   constructor(
     private fetchPage: (start: number, count: number) => Promise<Page>,
@@ -129,6 +138,7 @@ export class RowCache {
   ensure(start: number, end: number) {
     const first = Math.max(0, Math.floor(start / CHUNK))
     const last = Math.floor(Math.max(start, end - 1) / CHUNK)
+    this.near = (first + last) >> 1
     for (let c = first; c <= last; c++) {
       const have = this.chunks.get(c)
       const complete = have && (have.length === CHUNK || (!this.loading && c * CHUNK + have.length >= this.total))
@@ -159,6 +169,7 @@ export class RowCache {
       .then((page) => {
         if (gen !== this.generation) return
         this.chunks.set(c, page.rows)
+        this.trim()
         this.version++
         for (const [id, refs] of Object.entries(page.refs ?? {})) this.labels.set(id, refs)
         this.total = page.total
@@ -181,5 +192,12 @@ export class RowCache {
         if (this.inflight.get(c) === p) this.inflight.delete(c)
       })
     this.inflight.set(c, p)
+  }
+
+  /** Drops the chunks furthest from the rows last asked for, down to MAX_CHUNKS. */
+  private trim() {
+    if (this.chunks.size <= MAX_CHUNKS) return
+    const furthestFirst = [...this.chunks.keys()].sort((a, b) => Math.abs(b - this.near) - Math.abs(a - this.near))
+    for (const c of furthestFirst.slice(0, this.chunks.size - MAX_CHUNKS)) this.chunks.delete(c)
   }
 }
