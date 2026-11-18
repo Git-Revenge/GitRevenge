@@ -29,6 +29,8 @@ cd frontend && npm run check && npm run lint && npm test && npm run test:browser
 
 Also run `golangci-lint run` and, with `npx playwright install webkit`, `npm run test:browser:webkit`. CI runs everything on Windows, macOS and Linux.
 
+The browser tests use Edge on Windows. On macOS and Linux they use Playwright's own Chromium: run `npx playwright install chromium` once.
+
 On Linux, the app needs GTK and WebKitGTK to build (on Ubuntu or Debian: `sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev`), and `wails build` needs `-tags webkit2_41`.
 
 ## Guidelines
