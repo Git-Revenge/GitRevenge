@@ -49,9 +49,16 @@ export const easeInk = cubicBezier(0.2, 0.6, 0.2, 1)
 /** --ease-exit: things leaving. */
 export const easeExit = cubicBezier(0.4, 0, 0.6, 1)
 
+/** The media query behind reducedMotion, and the window it was asked of. */
+let lessMotion: { of: unknown; query: MediaQueryList | undefined } | undefined
+
 /** True when the person asked their system for less motion. */
 export function reducedMotion(): boolean {
-  return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  if (typeof window === 'undefined') return false
+  // The graph asks this several times for every row of every frame it draws. A query stays
+  // current by itself, so it's made once and read from then on.
+  if (lessMotion?.of !== window) lessMotion = { of: window, query: window.matchMedia?.('(prefers-reduced-motion: reduce)') }
+  return !!lessMotion.query?.matches
 }
 
 /** A duration that collapses to 0 under reduced motion. */
