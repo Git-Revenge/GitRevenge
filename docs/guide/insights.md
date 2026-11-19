@@ -45,7 +45,7 @@ If any of your [smart links](settings.md#links) is set to count for Shipped, the
 
 Each item shows its author, how many files and lines it changed, and its **cycle time**: from the merged branch's first commit to the merge. Only merge commits have one. Squash merges and direct commits don't keep the branch's history, so they say **single commit** rather than show a guess.
 
-**Dependency updates** a bot made are listed on their own at the end, collapsed, so they don't crowd out the work people did. An item counts as one when its author is a bot account (a name ending in `[bot]`, like `dependabot[bot]`), or when the branch a merge brought in is a [Bot branch](branch-care.md#branch-kinds).
+**Dependency updates** a bot made are listed on their own at the end, collapsed, so they don't crowd out the work people did. An item counts as one when its author is a bot (a name ending in `[bot]`, like `dependabot[bot]`, or one that matches the repository's [bot author patterns](settings.md#bot-authors)), or when the branch a merge brought in is a [Bot branch](branch-care.md#branch-kinds).
 
 ## Needs attention
 
@@ -79,7 +79,7 @@ The files the window's items changed most, by lines. A file that open branches a
 
 **Export CSV**, in the Shipped, Needs attention and Hotspots views, saves that list for a spreadsheet.
 
-Both start with the inputs they came from: the scope, each repository's target branch and exact commit, the window in UTC, the as-of point, the [branch kind](branch-care.md#branch-kinds) patterns, the smart links that count for Shipped, and the thresholds. That's what makes them reproducible. Anyone with those commits, using those inputs, gets the same result. The design decision behind this is [ADR 0008](../adr/0008-insights-from-repository-state.md).
+Both start with the inputs they came from: the scope, each repository's target branch and exact commit, the window in UTC, the as-of point, the [branch kind](branch-care.md#branch-kinds) patterns, the [bot author patterns](settings.md#bot-authors), the smart links that count for Shipped, and the thresholds. That's what makes them reproducible. Anyone with those commits, using those inputs, gets the same result. The design decision behind this is [ADR 0008](../adr/0008-insights-from-repository-state.md).
 
 ## What it doesn't do
 

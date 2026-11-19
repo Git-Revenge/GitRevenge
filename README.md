@@ -26,7 +26,7 @@ The user guide, with pictures and walkthroughs, is at [gitrevenge.com](https://g
 - **Lots of repos at once.** Repos open in tabs, worktrees are supported, and a group of local projects gets a dashboard with batch fetch and pull.
 - **LFS and submodules.** Track LFS patterns, see which files are in LFS, lock and unlock them. Initialize and update submodules.
 - **Insights for sprint reviews.** What shipped in a window, which branches are stuck or would conflict, and where the hotspots are, all computed from the repository alone and reproducible, with Markdown and CSV exports.
-- **Comfortable to live in.** Light and dark themes with subtle, reduced-motion-aware animation, a timeline graph with a compact mode and two experimental views (Horizontal, and a Map of every branch), a settings panel, and a command palette (<kbd>Ctrl</kbd>+<kbd>K</kbd>). Common actions have shortcuts, which you can rebind; <kbd>Ctrl</kbd>+<kbd>/</kbd> lists them. On macOS, read <kbd>⌘</kbd> for <kbd>Ctrl</kbd>.
+- **Comfortable to live in.** Light and dark themes with subtle, reduced-motion-aware animation, a timeline graph with a compact mode and two experimental views (Horizontal, and a Map of every branch or every author), a settings panel, and a command palette (<kbd>Ctrl</kbd>+<kbd>K</kbd>). Common actions have shortcuts, which you can rebind; <kbd>Ctrl</kbd>+<kbd>/</kbd> lists them. On macOS, read <kbd>⌘</kbd> for <kbd>Ctrl</kbd>.
 
 ## Privacy
 
