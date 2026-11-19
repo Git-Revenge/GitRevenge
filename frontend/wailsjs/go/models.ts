@@ -132,6 +132,152 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class AuthorIdentity {
+	    name: string;
+	    email: string;
+	    commits: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AuthorIdentity(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.email = source["email"];
+	        this.commits = source["commits"];
+	    }
+	}
+	export class MapAuthor {
+	    key: string;
+	    name: string;
+	    email: string;
+	    identities: AuthorIdentity[];
+	    commits: number;
+	    authored: number;
+	    coAuthored: number;
+	    updated: number;
+	    bot: boolean;
+	    you: boolean;
+	    trunk: number;
+	    branches: MapNode[];
+	    moreBranches: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MapAuthor(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.name = source["name"];
+	        this.email = source["email"];
+	        this.identities = this.convertValues(source["identities"], AuthorIdentity);
+	        this.commits = source["commits"];
+	        this.authored = source["authored"];
+	        this.coAuthored = source["coAuthored"];
+	        this.updated = source["updated"];
+	        this.bot = source["bot"];
+	        this.you = source["you"];
+	        this.trunk = source["trunk"];
+	        this.branches = this.convertValues(source["branches"], MapNode);
+	        this.moreBranches = source["moreBranches"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MapNode {
+	    name: string;
+	    kind: string;
+	    commit: string;
+	    commits: number;
+	    updated: number;
+	    parent: string;
+	    stacked?: boolean;
+	    worktree?: string;
+	    head: boolean;
+	    branchKind?: string;
+	    tags?: number;
+	    branches?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MapNode(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.commit = source["commit"];
+	        this.commits = source["commits"];
+	        this.updated = source["updated"];
+	        this.parent = source["parent"];
+	        this.stacked = source["stacked"];
+	        this.worktree = source["worktree"];
+	        this.head = source["head"];
+	        this.branchKind = source["branchKind"];
+	        this.tags = source["tags"];
+	        this.branches = source["branches"];
+	    }
+	}
+	export class AuthorMap {
+	    trunk: MapNode;
+	    authors: MapAuthor[];
+	    people: number;
+	    bots: number;
+	    commits: number;
+	    since: number;
+	    uncountedBranches: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AuthorMap(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.trunk = this.convertValues(source["trunk"], MapNode);
+	        this.authors = this.convertValues(source["authors"], MapAuthor);
+	        this.people = source["people"];
+	        this.bots = source["bots"];
+	        this.commits = source["commits"];
+	        this.since = source["since"];
+	        this.uncountedBranches = source["uncountedBranches"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class BatchResult {
 	    path: string;
 	    ok: boolean;
@@ -284,40 +430,6 @@ export namespace app {
 		    }
 		    return a;
 		}
-	}
-	export class MapNode {
-	    name: string;
-	    kind: string;
-	    commit: string;
-	    commits: number;
-	    updated: number;
-	    parent: string;
-	    stacked?: boolean;
-	    worktree?: string;
-	    head: boolean;
-	    branchKind?: string;
-	    tags?: number;
-	    branches?: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new MapNode(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.kind = source["kind"];
-	        this.commit = source["commit"];
-	        this.commits = source["commits"];
-	        this.updated = source["updated"];
-	        this.parent = source["parent"];
-	        this.stacked = source["stacked"];
-	        this.worktree = source["worktree"];
-	        this.head = source["head"];
-	        this.branchKind = source["branchKind"];
-	        this.tags = source["tags"];
-	        this.branches = source["branches"];
-	    }
 	}
 	export class BranchMap {
 	    trunk: MapNode;
@@ -996,6 +1108,7 @@ export namespace app {
 		    return a;
 		}
 	}
+	
 	export class MapGroup {
 	    nodes: MapNode[];
 	    more: number;
@@ -1740,6 +1853,24 @@ export namespace app {
 
 export namespace git {
 	
+	export class AuthorHistory {
+	    authored: number;
+	    coAuthored: number;
+	    first: number;
+	    last: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AuthorHistory(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.authored = source["authored"];
+	        this.coAuthored = source["coAuthored"];
+	        this.first = source["first"];
+	        this.last = source["last"];
+	    }
+	}
 	export class BlameLine {
 	    commit: string;
 	    author: string;

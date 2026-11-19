@@ -342,6 +342,14 @@ export function LinkRules(arg1) {
   return window['go']['app']['App']['LinkRules'](arg1);
 }
 
+export function MapAuthorHistory(arg1, arg2) {
+  return window['go']['app']['App']['MapAuthorHistory'](arg1, arg2);
+}
+
+export function MapAuthors(arg1, arg2) {
+  return window['go']['app']['App']['MapAuthors'](arg1, arg2);
+}
+
 export function MarkBisect(arg1, arg2) {
   return window['go']['app']['App']['MarkBisect'](arg1, arg2);
 }
