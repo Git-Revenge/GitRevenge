@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Added
 
+- The experimental Map view has an **Authors** mode, beside its branches: a node for each person who committed in the span the rings cover, bigger the more commits and closer the more recently. Zoom to change the span, from a week to ten years. A commit counts for its author and for each co-author, merges for nobody, and names that share an email or a name are one person. **Everyone / People / Bots** chooses who shows, your own node says "that's you", and a card gives what someone wrote in the span and in all, with a way to search the timeline for them. (#810, #819)
 - A repository can say which authors are bots, by name or email, in Settings under **Bot authors** (`gitrevenge.botAuthor` in git config). Insights lists what they shipped with the dependency updates, where it used to go only by names ending in `[bot]`, and prints the patterns with a report's inputs. (#808, #817)
 
 ### Changed

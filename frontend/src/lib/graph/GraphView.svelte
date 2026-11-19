@@ -380,6 +380,18 @@
     reveal(row)
   }
 
+  /** From an author's card in the Map: the timeline, searching for them. */
+  async function searchFromMap(author: string) {
+    const ok = await session.run(async () => {
+      await colorTheme.setView(density === 'compact' ? 'compact' : 'timeline')
+      return true
+    })
+    if (!ok) return
+    query = author
+    await tick()
+    void runSearch()
+  }
+
   /** A right-click on a map node: its commit's menu, for that branch or tag alone. */
   async function mapMenu(node: MapNode, x: number, y: number) {
     if (!onContext) return
@@ -2097,7 +2109,7 @@
       onDrop={onDrop}
     />
   {:else if mapView}
-    <Lazy load={() => import('./MapView.svelte')} {path} tick={mapTick} onSummary={(text: string) => (mapSummary = text)} onShow={showFromMap} onMenu={onContext ? mapMenu : undefined} {wip} />
+    <Lazy load={() => import('./MapView.svelte')} {path} tick={mapTick} onSummary={(text: string) => (mapSummary = text)} onShow={showFromMap} onAuthor={searchFromMap} onMenu={onContext ? mapMenu : undefined} {wip} />
   {/if}
   </div>
 </div>

@@ -6,17 +6,25 @@
 /** A node as the backend sends it (app.MapNode in Go). */
 export interface MapNode {
   name: string
-  kind: 'trunk' | 'branch' | 'remote' | 'tag' | 'tags' | 'group'
+  /** 'author' is a person in the Authors mode: the backend's app.MapAuthor, as a node. */
+  kind: 'trunk' | 'branch' | 'remote' | 'tag' | 'tags' | 'group' | 'author'
+  /** What tells this node from every other, where the name can't: two authors can each hold a
+   * branch of the same name. Without one, the kind and name do. */
+  id?: string
+  /** An author that matches a bot author pattern. */
+  bot?: boolean
   commit: string
   commits: number
   /** When it last moved, in Unix seconds. */
   updated: number
-  /** The branch node it hangs off, or '' for the trunk: the branch that holds a tag, or the
-   * one a stacked branch is stacked on. */
+  /** The node it hangs off, by id or else by name, or '' for the trunk: the branch that holds a
+   * tag, the one a stacked branch is stacked on, or the author a branch belongs to. */
   parent: string
   stacked?: boolean
   /** The folder of the other worktree the branch is checked out in. */
   worktree?: string
+  /** Where you are: the checked-out branch, or in the Authors mode, you. It's always drawn
+   * and always named. */
   head: boolean
   branchKind?: string
   /** How many tags a fold holds. */
@@ -48,10 +56,13 @@ export interface Placed extends MapNode {
 /** Where a node was put by hand, by its kind and name ("branch:topic"). */
 export type Pins = ReadonlyMap<string, { x: number; y: number }>
 
-/** A node's key among the pins. A branch and a tag can share a name. */
-export function pinKey(n: Pick<MapNode, 'kind' | 'name'>): string {
-  return `${n.kind}:${n.name}`
+/** A node's key among the pins, and among the nodes. A branch and a tag can share a name. */
+export function pinKey(n: Pick<MapNode, 'kind' | 'name' | 'id'>): string {
+  return `${n.kind}:${n.id ?? n.name}`
 }
+
+/** What a node is called by the nodes that hang off it: its id, or else its name. */
+const handle = (n: Pick<MapNode, 'name' | 'id'>) => n.id ?? n.name
 
 /** One ring: how old something is at it, in days, and what it's called. */
 export interface RingMark {
@@ -63,6 +74,8 @@ export interface RingMark {
 export interface Scale {
   /** What the whole map spans at this zoom, for the control that changes it. */
   name: string
+  /** The same span in a sentence: "38 commits in the last two months". */
+  period: string
   rings: RingMark[]
 }
 
@@ -71,15 +84,33 @@ export interface Scale {
  * day; it goes no closer. Zooming out, the rings become weeks, then months, then years.
  */
 export const SCALES: Scale[] = [
-  { name: 'A week, day by day', rings: [1, 2, 3, 4, 5, 6, 7].map((d) => ({ days: d, name: d === 1 ? 'today' : d === 7 ? '1 week' : `${d} days` })) },
-  { name: 'Two weeks', rings: [{ days: 7, name: 'this week' }, { days: 14, name: 'last week' }] },
-  { name: 'Two months', rings: [{ days: 7, name: '1 week' }, { days: 14, name: '2 weeks' }, { days: 30, name: '1 month' }, { days: 61, name: '2 months' }] },
-  { name: 'Six months', rings: [{ days: 30, name: '1 month' }, { days: 61, name: '2 months' }, { days: 91, name: '3 months' }, { days: 183, name: '6 months' }] },
-  { name: 'Two years', rings: [{ days: 91, name: '3 months' }, { days: 183, name: '6 months' }, { days: 365, name: '1 year' }, { days: 730, name: '2 years' }] },
-  { name: 'Ten years', rings: [{ days: 365, name: '1 year' }, { days: 730, name: '2 years' }, { days: 1826, name: '5 years' }, { days: 3652, name: '10 years' }] },
+  { name: 'A week, day by day', period: 'the last week', rings: [1, 2, 3, 4, 5, 6, 7].map((d) => ({ days: d, name: d === 1 ? 'today' : d === 7 ? '1 week' : `${d} days` })) },
+  { name: 'Two weeks', period: 'the last two weeks', rings: [{ days: 7, name: 'this week' }, { days: 14, name: 'last week' }] },
+  { name: 'Two months', period: 'the last two months', rings: [{ days: 7, name: '1 week' }, { days: 14, name: '2 weeks' }, { days: 30, name: '1 month' }, { days: 61, name: '2 months' }] },
+  { name: 'Six months', period: 'the last six months', rings: [{ days: 30, name: '1 month' }, { days: 61, name: '2 months' }, { days: 91, name: '3 months' }, { days: 183, name: '6 months' }] },
+  { name: 'Two years', period: 'the last two years', rings: [{ days: 91, name: '3 months' }, { days: 183, name: '6 months' }, { days: 365, name: '1 year' }, { days: 730, name: '2 years' }] },
+  { name: 'Ten years', period: 'the last ten years', rings: [{ days: 365, name: '1 year' }, { days: 730, name: '2 years' }, { days: 1826, name: '5 years' }, { days: 3652, name: '10 years' }] },
 ]
 /** The zoom the map opens at: this week and last. */
 export const DEFAULT_SCALE = 1
+/** The closest the Authors mode opens at: two months. Who wrote the most is a question about
+ * a stretch of time, and a fortnight is rarely the one meant. */
+export const AUTHORS_SCALE = 2
+
+/** How many days a zoom level spans: its outermost ring. In the Authors mode that's the window
+ * commits are counted in. */
+export function spanDays(level: number): number {
+  const rings = SCALES[zoomBy(level, 0)].rings
+  return rings[rings.length - 1].days
+}
+
+/** The level the Authors mode opens at when none has been chosen: two months, or as far out
+ * as it takes to hold the trunk's last commit, so a quiet repository doesn't open empty. */
+export function authorsScale(trunkUpdated: number, now: number): number {
+  const age = (now - trunkUpdated) / DAY
+  const at = SCALES.findIndex((s, i) => i >= AUTHORS_SCALE && s.rings[s.rings.length - 1].days >= age)
+  return at < 0 ? SCALES.length - 1 : at
+}
 
 /** The zoom level one step in (-1) or out (+1) from `level`, no further out than `widest`. */
 export function zoomBy(level: number, step: number, widest = SCALES.length - 1): number {
@@ -138,6 +169,77 @@ export function showingNodes<T extends Pick<MapNode, 'kind' | 'head'>>(nodes: T[
   if (showing === 'remote') return nodes.filter((n) => n.kind !== 'branch' || n.head)
   return nodes
 }
+
+/** One name and email a person committed under (app.AuthorIdentity in Go). */
+export interface AuthorIdentity {
+  name: string
+  email: string
+  commits: number
+}
+
+/** A person in the Authors mode, as the backend sends them (app.MapAuthor in Go). */
+export interface MapAuthor {
+  /** What tells them from the others: the email they used most. */
+  key: string
+  name: string
+  email: string
+  /** Every name and email folded into this person, most used first. */
+  identities: AuthorIdentity[]
+  /** The commits in the window they wrote or are credited on, each once. */
+  commits: number
+  authored: number
+  coAuthored: number
+  /** When their latest commit in the window was made, in Unix seconds. */
+  updated: number
+  bot: boolean
+  you: boolean
+  /** How many of their commits the trunk has. */
+  trunk: number
+  /** The unmerged branches holding commits of theirs, sized by those commits. */
+  branches: MapNode[]
+  moreBranches: number
+}
+
+/** Who the Authors mode shows. */
+export type Who = 'everyone' | 'people' | 'bots'
+
+/** How many authors the map draws at most: the ones with the most commits. */
+export const MAX_AUTHORS = 60
+
+/** The authors the switch leaves in, most commits first as the backend sends them, and no
+ * more than the map draws. Among those the switch leaves in, you always show, however few
+ * your commits: it's where you are. */
+export function shownAuthors(authors: MapAuthor[], who: Who): MapAuthor[] {
+  const pick = authors.filter((a) => who === 'everyone' || (who === 'bots') === a.bot)
+  let others = 0
+  return pick.filter((a) => a.you || others++ < MAX_AUTHORS)
+}
+
+/** An author as a node: sized by their commits, as far out as their last commit is old. */
+export function authorNode(a: MapAuthor): MapNode {
+  return { name: a.name, kind: 'author', id: a.key, bot: a.bot, commit: '', commits: a.commits, updated: a.updated, parent: '', head: a.you }
+}
+
+/** What the Authors mode holds, for the bar: "14 people · 2 bots", and "60 of 10,339 people"
+ * when there are more people than the map draws. */
+export function authorsSummary(people: number, bots: number, shownPeople: number): string {
+  const count = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`
+  const who = shownPeople < people ? `${shownPeople.toLocaleString()} of ${count(people, 'person', 'people')}` : count(people, 'person', 'people')
+  return bots ? `${who} · ${count(bots, 'bot', 'bots')}` : who
+}
+
+/** A colour number for an author, the same one each time for the same name, among `count`. */
+export function authorColor(name: string, count: number): number {
+  // FNV-1a: with so few colours, a weaker mix puts half a team on one of them.
+  let h = 2166136261
+  for (const c of name.toLowerCase()) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0
+  // And a last stir, so names that end alike don't land together.
+  h ^= h >>> 16
+  h = Math.imul(h, 0x85ebca6b) >>> 0
+  h ^= h >>> 13
+  return (h >>> 0) % count
+}
+
 /** px of radius per square root of a commit, at most: area carries the number. */
 const BRANCH_K = 4
 const TAG_K = 4.5
@@ -151,15 +253,17 @@ export function nameWidth(name: string): number {
 const NAME_H = 46
 export const KEY = { width: 200, height: 124 }
 export const ZOOM = { width: 210, height: 52 }
-/** The All / Local / Remote switch in the stage's top left corner. */
-export const SWITCH = { width: 196, height: 44 }
+/** The switches in the stage's top left corner: Branches / Authors, and under it whatever the
+ * mode offers. Two rows. */
+export const SWITCH = { width: 212, height: 74 }
 
-/** What the stage's controls take up, as centre and half-size: the switch in the top left, the
- * key in the bottom left and the zoom in the bottom right. None show on a stage too small. */
-export function controlBoxes(width: number, height: number): { x: number; y: number; hw: number; hh: number }[] {
+/** What the stage's controls take up, as centre and half-size: the switches in the top left,
+ * the key in the bottom left and the zoom in the bottom right. None show on a stage too small.
+ * `switches` is how much room the switches take, when it isn't the usual. */
+export function controlBoxes(width: number, height: number, switches: { width: number; height: number } = SWITCH): { x: number; y: number; hw: number; hh: number }[] {
   if (!keyShows(width, height)) return []
   return [
-    { x: SWITCH.width / 2, y: SWITCH.height / 2, hw: SWITCH.width / 2, hh: SWITCH.height / 2 },
+    { x: switches.width / 2, y: switches.height / 2, hw: switches.width / 2, hh: switches.height / 2 },
     { x: KEY.width / 2, y: height - KEY.height / 2, hw: KEY.width / 2, hh: KEY.height / 2 },
     { x: width - ZOOM.width / 2, y: height - ZOOM.height / 2, hw: ZOOM.width / 2, hh: ZOOM.height / 2 },
   ]
@@ -170,6 +274,8 @@ export function keyShows(width: number, height: number): boolean {
 }
 /** How many nodes it takes before only the newest keep their names showing. */
 export const CROWD = 40
+/** How many authors keep room for their names in a crowd: the ones who wrote most. */
+export const LEADING = 12
 
 const isTag = (n: Pick<MapNode, 'kind'>) => n.kind === 'tag' || n.kind === 'tags'
 const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.min(1, Math.max(0, t))
@@ -180,7 +286,8 @@ export function scales(nodes: Pick<MapNode, 'kind' | 'commits'>[]): { branch: nu
   const most = (pick: (n: Pick<MapNode, 'kind'>) => boolean) => Math.max(0, ...nodes.filter(pick).map((n) => n.commits))
   const fit = (k: number, limit: number, biggest: number) => (biggest > 0 ? Math.min(k, limit / Math.sqrt(biggest)) : k)
   return {
-    branch: fit(BRANCH_K, BRANCH_R.max, most((n) => n.kind === 'branch' || n.kind === 'remote')),
+    // An author is on the branches' footing: a circle whose area is commits.
+    branch: fit(BRANCH_K, BRANCH_R.max, most((n) => n.kind === 'branch' || n.kind === 'remote' || n.kind === 'author')),
     // A fold is as big as the history before it: it takes the limit, and doesn't set the scale.
     tag: fit(TAG_K, TAG_SIDE.max, most((n) => n.kind === 'tag')),
   }
@@ -263,6 +370,7 @@ export function layout(
   now: number,
   scale: Scale = SCALES[DEFAULT_SCALE],
   pins: Pins = new Map(),
+  switches: { width: number; height: number } = SWITCH,
 ): { trunk: Placed; nodes: Placed[]; rings: Rings; nameAngle: number; older: number } {
   const rings = ringsFor(width, height, scale)
   // What's older than the last ring isn't drawn at this zoom: it would only be a long spoke to
@@ -279,7 +387,7 @@ export function layout(
     const size = n.kind === 'group' ? groupSize(n.branches ?? 0) : n.kind === 'tags' ? TAG_SIDE.max : isTag(n) ? tagSide(n.commits, k.tag) : branchRadius(n.commits, k.branch) * 2
     return { ...n, x: 0, y: 0, size, r: isTag(n) ? (size * Math.SQRT2) / 2 : size / 2, band: bandOf(n.updated, now, scale), above: false, named: false }
   })
-  const byName = new Map(placed.filter((p) => !isTag(p)).map((p) => [p.name, p]))
+  const byName = new Map(placed.filter((p) => !isTag(p)).map((p) => [handle(p), p]))
   const holder = (p: Placed) => (p.parent ? byName.get(p.parent) : undefined)
   // What hangs off a node sits a short spring away from it; the more that hang there, the
   // longer the spring, so an opened group's branches have a ring to stand in.
@@ -331,10 +439,10 @@ export function layout(
     if (box.y + box.hh > height - KEY.height && p.x < KEY.width + box.hw) p.x = KEY.width + box.hw
     // And the zoom control in the bottom right.
     if (box.y + box.hh > height - ZOOM.height && p.x > width - ZOOM.width - box.hw) p.x = width - ZOOM.width - box.hw
-    // And the switch in the top left: whichever way out is shorter, right or down.
-    if (box.y - box.hh < SWITCH.height && p.x < SWITCH.width + box.hw) {
-      const right = SWITCH.width + box.hw - p.x
-      const down = SWITCH.height - (box.y - box.hh)
+    // And the switches in the top left: whichever way out is shorter, right or down.
+    if (box.y - box.hh < switches.height && p.x < switches.width + box.hw) {
+      const right = switches.width + box.hw - p.x
+      const down = switches.height - (box.y - box.hh)
       if (right < down) p.x += right
       else p.y += down
     }
@@ -345,11 +453,19 @@ export function layout(
   // spaced by their shapes alone, and names are given out afterwards to those with room.
   const crowded = placed.length > CROWD
   const isAbove = (p: Placed) => p.y < hub.y - 24 && !holder(p)
+  // Among authors in a crowd, the ones who wrote most keep room for their names: who they are
+  // is what the map is for.
+  const leading = new Set(
+    placed
+      .filter((p) => p.kind === 'author')
+      .sort((a, b) => b.commits - a.commits || b.updated - a.updated || a.name.localeCompare(b.name))
+      .slice(0, LEADING),
+  )
   const boxOf = (p: Placed) => {
     // An opened group's branches stand close round it: their names are given out afterwards,
     // where there's room, and keep none here.
     const member = holder(p)?.kind === 'group'
-    const named = !member && (!crowded || p.head || !!p.pinned || p.kind === 'branch' || p.kind === 'group')
+    const named = !member && (!crowded || p.head || !!p.pinned || p.kind === 'branch' || p.kind === 'group' || leading.has(p))
     const hw = Math.max(p.r, named ? nameWidth(p.name) / 2 : 0) + 5
     const hh = p.r + (named ? NAME_H / 2 : 0) + 3
     return { x: p.x, y: p.y + (named ? (isAbove(p) ? -NAME_H / 2 : NAME_H / 2) : 0), hw, hh }
@@ -417,11 +533,12 @@ export function layout(
   // another node, is left out: it shows when the node is pointed at or has the focus.
   type Box = { x: number; y: number; hw: number; hh: number; of?: Placed }
   const hit = (a: Box, b: Box) => Math.abs(a.x - b.x) < a.hw + b.hw && Math.abs(a.y - b.y) < a.hh + b.hh
-  const controls = controlBoxes(width, height)
+  const controls = controlBoxes(width, height, switches)
   const taken: Box[] = [{ x: hub.x, y: hub.y, hw: hub.r, hh: hub.r }, ...controls, ...placed.map((p) => ({ x: p.x, y: p.y, hw: p.r, hh: p.r, of: p }))]
   const onStage = (b: Box) => b.x - b.hw >= 0 && b.x + b.hw <= width && b.y - b.hh >= 0 && b.y + b.hh <= height
-  const rank = (p: Placed) => (p.head ? 0 : p.pinned ? 1 : p.kind === 'branch' ? 2 : p.kind === 'group' ? 3 : p.kind === 'remote' ? 4 : 5)
-  const wanting = [...placed].sort((a, b) => rank(a) - rank(b) || b.commits - a.commits || b.updated - a.updated || a.name.localeCompare(b.name))
+  // An author ranks with the local branches: among them, the most commits is named first.
+  const rank = (p: Placed) => (p.head ? 0 : p.pinned ? 1 : p.kind === 'branch' || p.kind === 'author' ? 2 : p.kind === 'group' ? 3 : p.kind === 'remote' ? 4 : 5)
+  const wanting = [...placed].sort((a, b) => rank(a) - rank(b) || Number(leading.has(b)) - Number(leading.has(a)) || b.commits - a.commits || b.updated - a.updated || a.name.localeCompare(b.name))
   for (const p of wanting) {
     const off = p.r + 4 + NAME_H / 2
     const label: Box = { x: p.x, y: p.above ? p.y - off : p.y + off, hw: nameWidth(p.name) / 2, hh: NAME_H / 2 - 2 }
