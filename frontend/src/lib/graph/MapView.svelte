@@ -13,8 +13,10 @@
   import Icon from '../ui/Icon.svelte'
   import {
     AUTHORS_SCALE,
+    authorBranchNodes,
     authorColor,
     authorNode,
+    sharedKey,
     authorsScale,
     authorsSummary,
     DEFAULT_SCALE,
@@ -198,9 +200,29 @@
   let shown = $derived(authorData ? shownAuthors(authorData.authors, who) : [])
   let authorOf = $derived(new Map(shown.map((a) => [a.key, a])))
 
+  // An author opens, as a group does: what they worked on stands round them. Any number can
+  // be open at once, each with their own, and which are open isn't kept between visits.
+  let openAuthors = $state<Record<string, true>>({})
+  const isOpen = (key: string) => !!openAuthors[key]
+  function toggleAuthor(key: string) {
+    if (openAuthors[key]) {
+      // A card on something they held goes with it.
+      if (held.some((n) => n.owner === key && keyOf(n) === picked)) picked = ''
+      openAuthors = Object.fromEntries(Object.entries(openAuthors).filter(([k]) => k !== key))
+    } else openAuthors = { ...openAuthors, [key]: true }
+  }
+  /** Whether an author has anything to open into. */
+  const opens = (au: MapAuthor) => au.trunk > 0 || au.branches.length > 0
+  /** What the open authors hold: for each, the trunk and the unmerged branches with commits of
+   * theirs. An author who has left the map takes theirs with them. */
+  let held = $derived(data && mode === 'authors' ? shown.filter((a) => openAuthors[a.key]).flatMap((a) => authorBranchNodes(a, data!.trunk)) : [])
+  /** The branch the pointer or the focus is on, among what authors hold: the same branch under
+   * every other open author lights up with it. */
+  let pointed = $state('')
+
   /** The nodes to draw: the map's own and the branches of the groups that are open, less what
-   * the switch leaves out; or in the Authors mode, the authors. */
-  let nodes = $derived(mode === 'authors' ? shown.map(authorNode) : data ? showingNodes([...data.nodes, ...Object.values(opened).flatMap((g) => g.nodes)], showing) : [])
+   * the switch leaves out; or in the Authors mode, the authors and what the open ones hold. */
+  let nodes = $derived(mode === 'authors' ? [...shown.map(authorNode), ...held] : data ? showingNodes([...data.nodes, ...Object.values(opened).flatMap((g) => g.nodes)], showing) : [])
 
   // Zoom: what the rings mean. All the way in, the map is one week and each ring a day; out,
   // the rings become weeks, then months, then years. The level is kept between visits.
@@ -391,6 +413,9 @@
     // A person takes one of the lanes' colours, the same one each time, and never the
     // trunk's; a bot is drawn in the Bot kind's.
     if (n.kind === 'author') return n.bot ? `var(${kindInfo('bot')?.token ?? '--ink-faint'})` : laneVar(1 + authorColor(n.name, LANE_COUNT - 1))
+    // What an author holds is tinted with their colour, so a cluster reads as one person's.
+    const owner = n.owner ? authorOf.get(n.owner) : undefined
+    if (owner) return colorOf(authorNode(owner))
     const kind = kindInfo(n.branchKind)
     if (kind) return `var(${kind.token})`
     let h = 0
@@ -402,7 +427,18 @@
     if (n.kind === 'group') return plural(n.branches ?? 0, 'branch', 'branches')
     if (n.kind === 'tags' || n.kind === 'trunk') return plural(n.commits, 'commit')
     if (n.kind === 'tag' || n.kind === 'author') return plural(n.commits, 'commit')
+    if (n.landed) return `${n.commits.toLocaleString()} landed`
     return n.commits ? plural(n.commits, 'commit') : `all in ${data?.trunk.name ?? 'the trunk'}`
+  }
+
+  /** What the card says of a branch as one author's share of it. */
+  function aboutHeld(n: MapNode, au: MapAuthor): string {
+    const trunk = data?.trunk.name ?? 'the trunk'
+    const when = relativeTime(n.updated, now)
+    const theirs = `${plural(n.commits, 'commit')} of ${au.name}'s in ${scale.period}`
+    if (n.landed) return `${theirs} ${n.commits === 1 ? 'is' : 'are'} in ${trunk}: landed.`
+    const where = n.kind === 'remote' ? ' It’s only on the remote.' : ''
+    return `${theirs} ${n.commits === 1 ? 'is' : 'are'} here and not in ${trunk}.${where} The branch last moved ${when === 'now' ? 'just now' : when}.`
   }
 
   /** How an author's commits in the span split: "12 written, 26 co-authored". Only said when
@@ -437,6 +473,8 @@
       const au = authorOf.get(n.id ?? '')
       return au ? aboutAuthor(au) : plural(n.commits, 'commit')
     }
+    const owner = n.owner ? authorOf.get(n.owner) : undefined
+    if (owner) return aboutHeld(n, owner)
     if (n.kind === 'trunk' && mode === 'authors' && authorData) {
       const by = [authorData.people ? plural(authorData.people, 'person', 'people') : '', authorData.bots ? plural(authorData.bots, 'bot') : ''].filter(Boolean).join(' and ')
       return `${plural(n.commits, 'commit')}. ${authorData.commits ? `${authorData.commits.toLocaleString()} of them in ${scale.period}, by ${by}` : `None in ${scale.period}`}. Merges aren't counted.`
@@ -454,6 +492,11 @@
   }
 
   const shapeOf = (n: MapNode) => (n.kind === 'tag' || n.kind === 'tags' ? 'tag' : n.kind === 'remote' ? 'remote' : n.kind === 'branch' && !n.commits ? 'merged' : n.kind === 'author' && n.bot ? 'bot' : n.kind)
+  /** What a screen reader hears a node called: a branch an author holds is theirs. */
+  const spoken = (n: MapNode) => {
+    const owner = n.owner ? authorOf.get(n.owner) : undefined
+    return owner ? `${n.name}, of ${owner.name}'s` : n.name
+  }
   /** What marks where you are: the checked-out branch, or in the Authors mode, you. */
   const hereWords = (n: MapNode) => (n.kind === 'author' ? 'that’s you' : 'you’re here')
   /** Opens a group, or folds it away again. */
@@ -488,13 +531,22 @@
 
 {#snippet nodeButton(n: Placed)}
   {@const key = keyOf(n)}
+  {@const au = n.kind === 'author' ? authorOf.get(n.id ?? '') : undefined}
   <button
     class="node is-{shapeOf(n)}"
     class:picked={picked === key}
     class:quiet={n.kind !== 'trunk' && !n.named}
+    class:owned={!!n.owner}
+    class:landed={!!n.landed}
+    class:echo={!!pointed && sharedKey(n) === pointed}
     data-node={key}
     aria-pressed={picked === key}
-    aria-label="{n.name}{n.head ? (n.kind === 'author' ? ', you' : ', checked out') : ''}. {about(n)}"
+    aria-expanded={n.kind === 'author' && au && opens(au) ? isOpen(au.key) : undefined}
+    aria-label="{spoken(n)}{n.head ? (n.kind === 'author' ? ', you' : ', checked out') : ''}. {about(n)}"
+    onpointerenter={() => (pointed = sharedKey(n))}
+    onpointerleave={() => (pointed = '')}
+    onfocus={() => (pointed = sharedKey(n))}
+    onblur={() => (pointed = '')}
     style:left="{n.x}px"
     style:top="{n.y}px"
     style:--c={colorOf(n)}
@@ -510,7 +562,7 @@
     onpointermove={nodeMove}
     onpointerup={nodeUp}
     onpointercancel={nodeUp}
-    ondblclick={() => (n.pinned ? unpin(key) : n.kind === 'group' ? toggleGroup(n.name) : undefined)}
+    ondblclick={() => (n.pinned ? unpin(key) : n.kind === 'group' ? toggleGroup(n.name) : au && opens(au) ? toggleAuthor(au.key) : undefined)}
     oncontextmenu={(e) => {
       // A person isn't a commit: there's no menu to give them.
       if (!onMenu || n.kind === 'tags' || n.kind === 'group' || n.kind === 'author') return
@@ -536,7 +588,6 @@
     {/if}
   </button>
   {#if picked === key && n.kind === 'author'}
-    {@const au = authorOf.get(n.id ?? '')}
     <div class="card" style={cardPlace(n)} role="group" aria-label="About {n.name}">
       <b>{n.name}</b>
       <span>{about(n)}</span>
@@ -552,13 +603,17 @@
           </span>
         {/if}
       {/if}
+      {#if au && isOpen(au.key) && au.moreBranches}
+        <span>{plural(au.moreBranches, 'more branch', 'more branches')} of theirs, less recently moved, {au.moreBranches === 1 ? "isn't" : "aren't"} shown.</span>
+      {/if}
       <span class="acts">
+        {#if au && opens(au)}<button class="btn sm text" onclick={() => toggleAuthor(au.key)}>{isOpen(au.key) ? 'Fold their branches away' : 'Show their branches'}</button>{/if}
         {#if onAuthor}<button class="btn sm text" onclick={() => onAuthor(n.name)}>Search the timeline for them</button>{/if}
         {#if n.pinned}<button class="btn sm text" onclick={() => unpin(key)}>Let it go back to its place</button>{/if}
       </span>
     </div>
   {:else if picked === key}
-    <div class="card" style={cardPlace(n)} role="group" aria-label="About {n.name}">
+    <div class="card" style={cardPlace(n)} role="group" aria-label="About {spoken(n)}">
       <b>{n.name}</b>
       <span>{about(n)}</span>
       <span class="acts">
@@ -878,6 +933,32 @@
     font-size: clamp(12px, calc(var(--size) * 0.34), 16px);
     font-weight: 500;
     line-height: 1;
+  }
+
+  /* What an author holds: a branch in their colour, lighter than they are, so the cluster
+     reads as theirs and they stay its middle. */
+  .node.is-branch.owned .shape {
+    background: color-mix(in srgb, var(--c) 46%, var(--paper));
+  }
+
+  /* What has landed is in the trunk now: a ring, as a merged branch is among the branches.
+     It's most of what anyone has written, and filled in it would outweigh its author. */
+  .node.is-branch.owned.landed .shape {
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--c) 8%, var(--paper));
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--c) 70%, var(--paper));
+  }
+
+  /* The same branch under another open author, while one of them is pointed at. */
+  .node.echo .shape {
+    outline: 2px solid var(--c);
+    outline-offset: 3px;
+  }
+
+  .node.quiet.echo .name {
+    display: flex;
+    background: var(--paper);
+    box-shadow: 0 0 0 1px var(--paper-edge);
   }
 
   /* A bot isn't a person: paper inside a dashed line, and the Bot kind's icon. */

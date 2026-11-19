@@ -13,6 +13,11 @@ export interface MapNode {
   id?: string
   /** An author that matches a bot author pattern. */
   bot?: boolean
+  /** The author this node belongs to, by their key: a branch or the trunk as one person's
+   * share of it, in an opened author. Its commits are theirs alone. */
+  owner?: string
+  /** An owned node that stands for the trunk: what of theirs has landed. */
+  landed?: boolean
   commit: string
   commits: number
   /** When it last moved, in Unix seconds. */
@@ -220,6 +225,24 @@ export function authorNode(a: MapAuthor): MapNode {
   return { name: a.name, kind: 'author', id: a.key, bot: a.bot, commit: '', commits: a.commits, updated: a.updated, parent: '', head: a.you }
 }
 
+/**
+ * What an author opens into, by branch: the trunk, for what of theirs has landed, and each
+ * unmerged branch that holds commits of theirs. Each hangs off the author and is sized by
+ * their commits there, so two open authors each have their own `main`.
+ */
+export function authorBranchNodes(a: MapAuthor, trunk: Pick<MapNode, 'name' | 'commit' | 'updated' | 'branchKind'>): MapNode[] {
+  const own = (n: MapNode, landed = false): MapNode => ({ ...n, id: `${a.key}|${landed ? 'trunk' : n.kind}:${n.name}`, parent: a.key, owner: a.key, landed, head: false, stacked: false, worktree: undefined })
+  const out: MapNode[] = []
+  if (a.trunk > 0) out.push(own({ name: trunk.name, kind: 'branch', commit: trunk.commit, commits: a.trunk, updated: trunk.updated, parent: '', head: false, branchKind: trunk.branchKind }, true))
+  for (const b of a.branches) out.push(own(b))
+  return out
+}
+
+/** What two owned nodes share when they're the same branch under different authors. */
+export function sharedKey(n: Pick<MapNode, 'kind' | 'name' | 'landed' | 'owner'>): string {
+  return n.owner ? `${n.landed ? 'trunk' : n.kind}:${n.name}` : ''
+}
+
 /** What the Authors mode holds, for the bar: "14 people · 2 bots", and "60 of 10,339 people"
  * when there are more people than the map draws. */
 export function authorsSummary(people: number, bots: number, shownPeople: number): string {
@@ -276,6 +299,8 @@ export function keyShows(width: number, height: number): boolean {
 export const CROWD = 40
 /** How many authors keep room for their names in a crowd: the ones who wrote most. */
 export const LEADING = 12
+/** How many nodes an opened author can hold with each still keeping room for its name. */
+export const FEW = 5
 
 const isTag = (n: Pick<MapNode, 'kind'>) => n.kind === 'tag' || n.kind === 'tags'
 const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.min(1, Math.max(0, t))
@@ -464,7 +489,10 @@ export function layout(
   const boxOf = (p: Placed) => {
     // An opened group's branches stand close round it: their names are given out afterwards,
     // where there's room, and keep none here.
-    const member = holder(p)?.kind === 'group'
+    // What an opened author holds is the same once there's a lot of it; a few branches keep
+    // room for their names, since which branches they are is what opening was for.
+    const of = holder(p)
+    const member = of?.kind === 'group' || (of?.kind === 'author' && (hanging.get(p.parent) ?? 0) > FEW)
     const named = !member && (!crowded || p.head || !!p.pinned || p.kind === 'branch' || p.kind === 'group' || leading.has(p))
     const hw = Math.max(p.r, named ? nameWidth(p.name) / 2 : 0) + 5
     const hh = p.r + (named ? NAME_H / 2 : 0) + 3
