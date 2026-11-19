@@ -1,5 +1,21 @@
 export namespace app {
 	
+	export class AreaCommit {
+	    sha: string;
+	    subject: string;
+	    when: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AreaCommit(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sha = source["sha"];
+	        this.subject = source["subject"];
+	        this.when = source["when"];
+	    }
+	}
 	export class Arrived {
 	    commits: string[];
 	    total: number;
@@ -112,6 +128,84 @@ export namespace app {
 	        this.window = this.convertValues(source["window"], InsightsWindow);
 	        this.thresholds = this.convertValues(source["thresholds"], Thresholds);
 	        this.branches = this.convertValues(source["branches"], BranchSignal);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AuthorArea {
+	    path: string;
+	    name: string;
+	    files: boolean;
+	    commits: number;
+	    updated: number;
+	    folders: number;
+	    recent: AreaCommit[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AuthorArea(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.name = source["name"];
+	        this.files = source["files"];
+	        this.commits = source["commits"];
+	        this.updated = source["updated"];
+	        this.folders = source["folders"];
+	        this.recent = this.convertValues(source["recent"], AreaCommit);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AuthorAreas {
+	    under: string;
+	    areas: AuthorArea[];
+	    more: number;
+	    commits: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AuthorAreas(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.under = source["under"];
+	        this.areas = this.convertValues(source["areas"], AuthorArea);
+	        this.more = source["more"];
+	        this.commits = source["commits"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

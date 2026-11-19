@@ -5,14 +5,17 @@
   //
   // It has a second mode, Authors (#816): a node for each person who committed inside the
   // span the rings cover, sized by how many commits and as far out as their last one is old.
-  import { BranchMap, BranchMapGroup, MapAuthorHistory, MapAuthors } from '../../../wailsjs/go/app/App.js'
+  import { BranchMap, BranchMapGroup, MapAuthorAreas, MapAuthorHistory, MapAuthors } from '../../../wailsjs/go/app/App.js'
   import { kindInfo } from '../branchKinds'
   import { errorText } from '../errors'
   import Loading from '../ui/Loading.svelte'
   import { initials, LANE_COUNT, laneVar, relativeTime } from './draw'
   import Icon from '../ui/Icon.svelte'
   import {
+    AUTHOR_SWITCHES,
     AUTHORS_SCALE,
+    authorAreaNodes,
+    SWITCH,
     authorBranchNodes,
     authorColor,
     authorNode,
@@ -32,8 +35,10 @@
     WIP_R,
     wipPlace,
     zoomBy,
+    type AuthorArea,
     type MapAuthor,
     type MapNode,
+    type OpenBy,
     type Placed,
     type Showing,
     type Who,
@@ -206,18 +211,108 @@
   const isOpen = (key: string) => !!openAuthors[key]
   function toggleAuthor(key: string) {
     if (openAuthors[key]) {
-      // A card on something they held goes with it.
+      // A card on something they held goes with it, and so do the folders opened under them.
       if (held.some((n) => n.owner === key && keyOf(n) === picked)) picked = ''
       openAuthors = Object.fromEntries(Object.entries(openAuthors).filter(([k]) => k !== key))
+      openFolders = Object.fromEntries(Object.entries(openFolders).filter(([k]) => !k.startsWith(`${key}|`)))
     } else openAuthors = { ...openAuthors, [key]: true }
   }
-  /** Whether an author has anything to open into. */
-  const opens = (au: MapAuthor) => au.trunk > 0 || au.branches.length > 0
-  /** What the open authors hold: for each, the trunk and the unmerged branches with commits of
-   * theirs. An author who has left the map takes theirs with them. */
-  let held = $derived(data && mode === 'authors' ? shown.filter((a) => openAuthors[a.key]).flatMap((a) => authorBranchNodes(a, data!.trunk)) : [])
-  /** The branch the pointer or the focus is on, among what authors hold: the same branch under
-   * every other open author lights up with it. */
+
+  // What an author opens into: the branches that hold their commits, or the folders their
+  // commits touched. One choice for every open author, so they're compared like with like,
+  // kept for each repository.
+  let by = $state<OpenBy>(saved('by', ['branch', 'area'], 'branch'))
+  function setBy(to: OpenBy) {
+    if (to === by) return
+    // A card on a branch or a folder has nothing to be about once they're swapped.
+    if (held.some((n) => keyOf(n) === picked)) picked = ''
+    by = to
+    keep('by', to, 'branch')
+  }
+  /** Whether an author has anything to open into. Anyone on the map has touched a file. */
+  const opens = (au: MapAuthor) => by === 'area' || au.trunk > 0 || au.branches.length > 0
+
+  // Folders are read for one author at a time, when they're opened: everyone's would take
+  // minutes on a long history. What's been read is kept by the span of days, the author and
+  // the folder it's under, and going a folder deeper costs no more git.
+  type Areas = { areas: AuthorArea[]; more: number } | 'reading' | 'failed'
+  let areaData = $state<Record<string, Areas>>({})
+  const areaKey = (author: string, under: string) => `${spanDays(zoom)}|${author}|${under}`
+  /** The folders read under an author's folder, or '' for the top; undefined until they are. */
+  const areasOf = (author: string, under: string) => {
+    const got = areaData[areaKey(author, under)]
+    return got && got !== 'reading' && got !== 'failed' ? got : undefined
+  }
+  /** The folders an author has opened, by their key and the folder's path. */
+  let openFolders = $state<Record<string, true>>({})
+  const folderOpen = (n: MapNode) => !!openFolders[`${n.owner}|${n.path}`]
+  function toggleFolder(n: MapNode) {
+    const key = `${n.owner}|${n.path}`
+    if (openFolders[key]) {
+      // What was open beneath it closes with it.
+      if (held.some((h) => h.owner === n.owner && h.path?.startsWith(`${n.path}/`) && keyOf(h) === picked)) picked = ''
+      openFolders = Object.fromEntries(Object.entries(openFolders).filter(([k]) => k !== key && !k.startsWith(`${key}/`)))
+    } else openFolders = { ...openFolders, [key]: true }
+  }
+  /** Whether a folder node opens: it has subfolders the author touched. */
+  const folderOpens = (n: MapNode) => n.kind === 'folder' && !n.files && (n.folders ?? 0) > 0
+
+  /** An author's folders, and under each open one its own, as far down as they've been read. */
+  function areaNodes(au: MapAuthor, under = ''): MapNode[] {
+    const got = areasOf(au.key, under)
+    if (!got) return []
+    const here = authorAreaNodes(au, got.areas, under)
+    return [...here, ...here.filter((n) => folderOpens(n) && folderOpen(n)).flatMap((n) => areaNodes(au, n.path))]
+  }
+
+  /** What the open authors hold: the trunk and the unmerged branches with commits of theirs,
+   * or the folders they worked in. An author who has left the map takes theirs with them. */
+  let held = $derived.by(() => {
+    if (!data || mode !== 'authors') return []
+    const open = shown.filter((a) => openAuthors[a.key])
+    return by === 'area' ? open.flatMap((a) => areaNodes(a)) : open.flatMap((a) => authorBranchNodes(a, data!.trunk))
+  })
+
+  // Reads what's open and hasn't been read: an author's top folders, and under each open
+  // folder its own. A change of span asks again, since the counts are the span's.
+  $effect(() => {
+    if (mode !== 'authors' || by !== 'area') return
+    const days = spanDays(zoom)
+    for (const au of shown) {
+      if (!openAuthors[au.key]) continue
+      const unders = ['', ...Object.keys(openFolders).filter((k) => k.startsWith(`${au.key}|`)).map((k) => k.slice(au.key.length + 1))]
+      for (const under of unders) {
+        const key = `${days}|${au.key}|${under}`
+        if (areaData[key]) continue
+        areaData = { ...areaData, [key]: 'reading' }
+        // An answer from before a reload is out of date by the time it comes: it's dropped.
+        const asked = areaRound
+        MapAuthorAreas(path, au.identities as never, days, under)
+          .then((res) => {
+            if (asked === areaRound) areaData = { ...areaData, [key]: { areas: (res?.areas ?? []) as unknown as AuthorArea[], more: res?.more ?? 0 } }
+          })
+          .catch(() => {
+            if (asked === areaRound) areaData = { ...areaData, [key]: 'failed' }
+          })
+      }
+    }
+  })
+  /** Counts the reloads, so an answer can tell whether it's still wanted. */
+  let areaRound = 0
+  $effect(() => {
+    // A reload may have brought new commits: what was read before is asked for again.
+    void tick
+    areaRound++
+    areaData = {}
+  })
+  /** Whether an author's folders are being read, or couldn't be. */
+  const areaState = (au: MapAuthor) => {
+    const got = areaData[areaKey(au.key, '')]
+    return got === 'reading' || got === 'failed' ? got : undefined
+  }
+
+  /** The branch or folder the pointer or the focus is on, among what authors hold: the same
+   * one under every other open author lights up with it. */
   let pointed = $state('')
 
   /** The nodes to draw: the map's own and the branches of the groups that are open, less what
@@ -302,9 +397,12 @@
   // a walk of the whole history, for that one person.
   type History = { authored: number; coAuthored: number; first: number; last: number }
   let histories = $state<Record<string, History | 'reading' | 'failed'>>({})
+  /** Counts the reloads, so an answer can tell whether it's still wanted. */
+  let historyRound = 0
   $effect(() => {
     // A reload may have brought new commits: what was counted before is asked for again.
     void tick
+    historyRound++
     histories = {}
   })
   $effect(() => {
@@ -312,9 +410,14 @@
     if (!au || histories[au.key]) return
     const key = au.key
     histories = { ...histories, [key]: 'reading' }
+    const asked = historyRound
     MapAuthorHistory(path, au.identities as never)
-      .then((res) => (histories = { ...histories, [key]: res as History }))
-      .catch(() => (histories = { ...histories, [key]: 'failed' }))
+      .then((res) => {
+        if (asked === historyRound) histories = { ...histories, [key]: res as History }
+      })
+      .catch(() => {
+        if (asked === historyRound) histories = { ...histories, [key]: 'failed' }
+      })
   })
   /** The wheel zooms a step for each notch: there's nothing here to scroll. */
   let wheeled = 0
@@ -383,7 +486,9 @@
     drag = null
   }
 
-  let placed = $derived(data && data.trunk.name && width > 0 && height > 0 ? layout(data.trunk, nodes, width, height, now, scale, pins) : null)
+  /** The Authors mode's second row holds two switches, side by side: more room to keep clear. */
+  let switches = $derived(mode === 'authors' ? { width: AUTHOR_SWITCHES, height: SWITCH.height } : SWITCH)
+  let placed = $derived(data && data.trunk.name && width > 0 && height > 0 ? layout(data.trunk, nodes, width, height, now, scale, pins, switches) : null)
   /** Tab order: the trunk, then the rest, newest first. */
   let ordered = $derived(placed ? [...placed.nodes].sort((a, b) => b.updated - a.updated || a.name.localeCompare(b.name)) : [])
   /** Where each line starts: the branch a tag hangs off, or the trunk. */
@@ -431,10 +536,17 @@
     return n.commits ? plural(n.commits, 'commit') : `all in ${data?.trunk.name ?? 'the trunk'}`
   }
 
-  /** What the card says of a branch as one author's share of it. */
+  /** A folder as its card names it: "frontend/src/", or "the files in frontend/". */
+  const folderWords = (n: MapNode) => (n.files ? (n.path ? `the files in ${n.path}/` : 'the files at the top') : `${n.path}/`)
+
+  /** What the card says of a branch, or a folder, as one author's share of it. */
   function aboutHeld(n: MapNode, au: MapAuthor): string {
     const trunk = data?.trunk.name ?? 'the trunk'
     const when = relativeTime(n.updated, now)
+    if (n.kind === 'folder') {
+      const touched = `${plural(n.commits, 'commit')} of ${au.name}'s in ${scale.period} ${n.commits === 1 ? 'touches' : 'touch'} ${folderWords(n)}`
+      return `${touched}. The last was ${when === 'now' ? 'just now' : when}.`
+    }
     const theirs = `${plural(n.commits, 'commit')} of ${au.name}'s in ${scale.period}`
     if (n.landed) return `${theirs} ${n.commits === 1 ? 'is' : 'are'} in ${trunk}: landed.`
     const where = n.kind === 'remote' ? ' It’s only on the remote.' : ''
@@ -491,7 +603,8 @@
     return `${where}${own} ${moved}`
   }
 
-  const shapeOf = (n: MapNode) => (n.kind === 'tag' || n.kind === 'tags' ? 'tag' : n.kind === 'remote' ? 'remote' : n.kind === 'branch' && !n.commits ? 'merged' : n.kind === 'author' && n.bot ? 'bot' : n.kind)
+  const shapeOf = (n: MapNode) =>
+    n.kind === 'tag' || n.kind === 'tags' ? 'tag' : n.kind === 'remote' ? 'remote' : n.kind === 'branch' && !n.commits ? 'merged' : n.kind === 'author' && n.bot ? 'bot' : n.kind === 'folder' && n.files ? 'files' : n.kind
   /** What a screen reader hears a node called: a branch an author holds is theirs. */
   const spoken = (n: MapNode) => {
     const owner = n.owner ? authorOf.get(n.owner) : undefined
@@ -504,9 +617,10 @@
 
   /** The card sits beside its node, on whichever side has the room. */
   function cardPlace(n: Placed): string {
-    // An author's card holds more: their names, and what they've written in all.
-    const w = n.kind === 'author' ? 264 : 232
-    const tall = n.kind === 'author' ? 230 : 150
+    // An author's card holds more: their names, and what they've written in all. So does a
+    // folder's: their latest commits in it.
+    const w = n.kind === 'author' || n.kind === 'folder' ? 264 : 232
+    const tall = n.kind === 'author' || n.kind === 'folder' ? 250 : 150
     const left = n.x + n.r + 14 + w < width ? n.x + n.r + 14 : Math.max(8, n.x - n.r - 14 - w)
     const top = Math.min(Math.max(8, n.y - 30), Math.max(8, height - tall))
     return `left: ${left}px; top: ${top}px; width: ${w}px;`
@@ -541,7 +655,7 @@
     class:echo={!!pointed && sharedKey(n) === pointed}
     data-node={key}
     aria-pressed={picked === key}
-    aria-expanded={n.kind === 'author' && au && opens(au) ? isOpen(au.key) : undefined}
+    aria-expanded={n.kind === 'author' && au && opens(au) ? isOpen(au.key) : folderOpens(n) ? folderOpen(n) : undefined}
     aria-label="{spoken(n)}{n.head ? (n.kind === 'author' ? ', you' : ', checked out') : ''}. {about(n)}"
     onpointerenter={() => (pointed = sharedKey(n))}
     onpointerleave={() => (pointed = '')}
@@ -562,10 +676,10 @@
     onpointermove={nodeMove}
     onpointerup={nodeUp}
     onpointercancel={nodeUp}
-    ondblclick={() => (n.pinned ? unpin(key) : n.kind === 'group' ? toggleGroup(n.name) : au && opens(au) ? toggleAuthor(au.key) : undefined)}
+    ondblclick={() => (n.pinned ? unpin(key) : n.kind === 'group' ? toggleGroup(n.name) : au && opens(au) ? toggleAuthor(au.key) : folderOpens(n) ? toggleFolder(n) : undefined)}
     oncontextmenu={(e) => {
       // A person isn't a commit: there's no menu to give them.
-      if (!onMenu || n.kind === 'tags' || n.kind === 'group' || n.kind === 'author') return
+      if (!onMenu || n.kind === 'tags' || n.kind === 'group' || n.kind === 'author' || n.kind === 'folder') return
       e.preventDefault()
       onMenu(n, e.clientX, e.clientY)
     }}
@@ -603,12 +717,53 @@
           </span>
         {/if}
       {/if}
-      {#if au && isOpen(au.key) && au.moreBranches}
+      {#if au && isOpen(au.key) && by === 'branch' && au.moreBranches}
         <span>{plural(au.moreBranches, 'more branch', 'more branches')} of theirs, less recently moved, {au.moreBranches === 1 ? "isn't" : "aren't"} shown.</span>
       {/if}
+      {#if au && isOpen(au.key) && by === 'area'}
+        {@const more = areasOf(au.key, '')?.more ?? 0}
+        {#if areaState(au) === 'failed'}
+          <span role="alert">Couldn't read the folders they worked in.</span>
+        {:else if more}
+          <span>{plural(more, 'more folder', 'more folders')} of theirs, with fewer commits, {more === 1 ? "isn't" : "aren't"} shown.</span>
+        {/if}
+      {/if}
       <span class="acts">
-        {#if au && opens(au)}<button class="btn sm text" onclick={() => toggleAuthor(au.key)}>{isOpen(au.key) ? 'Fold their branches away' : 'Show their branches'}</button>{/if}
+        {#if au && opens(au)}
+          {@const what = by === 'area' ? 'areas' : 'branches'}
+          <button class="btn sm text" disabled={isOpen(au.key) && areaState(au) === 'reading' && by === 'area'} onclick={() => toggleAuthor(au.key)}>
+            {!isOpen(au.key) ? `Show their ${what}` : by === 'area' && areaState(au) === 'reading' ? 'Reading their folders…' : `Fold their ${what} away`}
+          </button>
+        {/if}
         {#if onAuthor}<button class="btn sm text" onclick={() => onAuthor(n.name)}>Search the timeline for them</button>{/if}
+        {#if n.pinned}<button class="btn sm text" onclick={() => unpin(key)}>Let it go back to its place</button>{/if}
+      </span>
+    </div>
+  {:else if picked === key && n.kind === 'folder'}
+    {@const owner = authorOf.get(n.owner ?? '')}
+    {@const under = owner && !n.files ? areaData[areaKey(owner.key, n.path ?? '')] : undefined}
+    <div class="card" style={cardPlace(n)} role="group" aria-label="About {spoken(n)}">
+      <b>{owner?.name ?? ''} in {folderWords(n)}</b>
+      <span>{about(n)}</span>
+      {#if n.recent?.length}
+        <!-- Their latest commits here: each goes to its place in the timeline. -->
+        <span class="latest">
+          {n.commits > n.recent.length ? `The latest ${n.recent.length}:` : n.recent.length === 1 ? 'The commit:' : 'The commits:'}
+          {#each n.recent as c (c.sha)}
+            <button class="btn sm text" title="{c.subject}, {relativeTime(c.when, now)}" onclick={() => onShow({ ...n, name: c.subject, commit: c.sha }, false)}>{c.subject}</button>
+          {/each}
+        </span>
+      {/if}
+      {#if folderOpen(n) && under && under !== 'reading' && under !== 'failed' && under.more}
+        <span>{plural(under.more, 'more folder', 'more folders')} in it, with fewer commits, {under.more === 1 ? "isn't" : "aren't"} shown.</span>
+      {/if}
+      {#if folderOpen(n) && under === 'failed'}<span role="alert">Couldn't read its folders.</span>{/if}
+      <span class="acts">
+        {#if folderOpens(n)}
+          <button class="btn sm text" disabled={folderOpen(n) && under === 'reading'} onclick={() => toggleFolder(n)}>
+            {!folderOpen(n) ? 'Show its folders' : under === 'reading' ? 'Reading its folders…' : 'Fold its folders away'}
+          </button>
+        {/if}
         {#if n.pinned}<button class="btn sm text" onclick={() => unpin(key)}>Let it go back to its place</button>{/if}
       </span>
     </div>
@@ -705,10 +860,17 @@
         {/each}
       </div>
       {#if mode === 'authors'}
-        <div class="choice" role="group" aria-label="Authors to show">
-          {#each [['everyone', 'Everyone'], ['people', 'People'], ['bots', 'Bots']] as [which, label] (which)}
-            <button aria-pressed={who === which} onclick={() => setWho(which as Who)}>{label}</button>
-          {/each}
+        <div class="row">
+          <div class="choice" role="group" aria-label="Authors to show">
+            {#each [['everyone', 'Everyone'], ['people', 'People'], ['bots', 'Bots']] as [which, label] (which)}
+              <button aria-pressed={who === which} onclick={() => setWho(which as Who)}>{label}</button>
+            {/each}
+          </div>
+          <div class="choice" role="group" aria-label="What an author opens into">
+            {#each [['branch', 'By branch'], ['area', 'By area']] as [which, label] (which)}
+              <button aria-pressed={by === which} onclick={() => setBy(which as OpenBy)}>{label}</button>
+            {/each}
+          </div>
         </div>
       {:else}
         <div class="choice" role="group" aria-label="Branches to show">
@@ -870,6 +1032,13 @@
     z-index: 2;
   }
 
+  /* The button is only the press target: nothing of its own shows behind a shape that
+     doesn't fill it, such as a folder. */
+  .node:hover,
+  .node:active {
+    background: none;
+  }
+
   .shape {
     position: absolute;
     left: 50%;
@@ -947,6 +1116,28 @@
     border-radius: 50%;
     background: color-mix(in srgb, var(--c) 8%, var(--paper));
     box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--c) 70%, var(--paper));
+  }
+
+  /* A folder an author worked in: a folder's outline in their colour. The outline is cut out
+     of a layer of its own, so the focus ring round the shape isn't cut away with it. */
+  .node.is-folder .shape::before,
+  .node.is-files .shape::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--c) 52%, var(--paper));
+    clip-path: polygon(0% 12%, 36% 12%, 46% 26%, 100% 26%, 100% 90%, 0% 90%);
+  }
+
+  /* The files directly in a folder: a sheet with its corner turned. */
+  .node.is-files .shape::before {
+    background: color-mix(in srgb, var(--c) 30%, var(--paper));
+    clip-path: polygon(16% 4%, 62% 4%, 84% 26%, 84% 96%, 16% 96%);
+  }
+
+  /* An opened folder is lighter: what's in it is drawn beside it. */
+  .node.is-folder[aria-expanded='true'] .shape::before {
+    background: color-mix(in srgb, var(--c) 24%, var(--paper));
   }
 
   /* The same branch under another open author, while one of them is pointed at. */
@@ -1149,6 +1340,24 @@
     color: var(--ink-soft);
   }
 
+  /* An author's latest commits in a folder: each a line that goes to the timeline. */
+  .latest {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    color: var(--ink-mute);
+  }
+
+  /* A block, so a long subject is cut at its end and not from both sides. */
+  .latest .btn {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+  }
+
   /* A word under the trunk: what the map is waiting for, or why nobody is on it. */
   .word {
     position: absolute;
@@ -1229,6 +1438,12 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 6px;
+  }
+
+  /* Two switches side by side. */
+  .choices .row {
+    display: flex;
+    gap: 8px;
   }
 
   .choice {

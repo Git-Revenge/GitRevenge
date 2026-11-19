@@ -132,18 +132,7 @@ func (a *App) mapAuthorsSince(path string, days int, since int64) (AuthorMap, er
 		}
 	}
 
-	// The unmerged branches that moved inside the window: nothing older can hold a commit
-	// made in it.
-	branches := mapBranches(refs, trunk)
-	if since > 0 {
-		branches = slices.DeleteFunc(branches, func(b git.Ref) bool { return b.Updated < since })
-	}
-	slices.SortStableFunc(branches, func(x, y git.Ref) int { return cmp.Compare(y.Updated, x.Updated) })
-	uncounted := 0
-	if len(branches) > maxAuthorBranches {
-		uncounted = len(branches) - maxAuthorBranches
-		branches = branches[:maxAuthorBranches]
-	}
+	branches, uncounted := authorBranches(refs, trunk, since)
 
 	// One log for the trunk and one for each branch, side by side. Each job fills only its own.
 	onTrunk := newAuthorTally()
@@ -182,6 +171,23 @@ func (a *App) mapAuthorsSince(path string, days int, since int64) (AuthorMap, er
 	out.Since, out.UncountedBranches = since, uncounted
 	a.mapAuthors.put(key, out)
 	return out, nil
+}
+
+// authorBranches returns the unmerged branches the Authors mode reads for a window that
+// starts at since, most recently moved first: the ones that moved inside it, since nothing
+// older can hold a commit made in it, and no more than the limit. uncounted is how many
+// were left out for being over it.
+func authorBranches(refs []git.Ref, trunk git.Ref, since int64) (branches []git.Ref, uncounted int) {
+	branches = mapBranches(refs, trunk)
+	if since > 0 {
+		branches = slices.DeleteFunc(branches, func(b git.Ref) bool { return b.Updated < since })
+	}
+	slices.SortStableFunc(branches, func(x, y git.Ref) int { return cmp.Compare(y.Updated, x.Updated) })
+	if len(branches) > maxAuthorBranches {
+		uncounted = len(branches) - maxAuthorBranches
+		branches = branches[:maxAuthorBranches]
+	}
+	return branches, uncounted
 }
 
 // MapAuthorHistory returns how much the person behind identities has written over the whole

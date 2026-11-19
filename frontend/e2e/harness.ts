@@ -124,6 +124,12 @@ const behaviours: Record<string, (...args: never[]) => unknown> = {
     const total = scenario.graphData?.length ?? scenario.graphRows ?? 0
     return /^\d{40}$/.test(id) && Number(id) < total ? Number(id) : -1
   },
+  // An author's folders are asked for one folder at a time: a test answers by the folder
+  // asked about, '' for the top, and a folder it doesn't name has nothing under it.
+  MapAuthorAreas: (_path: string, _identities: unknown, _days: number, under: string) => {
+    const by = responses.MapAuthorAreas as Record<string, unknown> | undefined
+    return structuredClone(by?.[under] ?? { under, areas: [], more: 0, commits: 0 })
+  },
   GroupAction: (action: string, args: string[]) => {
     const groups = responses.Groups as Group[]
     if (action === 'move') {

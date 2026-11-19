@@ -178,6 +178,8 @@ export function LastCommitMessage(arg1:string):Promise<string>;
 
 export function LinkRules(arg1:string):Promise<links.Config>;
 
+export function MapAuthorAreas(arg1:string,arg2:Array<app.AuthorIdentity>,arg3:number,arg4:string):Promise<app.AuthorAreas>;
+
 export function MapAuthorHistory(arg1:string,arg2:Array<app.AuthorIdentity>):Promise<git.AuthorHistory>;
 
 export function MapAuthors(arg1:string,arg2:number):Promise<app.AuthorMap>;

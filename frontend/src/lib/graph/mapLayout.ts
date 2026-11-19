@@ -6,8 +6,9 @@
 /** A node as the backend sends it (app.MapNode in Go). */
 export interface MapNode {
   name: string
-  /** 'author' is a person in the Authors mode: the backend's app.MapAuthor, as a node. */
-  kind: 'trunk' | 'branch' | 'remote' | 'tag' | 'tags' | 'group' | 'author'
+  /** 'author' is a person in the Authors mode: the backend's app.MapAuthor, as a node.
+   * 'folder' is a folder an opened author worked in, or the files directly in one. */
+  kind: 'trunk' | 'branch' | 'remote' | 'tag' | 'tags' | 'group' | 'author' | 'folder'
   /** What tells this node from every other, where the name can't: two authors can each hold a
    * branch of the same name. Without one, the kind and name do. */
   id?: string
@@ -18,6 +19,15 @@ export interface MapNode {
   owner?: string
   /** An owned node that stands for the trunk: what of theirs has landed. */
   landed?: boolean
+  /** A folder's path, with no slash at the end; for a folder's own files, the folder. */
+  path?: string
+  /** A folder node that stands for the files directly in the folder, apart from its
+   * subfolders. */
+  files?: boolean
+  /** How many subfolders a folder opens into. */
+  folders?: number
+  /** The author's latest commits in a folder, newest first. */
+  recent?: AreaCommit[]
   commit: string
   commits: number
   /** When it last moved, in Unix seconds. */
@@ -205,6 +215,28 @@ export interface MapAuthor {
   moreBranches: number
 }
 
+/** One commit an author made in a folder (app.AreaCommit in Go). */
+export interface AreaCommit {
+  sha: string
+  subject: string
+  when: number
+}
+
+/** A folder an author worked in, or the files directly in one (app.AuthorArea in Go). */
+export interface AuthorArea {
+  path: string
+  name: string
+  files: boolean
+  commits: number
+  updated: number
+  folders: number
+  recent: AreaCommit[]
+}
+
+/** What an author opens into: the branches holding their commits, or the folders they worked
+ * in. */
+export type OpenBy = 'branch' | 'area'
+
 /** Who the Authors mode shows. */
 export type Who = 'everyone' | 'people' | 'bots'
 
@@ -238,9 +270,40 @@ export function authorBranchNodes(a: MapAuthor, trunk: Pick<MapNode, 'name' | 'c
   return out
 }
 
-/** What two owned nodes share when they're the same branch under different authors. */
-export function sharedKey(n: Pick<MapNode, 'kind' | 'name' | 'landed' | 'owner'>): string {
-  return n.owner ? `${n.landed ? 'trunk' : n.kind}:${n.name}` : ''
+/** What two owned nodes share when they're the same branch, or the same folder, under
+ * different authors. */
+export function sharedKey(n: Pick<MapNode, 'kind' | 'name' | 'landed' | 'owner' | 'path' | 'files'>): string {
+  if (!n.owner) return ''
+  if (n.kind === 'folder') return `${n.files ? 'files' : 'folder'}:${n.path ?? ''}`
+  return `${n.landed ? 'trunk' : n.kind}:${n.name}`
+}
+
+/** The id of the node for a folder under an author, or for the folder's own files. */
+export function areaId(author: string, path: string, files = false): string {
+  return `${author}|${files ? 'files' : 'folder'}:${path}`
+}
+
+/**
+ * What an author opens into, by area: the folders their commits touched one level under
+ * `under`, and the files directly in it. Each hangs off the author, or off the folder it's in
+ * when that folder was opened, and is sized by their commits there.
+ */
+export function authorAreaNodes(a: Pick<MapAuthor, 'key'>, areas: AuthorArea[], under = ''): MapNode[] {
+  return areas.map((area) => ({
+    name: area.name,
+    kind: 'folder',
+    id: areaId(a.key, area.path, area.files),
+    parent: under ? areaId(a.key, under) : a.key,
+    owner: a.key,
+    path: area.path,
+    files: area.files,
+    folders: area.folders,
+    recent: area.recent,
+    commit: area.recent[0]?.sha ?? '',
+    commits: area.commits,
+    updated: area.updated,
+    head: false,
+  }))
 }
 
 /** What the Authors mode holds, for the bar: "14 people · 2 bots", and "60 of 10,339 people"
@@ -279,6 +342,9 @@ export const ZOOM = { width: 210, height: 52 }
 /** The switches in the stage's top left corner: Branches / Authors, and under it whatever the
  * mode offers. Two rows. */
 export const SWITCH = { width: 212, height: 74 }
+/** How wide the switches are in the Authors mode, whose second row holds two side by side:
+ * who shows, and what an author opens into. */
+export const AUTHOR_SWITCHES = 396
 
 /** What the stage's controls take up, as centre and half-size: the switches in the top left,
  * the key in the bottom left and the zoom in the bottom right. None show on a stage too small.
@@ -378,6 +444,9 @@ export function restLength(updated: number, now: number, rings: Rings, trunkR: n
   return lerp(start, Math.max(start, rings.edge), Math.log(days / (last?.days ?? 1)) / Math.log(10))
 }
 
+/** How wide, in radians, the nodes that hang off a hanging node fan out: a little over half
+ * a turn, on the side away from what it hangs off. */
+const FAN = (200 * Math.PI) / 180
 /** The golden angle: successive nodes land as far round from each other as they can. */
 const GOLDEN = Math.PI * (3 - Math.sqrt(5))
 const STEPS = 260
@@ -404,6 +473,13 @@ export function layout(
   const all = nodes
   nodes = all.filter((n) => bandOf(n.updated, now, scale) < scale.rings.length || n.head || pins.has(pinKey(n)))
   const older = all.length - nodes.length
+  // What an author holds goes when they do, and what a folder holds when it does: left
+  // behind, it would be drawn as if it hung off the trunk.
+  for (let before = -1; before !== nodes.length; ) {
+    before = nodes.length
+    const here = new Set(nodes.map(handle))
+    nodes = nodes.filter((n) => !n.owner || here.has(n.parent))
+  }
   const k = scales(nodes)
   const hub: Placed = { ...trunk, x: rings.cx, y: rings.cy, r: trunkRadius(trunk.commits, k.branch), size: 0, band: 0, above: false, named: true }
   hub.size = hub.r * 2
@@ -431,13 +507,22 @@ export function layout(
   })
   // A node that hangs off a branch was seeded before the branch had its place.
   // Several on one node start spread evenly round it, from the side away from the trunk.
+  // What a node hangs off can hang off something too (a folder in a folder, under an author):
+  // each is placed after what holds it, and fans out on the side away from what holds that,
+  // so it reads as the folder's and not the author's.
+  const depth = (p: Placed) => {
+    let d = 0
+    for (let h = holder(p); h && d < 32; h = holder(h)) d++
+    return d
+  }
   const turn = new Map<string, number>()
-  for (const p of order) {
-    const from = holder(p)
-    if (!from) continue
+  for (const p of order.filter((p) => holder(p)).sort((a, b) => depth(a) - depth(b))) {
+    const from = holder(p)!
     const k = turn.get(p.parent) ?? 0
     turn.set(p.parent, k + 1)
-    const out = Math.atan2(from.y - hub.y, from.x - hub.x) + 0.6 + (k * 2 * Math.PI) / (hanging.get(p.parent) ?? 1)
+    const n = hanging.get(p.parent) ?? 1
+    const above = holder(from)
+    const out = above ? Math.atan2(from.y - above.y, from.x - above.x) + (n === 1 ? 0 : (k / (n - 1) - 0.5) * FAN) : Math.atan2(from.y - hub.y, from.x - hub.x) + 0.6 + (k * 2 * Math.PI) / n
     p.x = from.x + Math.cos(out) * rest(p)
     p.y = from.y + Math.sin(out) * rest(p)
   }
@@ -492,7 +577,7 @@ export function layout(
     // What an opened author holds is the same once there's a lot of it; a few branches keep
     // room for their names, since which branches they are is what opening was for.
     const of = holder(p)
-    const member = of?.kind === 'group' || (of?.kind === 'author' && (hanging.get(p.parent) ?? 0) > FEW)
+    const member = of?.kind === 'group' || ((of?.kind === 'author' || of?.kind === 'folder') && (hanging.get(p.parent) ?? 0) > FEW)
     const named = !member && (!crowded || p.head || !!p.pinned || p.kind === 'branch' || p.kind === 'group' || leading.has(p))
     const hw = Math.max(p.r, named ? nameWidth(p.name) / 2 : 0) + 5
     const hh = p.r + (named ? NAME_H / 2 : 0) + 3
@@ -565,7 +650,7 @@ export function layout(
   const taken: Box[] = [{ x: hub.x, y: hub.y, hw: hub.r, hh: hub.r }, ...controls, ...placed.map((p) => ({ x: p.x, y: p.y, hw: p.r, hh: p.r, of: p }))]
   const onStage = (b: Box) => b.x - b.hw >= 0 && b.x + b.hw <= width && b.y - b.hh >= 0 && b.y + b.hh <= height
   // An author ranks with the local branches: among them, the most commits is named first.
-  const rank = (p: Placed) => (p.head ? 0 : p.pinned ? 1 : p.kind === 'branch' || p.kind === 'author' ? 2 : p.kind === 'group' ? 3 : p.kind === 'remote' ? 4 : 5)
+  const rank = (p: Placed) => (p.head ? 0 : p.pinned ? 1 : p.kind === 'branch' || p.kind === 'author' || p.kind === 'folder' ? 2 : p.kind === 'group' ? 3 : p.kind === 'remote' ? 4 : 5)
   const wanting = [...placed].sort((a, b) => rank(a) - rank(b) || Number(leading.has(b)) - Number(leading.has(a)) || b.commits - a.commits || b.updated - a.updated || a.name.localeCompare(b.name))
   for (const p of wanting) {
     const off = p.r + 4 + NAME_H / 2

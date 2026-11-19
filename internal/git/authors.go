@@ -169,34 +169,11 @@ func (r *Repo) AuthorHistory(ctx context.Context, mailmapAt string, revs []strin
 	if err := CheckRevs(append([]string{mailmapAt}, revs...)...); err != nil {
 		return out, err
 	}
-	emails := map[string]bool{}
-	names := map[string]bool{}
-	var authorArgs, grepArgs []string
-	for _, id := range ids {
-		switch {
-		case id.Email != "":
-			if !emails[strings.ToLower(id.Email)] {
-				emails[strings.ToLower(id.Email)] = true
-				authorArgs = append(authorArgs, "--author=<"+id.Email+">")
-				grepArgs = append(grepArgs, "--grep=<"+id.Email+">")
-			}
-		case id.Name != "":
-			if !names[strings.ToLower(id.Name)] {
-				names[strings.ToLower(id.Name)] = true
-				authorArgs = append(authorArgs, "--author="+id.Name+" <")
-				grepArgs = append(grepArgs, "--grep="+id.Name)
-			}
-		}
-	}
-	if len(authorArgs) == 0 {
+	who := personOf(ids)
+	if len(who.authorArgs) == 0 {
 		return out, nil
 	}
-	theirs := func(id Identity) bool {
-		if id.Email != "" {
-			return emails[strings.ToLower(id.Email)]
-		}
-		return names[strings.ToLower(id.Name)]
-	}
+	authorArgs, grepArgs, theirs := who.authorArgs, who.grepArgs, who.is
 	stdin := strings.Join(revs, "\n") + "\n"
 	run := func(match []string, each func(f []string)) error {
 		args := append(authorPinned(mailmapAt), "log", "--no-merges", "--fixed-strings", "--regexp-ignore-case", "--format=%x1e%aN%x1f%aE%x1f%ct%x1f"+coAuthorTrailers)

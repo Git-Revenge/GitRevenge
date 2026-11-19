@@ -342,6 +342,10 @@ export function LinkRules(arg1) {
   return window['go']['app']['App']['LinkRules'](arg1);
 }
 
+export function MapAuthorAreas(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['MapAuthorAreas'](arg1, arg2, arg3, arg4);
+}
+
 export function MapAuthorHistory(arg1, arg2) {
   return window['go']['app']['App']['MapAuthorHistory'](arg1, arg2);
 }
