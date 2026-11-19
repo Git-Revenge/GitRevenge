@@ -1,6 +1,6 @@
 # 0008 — Insights come only from repository state, and are reproducible
 
-- Status: Accepted
+- Status: Accepted, amended 2026-11-19 (bot author patterns are an input)
 - Date: 2026-10-30
 
 ## Context
@@ -28,3 +28,11 @@ An earlier Insights view (#208) measured from "now" and read through the user's 
 - Remote branches are only as current as the last fetch. The view says so, and offers Fetch, but two people who fetched at different times have different repository states, and so may see different results.
 - Some useful measures are out of reach: review time, ticket status and anything about pull requests. Per-person productivity charts are deliberately left out.
 - Results are recomputed rather than read from a store. Window-bounded queries keep this fast on large repositories, and branch work is capped.
+
+## Amendment, 2026-11-19
+
+From #808: which authors are bots is an input.
+
+- Shipped groups an item with the dependency updates when its author is a bot. That used to mean a name ending in `[bot]` and nothing else. A repository can now add patterns for author names and emails, in git config as `gitrevenge.botAuthor`, beside the branch kind patterns (ADR 0009).
+- The patterns come from git config, which this decision otherwise keeps out of results. They're treated as the kind patterns are: an explicit input, part of the cache key, and printed with every export as **Bot authors**, the built-in `*[bot]` first. Two people with different patterns can see different groupings, and the exported inputs show why.
+- The Map's Authors mode (#816) reads the same patterns, so the app has one answer to who is a bot.

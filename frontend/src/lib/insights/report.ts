@@ -18,6 +18,8 @@ export interface RepoWindow {
   points?: string
   /** The branch kind patterns in use (ADR 0009), keyed by kind. */
   kinds?: Record<string, string[]>
+  /** The author patterns that mark a bot, the built-in one first. */
+  botAuthors?: string[]
   /** The smart links that find ticket references, "name pattern" each; empty for the
    * built-in PROJ-123 and #123. */
   references?: string[]
@@ -86,6 +88,8 @@ export function inputLines(inp: ReportInputs): [string, string][] {
   }
   const kinds = first ? kindsLine(first.kinds) : ''
   if (kinds) lines.push(['Branch kinds', kinds])
+  // Patterns can hold spaces ("Release Bot"), so they're set apart with semicolons.
+  if (first?.botAuthors?.length) lines.push(['Bot authors', first.botAuthors.join('; ')])
   if (first) lines.push(['References', first.references?.length ? first.references.join('; ') : 'built in: PROJ-123 and #123'])
   const t = inp.thresholds
   lines.push(['Thresholds', `stale ${t.stale}d, long-lived ${t.longLived}d, behind ${t.behind}, size ${t.size} lines`])

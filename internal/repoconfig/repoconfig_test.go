@@ -81,6 +81,7 @@ func TestSaveAndLoad(t *testing.T) {
 		Hide:          []string{"wip/*", "spike/*"},
 		HideKinds:     []string{"bot"},
 		ShowKinds:     []string{"docs"},
+		BotAuthors:    []string{"Release Bot", "*@bots.example.com"},
 		CleanupOnPull: true,
 		SyncNotes:     true,
 		StackParents:  map[string]string{"feature/b": "feature/a", "feature/c.d": ""},
@@ -215,5 +216,28 @@ func TestSmartLinkKeysAreNotOurs(t *testing.T) {
 	}
 	if s := load(t, g); !s.Empty() {
 		t.Fatalf("settings = %+v, want none", s)
+	}
+}
+
+// Bot authors are a list like the others: the repository's own replaces the global one, and
+// a pattern keeps its spaces.
+func TestBotAuthors(t *testing.T) {
+	fx, g := fixture(t)
+	global(t, g, "--add", "gitrevenge.botAuthor", "Release Bot")
+	if got := load(t, g); strings.Join(got.BotAuthors, "|") != "Release Bot" {
+		t.Fatalf("inherited bot authors = %q", got.BotAuthors)
+	}
+	was := load(t, g)
+	now := was
+	now.BotAuthors = []string{"noreply@example.com", "Deploy *"}
+	save(t, g, was, now)
+	if got := load(t, g); strings.Join(got.BotAuthors, "|") != "noreply@example.com|Deploy *" {
+		t.Fatalf("bot authors = %q", got.BotAuthors)
+	}
+	if out := fx.Git("config", "--local", "--get-all", "gitrevenge.botAuthor"); strings.TrimSpace(out) != "noreply@example.com\nDeploy *" {
+		t.Fatalf("local bot authors = %q", out)
+	}
+	if out := globalValues(t, g, "gitrevenge.botAuthor"); out != "Release Bot" {
+		t.Fatalf("global bot authors = %q, want them untouched", out)
 	}
 }

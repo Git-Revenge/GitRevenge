@@ -77,6 +77,7 @@ export namespace app {
 	    range: string;
 	    points?: string;
 	    kinds: Record<string, Array<string>>;
+	    botAuthors: string[];
 	    references: string[];
 	
 	    static createFrom(source: any = {}) {
@@ -93,6 +94,7 @@ export namespace app {
 	        this.range = source["range"];
 	        this.points = source["points"];
 	        this.kinds = source["kinds"];
+	        this.botAuthors = source["botAuthors"];
 	        this.references = source["references"];
 	    }
 	}
@@ -1311,6 +1313,8 @@ export namespace app {
 	    hideKinds: string[];
 	    showKinds: string[];
 	    foldableKinds: string[];
+	    botAuthors: string[];
+	    builtInBotAuthor: string;
 	    cleanupOnPull: boolean;
 	    syncNotes: boolean;
 	
@@ -1325,6 +1329,8 @@ export namespace app {
 	        this.hideKinds = source["hideKinds"];
 	        this.showKinds = source["showKinds"];
 	        this.foldableKinds = source["foldableKinds"];
+	        this.botAuthors = source["botAuthors"];
+	        this.builtInBotAuthor = source["builtInBotAuthor"];
 	        this.cleanupOnPull = source["cleanupOnPull"];
 	        this.syncNotes = source["syncNotes"];
 	    }

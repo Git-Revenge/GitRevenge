@@ -63,6 +63,14 @@
   let repo = $state<app.RepoPreferences | null>(null)
   let kindText = $state<Record<string, string>>({})
   let hideText = $state('')
+  let botText = $state('')
+
+  // Author patterns can hold spaces ("Release Bot"), so only a comma or a new line parts them.
+  const splitAuthors = (text: string) =>
+    text
+      .split(/[,\n]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
 
   const splitPatterns = (text: string) => text.split(/[\s,]+/).filter(Boolean)
   const joinPatterns = (list: string[]) => list.join(', ')
@@ -75,6 +83,7 @@
         repo = res
         kindText = Object.fromEntries(res.kinds.map((k) => [k.kind, joinPatterns(k.patterns)]))
         hideText = joinPatterns(res.hide)
+        botText = joinPatterns(res.botAuthors ?? [])
       })
       .catch((e) => (error = errorText(e)))
   })
@@ -87,6 +96,7 @@
         return { ...k, patterns, custom: !sameList(patterns, k.defaults) }
       }),
       hide: splitPatterns(hideText),
+      botAuthors: splitAuthors(botText),
     })
   }
 
@@ -290,6 +300,17 @@
             <span>Hidden branches</span>
             <input bind:value={hideText} placeholder="For example wip/*, gh-pages" spellcheck="false" autocomplete="off" />
           </label>
+          <label class="form-field">
+            <span class="kind-label">
+              Bot authors
+              <span class="kind-hint">Authors that aren't people</span>
+            </span>
+            <input bind:value={botText} placeholder="For example Release Bot, *@bots.example.com" spellcheck="false" autocomplete="off" aria-describedby="bot-authors-hint" />
+          </label>
+          <p class="hint" id="bot-authors-hint">
+            Patterns for an author's name or email, with commas between them; <code>*</code> matches any run of characters. A name ending in
+            <code>{repo.builtInBotAuthor?.replace('*', '') || '[bot]'}</code> is always a bot. Insights lists what these authors shipped with the dependency updates.
+          </p>
         </fieldset>
       {/if}
 

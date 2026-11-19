@@ -35,8 +35,13 @@ type RepoPreferences struct {
 	ShowKinds []string `json:"showKinds"`
 	// FoldableKinds are the kinds whose lanes can fold: machine commits, not somebody's work.
 	FoldableKinds []string `json:"foldableKinds"`
-	CleanupOnPull bool     `json:"cleanupOnPull"`
-	SyncNotes     bool     `json:"syncNotes"`
+	// BotAuthors lists patterns of author names and emails that are bots, on top of
+	// BuiltInBotAuthor, which always applies.
+	BotAuthors []string `json:"botAuthors"`
+	// BuiltInBotAuthor is the author pattern that's always a bot, for showing.
+	BuiltInBotAuthor string `json:"builtInBotAuthor"`
+	CleanupOnPull    bool   `json:"cleanupOnPull"`
+	SyncNotes        bool   `json:"syncNotes"`
 }
 
 // RepoPreferences returns the settings for the repository at path.
@@ -47,7 +52,7 @@ func (a *App) RepoPreferences(path string) (RepoPreferences, error) {
 		return RepoPreferences{}, err
 	}
 	rs := m.Settings().Get().Repo(path)
-	out := RepoPreferences{Hide: nonNil(rs.Hide), HideKinds: nonNil(rs.HideKinds), ShowKinds: nonNil(rs.ShowKinds), FoldableKinds: slices.Clone(foldableKinds), CleanupOnPull: rs.CleanupOnPull, SyncNotes: rs.SyncNotes}
+	out := RepoPreferences{Hide: nonNil(rs.Hide), HideKinds: nonNil(rs.HideKinds), ShowKinds: nonNil(rs.ShowKinds), FoldableKinds: slices.Clone(foldableKinds), BotAuthors: nonNil(rs.BotAuthors), BuiltInBotAuthor: branchkind.BuiltInBotAuthor, CleanupOnPull: rs.CleanupOnPull, SyncNotes: rs.SyncNotes}
 	for _, k := range branchkind.Order {
 		kp := KindPatterns{Kind: string(k), Defaults: nonNil(branchkind.Defaults[k])}
 		if p, ok := rs.Kinds[string(k)]; ok {
@@ -92,6 +97,13 @@ func (a *App) SetRepoPreferences(path string, p RepoPreferences) error {
 	}
 	if len(hide) > 0 {
 		rs.Hide = hide
+	}
+	bots, err := cleanAuthorPatterns(p.BotAuthors)
+	if err != nil {
+		return err
+	}
+	if len(bots) > 0 {
+		rs.BotAuthors = bots
 	}
 	for _, k := range p.HideKinds {
 		if !branchkind.Valid(branchkind.Kind(k)) {
@@ -416,6 +428,23 @@ func cleanPatterns(in []string) ([]string, error) {
 		}
 		if err := branchkind.CheckPattern(p); err != nil {
 			return nil, userError("Branch pattern: " + err.Error() + ".")
+		}
+		out = append(out, p)
+	}
+	return out, nil
+}
+
+// cleanAuthorPatterns trims author patterns, drops blanks, duplicates and the built-in one,
+// and checks each one.
+func cleanAuthorPatterns(in []string) ([]string, error) {
+	out := []string{}
+	for _, p := range in {
+		p = strings.TrimSpace(p)
+		if p == "" || p == branchkind.BuiltInBotAuthor || slices.Contains(out, p) {
+			continue
+		}
+		if err := branchkind.CheckAuthorPattern(p); err != nil {
+			return nil, userError("Bot author pattern: " + err.Error() + ".")
 		}
 		out = append(out, p)
 	}

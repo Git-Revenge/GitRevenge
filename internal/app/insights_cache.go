@@ -86,8 +86,9 @@ func cachedInsight[T any](ctx context.Context, a *App, g *git.Repo, root, view s
 		return zero, err
 	}
 	// Branch kinds decide which branches and items count (ADR 0009), so they're part of
-	// the key too.
-	kinds, err := json.Marshal(a.branchRules(root).KindPatterns())
+	// the key too, and so are the authors that count as bots.
+	rules := a.branchRules(root)
+	kinds, err := json.Marshal(map[string]any{"kinds": rules.KindPatterns(), "botAuthors": rules.BotAuthorPatterns()})
 	if err != nil {
 		return zero, err
 	}
