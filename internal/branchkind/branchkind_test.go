@@ -116,3 +116,53 @@ func TestCheckPattern(t *testing.T) {
 		}
 	}
 }
+
+func TestBotAuthor(t *testing.T) {
+	r := New(nil, nil)
+	if !r.BotAuthor("dependabot[bot]", "49699333+dependabot[bot]@users.noreply.github.com") {
+		t.Error("a GitHub App's name is a bot with no patterns set")
+	}
+	if r.BotAuthor("Robot Person", "robot@example.com") {
+		t.Error("an ordinary name is a bot with no patterns set")
+	}
+	if got := r.BotAuthorPatterns(); len(got) != 1 || got[0] != BuiltInBotAuthor {
+		t.Errorf("patterns = %v, want only the built-in one", got)
+	}
+
+	r = r.WithBotAuthors([]string{"Release Bot", "*@bots.example.com", "Deploy *", BuiltInBotAuthor})
+	cases := []struct {
+		name, email string
+		want        bool
+	}{
+		{"Release Bot", "release@example.com", true},
+		{"release bot", "release@example.com", true},    // case doesn't count
+		{"Someone", "Ci@Bots.Example.com", true},        // by email, any case
+		{"Deploy Service", "deploy@example.com", true},  // a star
+		{"Release Bottle", "bottle@example.com", false}, // the whole name must match
+		{"Someone", "", false},                          // no email to match
+		{"renovate[bot]", "renovate@example.com", true}, // the built-in one still applies
+		{"Ada Lovelace", "ada@example.com", false},
+	}
+	for _, c := range cases {
+		if got := r.BotAuthor(c.name, c.email); got != c.want {
+			t.Errorf("BotAuthor(%q, %q) = %v, want %v", c.name, c.email, got, c.want)
+		}
+	}
+	// The built-in one is listed once, first.
+	if got := r.BotAuthorPatterns(); len(got) != 4 || got[0] != BuiltInBotAuthor {
+		t.Errorf("patterns = %v", got)
+	}
+}
+
+func TestCheckAuthorPattern(t *testing.T) {
+	for _, ok := range []string{"Release Bot", "*[bot]", "*@bots.example.com", "noreply@example.com"} {
+		if err := CheckAuthorPattern(ok); err != nil {
+			t.Errorf("CheckAuthorPattern(%q) = %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"", "   ", "a\nb"} {
+		if err := CheckAuthorPattern(bad); err == nil {
+			t.Errorf("CheckAuthorPattern(%q) passed", bad)
+		}
+	}
+}

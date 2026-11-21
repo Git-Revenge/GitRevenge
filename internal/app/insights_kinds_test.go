@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/git-revenge/gitrevenge/internal/branchkind"
@@ -140,5 +141,60 @@ func TestRepoSettingsFollowTheRoot(t *testing.T) {
 	}
 	if a.branchRules(fx.Dir).Kind("feature/x") != branchkind.Environment {
 		t.Fatal("a setting saved through a subfolder didn't reach the repository root")
+	}
+}
+
+// An author the repository names as a bot is grouped with the dependency updates, the
+// patterns are printed with the result, and changing them isn't hidden by the cache.
+func TestInsightsShippedHonoursBotAuthors(t *testing.T) {
+	t.Parallel()
+	fx := kindsFixture(t)
+	fx.WriteFile("deps.txt", "vite 7.2\n")
+	fx.Git("-c", "user.name=Release Robot", "-c", "user.email=robot@bots.example.com", "commit", "-qam", "Update vite to 7.2")
+	a := newTestApp(t)
+	isBot := func() (bool, []string) {
+		t.Helper()
+		res, err := a.InsightsShipped(fx.Dir, InsightsInputs{Window: "14d"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, it := range res.Items {
+			if it.Title == "Update vite to 7.2" {
+				return it.Bot, res.Window.BotAuthors
+			}
+		}
+		t.Fatal("the commit isn't listed")
+		return false, nil
+	}
+	if bot, pats := isBot(); bot || !slices.Equal(pats, []string{branchkind.BuiltInBotAuthor}) {
+		t.Fatalf("with no patterns: bot = %v, patterns = %v", bot, pats)
+	}
+
+	p, err := a.RepoPreferences(fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.BotAuthors == nil || len(p.BotAuthors) != 0 || p.BuiltInBotAuthor != branchkind.BuiltInBotAuthor {
+		t.Fatalf("preferences = %+v", p)
+	}
+	p.BotAuthors = []string{" *@bots.example.com ", "*[bot]", "", "*@bots.example.com"}
+	if err := a.SetRepoPreferences(fx.Dir, p); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := a.RepoPreferences(fx.Dir); !slices.Equal(got.BotAuthors, []string{"*@bots.example.com"}) {
+		t.Fatalf("saved bot authors = %v, want them trimmed, once, without the built-in one", got.BotAuthors)
+	}
+	if out := fx.Git("config", "--local", "--get-all", "gitrevenge.botAuthor"); strings.TrimSpace(out) != "*@bots.example.com" {
+		t.Fatalf("git config holds %q", out)
+	}
+	if bot, pats := isBot(); !bot || !slices.Equal(pats, []string{branchkind.BuiltInBotAuthor, "*@bots.example.com"}) {
+		t.Fatalf("with the pattern: bot = %v, patterns = %v", bot, pats)
+	}
+
+	// Saving the other preferences keeps them; a pattern that can't match is refused.
+	p, _ = a.RepoPreferences(fx.Dir)
+	p.BotAuthors = []string{"bad\npattern"}
+	if err := a.SetRepoPreferences(fx.Dir, p); err == nil {
+		t.Fatal("a pattern with a line break was accepted")
 	}
 }

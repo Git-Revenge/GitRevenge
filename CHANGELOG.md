@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- A repository can say which authors are bots, by name or email, in Settings under **Bot authors** (`gitrevenge.botAuthor` in git config). Insights lists what they shipped with the dependency updates, where it used to go only by names ending in `[bot]`, and prints the patterns with a report's inputs. (#808, #817)
+
 ### Changed
 
 - Only the repository on screen is watched for changes. A tab behind it used to refresh every time something changed in its repository, with nobody looking, and on Linux each open tab held a watch for every folder in its tree. Now a tab is brought up to date when you switch to it: its files, branches and operation are read as it opens, and its graph is read again only if a branch, tag or HEAD has moved. The Insights and Ignore rules tabs watch the repositories they're showing. A tab's label can show the branch it was on until you switch to it. (#780)

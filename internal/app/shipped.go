@@ -50,6 +50,9 @@ type InsightsWindow struct {
 	// Kinds are the branch kind patterns in use, an input since they decide which branches
 	// are Docs (left out) and which items are Bot (grouped) (ADR 0009).
 	Kinds map[string][]string `json:"kinds"`
+	// BotAuthors are the author patterns that mark a bot, the built-in one first: an input
+	// since they decide which items are grouped as dependency updates.
+	BotAuthors []string `json:"botAuthors"`
 	// References are the smart link rules that find ticket references, "name pattern" each,
 	// or empty for the built-in PROJ-123 and #123. They decide how Shipped groups.
 	References []string `json:"references"`
@@ -110,7 +113,7 @@ func resolveInputs(ctx context.Context, g *git.Repo, in InsightsInputs, rules br
 	if err != nil {
 		return InsightsWindow{}, userError("There's no branch named " + target + ".")
 	}
-	w := InsightsWindow{Target: target, TargetSHA: tip.SHA, AsOf: in.AsOf, Kinds: rules.KindPatterns()}
+	w := InsightsWindow{Target: target, TargetSHA: tip.SHA, AsOf: in.AsOf, Kinds: rules.KindPatterns(), BotAuthors: rules.BotAuthorPatterns()}
 	if w.AsOf == 0 {
 		w.AsOf = tip.Time
 	}
@@ -160,11 +163,12 @@ func branchName(name string) string {
 // branch 'origin/x'".
 var mergedBranch = regexp.MustCompile(`^Merge (?:pull request #\d+ from [^/\s]+/(\S+)|(?:remote-tracking )?branch '(?:origin/)?([^']+)')`)
 
-// markBots flags items a bot opened: the author is a GitHub App ("dependabot[bot]"), or the
-// branch a merge brought in matches a Bot pattern.
+// markBots flags items a bot opened: the author matches a bot author pattern (a GitHub App
+// such as "dependabot[bot]", or one the repository names), or the branch a merge brought in
+// matches a Bot pattern.
 func markBots(items []git.ShippedItem, rules branchkind.Rules) {
 	for i, it := range items {
-		bot := strings.HasSuffix(it.Author, "[bot]")
+		bot := rules.BotAuthor(it.Author, it.Email)
 		if m := mergedBranch.FindStringSubmatch(it.Title); m != nil && !bot {
 			bot = rules.Kind(m[1]+m[2]) == branchkind.Bot
 		}

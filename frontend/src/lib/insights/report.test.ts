@@ -38,6 +38,16 @@ describe('inputs', () => {
       ['Thresholds', 'stale 7d, long-lived 14d, behind 50, size 500 lines'],
     ])
   })
+
+  it('names the branch kinds and the authors that count as bots', () => {
+    const withBots: ReportInputs = {
+      ...inputs,
+      windows: [{ ...inputs.windows[0], kinds: { trunk: ['main'], bot: ['dependabot/*'] }, botAuthors: ['*[bot]', 'Release Bot', '*@bots.example.com'] }],
+    }
+    const lines = Object.fromEntries(inputLines(withBots))
+    expect(lines['Branch kinds']).toBe('trunk main; release (none); environment (none); docs (none); bot dependabot/*; feature (none)')
+    expect(lines['Bot authors']).toBe('*[bot]; Release Bot; *@bots.example.com')
+  })
 })
 
 describe('summary', () => {

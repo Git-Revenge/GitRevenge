@@ -10,6 +10,8 @@
 //		hide = spike/*
 //		hideKind = bot
 //		showKind = docs
+//		botAuthor = Release Bot
+//		botAuthor = *@bots.example.com
 //	[gitrevenge-kind "release"]
 //		pattern = release/*
 //		pattern = hotfix/*
@@ -51,6 +53,7 @@ const (
 	KeyHide          = section + ".hide"
 	KeyHideKind      = section + ".hideKind"
 	KeyShowKind      = section + ".showKind"
+	KeyBotAuthor     = section + ".botAuthor"
 
 	// stackVar is the per-branch variable, beside git's own branch.<name>.merge. Git removes
 	// a branch's section when the branch is deleted, and this goes with it.
@@ -81,7 +84,10 @@ type Settings struct {
 	HideKinds []string
 	// ShowKinds shows these kinds' lanes in full in the graph. Only Bot and Docs lanes fold
 	// to a line a day, and they do unless they're listed here.
-	ShowKinds     []string
+	ShowKinds []string
+	// BotAuthors lists patterns of author names and emails that are bots, besides the
+	// built-in *[bot].
+	BotAuthors    []string
 	CleanupOnPull bool
 	SyncNotes     bool
 	// StackParents says which local branch each branch is stacked on, by branch name; ""
@@ -97,7 +103,7 @@ func (s Settings) Equal(o Settings) bool {
 	if s.CleanupOnPull != o.CleanupOnPull || s.SyncNotes != o.SyncNotes {
 		return false
 	}
-	if !slices.Equal(s.Hide, o.Hide) || !slices.Equal(s.HideKinds, o.HideKinds) || !slices.Equal(s.ShowKinds, o.ShowKinds) {
+	if !slices.Equal(s.Hide, o.Hide) || !slices.Equal(s.HideKinds, o.HideKinds) || !slices.Equal(s.ShowKinds, o.ShowKinds) || !slices.Equal(s.BotAuthors, o.BotAuthors) {
 		return false
 	}
 	if !maps.Equal(s.StackParents, o.StackParents) || !maps.EqualFunc(s.Kinds, o.Kinds, slices.Equal[[]string]) {
@@ -118,6 +124,7 @@ type layer struct {
 	cleanup, notes *bool
 	hide, hideKind []string
 	showKind       []string
+	botAuthor      []string
 	kinds          map[string][]string
 	stack          map[string]string
 	insights       [4]*int
@@ -175,6 +182,7 @@ func merge(global, local layer) Settings {
 	s.Hide = list(local.hide, global.hide)
 	s.HideKinds = list(local.hideKind, global.hideKind)
 	s.ShowKinds = list(local.showKind, global.showKind)
+	s.BotAuthors = list(local.botAuthor, global.botAuthor)
 	for _, src := range []map[string][]string{global.kinds, local.kinds} {
 		for k, v := range src {
 			if s.Kinds == nil {
@@ -277,6 +285,8 @@ func read(ctx context.Context, g *git.Repo, scope string) (layer, error) {
 			add(&l.hideKind, value)
 		case sec == section && variable == "showkind":
 			add(&l.showKind, value)
+		case sec == section && variable == "botauthor":
+			add(&l.botAuthor, value)
 		case sec == kindSection && variable == "pattern" && sub != "":
 			if l.kinds == nil {
 				l.kinds = map[string][]string{}
@@ -376,6 +386,11 @@ func Save(ctx context.Context, g *git.Repo, was, now Settings) error {
 	}
 	if !slices.Equal(was.ShowKinds, now.ShowKinds) {
 		if err := setList(ctx, g, KeyShowKind, now.ShowKinds, global.ShowKinds); err != nil {
+			return err
+		}
+	}
+	if !slices.Equal(was.BotAuthors, now.BotAuthors) {
+		if err := setList(ctx, g, KeyBotAuthor, now.BotAuthors, global.BotAuthors); err != nil {
 			return err
 		}
 	}

@@ -348,6 +348,13 @@ const mounts = {
   },
   async settings() {
     const { default: SettingsDialog } = await import('../src/lib/SettingsDialog.svelte')
+    // A scenario that answers for a repository's preferences has that repository open, so the
+    // dialog shows its section.
+    if (responses.RepoPreferences) {
+      const { session } = await import('../src/lib/session.svelte')
+      session.tabs = [{ path: '/r', name: 'tidewater' } as (typeof session.tabs)[number]]
+      session.active = '/r'
+    }
     mount(SettingsDialog, { target: host, props: { onClose: record('close') } })
   },
   // Opening a repository the app refuses for want of trust, then the dialog that asks.

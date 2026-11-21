@@ -47,6 +47,60 @@ type Rules struct {
 	hide  []string
 	// hideKinds hides every branch of these kinds (the graph's Docs and Bots toggles).
 	hideKinds map[Kind]bool
+	// botAuthors are the repository's own patterns for authors that are bots, on top of
+	// the built-in one.
+	botAuthors []string
+}
+
+// BuiltInBotAuthor is the author pattern that always marks a bot: a GitHub App's name, such
+// as dependabot[bot].
+const BuiltInBotAuthor = "*[bot]"
+
+// WithBotAuthors returns r with these patterns marking authors as bots, besides the
+// built-in one.
+func (r Rules) WithBotAuthors(patterns []string) Rules {
+	r.botAuthors = patterns
+	return r
+}
+
+// BotAuthorPatterns returns the author patterns in use, the built-in one first, for printing
+// as an input (ADR 0008) and keying cached results.
+func (r Rules) BotAuthorPatterns() []string {
+	out := []string{BuiltInBotAuthor}
+	for _, p := range r.botAuthors {
+		if !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// BotAuthor reports whether an author is a bot: the name or the email matches one of the
+// author patterns. Case doesn't count, since email addresses don't have any.
+func (r Rules) BotAuthor(name, email string) bool {
+	name, email = strings.ToLower(name), strings.ToLower(email)
+	for _, p := range r.BotAuthorPatterns() {
+		p = strings.ToLower(p)
+		if Match(p, name) || (email != "" && Match(p, email)) {
+			return true
+		}
+	}
+	return false
+}
+
+// CheckAuthorPattern returns an error describing why pattern can't match an author's name or
+// email, or nil. Unlike a branch pattern it may hold spaces and brackets: "Release Bot",
+// "*[bot]".
+func CheckAuthorPattern(pattern string) error {
+	if strings.TrimSpace(pattern) == "" {
+		return fmt.Errorf("a pattern is empty")
+	}
+	for _, c := range pattern {
+		if unicode.IsControl(c) {
+			return fmt.Errorf("%q has a character names and emails can't contain", pattern)
+		}
+	}
+	return nil
 }
 
 // New returns rules from a repository's overrides: a kind missing from overrides uses its
