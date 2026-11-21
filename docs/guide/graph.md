@@ -78,9 +78,41 @@ Ticket keys and web addresses in a message or trailer are links when a [smart li
 ![A selected commit, with its message, trailers, author, a git note and the files it changed](../img/commit-details-light.webp#gh-light-mode-only)
 ![A selected commit, with its message, trailers, author, a git note and the files it changed](../img/commit-details-dark.webp#gh-dark-mode-only)
 
+## Authors
+
+The name on a commit is the one `git log` shows: if the repository has a [mailmap](people.md), someone who has committed under several names or addresses appears under one. A repository with no mailmap shows each commit's author as written.
+
+A mailmap changes what's shown and never the commit. When a commit was written under another name or address, the panel on the right says so under the author, as **This commit says** with the name and address the commit has.
+
+### The card about an author
+
+![The card about an author: who they are, what this commit says, how much they wrote, and the ways on from there](../img/author-card-light.webp#gh-light-mode-only)
+![The card about an author: who they are, what this commit says, how much they wrote, and the ways on from there](../img/author-card-dark.webp#gh-dark-mode-only)
+
+A small card says who wrote a commit. Open it any of these ways:
+
+- click the author's name in the panel on the right;
+- click the author's name on a row, where the row has one;
+- select a commit and press <kbd>Enter</kbd>;
+- right-click a commit and choose **About** with their name, at the end of the menu.
+
+The card shows:
+
+- **Who:** the name and address they're shown as, and a **bot** mark for a [bot author](settings.md#bot-authors).
+- **This commit says:** what the commit has, when the mailmap reads it as someone else, and the line of the mailmap that decides it.
+- **How much:** their commits across the repository's branches and tags, and how many more credit them as co-author. On a long history the count takes a moment the first time.
+
+From the card you can:
+
+- **Search the timeline for them**, which fills the search with their name;
+- **Open People**, which shows them in the [People](people.md) tab;
+- **Same person as…**, which opens People ready for you to choose who else they are.
+
+<kbd>Esc</kbd> closes the card, and so does a click anywhere else.
+
 ## Searching
 
-Press <kbd>Ctrl</kbd>+<kbd>F</kbd> to search. You can search by commit message, author or SHA. You can also search for a trailer, such as `Co-authored-by: Tyler` or `Closes: #12`, and `has:note` finds the commits that have a git note.
+Press <kbd>Ctrl</kbd>+<kbd>F</kbd> to search. You can search by commit message, author or SHA. An author is found under every name they've used: the one shown and the one each commit was written with. A search with an `@` in it is taken as an address. You can also search for a trailer, such as `Co-authored-by: Tyler` or `Closes: #12`, and `has:note` finds the commits that have a git note.
 
 <kbd>Enter</kbd> goes to the next match and <kbd>Shift</kbd>+<kbd>Enter</kbd> to the previous one. Matches further back than what's loaded are found too; the graph loads up to them. Each match has a tick on the [ruler](#the-ruler). [Find a commit](../walkthroughs/find-a-commit.md) shows it in action.
 
@@ -141,7 +173,7 @@ Right-click a commit, branch or tag for what you can do with it: check it out, c
 
 You don't have to right-click. Rest the pointer on a commit, or select one from the keyboard, and two small buttons appear at the right of its row: one copies its SHA, the other opens the same menu. <kbd>Tab</kbd> reaches them after the graph.
 
-A commit's menu starts with what you can do with the commit itself. Below that, each branch and tag on it has its own submenu, so what you do to `main` stays apart from what you do to `origin/main`. Hover over one to open it, or use the arrow keys.
+A commit's menu starts with what you can do with the commit itself, ending with **About** and its author's name, which opens [the card about them](#the-card-about-an-author). Below that, each branch and tag on it has its own submenu, so what you do to `main` stays apart from what you do to `origin/main`. Hover over one to open it, or use the arrow keys.
 
 ![A commit's menu, with the submenu of a branch on it open](../img/commit-menu-light.webp#gh-light-mode-only)
 ![A commit's menu, with the submenu of a branch on it open](../img/commit-menu-dark.webp#gh-dark-mode-only)

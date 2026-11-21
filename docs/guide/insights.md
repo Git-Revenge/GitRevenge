@@ -26,7 +26,7 @@ The **target branch** is the one `origin/HEAD` points at, usually `origin/main`,
 ## Overview
 
 - **Shipped:** how many items landed on the target in the window.
-- **People:** how many different authors those items have. Names and emails follow the repository's committed `.mailmap`.
+- **People:** how many different authors those items have. Names and emails follow the `.mailmap` committed on the target branch, and nothing else. The graph also follows a `.mailmap` you've saved and not committed, and any mailmap file of your own; Insights leaves both out, so the same report gives everyone the same people. [People and the mailmap](people.md#which-mailmap-is-read) has the detail.
 - **Needs attention:** how many open branches are past a threshold or would conflict.
 - **Rework:** how many reverts and `fixup!`, `squash!` or `amend!` commits landed.
 

@@ -125,7 +125,7 @@ const features = [
   },
   {
     title: 'Editors for git’s own files',
-    body: 'See every ignore rule that applies and which one decides a path. Edit git config with a line on what each setting does, where a value comes from, and a backup on every save.',
+    body: 'See every ignore rule that applies and which one decides a path. Edit git config with a line on what each setting does and a backup on every save. See who a history names, and join the names that are one person in its mailmap.',
     to: '/docs/guide/ignoring',
   },
   {
