@@ -202,7 +202,10 @@ jobs:
 
       # 1.0 moved the install folder and renamed the uninstall key. Install 0.11.0, upgrade it
       # with this installer, and check that one install is left, in the new place, and that it
-      # uninstalls cleanly.
+      # uninstalls cleanly. Also that the installer puts the gitrevenge command on the PATH,
+      # that it starts the app, and that uninstalling leaves the PATH exactly as it found it.
+      # A runner's PATH is several thousand characters, which is what an installer that edits
+      # it carelessly would empty.
       - name: Upgrade a 0.11.0 install
         if: runner.os == 'Windows'
         shell: pwsh
@@ -214,6 +217,22 @@ jobs:
           $oldDir = "$env:ProgramFiles\Ris Adams\Git Revenge"
           $newDir = "$env:ProgramFiles\Git Revenge"
           function Check($ok, $what) { if (-not $ok) { throw "Failed: $what" } else { Write-Host "ok: $what" } }
+          # The machine's PATH as the registry holds it, with its variables unexpanded.
+          function MachinePath {
+            $key = Get-Item 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment'
+            [pscustomobject]@{ Value = $key.GetValue('Path', '', 'DoNotExpandEnvironmentNames'); Kind = $key.GetValueKind('Path') }
+          }
+          # Runs a command in a shell of its own and waits for the installed app to appear.
+          function StartsApp($shell, $arguments, $what) {
+            Start-Process $shell -ArgumentList $arguments -WindowStyle Hidden
+            for ($i = 0; $i -lt 30 -and -not (Get-Process gitrevenge -ErrorAction Ignore); $i++) { Start-Sleep 1 }
+            $app = Get-Process gitrevenge -ErrorAction Ignore
+            Check ($app -and $app.Path -eq "$newDir\gitrevenge.exe") $what
+            $app | Stop-Process -Force
+            $app | Wait-Process -Timeout 30
+          }
+          $pathBefore = MachinePath
+          Write-Host "The machine's PATH is $($pathBefore.Value.Length) characters ($($pathBefore.Kind))"
 
           gh release download v0.11.0 --repo $env:GITHUB_REPOSITORY --pattern 'GitRevenge-0.11.0-windows-amd64-installer.exe' --dir old
           Start-Process old\GitRevenge-0.11.0-windows-amd64-installer.exe -ArgumentList '/S' -Wait
@@ -238,10 +257,23 @@ jobs:
             }
           }
 
+          # The launchers' folder is the PATH's last entry, and nothing else in it changed.
+          $added = if ($pathBefore.Value.EndsWith(';')) { "$($pathBefore.Value)$newDir\bin;" } else { "$($pathBefore.Value);$newDir\bin" }
+          $path = MachinePath
+          Check ($path.Value -ceq $added -and $path.Kind -eq $pathBefore.Kind) "the PATH gained only $newDir\bin"
+          # What a terminal opened now would have.
+          $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
+          Check ((Get-Command gitrevenge).Source -eq "$newDir\bin\gitrevenge.cmd") 'PowerShell finds gitrevenge on the PATH'
+          StartsApp 'cmd.exe' '/c gitrevenge' 'gitrevenge starts the app from cmd'
+          StartsApp "$env:ProgramFiles\Git\bin\bash.exe" '-c gitrevenge' 'gitrevenge starts the app from Git Bash'
+
           Start-Process "$newDir\uninstall.exe" -ArgumentList '/S' -Wait
           # The uninstaller copies itself to a temp folder and returns before it's done.
           for ($i = 0; $i -lt 30 -and (Test-Path "$uninstall\GitRevenge"); $i++) { Start-Sleep 1 }
           Check (-not (Test-Path "$uninstall\GitRevenge")) 'uninstall removes the key'
+          $path = MachinePath
+          Check ($path.Value -ceq $pathBefore.Value -and $path.Kind -eq $pathBefore.Kind) 'uninstall leaves the PATH as it was before the install'
+          Check (-not (Test-Path "$newDir\bin")) 'uninstall removes the launchers'
 
       - name: Package for Linux
         if: matrix.packager
