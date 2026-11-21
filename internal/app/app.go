@@ -47,6 +47,8 @@ type App struct {
 	configs   gitConfigs
 	conflicts conflictChecks
 	insights  insightsCache
+	// mapAuthors holds the Map's Authors mode results, by repository, window and ref state.
+	mapAuthors insightsCache
 	// configBackupDir overrides where config backups are kept; tests use it.
 	configBackupDir string
 	// repoConfigMu orders reads of a repository's settings from git config with writes to

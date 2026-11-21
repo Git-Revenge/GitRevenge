@@ -178,6 +178,10 @@ export function LastCommitMessage(arg1:string):Promise<string>;
 
 export function LinkRules(arg1:string):Promise<links.Config>;
 
+export function MapAuthorHistory(arg1:string,arg2:Array<app.AuthorIdentity>):Promise<git.AuthorHistory>;
+
+export function MapAuthors(arg1:string,arg2:number):Promise<app.AuthorMap>;
+
 export function MarkBisect(arg1:string,arg2:string):Promise<void>;
 
 export function MarkBranchKind(arg1:string,arg2:string,arg3:string):Promise<void>;
