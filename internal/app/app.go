@@ -49,6 +49,8 @@ type App struct {
 	insights  insightsCache
 	// mapAuthors holds the Map's Authors mode results, by repository, window and ref state.
 	mapAuthors insightsCache
+	// people holds who each repository's history names, for the People view (see people.go).
+	people peopleReads
 	// configBackupDir overrides where config backups are kept; tests use it.
 	configBackupDir string
 	// repoConfigMu orders reads of a repository's settings from git config with writes to

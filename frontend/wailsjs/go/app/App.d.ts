@@ -180,6 +180,10 @@ export function LastCommitMessage(arg1:string):Promise<string>;
 
 export function LinkRules(arg1:string):Promise<links.Config>;
 
+export function MailmapNotes(arg1:string,arg2:string):Promise<Array<git.MailmapNote>>;
+
+export function MailmapSources(arg1:string):Promise<Array<git.MailmapSource>>;
+
 export function MapAuthorAreas(arg1:string,arg2:Array<app.AuthorIdentity>,arg3:number,arg4:string):Promise<app.AuthorAreas>;
 
 export function MapAuthorHistory(arg1:string,arg2:Array<app.AuthorIdentity>):Promise<git.AuthorHistory>;
@@ -201,6 +205,8 @@ export function OpenMergeTool(arg1:string,arg2:string):Promise<void>;
 export function OpenRepo(arg1:string):Promise<app.RepoTab>;
 
 export function OwnMoveAge(arg1:string):Promise<number>;
+
+export function People(arg1:string,arg2:app.PeopleRequest):Promise<app.PeopleList>;
 
 export function PlanBisect(arg1:string,arg2:string,arg3:string):Promise<app.BisectPlan>;
 
@@ -229,6 +235,8 @@ export function PushStack(arg1:string,arg2:Array<string>):Promise<void>;
 export function PushedUndo(arg1:string,arg2:boolean):Promise<app.SharedCommits>;
 
 export function ReadIgnoreFile(arg1:string,arg2:string):Promise<string>;
+
+export function ReadMailmapFile(arg1:string,arg2:string):Promise<string>;
 
 export function RebasePlan(arg1:string,arg2:string):Promise<Array<git.RebaseItem>>;
 
@@ -295,6 +303,8 @@ export function SaveGitConfig(arg1:string,arg2:boolean):Promise<app.ConfigSaveRe
 export function SaveIgnoreFile(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function SaveLinkRule(arg1:string,arg2:links.Rule,arg3:string):Promise<void>;
+
+export function SaveMailmap(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<void>;
 
 export function SearchGraph(arg1:string,arg2:string):Promise<graph.SearchResult>;
 
@@ -395,6 +405,8 @@ export function UpdateStack(arg1:string,arg2:Array<string>):Promise<Array<string
 export function UpdateSubmodules(arg1:string):Promise<void>;
 
 export function Version():Promise<string>;
+
+export function WhoIs(arg1:string,arg2:app.MailmapText,arg3:string):Promise<Array<app.WhoAnswer>>;
 
 export function WorkingTree(arg1:string):Promise<app.WorkingTree>;
 
