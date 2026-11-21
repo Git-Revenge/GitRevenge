@@ -18,6 +18,8 @@ export function AnswerPrompt(arg1:string,arg2:string,arg3:boolean):Promise<void>
 
 export function ArrivedCommits(arg1:string,arg2:string,arg3:string):Promise<app.Arrived>;
 
+export function AuthorCard(arg1:string,arg2:string):Promise<app.AuthorCard>;
+
 export function Bisect(arg1:string):Promise<app.BisectInfo>;
 
 export function Blame(arg1:string,arg2:string,arg3:string):Promise<Array<git.BlameLine>>;
@@ -211,6 +213,8 @@ export function OwnMoveAge(arg1:string):Promise<number>;
 export function People(arg1:string,arg2:app.PeopleRequest):Promise<app.PeopleList>;
 
 export function PeopleSuggestions(arg1:string,arg2:app.MailmapText):Promise<app.Suggestions>;
+
+export function PersonCard(arg1:string,arg2:git.Identity):Promise<app.Person>;
 
 export function PlanBisect(arg1:string,arg2:string,arg3:string):Promise<app.BisectPlan>;
 

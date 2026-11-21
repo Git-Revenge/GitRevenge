@@ -79,6 +79,13 @@
     if (diff?.mode === 'commit') diff = null
   }
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
+  /** The card about a commit's author, while one is open: whose, and where it goes. */
+  let authorCard = $state<{ sha: string; name: string; x: number; y: number; above: number; opener?: HTMLElement } | null>(null)
+  // The card is about a commit in this repository: it goes when another one shows.
+  $effect(() => {
+    void path
+    authorCard = null
+  })
   /** Where the graph's columns are, so the row of changes above it lines up with them. */
 
   let dialog = $state<DialogSpec | null>(null)
@@ -98,6 +105,8 @@
       return head.startsWith('detached') ? '' : head
     },
     openDialog: (spec) => (dialog = spec),
+    // From a row's menu, the card goes where the menu was.
+    openAuthor: (row) => (authorCard = { sha: row.id, name: row.author, x: menuAt.x, y: menuAt.y, above: menuAt.y }),
     // One bisect at a time: the entry goes while one is running.
     get openBisect() {
       return running
@@ -143,7 +152,10 @@
     },
   ])
 
+  /** Where the last menu opened, for what one of its items puts in its place. */
+  let menuAt = { x: 0, y: 0 }
   function openMenu(items: MenuItem[], x: number, y: number) {
+    menuAt = { x, y }
     menu = items.length ? { x, y, items } : null
   }
 
@@ -285,7 +297,7 @@
     <!-- The graph stays mounted while a diff is open, so scroll position and selection
          survive returning to it. -->
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           openMenu(commitMenuItems(row, refs, ctx), x, y)}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
@@ -385,7 +397,10 @@
       onRevert={revertFound}
     />
   {:else if selected}
-    <CommitPanel {path} onMenu={openMenu} showNotes={noteAsk} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} onReveal={revealCommit} onActions={(x, y) => selected && openMenu(commitMenuItems(selected, graph.refsOf(selected.id), ctx), x, y)} />
+    <CommitPanel {path} onMenu={openMenu} showNotes={noteAsk} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} onAuthor={(sha, name, from) => {
+        const at = from.getBoundingClientRect()
+        authorCard = { sha, name, x: at.left, y: at.bottom + 4, above: at.top, opener: from }
+      }} onReveal={revealCommit} onActions={(x, y) => selected && openMenu(commitMenuItems(selected, graph.refsOf(selected.id), ctx), x, y)} />
   {/if}
     </div>
   {/if}
@@ -393,6 +408,11 @@
 
 {#if menu}
   <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => (menu = null)} />
+{/if}
+{#if authorCard}
+  {#key authorCard.sha}
+    <Lazy load={() => import('./people/AuthorCard.svelte')} repo={path} {...authorCard} onSearch={(q: string) => graph?.search(q)} onClose={() => (authorCard = null)} />
+  {/key}
 {/if}
 {#if dialog}
   <Dialog spec={dialog} onClose={() => (dialog = null)} />

@@ -25,6 +25,8 @@ export interface MenuContext {
   /** Opens the dialog that starts a bisect with this commit as the bad one; absent while one
    * is already running. */
   openBisect?: (bad: string) => void
+  /** Opens the card about a commit's author; absent where there's no graph to put it by. */
+  openAuthor?: (row: Row) => void
 }
 
 /** Joins groups of items, drawing a rule between non-empty groups. */
@@ -479,6 +481,8 @@ export function commitItems(row: Row, refs: Ref[], ctx: MenuContext): MenuItem[]
             }),
         }
       : { label: `Revert ${short}`, icon: 'revert', run: integrate(path, 'revert', row.id, '') },
+    // Who wrote it: the same card a click on the author opens, for rows that don't name them.
+    ...(ctx.openAuthor && row.author ? [{ label: `About ${row.author}`, icon: 'people' as const, separator: true, run: () => ctx.openAuthor?.(row) }] : []),
   ]
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { app, git } from '../../../wailsjs/go/models'
-import { canTakeApart, changedLines, describeNote, joined, linesText, sourceNote, summary, wrote } from './mailmap'
+import { canTakeApart, changedLines, describeNote, faceColor, joined, linesIn, linesText, sourceNote, summary, wrote } from './mailmap'
 
 const note = (over: Partial<git.MailmapNote>) => ({ line: 1, kind: 'map', identities: 0, commits: 0, coAuthored: 0, replaced: false, ...over }) as git.MailmapNote
 const identity = (name: string, email: string, lines: git.MailmapRef[] = []) => ({ name, email, commits: 1, coAuthored: 0, lines }) as app.PersonIdentity
@@ -43,6 +43,31 @@ describe('linesText', () => {
         { source: 'mailmap.file', line: 3 },
       ]),
     ).toBe('line 1, line 3 of your mailmap file')
+  })
+})
+
+describe('linesIn', () => {
+  it('says which file each line is in', () => {
+    expect(linesIn([{ source: '.mailmap', line: 6 }])).toBe('line 6 of .mailmap')
+    expect(
+      linesIn([
+        { source: '.mailmap', line: 2 },
+        { source: '.mailmap', line: 5 },
+      ]),
+    ).toBe('lines 2 and 5 of .mailmap')
+    expect(
+      linesIn([
+        { source: '.mailmap', line: 6 },
+        { source: 'mailmap.file', line: 1 },
+      ]),
+    ).toBe('line 6 of .mailmap and line 1 of your mailmap file')
+  })
+})
+
+describe('faceColor', () => {
+  it('gives a name the same colour each time', () => {
+    expect(faceColor('Sarah Lind')).toBe(faceColor('Sarah Lind'))
+    expect(faceColor('Sarah Lind')).toMatch(/^var\(--lane-[0-5]\)$/)
   })
 })
 

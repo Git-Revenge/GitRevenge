@@ -1127,6 +1127,41 @@ export function drawRow(
   return labelSpan
 }
 
+/** Where a row writes its author: across the row, and down from the row's top. */
+export interface AuthorSpan {
+  x0: number
+  x1: number
+  y0: number
+  y1: number
+}
+
+/**
+ * Where a row writes its author, or null when it doesn't: a timeline row that carries on a
+ * run says only when, and a compact row has an author column only where there's room. A
+ * click there opens the author's card, so this measures what drawRow draws. In a run of
+ * compact rows the column holds a ditto, which stands for the name and takes the click.
+ */
+export function authorSpan(ctx: CanvasRenderingContext2D, row: Row, lay: Layout, follower: boolean, isHead: boolean, near: Near = {}): AuthorSpan | null {
+  if (lay.density === 'comfortable') {
+    if (follower) return null
+    ctx.save()
+    setFont(ctx, `12px ${MONO}`, '0.08em')
+    const line = clip(ctx, metaLine(row).toUpperCase(), lay.width - 14 - lay.textX)
+    const name = row.author.toUpperCase()
+    // A line cut short inside the name is all name.
+    const width = ctx.measureText(line.startsWith(name) ? name : line).width
+    ctx.restore()
+    return { x0: lay.textX, x1: lay.textX + width, y0: 28, y1: 46 }
+  }
+  if (!lay.authorW) return null
+  ctx.save()
+  setFont(ctx, `13px ${SERIF}`)
+  const text = !isHead && repeatsAuthor(row, near) ? DITTO : clip(ctx, row.author, lay.authorW - (lay.dateW ? 16 : MARKS_W))
+  const width = Math.max(14, ctx.measureText(text).width)
+  ctx.restore()
+  return { x0: lay.authorX, x1: lay.authorX + width, y0: 0, y1: lay.m.rowH }
+}
+
 function disc(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string) {
   ctx.beginPath()
   ctx.arc(x, y, r, 0, Math.PI * 2)

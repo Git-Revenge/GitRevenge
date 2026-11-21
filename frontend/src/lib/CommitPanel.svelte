@@ -32,6 +32,7 @@
     onReveal,
     current,
     onSearch,
+    onAuthor,
     onMenu,
     showNotes = 0,
   }: {
@@ -48,6 +49,10 @@
     current?: DiffTarget | null
     /** Searches the graph, e.g. for other commits with the same trailer. */
     onSearch?: (query: string) => void
+    /** Asks for the card about the commit's author, by the button that names them, which is
+     * handed over so the card can sit under it and give the focus back. Without it the name
+     * searches for their commits. */
+    onAuthor?: (commit: string, name: string, from: HTMLElement) => void
     /** Opens the commit's menu at this position. */
     onActions?: (x: number, y: number) => void
     /** Shows another commit in the graph, such as a parent. */
@@ -400,7 +405,11 @@
     <header>
       <h2>{#each linker.parts(c.subject, 'message') as part, k (k)}{#if part.href}<a href={part.href} title={linkTitle(part)} class:smart={!!part.rule} onclick={(e) => openLink(e, part.href!)} oncontextmenu={(e) => linkMenu(e, part)}>{part.text}</a>{:else}{part.text}{/if}{/each}</h2>
       <div class="who">
-        <button class="author" onclick={() => onSearch?.(author.name)} title="Find commits by {author.name}">{author.name}</button>
+        {#if onAuthor}
+          <button class="author" aria-haspopup="dialog" onclick={(e) => onAuthor(c.id, author.name, e.currentTarget)} title="About {author.name}">{author.name}</button>
+        {:else}
+          <button class="author" onclick={() => onSearch?.(author.name)} title="Find commits by {author.name}">{author.name}</button>
+        {/if}
         <span class="when">{formatTime(c.author.time)}</span>
       </div>
       {#if authorSays}

@@ -39,6 +39,8 @@ class PeopleState {
   suggestions = $state<app.Suggestions | null>(null)
   /** What the last Take apart did to others on the same line, until the next edit. */
   apart = $state<git.ApartPlan | null>(null)
+  /** The person picked first, when joining two from the list by hand ("Same person as…"). */
+  picking = $state<app.Person | null>(null)
   error = $state('')
   /** Why the last save failed, until the next save, revert or reload. */
   saveError = $state('')
@@ -76,6 +78,7 @@ class PeopleState {
     this.notes = []
     this.suggestions = null
     this.apart = null
+    this.picking = null
     this.query = ''
     this.selected = WORK_TREE
     this.view = 'people'
@@ -114,7 +117,23 @@ class PeopleState {
     } catch (e) {
       this.error = errorText(e)
     }
+    this.#take()
     await this.refresh()
+  }
+
+  /**
+   * Takes up what an author's card in the graph asked for: find someone in the list, or
+   * start saying they're the same person as someone else. The list is long and comes a
+   * page at a time, so going to someone means narrowing it to them, by their address when
+   * they have one.
+   */
+  #take() {
+    const ask = peopleTab.ask
+    if (!ask) return
+    peopleTab.ask = null
+    this.view = 'people'
+    this.picking = ask.pick ? ask.person : null
+    this.query = ask.pick ? '' : ask.person.email || ask.person.name
   }
 
   /** Asks again who the history names and what each line does, through the text as it stands. */

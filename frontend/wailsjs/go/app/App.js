@@ -22,6 +22,10 @@ export function ArrivedCommits(arg1, arg2, arg3) {
   return window['go']['app']['App']['ArrivedCommits'](arg1, arg2, arg3);
 }
 
+export function AuthorCard(arg1, arg2) {
+  return window['go']['app']['App']['AuthorCard'](arg1, arg2);
+}
+
 export function Bisect(arg1) {
   return window['go']['app']['App']['Bisect'](arg1);
 }
@@ -408,6 +412,10 @@ export function People(arg1, arg2) {
 
 export function PeopleSuggestions(arg1, arg2) {
   return window['go']['app']['App']['PeopleSuggestions'](arg1, arg2);
+}
+
+export function PersonCard(arg1, arg2) {
+  return window['go']['app']['App']['PersonCard'](arg1, arg2);
 }
 
 export function PlanBisect(arg1, arg2, arg3) {

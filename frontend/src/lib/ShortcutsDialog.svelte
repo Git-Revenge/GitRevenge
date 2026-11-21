@@ -20,6 +20,7 @@
     { group: 'Graph', title: 'Move a page', keys: ['PageUp', 'PageDown'] },
     { group: 'Graph', title: 'First or last commit', keys: ['Home', 'End'] },
     { group: 'Graph', title: 'Next or previous search match', keys: ['Enter', 'Shift+Enter'] },
+    { group: 'Graph', title: "About the selected commit's author", keys: ['Enter'] },
     { group: 'Sidebar', title: 'Move through the list', keys: ['↑', '↓'] },
     { group: 'Sidebar', title: 'Open or close a folder, or step in and out', keys: ['→', '←'] },
     { group: 'Sidebar', title: 'Show in the graph', keys: ['Enter'] },

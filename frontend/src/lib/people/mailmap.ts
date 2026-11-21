@@ -43,6 +43,29 @@ export function linesText(lines: git.MailmapRef[]): string {
   return parts.join(', ')
 }
 
+/**
+ * The lines that read a commit as someone else, with the file each is in: "line 6 of
+ * .mailmap", "lines 2 and 5 of .mailmap", "line 6 of .mailmap and line 1 of your mailmap
+ * file". For where the People view's own text isn't beside it to say which file.
+ */
+export function linesIn(lines: git.MailmapRef[]): string {
+  const bySource = new Map<string, number[]>()
+  for (const l of lines) bySource.set(l.source, [...(bySource.get(l.source) ?? []), l.line])
+  const parts: string[] = []
+  for (const [source, ns] of bySource) {
+    const where = ns.length === 1 ? `line ${ns[0]}` : `lines ${ns.slice(0, -1).join(', ')} and ${ns[ns.length - 1]}`
+    parts.push(`${where} of ${source === WORK_TREE ? WORK_TREE : sourceLabel(source).toLowerCase()}`)
+  }
+  return parts.join(' and ')
+}
+
+/** A colour for someone's initials, the same each time for the same name. */
+export function faceColor(name: string): string {
+  let h = 0
+  for (const c of name) h = (h * 31 + c.codePointAt(0)!) >>> 0
+  return `var(--lane-${h % 6})`
+}
+
 /** Whether an identity can be taken apart here: only lines of the .mailmap can be removed. */
 export function canTakeApart(id: app.PersonIdentity): boolean {
   return id.lines.length > 0 && id.lines.every((l) => l.source === WORK_TREE)
