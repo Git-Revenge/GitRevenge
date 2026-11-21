@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   AUTHORS_SCALE,
+  authorBranchNodes,
   authorColor,
   authorNode,
+  sharedKey,
   authorsScale,
   authorsSummary,
   BRANCH_R,
@@ -146,5 +148,65 @@ describe('authors laid out', () => {
     const out = layout(trunk, nodes, 1000, 640, NOW, SCALES[AUTHORS_SCALE], new Map(), wide)
     for (const n of out.nodes) expect(n.x - n.r < wide.width && n.y - n.r < wide.height, n.name).toBe(false)
     expect(controlBoxes(1000, 640, wide)[0]).toEqual({ x: 210, y: SWITCH.height / 2, hw: 210, hh: SWITCH.height / 2 })
+  })
+})
+
+// #811: an author opens into the trunk and the unmerged branches holding their commits.
+describe('an author opened by branch', () => {
+  const topic = node('topic', { commits: 4, updated: NOW - 2 * DAY, head: true, worktree: '/wt', stacked: true, parent: 'base' })
+  const far = node('origin/spike', { kind: 'remote', commits: 2, updated: NOW - 5 * DAY })
+  const maya = author('Maya', 30, { trunk: 24, branches: [topic, far] })
+
+  it('holds the trunk for what has landed, then each branch, sized by their commits there', () => {
+    const got = authorBranchNodes(maya, trunk)
+    expect(got.map((n) => [n.name, n.kind, n.commits, !!n.landed])).toEqual([
+      ['main', 'branch', 24, true],
+      ['topic', 'branch', 4, false],
+      ['origin/spike', 'remote', 2, false],
+    ])
+    for (const n of got) expect(n).toMatchObject({ parent: 'maya@example.com', owner: 'maya@example.com', head: false, stacked: false })
+    // Where the branch is checked out is the Branches mode's business.
+    expect(got[1].worktree).toBeUndefined()
+  })
+
+  it('leaves the trunk out when nothing of theirs has landed', () => {
+    expect(authorBranchNodes(author('Leo', 4, { trunk: 0, branches: [topic] }), trunk).map((n) => n.name)).toEqual(['topic'])
+    expect(authorBranchNodes(author('Leo', 4, { trunk: 0 }), trunk)).toEqual([])
+  })
+
+  it('gives each author their own node for a branch they share, which the two know as the same', () => {
+    const leo = author('Leo', 9, { trunk: 5, branches: [{ ...topic, commits: 1 }] })
+    const mine = authorBranchNodes(maya, trunk)
+    const theirs = authorBranchNodes(leo, trunk)
+    expect(new Set([...mine, ...theirs].map(pinKey)).size).toBe(5)
+    expect(sharedKey(mine[0])).toBe(sharedKey(theirs[0]))
+    expect(sharedKey(mine[1])).toBe(sharedKey(theirs[1]))
+    expect(sharedKey(mine[0])).not.toBe(sharedKey(mine[1]))
+    // A local branch and a remote one of the same name aren't the same branch, nor is a
+    // branch that happens to be called what the trunk is.
+    expect(sharedKey({ kind: 'branch', name: 'x', owner: 'a' })).not.toBe(sharedKey({ kind: 'remote', name: 'x', owner: 'a' }))
+    expect(sharedKey({ kind: 'branch', name: 'main', owner: 'a', landed: true })).not.toBe(sharedKey({ kind: 'branch', name: 'main', owner: 'a' }))
+    // Something nobody holds shares with nothing.
+    expect(sharedKey(node('topic'))).toBe('')
+  })
+
+  it('stands what they hold round them, nearer to them than the trunk is', () => {
+    const leo = author('Leo', 9, { trunk: 5, updated: NOW - 20 * DAY, branches: [{ ...topic, commits: 1 }] })
+    const nodes = [authorNode(maya), authorNode(leo), ...authorBranchNodes(maya, trunk), ...authorBranchNodes(leo, trunk)]
+    const out = layout(trunk, nodes, 1200, 760, NOW, SCALES[AUTHORS_SCALE])
+    const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y)
+    for (const who of ['maya@example.com', 'leo@example.com']) {
+      const at = out.nodes.find((n) => n.id === who)!
+      for (const n of out.nodes.filter((n) => n.owner === who)) {
+        expect(dist(n, at), `${n.name} of ${who}`).toBeLessThan(160)
+        // Nothing sits on top of its author.
+        expect(dist(n, at), `${n.name} of ${who}`).toBeGreaterThanOrEqual(n.r + at.r)
+      }
+    }
+    // Opening doesn't move who's on the map off it.
+    for (const n of out.nodes) {
+      expect(n.x - n.r, n.name).toBeGreaterThanOrEqual(0)
+      expect(n.x + n.r, n.name).toBeLessThanOrEqual(1200)
+    }
   })
 })

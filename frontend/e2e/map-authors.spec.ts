@@ -209,6 +209,102 @@ test.describe("the Map's Authors mode", () => {
     await expect(page.locator('.node[data-node^="author:"]')).toHaveCount(60)
   })
 
+  // #811: an author opens into the trunk and the unmerged branches that hold their commits.
+  test.describe('opened by branch', () => {
+    const held = (name: string, kind: string, commits: number, days: number) => ({ name, kind, commit: id(5), commits, updated: now - days * DAY, parent: '', head: false })
+    const mayaOpen = { ...maya, trunk: 31, branches: [held('topic', 'branch', 5, 1), held('origin/spike', 'remote', 2, 3)], moreBranches: 2 }
+    const leoOpen = author('Leo Brandt', 9, 12, { trunk: 8, branches: [held('topic', 'branch', 1, 1)] })
+    const priya = author('Priya Nair', 1, 40, { trunk: 0, branches: [] })
+    const opened = { MapAuthors: { ...authors, authors: [mayaOpen, leoOpen, priya], people: 3, bots: 0 } }
+    const heldBy = (page: Page, who: string, what: string) => page.locator(`.node.owned[data-node^="branch:${who}|"][data-node$=":${what}"], .node.owned[data-node^="remote:${who}|"][data-node$=":${what}"]`)
+
+    test('a double-click opens an author into what has landed and what’s on branches, and another folds it away', async ({ page }) => {
+      await toAuthors(page, opened)
+      const node = authorOf(page, 'Maya Okafor')
+      await expect(node).toHaveAttribute('aria-expanded', 'false')
+      await expect(page.locator('.node.owned')).toHaveCount(0)
+      await node.dblclick()
+      await expect(node).toHaveAttribute('aria-expanded', 'true')
+      await expect(page.locator('.node.owned')).toHaveCount(3)
+      await expect(heldBy(page, maya.key, 'main')).toContainText('31 landed')
+      await expect(heldBy(page, maya.key, 'topic')).toContainText('5 commits')
+      await expect(heldBy(page, maya.key, 'origin/spike')).toHaveClass(/is-remote/)
+      await expect(page.getByRole('button', { name: /^main, of Maya Okafor's\. 31 commits of Maya Okafor's in the last two months are in main: landed\./ })).toBeVisible()
+      await expect(page.getByRole('button', { name: /^topic, of Maya Okafor's\. 5 commits of Maya Okafor's in the last two months are here and not in main\./ })).toBeVisible()
+      await node.dblclick()
+      await expect(page.locator('.node.owned')).toHaveCount(0)
+      // Which authors are open isn't kept.
+      expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => /open/i.test(k)))).toEqual([])
+    })
+
+    test('what an author holds stands by them, in their colour', async ({ page }) => {
+      await toAuthors(page, opened)
+      await authorOf(page, 'Maya Okafor').dblclick()
+      await expect(page.locator('.node.owned')).toHaveCount(3)
+      const centre = async (loc: ReturnType<typeof authorOf>) => {
+        const b = (await loc.boundingBox())!
+        return { x: b.x + b.width / 2, y: b.y + b.height / 2 }
+      }
+      const [at, hub] = [await centre(authorOf(page, 'Maya Okafor')), await centre(page.locator('.node[data-node="trunk:main"]'))]
+      for (const what of ['main', 'topic', 'origin/spike']) {
+        const c = await centre(heldBy(page, maya.key, what))
+        expect(Math.hypot(c.x - at.x, c.y - at.y), what).toBeLessThan(Math.hypot(c.x - hub.x, c.y - hub.y))
+      }
+      const colour = (loc: ReturnType<typeof authorOf>) => loc.evaluate((el) => (el as HTMLElement).style.getPropertyValue('--c'))
+      expect(await colour(heldBy(page, maya.key, 'topic'))).toBe(await colour(authorOf(page, 'Maya Okafor')))
+    })
+
+    test('the card opens and folds them, and says when some branches aren’t shown', async ({ page }) => {
+      await toAuthors(page, opened)
+      await authorOf(page, 'Maya Okafor').click()
+      const card = page.getByRole('group', { name: 'About Maya Okafor' })
+      await card.getByRole('button', { name: 'Show their branches' }).click()
+      await expect(page.locator('.node.owned')).toHaveCount(3)
+      await expect(card).toContainText("2 more branches of theirs, less recently moved, aren't shown.")
+      await card.getByRole('button', { name: 'Fold their branches away' }).click()
+      await expect(page.locator('.node.owned')).toHaveCount(0)
+      // Somebody with nothing landed and nothing on a branch that was read has nothing to open.
+      await authorOf(page, 'Priya Nair').click()
+      await expect(page.getByRole('group', { name: 'About Priya Nair' }).getByRole('button', { name: 'Show their branches' })).toHaveCount(0)
+      await expect(authorOf(page, 'Priya Nair')).not.toHaveAttribute('aria-expanded')
+    })
+
+    test('two open authors each have their own, and pointing at a branch lights it up under the other', async ({ page }) => {
+      await toAuthors(page, opened)
+      await authorOf(page, 'Maya Okafor').dblclick()
+      await authorOf(page, 'Leo Brandt').dblclick()
+      await expect(page.locator('.node.owned')).toHaveCount(5)
+      await expect(heldBy(page, leoOpen.key, 'main')).toContainText('8 landed')
+      await expect(heldBy(page, leoOpen.key, 'topic')).toContainText('1 commit')
+      await heldBy(page, maya.key, 'topic').hover()
+      await expect(heldBy(page, leoOpen.key, 'topic')).toHaveClass(/echo/)
+      await expect(heldBy(page, maya.key, 'topic')).toHaveClass(/echo/)
+      await expect(heldBy(page, leoOpen.key, 'main')).not.toHaveClass(/echo/)
+      // From the keyboard too.
+      await page.mouse.move(2, 2)
+      await expect(page.locator('.node.echo')).toHaveCount(0)
+      await heldBy(page, leoOpen.key, 'main').focus()
+      await expect(heldBy(page, maya.key, 'main')).toHaveClass(/echo/)
+    })
+
+    test('a branch an author holds has a card that leads to the timeline, and the branch’s own menu', async ({ page }) => {
+      await toAuthors(page, opened)
+      await authorOf(page, 'Maya Okafor').dblclick()
+      await heldBy(page, maya.key, 'topic').click()
+      const card = page.getByRole('group', { name: "About topic, of Maya Okafor's" })
+      await expect(card).toContainText("5 commits of Maya Okafor's in the last two months are here and not in main. The branch last moved 1d ago.")
+      await expect(card.getByRole('button', { name: 'Show it in the timeline' })).toBeVisible()
+      // Folding the author away takes the card with it.
+      await authorOf(page, 'Maya Okafor').dblclick()
+      await expect(card).toHaveCount(0)
+
+      await authorOf(page, 'Maya Okafor').dblclick()
+      await heldBy(page, maya.key, 'topic').click()
+      await page.getByRole('group', { name: "About topic, of Maya Okafor's" }).getByRole('button', { name: 'Focus the timeline on it' }).click()
+      await expect.poll(async () => (await calls(page, 'SetGraphFocus')).at(-1)).toEqual(['/repo', 'topic', false])
+    })
+  })
+
   test('says what went wrong when the authors can’t be read', async ({ page }) => {
     await page.setViewportSize({ width: 1200, height: 700 })
     await open(page, 'graph', { ...scenario(), failures: { MapAuthors: 'fatal: bad object' } })
