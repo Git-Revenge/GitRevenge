@@ -102,6 +102,9 @@ func (r *Repo) MailmapState(ctx context.Context) MailmapState {
 // change to the work tree.
 func (s MailmapState) FilesMoved() bool { return statFiles(s.Files) != s.Stat }
 
+// Key is the state as one string, for telling a kept answer from a stale one.
+func (s MailmapState) Key() string { return s.Config + "\n\n" + s.Stat }
+
 // Same reports whether two states read names alike.
 func (s MailmapState) Same(other MailmapState) bool {
 	return s.Config == other.Config && s.Stat == other.Stat

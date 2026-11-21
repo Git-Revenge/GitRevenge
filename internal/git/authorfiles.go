@@ -78,8 +78,8 @@ type AuthorFilesCommit struct {
 //
 // Only that person's commits are compared with their parents, which is what keeps this quick
 // on a long history: the files of everyone's commits would take minutes to read.
-func (r *Repo) AuthorFiles(ctx context.Context, mailmapAt string, since int64, revs []string, ids []Identity, each func(AuthorFilesCommit)) error {
-	if err := CheckRevs(append([]string{mailmapAt}, revs...)...); err != nil {
+func (r *Repo) AuthorFiles(ctx context.Context, since int64, revs []string, ids []Identity, each func(AuthorFilesCommit)) error {
+	if err := CheckRevs(revs...); err != nil {
 		return err
 	}
 	who := personOf(ids)
@@ -91,7 +91,7 @@ func (r *Repo) AuthorFiles(ctx context.Context, mailmapAt string, since int64, r
 	run := func(match []string, wanted func(author Identity, coAuthors string) bool) error {
 		// Names come as they are, not quoted, and a move isn't looked for: it would cost a
 		// comparison of every added file with every removed one.
-		args := append(authorPinned(mailmapAt), "-c", "core.quotePath=false", "log", "--no-merges", "--fixed-strings", "--regexp-ignore-case",
+		args := append(authorFlags(), "-c", "core.quotePath=false", "log", "--no-merges", "--fixed-strings", "--regexp-ignore-case",
 			"--name-only", "--no-renames", "--no-textconv", "--no-ext-diff",
 			"--format=%x1e%H%x1f%aN%x1f%aE%x1f%ct%x1f%s%x1f"+coAuthorTrailers+"%x1c")
 		if since > 0 {

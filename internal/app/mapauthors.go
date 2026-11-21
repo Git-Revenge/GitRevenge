@@ -47,7 +47,7 @@ type MapAuthor struct {
 	Name  string `json:"name"`
 	Email string `json:"email"`
 	// Identities are every name and email folded into this person, most used first: after the
-	// committed .mailmap, anyone sharing an email or a name is one person.
+	// mailmap, anyone sharing an email or a name is one person.
 	Identities []AuthorIdentity `json:"identities"`
 	// Commits is the node's size: the commits in the window they wrote or are credited on,
 	// each counted once. Authored and CoAuthored split it.
@@ -100,7 +100,8 @@ func (a *App) MapAuthors(path string, days int) (AuthorMap, error) {
 }
 
 // mapAuthorsSince is MapAuthors with the start of the window given. Results are kept for the
-// rest of the hour, until a ref moves or the rules that shape them change.
+// rest of the hour, until a ref moves, the mailmap changes, or the rules that shape them do.
+// Names are read through the mailmap git reads, as the graph's are, so the two agree.
 func (a *App) mapAuthorsSince(path string, days int, since int64) (AuthorMap, error) {
 	empty := AuthorMap{Authors: []MapAuthor{}, Since: since}
 	r, err := a.openRepo(path)
@@ -120,7 +121,7 @@ func (a *App) mapAuthorsSince(path string, days int, since int64) (AuthorMap, er
 	if err != nil {
 		return empty, err
 	}
-	shape, err := json.Marshal([]any{rules.BotAuthorPatterns(), rules.Hide(), me, trunk.Name})
+	shape, err := json.Marshal([]any{rules.BotAuthorPatterns(), rules.Hide(), me, trunk.Name, r.Git.MailmapState(ctx).Key()})
 	if err != nil {
 		return empty, err
 	}
@@ -140,7 +141,7 @@ func (a *App) mapAuthorsSince(path string, days int, since int64) (AuthorMap, er
 	total := 0
 	jobs := []func() error{
 		func() error {
-			return r.Git.AuthorLog(ctx, trunk.Name, since, []string{trunk.Name}, onTrunk.add)
+			return r.Git.AuthorLog(ctx, since, []string{trunk.Name}, onTrunk.add)
 		},
 		func() error {
 			s, err := r.Git.ReadString(ctx, "rev-list", "--count", trunk.Name, "--")
@@ -153,7 +154,7 @@ func (a *App) mapAuthorsSince(path string, days int, since int64) (AuthorMap, er
 	}
 	for i, b := range branches {
 		jobs = append(jobs, func() error {
-			return r.Git.AuthorLog(ctx, trunk.Name, since, []string{trunk.Name + ".." + b.Name}, func(c git.AuthorCommit) {
+			return r.Git.AuthorLog(ctx, since, []string{trunk.Name + ".." + b.Name}, func(c git.AuthorCommit) {
 				onBranch[i] = append(onBranch[i], c)
 			})
 		})
@@ -164,7 +165,7 @@ func (a *App) mapAuthorsSince(path string, days int, since int64) (AuthorMap, er
 
 	out := foldAuthors(onTrunk, branches, onBranch, func(ids []git.Identity) []git.Identity {
 		// Without the mailmap's answer, a co-author is who the trailer says.
-		mapped, _ := r.Git.MailmapIdentities(ctx, trunk.Name, ids)
+		mapped, _ := r.Git.Mailmap(ctx, ids)
 		return mapped
 	}, rules, me)
 	out.Trunk = MapNode{Name: trunk.Short, Kind: mapTrunk, Commit: trunk.Commit, Commits: total, Updated: trunk.Updated, Head: trunk.Head, BranchKind: trunk.BranchKind, Worktree: trunk.Worktree}
@@ -211,7 +212,7 @@ func (a *App) MapAuthorHistory(path string, identities []AuthorIdentity) (git.Au
 	for i, id := range identities {
 		ids[i] = git.Identity{Name: id.Name, Email: id.Email}
 	}
-	return r.Git.AuthorHistory(context.Background(), trunk.Name, revs, ids)
+	return r.Git.AuthorHistory(context.Background(), revs, ids)
 }
 
 // authorTally counts commits by who took part in them, without keeping the commits: a long
