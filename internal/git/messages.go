@@ -2,9 +2,12 @@ package git
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -122,6 +125,115 @@ func (r *Repo) HistoryTips(ctx context.Context) ([]string, error) {
 		}
 	}
 	return tips, nil
+}
+
+// CommitIDs says which of ids, full or abbreviated, name a commit in the repository, and
+// returns the full id of each that does. One that names nothing, something that isn't a
+// commit, or more than one object is left out.
+func (r *Repo) CommitIDs(ctx context.Context, ids []string) (map[string]string, error) {
+	out := map[string]string{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	for _, id := range ids {
+		if !isHex(id) {
+			return nil, errors.New("not an object id: " + strconv.Quote(id))
+		}
+	}
+	// git takes about a tenth of a millisecond to place an abbreviated id, which for the
+	// hundred thousand in the Linux kernel's Fixes trailers is eleven seconds. Past a
+	// couple of thousand it's quicker to list every commit once and look them up here.
+	if len(ids) > commitIDsOneByOne {
+		return r.commitIDsByList(ctx, ids)
+	}
+	// git answers a line for each line asked, in order: "<full id> <type>" for an object
+	// it has, and the id as asked with "missing" or "ambiguous" otherwise.
+	raw, err := r.readCmd(ctx, Cmd{Args: []string{"cat-file", "--batch-check=%(objectname) %(objecttype)"}, Stdin: strings.NewReader(strings.Join(ids, "\n") + "\n")})
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(strings.TrimRight(string(raw), "\n"), "\n")
+	if len(lines) != len(ids) {
+		return nil, errors.New("git answered " + strconv.Itoa(len(lines)) + " lines for " + strconv.Itoa(len(ids)) + " ids")
+	}
+	for i, line := range lines {
+		if full, what, _ := strings.Cut(line, " "); what == "commit" {
+			out[ids[i]] = full
+		}
+	}
+	return out, nil
+}
+
+// commitIDsOneByOne is how many ids CommitIDs asks git about one at a time.
+const commitIDsOneByOne = 2000
+
+// commitIDsByList answers CommitIDs from a list of every commit any ref reaches: the ids
+// sorted, and each one asked about found by its place among them. A commit no ref reaches
+// isn't found this way, which is right for what the graph can show.
+func (r *Repo) commitIDsByList(ctx context.Context, ids []string) (map[string]string, error) {
+	var all []byte
+	size := 0
+	err := r.Stream(ctx, func(rd io.Reader) error {
+		sc := bufio.NewScanner(rd)
+		for sc.Scan() {
+			line := sc.Bytes()
+			if size == 0 {
+				size = len(line) / 2
+			}
+			if len(line) != size*2 {
+				continue
+			}
+			at := len(all)
+			all = append(all, make([]byte, size)...)
+			if _, err := hex.Decode(all[at:], line); err != nil {
+				all = all[:at]
+			}
+		}
+		return sc.Err()
+	}, "rev-list", "--all")
+	if err != nil && !isEmptyRepoLogError(err) {
+		return nil, err
+	}
+	out := map[string]string{}
+	if size == 0 {
+		return out, nil
+	}
+	n := len(all) / size
+	order := make([]uint32, n)
+	for i := range order {
+		order[i] = uint32(i)
+	}
+	id := func(i uint32) []byte { return all[int(i)*size : (int(i)+1)*size] }
+	slices.SortFunc(order, func(a, b uint32) int { return bytes.Compare(id(a), id(b)) })
+
+	// An abbreviation names every id from itself followed by zeros to itself followed by
+	// fs. It's a commit when exactly one id is in that span.
+	low, high := make([]byte, size), make([]byte, size)
+	pad := make([]byte, size*2)
+	for _, asked := range ids {
+		if len(asked) > size*2 {
+			continue
+		}
+		short := strings.ToLower(asked)
+		span := func(fill byte, into []byte) {
+			copy(pad, short)
+			for i := len(short); i < len(pad); i++ {
+				pad[i] = fill
+			}
+			_, _ = hex.Decode(into, pad)
+		}
+		span('0', low)
+		span('f', high)
+		first, _ := slices.BinarySearchFunc(order, low, func(i uint32, want []byte) int { return bytes.Compare(id(i), want) })
+		if first >= n || bytes.Compare(id(order[first]), high) > 0 {
+			continue
+		}
+		if first+1 < n && bytes.Compare(id(order[first+1]), high) <= 0 {
+			continue // two commits start this way
+		}
+		out[asked] = hex.EncodeToString(id(order[first]))
+	}
+	return out, nil
 }
 
 // MissingObjects returns which of ids the repository no longer has, such as commits a

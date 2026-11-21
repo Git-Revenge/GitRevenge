@@ -120,6 +120,56 @@ func TestMessageRangeTakesOnlyObjectIDs(t *testing.T) {
 	}
 }
 
+func TestCommitIDs(t *testing.T) {
+	t.Parallel()
+	fx := gittest.New(t)
+	ids := fx.Linear(2)
+	fx.Tag("v1", "an annotated tag")
+	tag := fx.Git("rev-parse", "v1")
+	tree := fx.Git("rev-parse", "HEAD^{tree}")
+	r := OpenRepo(newTestRunner(t), fx.Dir)
+	short := ids[0][:9]
+	gone := strings.Repeat("0", len(ids[0])-1) + "1"
+
+	got, err := r.CommitIDs(context.Background(), []string{ids[1], short, gone, tree, tag})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A full id and an abbreviation are commits; an id of nothing, a tree and a tag aren't.
+	if len(got) != 2 || got[ids[1]] != ids[1] || got[short] != ids[0] {
+		t.Fatalf("commits = %v", got)
+	}
+	// A long list is answered from every commit's id, looked up here, and says the same.
+	listed, err := r.commitIDsByList(context.Background(), []string{ids[1], short, strings.ToUpper(short), ids[0][:8], gone, tree, tag})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listed) != 4 || listed[ids[1]] != ids[1] || listed[short] != ids[0] || listed[strings.ToUpper(short)] != ids[0] || listed[ids[0][:8]] != ids[0] {
+		t.Fatalf("by list = %v", listed)
+	}
+	// An abbreviation two commits share names neither. Among seventeen more commits, two
+	// start with the same character.
+	more := fx.Linear(17)
+	starts := map[byte]int{}
+	for _, id := range more {
+		starts[id[0]]++
+	}
+	for c, n := range starts {
+		if n < 2 {
+			continue
+		}
+		if both, err := r.commitIDsByList(context.Background(), []string{string(c)}); err != nil || len(both) != 0 {
+			t.Fatalf("%q starts %d commits, and was read as one: %v, %v", c, n, both, err)
+		}
+	}
+	if none, err := r.CommitIDs(context.Background(), nil); err != nil || len(none) != 0 {
+		t.Fatalf("with nothing asked: %v, %v", none, err)
+	}
+	if _, err := r.CommitIDs(context.Background(), []string{"--all"}); err == nil {
+		t.Fatal("an option was taken as an id")
+	}
+}
+
 func TestMissingObjects(t *testing.T) {
 	t.Parallel()
 	fx := gittest.New(t)

@@ -75,6 +75,7 @@ const sidebars = {
             { type: 'doc', id: 'adr/repository-settings-in-git-config', label: 'ADR-0011 Repository settings in git config' },
             { type: 'doc', id: 'adr/names-follow-gits-mailmap', label: "ADR-0012 Names follow git's mailmap" },
             { type: 'doc', id: 'adr/trailers-read-once-and-kept', label: 'ADR-0013 Trailers read once and kept' },
+            { type: 'doc', id: 'adr/how-a-trailer-is-read', label: 'ADR-0014 How a trailer is read' },
           ],
         },
       ],

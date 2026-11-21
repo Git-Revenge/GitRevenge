@@ -51,6 +51,8 @@ type App struct {
 	mapAuthors insightsCache
 	// people holds who each repository's history names, for the People view (see people.go).
 	people peopleReads
+	// trailerReadings keeps each open repository's trailers as read through its rules.
+	trailerReadings trailerReadings
 	// configBackupDir overrides where config backups are kept; tests use it.
 	configBackupDir string
 	// repoConfigMu orders reads of a repository's settings from git config with writes to
