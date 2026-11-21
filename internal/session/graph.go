@@ -57,6 +57,9 @@ type graphLoader struct {
 	// "" while that isn't known; sigReady is closed once it is. See refresh.
 	sig      string
 	sigReady chan struct{}
+	// mailmap is how the mailmap stood just before the latest load, as sig is for refs: a
+	// row's author is the name the mailmap gave it when it was read.
+	mailmap git.MailmapState
 	// stopped is set by stop: the repository is closing, and nothing loads after that.
 	stopped bool
 	// showHidden puts hidden branches back in the graph, for this session only.
@@ -254,6 +257,7 @@ func (l *graphLoader) refresh(ctx context.Context) {
 		return
 	}
 	var was string
+	var names git.MailmapState
 	for {
 		// A load that has only just begun hasn't said where the refs stood yet.
 		l.mu.Lock()
@@ -267,6 +271,7 @@ func (l *graphLoader) refresh(ctx context.Context) {
 		l.mu.Lock()
 		latest := l.sigReady == ready
 		was = l.sig
+		names = l.mailmap
 		l.mu.Unlock()
 		if latest {
 			break
@@ -274,11 +279,31 @@ func (l *graphLoader) refresh(ctx context.Context) {
 	}
 	if was != "" {
 		now, err := l.repo.RefsState(ctx)
-		if ctx.Err() != nil || (err == nil && now == was) {
+		if ctx.Err() != nil {
+			return
+		}
+		if err == nil && now == was && l.repo.MailmapState(ctx).Same(names) {
 			return
 		}
 	}
 	l.reload()
+}
+
+// mailmapMoved reports whether names may read differently from the way the displayed graph
+// has them, after a change to the work tree or, with config, to the repository's settings.
+// A change to the work tree only asks the file system, since most of them are someone
+// saving a source file.
+func (l *graphLoader) mailmapMoved(ctx context.Context, config bool) bool {
+	l.mu.Lock()
+	started, was := l.started, l.mailmap
+	l.mu.Unlock()
+	if !started {
+		return false
+	}
+	if config {
+		return !l.repo.MailmapState(ctx).Same(was)
+	}
+	return was.FilesMoved()
 }
 
 // settled waits until the graph has loaded as far as it will for now: to the end, or to
@@ -435,6 +460,8 @@ func (l *graphLoader) reload() {
 			sig, _ := l.repo.RefsState(ctx)
 			sigCh <- sig
 		}()
+		// And where the mailmap stands, before the log below reads it for the same reason.
+		names := l.repo.MailmapState(ctx)
 		var remotes []string
 		if rs, err := l.repo.Remotes(ctx); err == nil {
 			for _, r := range rs {
@@ -445,6 +472,7 @@ func (l *graphLoader) reload() {
 		l.mu.Lock()
 		if ctx.Err() == nil {
 			l.sig = sig
+			l.mailmap = names
 		}
 		l.mu.Unlock()
 		close(sigReady)

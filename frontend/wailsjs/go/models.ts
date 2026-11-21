@@ -581,6 +581,8 @@ export namespace app {
 	export class CommitInfo {
 	    commit: git.CommitDetail;
 	    files: git.FileChange[];
+	    author: git.Identity;
+	    committer: git.Identity;
 	
 	    static createFrom(source: any = {}) {
 	        return new CommitInfo(source);
@@ -590,6 +592,8 @@ export namespace app {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.commit = this.convertValues(source["commit"], git.CommitDetail);
 	        this.files = this.convertValues(source["files"], git.FileChange);
+	        this.author = this.convertValues(source["author"], git.Identity);
+	        this.committer = this.convertValues(source["committer"], git.Identity);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

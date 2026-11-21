@@ -433,8 +433,14 @@ func (m *Manager) add(root, gitDir, commonDir string) *Repo {
 	r.graph.stackOverrides = func() map[string]string { return store.Get().Repo(root).StackParents }
 	onChange := m.onChange
 	r.changes.deliver = func(k watch.Kind) {
-		if k.Has(watch.Head) || k.Has(watch.Refs) {
+		switch {
+		case k.Has(watch.Head) || k.Has(watch.Refs):
 			r.graph.reloadStarted()
+		case k.Has(watch.Config) || k.Has(watch.WorkTree):
+			// A saved .mailmap, or a mailmap.file setting, changes the names on every row.
+			if r.graph.mailmapMoved(context.Background(), k.Has(watch.Config)) {
+				r.graph.reloadStarted()
+			}
 		}
 		if onChange != nil {
 			onChange(r.Path, k)

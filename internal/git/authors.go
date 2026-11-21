@@ -108,45 +108,12 @@ func ParseIdentity(s string) Identity {
 // co-author's trailer, which git log doesn't map. An identity with no email can't be looked
 // up and comes back as it is.
 func (r *Repo) MailmapIdentities(ctx context.Context, mailmapAt string, ids []Identity) ([]Identity, error) {
-	out := make([]Identity, len(ids))
-	copy(out, ids)
 	if err := CheckRevs(mailmapAt); err != nil {
+		out := make([]Identity, len(ids))
+		copy(out, ids)
 		return out, err
 	}
-	var in strings.Builder
-	var asked []int
-	for i, id := range ids {
-		// A line break would be read as another contact.
-		if id.Email == "" || strings.ContainsAny(id.Name+id.Email, "\r\n<>") {
-			continue
-		}
-		in.WriteString(id.Name + " <" + id.Email + ">\n")
-		asked = append(asked, i)
-	}
-	if len(asked) == 0 {
-		return out, nil
-	}
-	args := []string{"-c", "mailmap.file=", "-c", "mailmap.blob=" + mailmapAt + ":.mailmap", "check-mailmap", "--stdin"}
-	var lines []string
-	err := r.streamCmd(ctx, Cmd{Args: args, Stdin: strings.NewReader(in.String())}, func(rd io.Reader) error {
-		sc := bufio.NewScanner(rd)
-		sc.Buffer(make([]byte, 64*1024), 1024*1024)
-		for sc.Scan() {
-			lines = append(lines, sc.Text())
-		}
-		return sc.Err()
-	})
-	if err != nil {
-		return out, err
-	}
-	// One line back for each line in; anything else and the answers can't be lined up.
-	if len(lines) != len(asked) {
-		return out, nil
-	}
-	for k, i := range asked {
-		out[i] = ParseIdentity(lines[k])
-	}
-	return out, nil
+	return r.checkMailmap(ctx, []string{"-c", "mailmap.file=", "-c", "mailmap.blob=" + mailmapAt + ":.mailmap"}, ids)
 }
 
 // AuthorHistory is how much one person has written over a repository's whole history.

@@ -31,7 +31,7 @@ func (r *Repo) FileHistory(ctx context.Context, path string) ([]FileCommit, erro
 		Args: []string{
 			"log", "--follow", "--name-status", "-z",
 			"--max-count=" + strconv.Itoa(MaxFileHistory),
-			"--format=%x1e%H%x1f%an%x1f%at%x1f%s",
+			"--format=%x1e%H%x1f%aN%x1f%at%x1f%s",
 			"--", path,
 		},
 		Env: []string{"GIT_LITERAL_PATHSPECS=1"},

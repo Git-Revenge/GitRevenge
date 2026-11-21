@@ -132,7 +132,7 @@ func (r *Repo) conflictsIn(ctx context.Context, tree string, paths []string) []F
 // forecastCommits lists the commits in a range with their subjects and authors, in the
 // order git log gives them.
 func (r *Repo) forecastCommits(ctx context.Context, extra []string, revRange string) ([]ForecastCommit, error) {
-	args := append([]string{"log", "--format=%H%x00%s%x00%an", fmt.Sprintf("--max-count=%d", ForecastListCap)}, extra...)
+	args := append([]string{"log", "--format=%H%x00%s%x00%aN", fmt.Sprintf("--max-count=%d", ForecastListCap)}, extra...)
 	out, err := r.Read(ctx, append(args, revRange)...)
 	if err != nil {
 		return nil, err

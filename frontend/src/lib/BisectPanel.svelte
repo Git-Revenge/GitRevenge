@@ -3,6 +3,7 @@
   import type { app } from '../../wailsjs/go/models'
   import { bisect, TERM_LABEL } from './bisect.svelte'
   import { formatTime } from './graph/draw'
+  import { shownAs } from './people'
 
   /** The right-hand panel during a bisect: the commit under test and what to say about it, or
    * the answer and what to do with it (issue #592). */
@@ -61,7 +62,7 @@
       <span class={['hand', found && 'rose']}>{found ? 'the first bad commit' : 'under test'}</span>
       <h2>{detail?.commit.subject ?? short(subject)}</h2>
       <p class="who">
-        {#if detail}<span>{detail.commit.author.name} · {formatTime(detail.commit.author.time)} ·</span>{/if}
+        {#if detail}<span>{shownAs(detail.author, detail.commit.author).name} · {formatTime(detail.commit.author.time)} ·</span>{/if}
         <span class="mono">{short(subject)}</span>
       </p>
     </header>

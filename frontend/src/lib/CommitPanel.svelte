@@ -18,6 +18,7 @@
   import { session } from './session.svelte'
   import { reflow } from './text'
   import { asPerson, groupTrailers, valueParts } from './trailers'
+  import { shownAs, writtenAs } from './people'
   import Markdown from './Markdown.svelte'
   import Icon, { type IconName } from './ui/Icon.svelte'
   import Loading from './ui/Loading.svelte'
@@ -392,12 +393,20 @@
     <Loading />
   {:else}
     {@const c = info.commit}
+    {@const author = shownAs(info.author, c.author)}
+    {@const committer = shownAs(info.committer, c.committer)}
+    {@const authorSays = writtenAs(info.author, c.author)}
+    {@const committerSays = writtenAs(info.committer, c.committer)}
     <header>
       <h2>{#each linker.parts(c.subject, 'message') as part, k (k)}{#if part.href}<a href={part.href} title={linkTitle(part)} class:smart={!!part.rule} onclick={(e) => openLink(e, part.href!)} oncontextmenu={(e) => linkMenu(e, part)}>{part.text}</a>{:else}{part.text}{/if}{/each}</h2>
       <div class="who">
-        <button class="author" onclick={() => onSearch?.(c.author.name)} title="Find commits by {c.author.name}">{c.author.name}</button>
+        <button class="author" onclick={() => onSearch?.(author.name)} title="Find commits by {author.name}">{author.name}</button>
         <span class="when">{formatTime(c.author.time)}</span>
       </div>
+      {#if authorSays}
+        <!-- A mailmap changes who is shown, never the commit. -->
+        <p class="says">This commit says <span class="as-said" title={authorSays}>{authorSays}</span></p>
+      {/if}
       <div class="ids">
         <button class="btn sm secondary sha" onclick={() => copySha(c.id)} title="Copy the full SHA" aria-label="Copy SHA {c.id.slice(0, 7)}"
           >{#if copied}Copied{:else}{c.id.slice(0, 7)}{/if}<Icon name={copied ? 'check' : 'copy'} size={13} /></button
@@ -483,14 +492,16 @@
           <dl class="details">
             <dt class="meta">Author</dt>
             <dd>
-              {c.author.name}
-              <span class="email" title={c.author.email}>{c.author.email}</span>
+              {author.name}
+              <span class="email" title={author.email}>{author.email}</span>
+              {#if authorSays}<span class="says">The commit says <span class="as-said" title={authorSays}>{authorSays}</span></span>{/if}
               <span class="when">{formatTime(c.author.time)}</span>
             </dd>
-            {#if c.committer.name !== c.author.name || c.committer.time !== c.author.time}
+            {#if committer.name !== author.name || c.committer.time !== c.author.time}
               <dt class="meta">Committer</dt>
               <dd>
-                {c.committer.name}
+                {committer.name}
+                {#if committerSays}<span class="says">The commit says <span class="as-said" title={committerSays}>{committerSays}</span></span>{/if}
                 <span class="when">{formatTime(c.committer.time)}</span>
               </dd>
             {/if}
@@ -575,6 +586,29 @@
     align-items: baseline;
     gap: 2px 8px;
     font-size: 14px;
+  }
+
+  /* What the commit itself has, when the mailmap shows someone else. */
+  .says {
+    display: block;
+    margin: 0;
+    font-size: 13px;
+    color: var(--ink-mute);
+  }
+
+  /* The name and address stay together: on the line after the words when they don't fit
+     beside them, and cut short, with the whole of it in the tooltip, when a line can't
+     hold them either. */
+  .as-said {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+    user-select: text;
   }
 
   .author {

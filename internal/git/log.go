@@ -14,10 +14,17 @@ import (
 
 // LogCommit is one commit as read from `git log`.
 type LogCommit struct {
-	ID          string
-	Parents     []string
+	ID      string
+	Parents []string
+	// AuthorName and AuthorEmail are the author as the mailmap git reads gives them: the
+	// .mailmap in the work tree, and mailmap.file or mailmap.blob when set. That's what
+	// `git log` shows in a terminal, so the two agree.
 	AuthorName  string
 	AuthorEmail string
+	// WrittenName and WrittenEmail are the author as the commit has them. They're the same
+	// as the two above unless a mailmap line says otherwise.
+	WrittenName  string
+	WrittenEmail string
 	// AuthorTime is a Unix timestamp in seconds.
 	AuthorTime int64
 	Subject    string
@@ -41,7 +48,7 @@ type LogOptions struct {
 
 // logFormat separates fields with US (0x1f). Records are NUL-terminated via -z, and none of
 // these fields can contain NUL.
-const logFormat = "%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%s"
+const logFormat = "%H%x1f%P%x1f%aN%x1f%aE%x1f%an%x1f%ae%x1f%at%x1f%s"
 
 // Log streams commits in date order, calling fn for each as git produces it. Returning an
 // error from fn stops git and is returned from Log.
@@ -180,11 +187,11 @@ func (r *Repo) CountCommits(ctx context.Context, opts LogOptions) (int, error) {
 func parseLogRecord(rec []byte) (LogCommit, error) {
 	// Trim the newline git may emit between records in some modes.
 	rec = bytes.TrimLeft(rec, "\n")
-	f := bytes.SplitN(rec, []byte{0x1f}, 6)
-	if len(f) != 6 {
+	f := bytes.SplitN(rec, []byte{0x1f}, 8)
+	if len(f) != 8 {
 		return LogCommit{}, fmt.Errorf("unexpected log record %q", rec)
 	}
-	t, err := strconv.ParseInt(string(f[4]), 10, 64)
+	t, err := strconv.ParseInt(string(f[6]), 10, 64)
 	if err != nil {
 		return LogCommit{}, fmt.Errorf("bad author time in log record %q", rec)
 	}
@@ -193,12 +200,14 @@ func parseLogRecord(rec []byte) (LogCommit, error) {
 		parents = strings.Fields(string(f[1]))
 	}
 	return LogCommit{
-		ID:          string(f[0]),
-		Parents:     parents,
-		AuthorName:  string(f[2]),
-		AuthorEmail: string(f[3]),
-		AuthorTime:  t,
-		Subject:     string(f[5]),
+		ID:           string(f[0]),
+		Parents:      parents,
+		AuthorName:   string(f[2]),
+		AuthorEmail:  string(f[3]),
+		WrittenName:  string(f[4]),
+		WrittenEmail: string(f[5]),
+		AuthorTime:   t,
+		Subject:      string(f[7]),
 	}, nil
 }
 
