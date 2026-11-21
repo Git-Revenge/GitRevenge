@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  areaId,
+  AUTHOR_SWITCHES,
   AUTHORS_SCALE,
+  authorAreaNodes,
   authorBranchNodes,
   authorColor,
   authorNode,
@@ -16,6 +19,7 @@ import {
   shownAuthors,
   spanDays,
   SWITCH,
+  type AuthorArea,
   type MapAuthor,
   type MapNode,
 } from './mapLayout'
@@ -208,5 +212,71 @@ describe('an author opened by branch', () => {
       expect(n.x - n.r, n.name).toBeGreaterThanOrEqual(0)
       expect(n.x + n.r, n.name).toBeLessThanOrEqual(1200)
     }
+  })
+})
+
+// #812: an author opens into the folders their commits touched.
+describe('an author opened by area', () => {
+  const area = (path: string, commits: number, over: Partial<AuthorArea> = {}): AuthorArea => ({ path, name: `${path.split('/').pop()}/`, files: false, commits, updated: NOW - DAY, folders: 0, recent: [{ sha: 'c1', subject: 'Work', when: NOW - DAY }], ...over })
+  const maya = author('Maya', 30)
+  const top = [area('frontend', 24, { folders: 2 }), area('internal', 11), area('', 3, { name: 'top-level files', files: true })]
+
+  it('holds each folder, and the files beside them, sized by their commits there', () => {
+    const got = authorAreaNodes(maya, top)
+    expect(got.map((n) => [n.name, n.kind, n.commits, n.path, !!n.files, n.folders])).toEqual([
+      ['frontend/', 'folder', 24, 'frontend', false, 2],
+      ['internal/', 'folder', 11, 'internal', false, 0],
+      ['top-level files', 'folder', 3, '', true, 0],
+    ])
+    for (const n of got) expect(n).toMatchObject({ parent: 'maya@example.com', owner: 'maya@example.com', head: false, updated: NOW - DAY, commit: 'c1' })
+    expect(got.map((n) => n.id)).toEqual([areaId('maya@example.com', 'frontend'), areaId('maya@example.com', 'internal'), areaId('maya@example.com', '', true)])
+    expect(new Set(got.map(pinKey)).size).toBe(3)
+  })
+
+  it('hangs what’s in a folder off the folder', () => {
+    const inside = authorAreaNodes(maya, [area('frontend/src', 20), area('frontend', 2, { name: 'files in frontend/', files: true })], 'frontend')
+    for (const n of inside) expect(n.parent).toBe(areaId('maya@example.com', 'frontend'))
+    // A folder and the files directly in it are two nodes.
+    expect(inside[1].id).not.toBe(areaId('maya@example.com', 'frontend'))
+  })
+
+  it('knows a folder as the same one under another author, and apart from its own files', () => {
+    const leo = author('Leo', 9)
+    const [mine] = authorAreaNodes(maya, top)
+    const [theirs] = authorAreaNodes(leo, top)
+    expect(mine.id).not.toBe(theirs.id)
+    expect(sharedKey(mine)).toBe(sharedKey(theirs))
+    expect(sharedKey(mine)).toBe('folder:frontend')
+    const files = authorAreaNodes(maya, [area('frontend', 2, { files: true })])[0]
+    expect(sharedKey(files)).not.toBe(sharedKey(mine))
+  })
+
+  it('takes what an author holds off the map with them, folders in folders too', () => {
+    // An author whose last commit is older than the last ring isn't drawn; what they hold
+    // would otherwise be drawn as if it hung off the trunk.
+    const gone = author('Gone', 12, { updated: NOW - 300 * DAY })
+    const inside = authorAreaNodes(gone, [area('frontend/src', 4)], 'frontend')
+    const out = layout(trunk, [authorNode(maya), authorNode(gone), ...authorAreaNodes(gone, top), ...inside, ...authorAreaNodes(maya, top)], 1200, 760, NOW, SCALES[AUTHORS_SCALE])
+    expect(out.nodes.some((n) => n.owner === 'gone@example.com')).toBe(false)
+    expect(out.nodes.filter((n) => n.owner === 'maya@example.com')).toHaveLength(3)
+    // Only the author is counted as older than the last ring, not what went with them.
+    expect(out.older).toBe(1)
+  })
+
+  it('stands a folder’s folders by it, a level further from their author', () => {
+    const inside = authorAreaNodes(maya, [area('frontend/src', 20), area('frontend/e2e', 6)], 'frontend')
+    const nodes = [authorNode(maya), authorNode(author('Leo', 9, { updated: NOW - 20 * DAY })), ...authorAreaNodes(maya, top), ...inside]
+    const out = layout(trunk, nodes, 1200, 760, NOW, SCALES[AUTHORS_SCALE], new Map(), { width: AUTHOR_SWITCHES, height: SWITCH.height })
+    const at = (id: string) => out.nodes.find((n) => n.id === id)!
+    const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y)
+    const fe = at(areaId('maya@example.com', 'frontend'))
+    for (const n of out.nodes.filter((n) => n.parent === fe.id)) {
+      expect(dist(n, fe), n.name).toBeLessThan(dist(n, at('maya@example.com')))
+      expect(dist(n, fe), n.name).toBeGreaterThanOrEqual(n.r + fe.r)
+    }
+    // A folder is on the branches' scale: more commits, bigger.
+    expect(fe.r).toBeGreaterThan(at(areaId('maya@example.com', 'internal')).r)
+    // Nothing lands under the wider switches.
+    for (const n of out.nodes) expect(n.x - n.r < AUTHOR_SWITCHES && n.y - n.r < SWITCH.height, n.name).toBe(false)
   })
 })

@@ -305,6 +305,177 @@ test.describe("the Map's Authors mode", () => {
     })
   })
 
+  // #812: an author opens into the folders their commits touched, read when they're opened.
+  test.describe('opened by area', () => {
+    const commit = (n: number, subject: string, days: number) => ({ sha: id(n), subject, when: now - days * DAY })
+    const folder = (path: string, commits: number, days: number, over: object = {}) => ({ path, name: `${path.split('/').pop()}/`, files: false, commits, updated: now - days * DAY, folders: 0, recent: [commit(3, `Work in ${path}`, days)], ...over })
+    const areas = {
+      '': {
+        under: '',
+        areas: [
+          folder('frontend', 24, 0, { folders: 2, recent: [commit(3, 'Draw the tide table', 0), commit(4, 'Fix the units switch', 2), commit(6, 'Tidy the sidebar', 9)] }),
+          folder('internal', 11, 1, { folders: 1 }),
+          { path: '', name: 'top-level files', files: true, commits: 3, updated: now - 4 * DAY, folders: 0, recent: [commit(7, 'Bump the version', 4)] },
+        ],
+        more: 4,
+        commits: 38,
+      },
+      frontend: { under: 'frontend', areas: [folder('frontend/src', 20, 0, { folders: 3 }), folder('frontend/e2e', 6, 2), { path: 'frontend', name: 'files in frontend/', files: true, commits: 2, updated: now - 5 * DAY, folders: 0, recent: [] }], more: 0, commits: 38 },
+    }
+    const leoAreas = author('Leo Brandt', 9, 12)
+    const withAreas = { MapAuthors: { ...authors, authors: [maya, leoAreas], people: 2, bots: 0 }, MapAuthorAreas: areas }
+    const by = (page: Page) => page.getByRole('group', { name: 'What an author opens into' })
+    const areaOf = (page: Page, who: string, path: string, files = false) => page.locator(`.node.owned[data-node="folder:${who}|${files ? 'files' : 'folder'}:${path}"]`)
+    const toAreas = async (page: Page, over: object = withAreas) => {
+      await toAuthors(page, over)
+      await by(page).getByRole('button', { name: 'By area' }).click()
+    }
+
+    test('the switch opens on branches, turns authors to areas, and remembers', async ({ page }) => {
+      await toAuthors(page, withAreas)
+      await expect(by(page).getByRole('button', { name: 'By branch' })).toHaveAttribute('aria-pressed', 'true')
+      await by(page).getByRole('button', { name: 'By area' }).click()
+      await expect(by(page).getByRole('button', { name: 'By area' })).toHaveAttribute('aria-pressed', 'true')
+      expect(await page.evaluate(() => localStorage.getItem('graph.map.by:/repo'))).toBe('area')
+      // Nothing is read until somebody is opened.
+      expect(await calls(page, 'MapAuthorAreas')).toEqual([])
+    })
+
+    test('opening an author reads the folders they worked in and stands them round them', async ({ page }) => {
+      await toAreas(page)
+      await authorOf(page, 'Maya Okafor').dblclick()
+      await expect(page.locator('.node.owned')).toHaveCount(3)
+      expect(await calls(page, 'MapAuthorAreas')).toEqual([['/repo', maya.identities, 61, '']])
+      await expect(areaOf(page, maya.key, 'frontend')).toContainText('frontend/')
+      await expect(areaOf(page, maya.key, 'frontend')).toContainText('24 commits')
+      await expect(areaOf(page, maya.key, 'frontend')).toHaveClass(/is-folder/)
+      await expect(areaOf(page, maya.key, '', true)).toContainText('top-level files')
+      await expect(areaOf(page, maya.key, '', true)).toHaveClass(/is-files/)
+      await expect(page.getByRole('button', { name: /^frontend\/, of Maya Okafor's\. 24 commits of Maya Okafor's in the last two months touch frontend\/\. The last was just now\./ })).toBeVisible()
+      // A folder with folders of theirs beneath it opens; one without doesn't, nor do the files.
+      await expect(areaOf(page, maya.key, 'frontend')).toHaveAttribute('aria-expanded', 'false')
+      await expect(areaOf(page, maya.key, '', true)).not.toHaveAttribute('aria-expanded')
+      // More commits, a bigger folder.
+      const wide = async (path: string) => (await areaOf(page, maya.key, path).locator('.shape').boundingBox())!.width
+      expect(await wide('frontend')).toBeGreaterThan(await wide('internal'))
+    })
+
+    test('a folder opens into its own folders, a level at a time, and folds away with what was under it', async ({ page }) => {
+      await toAreas(page)
+      await authorOf(page, 'Maya Okafor').dblclick()
+      await areaOf(page, maya.key, 'frontend').dblclick()
+      await expect(areaOf(page, maya.key, 'frontend')).toHaveAttribute('aria-expanded', 'true')
+      await expect(page.locator('.node.owned')).toHaveCount(6)
+      await expect(areaOf(page, maya.key, 'frontend/src')).toContainText('src/')
+      await expect(areaOf(page, maya.key, 'frontend/src')).toContainText('20 commits')
+      await expect(areaOf(page, maya.key, 'frontend', true)).toContainText('files in frontend/')
+      expect((await calls(page, 'MapAuthorAreas')).map((c) => c[3])).toEqual(['', 'frontend'])
+      // What's in a folder stands by the folder, not by the author.
+      const centre = async (loc: ReturnType<typeof areaOf>) => {
+        const b = (await loc.boundingBox())!
+        return { x: b.x + b.width / 2, y: b.y + b.height / 2 }
+      }
+      const [src, fe, hub] = [await centre(areaOf(page, maya.key, 'frontend/src')), await centre(areaOf(page, maya.key, 'frontend')), await centre(page.locator('.node[data-node="trunk:main"]'))]
+      expect(Math.hypot(src.x - fe.x, src.y - fe.y)).toBeLessThan(Math.hypot(src.x - hub.x, src.y - hub.y))
+
+      await areaOf(page, maya.key, 'frontend').dblclick()
+      await expect(page.locator('.node.owned')).toHaveCount(3)
+      // Folding the author away takes everything; opening them again starts from the top,
+      // without asking again.
+      await authorOf(page, 'Maya Okafor').dblclick()
+      await expect(page.locator('.node.owned')).toHaveCount(0)
+      await authorOf(page, 'Maya Okafor').dblclick()
+      await expect(page.locator('.node.owned')).toHaveCount(3)
+      expect((await calls(page, 'MapAuthorAreas')).map((c) => c[3])).toEqual(['', 'frontend'])
+    })
+
+    test('a folder’s card lists their latest commits there, each leading to the timeline', async ({ page }) => {
+      await toAreas(page)
+      await authorOf(page, 'Maya Okafor').dblclick()
+      await areaOf(page, maya.key, 'frontend').click()
+      const card = page.getByRole('group', { name: "About frontend/, of Maya Okafor's" })
+      await expect(card).toContainText('Maya Okafor in frontend/')
+      await expect(card).toContainText("24 commits of Maya Okafor's in the last two months touch frontend/. The last was just now.")
+      await expect(card).toContainText('The latest 3:')
+      await expect(card.locator('.latest button')).toHaveText(['Draw the tide table', 'Fix the units switch', 'Tidy the sidebar'])
+      await card.getByRole('button', { name: 'Show its folders' }).click()
+      await expect(page.locator('.node.owned')).toHaveCount(6)
+      await expect(card.getByRole('button', { name: 'Fold its folders away' })).toBeVisible()
+
+      await card.getByRole('button', { name: 'Fix the units switch' }).click()
+      await expect(page.locator('.map')).toHaveCount(0)
+      await expect.poll(async () => (await calls(page, 'CommitRow')).at(-1)).toEqual(['/repo', id(4)])
+    })
+
+    test('the author’s card opens them, and says when folders were left out', async ({ page }) => {
+      await toAreas(page)
+      await authorOf(page, 'Maya Okafor').click()
+      const card = page.getByRole('group', { name: 'About Maya Okafor' })
+      await card.getByRole('button', { name: 'Show their areas' }).click()
+      await expect(page.locator('.node.owned')).toHaveCount(3)
+      await expect(card).toContainText("4 more folders of theirs, with fewer commits, aren't shown.")
+      await card.getByRole('button', { name: 'Fold their areas away' }).click()
+      await expect(page.locator('.node.owned')).toHaveCount(0)
+    })
+
+    test('says it’s reading while the folders are read, and when they can’t be', async ({ page }) => {
+      await page.setViewportSize({ width: 1200, height: 700 })
+      await page.addInitScript(() => localStorage.setItem('graph.map.by:/repo', 'area'))
+      await open(page, 'graph', { ...scenario(withAreas), delays: { MapAuthorAreas: 800 } })
+      await page.getByRole('group', { name: 'What the map shows' }).getByRole('button', { name: 'Authors' }).click()
+      await authorOf(page, 'Maya Okafor').click()
+      const card = page.getByRole('group', { name: 'About Maya Okafor' })
+      await card.getByRole('button', { name: 'Show their areas' }).click()
+      await expect(card.getByRole('button', { name: 'Reading their folders…' })).toBeDisabled()
+      await expect(card.getByRole('button', { name: 'Fold their areas away' })).toBeEnabled()
+      await expect(page.locator('.node.owned')).toHaveCount(3)
+    })
+
+    test('says so when the folders can’t be read', async ({ page }) => {
+      await page.setViewportSize({ width: 1200, height: 700 })
+      await page.addInitScript(() => localStorage.setItem('graph.map.by:/repo', 'area'))
+      await open(page, 'graph', { ...scenario(withAreas), failures: { MapAuthorAreas: 'fatal: bad object' } })
+      await page.getByRole('group', { name: 'What the map shows' }).getByRole('button', { name: 'Authors' }).click()
+      await authorOf(page, 'Maya Okafor').click()
+      const card = page.getByRole('group', { name: 'About Maya Okafor' })
+      await card.getByRole('button', { name: 'Show their areas' }).click()
+      await expect(card.getByRole('alert')).toHaveText("Couldn't read the folders they worked in.")
+      await expect(page.locator('.node.owned')).toHaveCount(0)
+    })
+
+    test('flipping the switch opens every open author the other way, and pointing at a folder lights it up under the others', async ({ page }) => {
+      const both = { ...withAreas, MapAuthors: { ...authors, authors: [{ ...maya, trunk: 31, branches: [] }, { ...leoAreas, trunk: 8, branches: [] }], people: 2, bots: 0 } }
+      await toAuthors(page, both)
+      await authorOf(page, 'Maya Okafor').dblclick()
+      await authorOf(page, 'Leo Brandt').dblclick()
+      // By branch: each has what landed.
+      await expect(page.locator('.node.owned.landed')).toHaveCount(2)
+      await by(page).getByRole('button', { name: 'By area' }).click()
+      await expect(page.locator('.node.owned.landed')).toHaveCount(0)
+      await expect(page.locator('.node.owned.is-folder')).toHaveCount(4)
+      await expect.poll(async () => (await calls(page, 'MapAuthorAreas')).length).toBe(2)
+      await areaOf(page, maya.key, 'frontend').hover()
+      await expect(areaOf(page, leoAreas.key, 'frontend')).toHaveClass(/echo/)
+      await expect(areaOf(page, leoAreas.key, 'internal')).not.toHaveClass(/echo/)
+      // And back.
+      await by(page).getByRole('button', { name: 'By branch' }).click()
+      await expect(page.locator('.node.owned.landed')).toHaveCount(2)
+      await expect(page.locator('.node.owned.is-folder')).toHaveCount(0)
+    })
+
+    test('a change of span reads the open author’s folders again', async ({ page }) => {
+      await toAreas(page)
+      await authorOf(page, 'Maya Okafor').dblclick()
+      await expect(page.locator('.node.owned')).toHaveCount(3)
+      await page.getByRole('button', { name: 'Zoom out' }).click()
+      await expect.poll(async () => (await calls(page, 'MapAuthorAreas')).map((c) => [c[2], c[3]])).toEqual([
+        [61, ''],
+        [183, ''],
+      ])
+      await expect(page.locator('.node.owned')).toHaveCount(3)
+    })
+  })
+
   test('says what went wrong when the authors can’t be read', async ({ page }) => {
     await page.setViewportSize({ width: 1200, height: 700 })
     await open(page, 'graph', { ...scenario(), failures: { MapAuthors: 'fatal: bad object' } })
