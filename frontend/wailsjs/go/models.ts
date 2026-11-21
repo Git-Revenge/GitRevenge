@@ -1206,6 +1206,20 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class MailmapText {
+	    text: string;
+	    edited: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new MailmapText(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.text = source["text"];
+	        this.edited = source["edited"];
+	    }
+	}
 	
 	export class MapGroup {
 	    nodes: MapNode[];
@@ -1286,6 +1300,162 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class PersonIdentity {
+	    name: string;
+	    email: string;
+	    commits: number;
+	    coAuthored: number;
+	    lines: git.MailmapRef[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PersonIdentity(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.email = source["email"];
+	        this.commits = source["commits"];
+	        this.coAuthored = source["coAuthored"];
+	        this.lines = this.convertValues(source["lines"], git.MailmapRef);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Person {
+	    name: string;
+	    email: string;
+	    commits: number;
+	    coAuthored: number;
+	    bot: boolean;
+	    identities: PersonIdentity[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Person(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.email = source["email"];
+	        this.commits = source["commits"];
+	        this.coAuthored = source["coAuthored"];
+	        this.bot = source["bot"];
+	        this.identities = this.convertValues(source["identities"], PersonIdentity);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PeopleList {
+	    people: Person[];
+	    matching: number;
+	    everyone: number;
+	    bots: number;
+	    identities: number;
+	    commits: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new PeopleList(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.people = this.convertValues(source["people"], Person);
+	        this.matching = source["matching"];
+	        this.everyone = source["everyone"];
+	        this.bots = source["bots"];
+	        this.identities = source["identities"];
+	        this.commits = source["commits"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PeopleRequest {
+	    mailmap: MailmapText;
+	    query: string;
+	    offset: number;
+	    limit: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new PeopleRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mailmap = this.convertValues(source["mailmap"], MailmapText);
+	        this.query = source["query"];
+	        this.offset = source["offset"];
+	        this.limit = source["limit"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
 	export class Preferences {
 	    theme: string;
 	    graphDensity: string;
@@ -1911,6 +2081,46 @@ export namespace app {
 	        this.url = source["url"];
 	        this.available = source["available"];
 	    }
+	}
+	export class WhoAnswer {
+	    written: git.Identity;
+	    shown: git.Identity;
+	    lines: git.MailmapRef[];
+	    commits: number;
+	    coAuthored: number;
+	    known: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new WhoAnswer(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.written = this.convertValues(source["written"], git.Identity);
+	        this.shown = this.convertValues(source["shown"], git.Identity);
+	        this.lines = this.convertValues(source["lines"], git.MailmapRef);
+	        this.commits = source["commits"];
+	        this.coAuthored = source["coAuthored"];
+	        this.known = source["known"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class WorkingTree {
 	    status: git.Status;
@@ -2609,6 +2819,72 @@ export namespace git {
 		    }
 		    return a;
 		}
+	}
+	export class MailmapNote {
+	    line: number;
+	    kind: string;
+	    newName?: string;
+	    newEmail?: string;
+	    oldName?: string;
+	    oldEmail?: string;
+	    why?: string;
+	    identities: number;
+	    commits: number;
+	    coAuthored: number;
+	    replaced: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new MailmapNote(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.line = source["line"];
+	        this.kind = source["kind"];
+	        this.newName = source["newName"];
+	        this.newEmail = source["newEmail"];
+	        this.oldName = source["oldName"];
+	        this.oldEmail = source["oldEmail"];
+	        this.why = source["why"];
+	        this.identities = source["identities"];
+	        this.commits = source["commits"];
+	        this.coAuthored = source["coAuthored"];
+	        this.replaced = source["replaced"];
+	    }
+	}
+	export class MailmapRef {
+	    source: string;
+	    line: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MailmapRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.source = source["source"];
+	        this.line = source["line"];
+	    }
+	}
+	export class MailmapSource {
+	    source: string;
+	    path: string;
+	    exists: boolean;
+	    editable: boolean;
+	    lines: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MailmapSource(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.source = source["source"];
+	        this.path = source["path"];
+	        this.exists = source["exists"];
+	        this.editable = source["editable"];
+	        this.lines = source["lines"];
+	    }
 	}
 	export class Note {
 	    ref: string;

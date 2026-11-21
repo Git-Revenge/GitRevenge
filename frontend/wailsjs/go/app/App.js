@@ -346,6 +346,14 @@ export function LinkRules(arg1) {
   return window['go']['app']['App']['LinkRules'](arg1);
 }
 
+export function MailmapNotes(arg1, arg2) {
+  return window['go']['app']['App']['MailmapNotes'](arg1, arg2);
+}
+
+export function MailmapSources(arg1) {
+  return window['go']['app']['App']['MailmapSources'](arg1);
+}
+
 export function MapAuthorAreas(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['MapAuthorAreas'](arg1, arg2, arg3, arg4);
 }
@@ -388,6 +396,10 @@ export function OpenRepo(arg1) {
 
 export function OwnMoveAge(arg1) {
   return window['go']['app']['App']['OwnMoveAge'](arg1);
+}
+
+export function People(arg1, arg2) {
+  return window['go']['app']['App']['People'](arg1, arg2);
 }
 
 export function PlanBisect(arg1, arg2, arg3) {
@@ -444,6 +456,10 @@ export function PushedUndo(arg1, arg2) {
 
 export function ReadIgnoreFile(arg1, arg2) {
   return window['go']['app']['App']['ReadIgnoreFile'](arg1, arg2);
+}
+
+export function ReadMailmapFile(arg1, arg2) {
+  return window['go']['app']['App']['ReadMailmapFile'](arg1, arg2);
 }
 
 export function RebasePlan(arg1, arg2) {
@@ -576,6 +592,10 @@ export function SaveIgnoreFile(arg1, arg2, arg3, arg4) {
 
 export function SaveLinkRule(arg1, arg2, arg3) {
   return window['go']['app']['App']['SaveLinkRule'](arg1, arg2, arg3);
+}
+
+export function SaveMailmap(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['SaveMailmap'](arg1, arg2, arg3, arg4);
 }
 
 export function SearchGraph(arg1, arg2) {
@@ -776,6 +796,10 @@ export function UpdateSubmodules(arg1) {
 
 export function Version() {
   return window['go']['app']['App']['Version']();
+}
+
+export function WhoIs(arg1, arg2, arg3) {
+  return window['go']['app']['App']['WhoIs'](arg1, arg2, arg3);
 }
 
 export function WorkingTree(arg1) {
