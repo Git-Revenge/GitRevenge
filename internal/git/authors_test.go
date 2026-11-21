@@ -35,7 +35,7 @@ func TestAuthorLogReadsAuthorsAndCoAuthorTrailers(t *testing.T) {
 	r := OpenRepo(newTestRunner(t), fx.Dir)
 
 	var got []AuthorCommit
-	if err := r.AuthorLog(context.Background(), "main", 0, []string{"main"}, func(c AuthorCommit) { got = append(got, c) }); err != nil {
+	if err := r.AuthorLog(context.Background(), 0, []string{"main"}, func(c AuthorCommit) { got = append(got, c) }); err != nil {
 		t.Fatal(err)
 	}
 	// Three commits: the merge isn't read.
@@ -54,7 +54,7 @@ func TestAuthorLogReadsAuthorsAndCoAuthorTrailers(t *testing.T) {
 
 	// A range reads only what the branch has of its own.
 	got = nil
-	if err := r.AuthorLog(context.Background(), "main", 0, []string{"main~1..side"}, func(c AuthorCommit) { got = append(got, c) }); err != nil {
+	if err := r.AuthorLog(context.Background(), 0, []string{"main~1..side"}, func(c AuthorCommit) { got = append(got, c) }); err != nil {
 		t.Fatal(err)
 	}
 	if len(got) != 1 || got[0].Name != "Test User" {
@@ -62,24 +62,7 @@ func TestAuthorLogReadsAuthorsAndCoAuthorTrailers(t *testing.T) {
 	}
 
 	// A name that git would read as an option is refused.
-	if err := r.AuthorLog(context.Background(), "main", 0, []string{"--all"}, func(AuthorCommit) {}); err == nil {
+	if err := r.AuthorLog(context.Background(), 0, []string{"--all"}, func(AuthorCommit) {}); err == nil {
 		t.Fatal("an option was accepted as a revision")
-	}
-}
-
-func TestMailmapIdentities(t *testing.T) {
-	fx := gittest.New(t)
-	fx.CommitFile(".mailmap", "Jane Doe <jane@example.com> <jdoe@old.example.com>\n", "Add a mailmap")
-	r := OpenRepo(newTestRunner(t), fx.Dir)
-	in := []Identity{{Name: "jdoe", Email: "jdoe@old.example.com"}, {Name: "No Email"}, {Name: "Sam", Email: "sam@example.com"}}
-	got, err := r.MailmapIdentities(context.Background(), "main", in)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []Identity{{Name: "Jane Doe", Email: "jane@example.com"}, {Name: "No Email"}, {Name: "Sam", Email: "sam@example.com"}}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("identity %d = %+v, want %+v", i, got[i], want[i])
-		}
 	}
 }

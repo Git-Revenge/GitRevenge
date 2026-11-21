@@ -97,7 +97,7 @@ func (a *App) mapAuthorAreasSince(repoPath string, identities []AuthorIdentity, 
 	if err != nil {
 		return empty, err
 	}
-	shape, err := json.Marshal([]any{ids, a.branchRules(r.Path).Hide(), trunk.Name})
+	shape, err := json.Marshal([]any{ids, a.branchRules(r.Path).Hide(), trunk.Name, r.Git.MailmapState(ctx).Key()})
 	if err != nil {
 		return empty, err
 	}
@@ -114,7 +114,7 @@ func (a *App) mapAuthorAreasSince(repoPath string, identities []AuthorIdentity, 
 			revs = append(revs, b.Name)
 		}
 		tree = newAreaTree()
-		if err := r.Git.AuthorFiles(ctx, trunk.Name, since, revs, ids, tree.add); err != nil {
+		if err := r.Git.AuthorFiles(ctx, since, revs, ids, tree.add); err != nil {
 			return empty, err
 		}
 		tree.index()

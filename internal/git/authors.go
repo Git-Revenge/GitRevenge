@@ -9,16 +9,15 @@ import (
 	"strings"
 )
 
-// The Map's Authors mode asks who wrote what. Like Insights, it reads names through the
-// .mailmap committed at one branch and never through the user's own mailmap file, so two
-// people looking at the same repository see the same people.
+// The Map's Authors mode asks who wrote what. It reads names through the mailmap git reads,
+// as the graph does (see mailmap.go), so the two show the same people. It isn't a report:
+// Insights is, and pins the mailmap committed on its target instead.
 
-// authorPinned returns the -c overrides the author queries run with.
-func authorPinned(mailmapAt string) []string {
+// authorFlags returns the -c overrides the author queries run with. They fix how the
+// output is written, and leave which mailmap is read to git.
+func authorFlags() []string {
 	return []string{
 		"-c", "log.mailmap=true",
-		"-c", "mailmap.file=",
-		"-c", "mailmap.blob=" + mailmapAt + ":.mailmap",
 		"-c", "log.showSignature=false",
 		"-c", "i18n.logOutputEncoding=UTF-8",
 	}
@@ -31,7 +30,7 @@ const coAuthorTrailers = "%(trailers:key=Co-authored-by,key=Co-developed-by,valu
 // AuthorCommit is one commit as the Authors mode counts it.
 type AuthorCommit struct {
 	SHA string
-	// Name and Email are the author's, as the committed .mailmap resolves them. The author
+	// Name and Email are the author's, as the mailmap resolves them. The author
 	// field is read, never the committer: whoever applied, rebased or merged the work isn't
 	// who wrote it.
 	Name, Email string
@@ -45,12 +44,12 @@ type AuthorCommit struct {
 // AuthorLog calls each for every commit in revs that isn't a merge, newest first. revs are
 // what git log takes: a ref for everything it reaches, "a..b" for what b has that a doesn't.
 // With since above 0, only commits made at or after it (Unix seconds) are read, and the walk
-// goes no further back. Names are resolved through the .mailmap committed at mailmapAt.
-func (r *Repo) AuthorLog(ctx context.Context, mailmapAt string, since int64, revs []string, each func(AuthorCommit)) error {
-	if err := CheckRevs(append([]string{mailmapAt}, revs...)...); err != nil {
+// goes no further back. Names are resolved through the mailmap git reads.
+func (r *Repo) AuthorLog(ctx context.Context, since int64, revs []string, each func(AuthorCommit)) error {
+	if err := CheckRevs(revs...); err != nil {
 		return err
 	}
-	args := append(authorPinned(mailmapAt), "log", "--no-merges", "--format=%x1e%H%x1f%aN%x1f%aE%x1f%ct%x1f"+coAuthorTrailers)
+	args := append(authorFlags(), "log", "--no-merges", "--format=%x1e%H%x1f%aN%x1f%aE%x1f%ct%x1f"+coAuthorTrailers)
 	if since > 0 {
 		args = append(args, "--since="+strconv.FormatInt(since, 10))
 	}
@@ -103,19 +102,6 @@ func ParseIdentity(s string) Identity {
 	return Identity{Name: strings.TrimSpace(s[:open]), Email: strings.TrimSpace(email)}
 }
 
-// MailmapIdentities returns each identity as the .mailmap committed at mailmapAt resolves it,
-// in the same order. It's for names that don't come from an author field, such as a
-// co-author's trailer, which git log doesn't map. An identity with no email can't be looked
-// up and comes back as it is.
-func (r *Repo) MailmapIdentities(ctx context.Context, mailmapAt string, ids []Identity) ([]Identity, error) {
-	if err := CheckRevs(mailmapAt); err != nil {
-		out := make([]Identity, len(ids))
-		copy(out, ids)
-		return out, err
-	}
-	return r.checkMailmap(ctx, []string{"-c", "mailmap.file=", "-c", "mailmap.blob=" + mailmapAt + ":.mailmap"}, ids)
-}
-
 // AuthorHistory is how much one person has written over a repository's whole history.
 type AuthorHistory struct {
 	// Authored counts the commits they're the author of; CoAuthored the ones that credit them
@@ -131,9 +117,9 @@ type AuthorHistory struct {
 // AuthorHistory counts every commit reachable from revs that the person behind ids wrote or
 // is credited on. ids are the names and emails that are all one person; an identity is
 // matched by its email, or by its name when it has no email.
-func (r *Repo) AuthorHistory(ctx context.Context, mailmapAt string, revs []string, ids []Identity) (AuthorHistory, error) {
+func (r *Repo) AuthorHistory(ctx context.Context, revs []string, ids []Identity) (AuthorHistory, error) {
 	var out AuthorHistory
-	if err := CheckRevs(append([]string{mailmapAt}, revs...)...); err != nil {
+	if err := CheckRevs(revs...); err != nil {
 		return out, err
 	}
 	who := personOf(ids)
@@ -143,7 +129,7 @@ func (r *Repo) AuthorHistory(ctx context.Context, mailmapAt string, revs []strin
 	authorArgs, grepArgs, theirs := who.authorArgs, who.grepArgs, who.is
 	stdin := strings.Join(revs, "\n") + "\n"
 	run := func(match []string, each func(f []string)) error {
-		args := append(authorPinned(mailmapAt), "log", "--no-merges", "--fixed-strings", "--regexp-ignore-case", "--format=%x1e%aN%x1f%aE%x1f%ct%x1f"+coAuthorTrailers)
+		args := append(authorFlags(), "log", "--no-merges", "--fixed-strings", "--regexp-ignore-case", "--format=%x1e%aN%x1f%aE%x1f%ct%x1f"+coAuthorTrailers)
 		args = append(append(args, match...), "--stdin")
 		err := r.streamCmd(ctx, Cmd{Args: args, Stdin: strings.NewReader(stdin)}, func(rd io.Reader) error {
 			return eachRecord(rd, func(rec string) {

@@ -127,7 +127,60 @@ func TestMapAuthorsFoldsOnePersonsIdentities(t *testing.T) {
 	}
 }
 
-func TestMapAuthorsReadTheCommittedMailmap(t *testing.T) {
+// The Map reads the mailmap the graph does, so one that's saved and not yet committed
+// counts, and what was counted before it was saved is dropped.
+func TestMapAuthorsFollowASavedMailmap(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.Linear(1)
+	commitAs(fx, "jdoe", "jdoe@old.example.com", "j1.txt", "one")
+	commitAs(fx, "Sam", "sam@example.com", "s1.txt", "two", "Co-authored-by: jdoe <jdoe@old.example.com>")
+	path := openForMap(t, a, fx)
+
+	before, err := a.mapAuthorsSince(path, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if jdoe := mapAuthor(t, before, "jdoe"); jdoe.Commits != 2 {
+		t.Fatalf("before any mailmap, jdoe = %+v", jdoe)
+	}
+
+	// No ref moves: only the file in the work tree is new.
+	fx.WriteFile(".mailmap", "Jane Doe <jane@example.com> <jdoe@old.example.com>\n")
+	after, err := a.mapAuthorsSince(path, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jane := mapAuthor(t, after, "Jane Doe")
+	if jane.Commits != 2 || jane.Authored != 1 || jane.CoAuthored != 1 || jane.Email != "jane@example.com" {
+		t.Fatalf("jane = %+v, want the author and the co-author both mapped to her by the saved mailmap", jane)
+	}
+	for _, who := range after.Authors {
+		if who.Name == "jdoe" {
+			t.Fatalf("jdoe is still on the map after the mailmap: %+v", who)
+		}
+	}
+	// Her card finds the commit she wrote under the old name. The one that credits her
+	// under it in a trailer isn't found: the card searches messages for the names it's
+	// given, and the old one isn't among them (#843).
+	h, err := a.MapAuthorHistory(path, []AuthorIdentity{{Name: "Jane Doe", Email: "jane@example.com"}})
+	if err != nil || h.Authored != 1 {
+		t.Fatalf("her card = %+v, %v, want the one commit she wrote", h, err)
+	}
+
+	// Taking the file away puts jdoe back.
+	fx.RemoveFile(".mailmap")
+	again, err := a.mapAuthorsSince(path, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if jdoe := mapAuthor(t, again, "jdoe"); jdoe.Commits != 2 {
+		t.Fatalf("with the mailmap gone, jdoe = %+v", jdoe)
+	}
+}
+
+func TestMapAuthorsReadACommittedMailmap(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
 	fx := gittest.New(t)
