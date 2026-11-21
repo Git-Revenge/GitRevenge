@@ -58,6 +58,10 @@ class Session {
   ignoreTabId = $state('gitrevenge:ignore')
   /** The repository the Ignore rules tab showed last session, or '' if it was closed. */
   savedIgnoreTab = ''
+  /** The active value for the People tab; never a repository path. */
+  peopleTabId = $state('gitrevenge:people')
+  /** The repository the People tab showed last session, or '' if it was closed. */
+  savedPeopleTab = ''
 
   activeTab = $derived(this.tabs.find((t) => t.path === this.active))
 
@@ -85,6 +89,8 @@ class Session {
     this.savedInsightsTab = st.insightsTab
     this.ignoreTabId = st.ignoreTabId
     this.savedIgnoreTab = st.ignoreTab
+    this.peopleTabId = st.peopleTabId || this.peopleTabId
+    this.savedPeopleTab = st.peopleTab ?? ''
     this.active = st.active
     if (st.failed.length > 0) {
       this.error = `Couldn't reopen: ${st.failed.map((f) => f.path).join(', ')}`

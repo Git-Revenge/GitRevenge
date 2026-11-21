@@ -1830,6 +1830,8 @@ export namespace app {
 	    insightsTabId: string;
 	    ignoreTab: string;
 	    ignoreTabId: string;
+	    peopleTab: string;
+	    peopleTabId: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SessionState(source);
@@ -1846,6 +1848,8 @@ export namespace app {
 	        this.insightsTabId = source["insightsTabId"];
 	        this.ignoreTab = source["ignoreTab"];
 	        this.ignoreTabId = source["ignoreTabId"];
+	        this.peopleTab = source["peopleTab"];
+	        this.peopleTabId = source["peopleTabId"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

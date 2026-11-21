@@ -227,6 +227,11 @@ func TestTabsThatShowRepositoriesWatchThem(t *testing.T) {
 		t.Fatalf("shown = %v", got)
 	}
 
+	// The People tab shows a repository too: a .mailmap saved in it has to be noticed.
+	set(func(s *settings.Settings) { s.PeopleTab = b.Path }, settings.PeopleTabID)
+	expectWatched(t, m, "the People tab", b.Path)
+	took()
+
 	set(func(s *settings.Settings) { s.InsightsTab = "repo:" + b.Path }, settings.InsightsTabID)
 	expectWatched(t, m, "Insights for one repository", b.Path)
 	took()

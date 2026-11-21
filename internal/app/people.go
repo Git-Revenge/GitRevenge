@@ -10,6 +10,7 @@ import (
 
 	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/session"
+	"github.com/git-revenge/gitrevenge/internal/settings"
 )
 
 // The People view asks who a repository's history names and how its mailmap reads them.
@@ -244,10 +245,11 @@ func (a *App) ReadMailmapFile(path, source string) (string, error) {
 	return r.Git.ReadMailmapSource(context.Background(), source)
 }
 
-// MailmapNotes says what each line of the work tree's .mailmap does: what it joins, that
-// it matches nobody, that a later line replaces it, or why git skips it. text is the text
-// being edited.
-func (a *App) MailmapNotes(path, text string) ([]git.MailmapNote, error) {
+// MailmapNotes says what each line of one mailmap source does: what it joins, that it
+// matches nobody, that a later line replaces it, or why git skips it. mm is the work
+// tree's .mailmap as it's being edited, which decides what the lines of every source still
+// do; source is the one whose lines are wanted.
+func (a *App) MailmapNotes(path string, mm MailmapText, source string) ([]git.MailmapNote, error) {
 	r, err := a.openRepo(path)
 	if err != nil {
 		return []git.MailmapNote{}, err
@@ -257,11 +259,17 @@ func (a *App) MailmapNotes(path, text string) ([]git.MailmapNote, error) {
 	if err != nil {
 		return []git.MailmapNote{}, err
 	}
-	m, err := r.Git.ReadMailmap(ctx, text, true)
+	m, err := r.Git.ReadMailmap(ctx, mm.Text, mm.Edited)
 	if err != nil {
 		return []git.MailmapNote{}, err
 	}
-	notes := m.Notes(git.MailmapWorkTree, text, history.ids)
+	text := mm.Text
+	if source != git.MailmapWorkTree || !mm.Edited {
+		if text, err = r.Git.ReadMailmapSource(ctx, source); err != nil {
+			return []git.MailmapNote{}, err
+		}
+	}
+	notes := m.Notes(source, text, history.ids)
 	if notes == nil {
 		notes = []git.MailmapNote{}
 	}
@@ -351,6 +359,19 @@ func (a *App) WhoIs(path string, mm MailmapText, query string) ([]WhoAnswer, err
 		out = append(out, answer(git.HistoryIdentity{Identity: asked}, false))
 	}
 	return out, nil
+}
+
+// SetPeopleTab remembers which repository the People tab shows, for the next launch; ""
+// records that the tab is closed.
+func (a *App) SetPeopleTab(repo string) error {
+	m, err := a.sessions()
+	if err != nil {
+		return err
+	}
+	err = m.Settings().Update(func(s *settings.Settings) { s.PeopleTab = repo })
+	// The repository on screen is the one whose people are showing.
+	m.Rewatch()
+	return err
 }
 
 // SaveMailmap writes the work tree's .mailmap. base is the text it had when editing began;

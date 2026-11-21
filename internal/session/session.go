@@ -500,7 +500,7 @@ func (m *Manager) Close(path string) error {
 const watchWait = 100 * time.Millisecond
 
 // shown lists the open repositories on screen: the active tab's, or the ones the Ignore
-// rules or Insights tab is showing. The start page and the Git Config tab show none (config
+// rules, People or Insights tab is showing. The start page and the Git Config tab show none (config
 // files are watched on their own).
 func (m *Manager) shown() []*Repo {
 	s := m.settings.Get()
@@ -509,6 +509,8 @@ func (m *Manager) shown() []*Repo {
 	case "", settings.ConfigTabID:
 	case settings.IgnoreTabID:
 		paths = []string{s.IgnoreTab}
+	case settings.PeopleTabID:
+		paths = []string{s.PeopleTab}
 	case settings.InsightsTabID:
 		switch kind, id, _ := strings.Cut(s.InsightsTab, ":"); kind {
 		case "repo":
@@ -678,6 +680,8 @@ func (m *Manager) Restore(ctx context.Context) (active string, failed map[string
 		active = settings.InsightsTabID
 	case saved.ActiveTab == settings.IgnoreTabID && saved.IgnoreTab != "":
 		active = settings.IgnoreTabID
+	case saved.ActiveTab == settings.PeopleTabID && saved.PeopleTab != "":
+		active = settings.PeopleTabID
 	case shown != nil:
 		active = shown.Path
 	case len(m.repos) > 0:

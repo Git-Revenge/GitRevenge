@@ -8,6 +8,7 @@
   import type { DialogSpec } from './Dialog.svelte'
   import { errorText } from './errors'
   import { ignoreRules } from './ignorerules/ignoreRules.svelte'
+  import { people } from './people/people.svelte'
   import LFSDialog from './LFSDialog.svelte'
   import { canOpenWorktree, canRemoveWorktree, folderName, lfsNames, matchesFilter, submoduleStatus, worktreeNames, worktreeStatus, worktreeTooltip } from './repoPanel'
   import { session } from './session.svelte'
@@ -76,8 +77,9 @@
   let lfsFiles = $derived(lfs?.status.files.length ?? 0)
   let showLfs = $derived(!!lfs?.available && matchesFilter(filter, ...lfsNames(lfs.status.patterns, lfs.status.files)))
   let showIgnore = $derived(matchesFilter(filter, 'Ignore rules', '.gitignore', 'exclude'))
+  let showPeople = $derived(matchesFilter(filter, 'People', '.mailmap', 'mailmap', 'authors'))
   let filtering = $derived(filter.trim().length > 0)
-  let matches = $derived(shownTrees.length + shownSubs.length + (showLfs ? 1 : 0) + (showIgnore ? 1 : 0))
+  let matches = $derived(shownTrees.length + shownSubs.length + (showLfs ? 1 : 0) + (showIgnore ? 1 : 0) + (showPeople ? 1 : 0))
 
   $effect(() => {
     onStatus?.({ attention: subs.filter((s) => s.state !== 'ok').length, matches })
@@ -186,6 +188,19 @@
         <button class="row lfs" onclick={() => ignoreRules.show(path)} title="Read and edit this repository's .gitignore files, its exclude file and your global excludes">
           <span class="icon"><Icon name="eye" size={14} /></span>
           <span class="name">Ignore rules</span>
+        </button>
+      </li>
+    </ul>
+  </section>
+{/if}
+
+{#if showPeople}
+  <section>
+    <ul>
+      <li>
+        <button class="row lfs" onclick={() => people.show(path)} title="See who this repository's history names, and say which names are one person in its .mailmap">
+          <span class="icon"><Icon name="people" size={14} /></span>
+          <span class="name">People</span>
         </button>
       </li>
     </ul>
