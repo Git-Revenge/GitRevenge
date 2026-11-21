@@ -25,6 +25,8 @@ export interface Scenario {
   /** Which preview the preview dialog shows; a merge unless said. */
   previewKind?: 'merge' | 'rebase'
   theme?: 'light' | 'dark'
+  /** Someone the People tab is opened on, as an author's card in the graph asks. */
+  peopleAsk?: { person: unknown; pick: boolean }
   /** Gives the graph a working tree to show, with this many changed files. */
   wip?: { changes: number | null }
   /** Mounts the toolbar under the error banner, for the commands its actions run. */

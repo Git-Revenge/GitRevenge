@@ -10,7 +10,7 @@
   import InkButton from '../ui/InkButton.svelte'
   import Loading from '../ui/Loading.svelte'
   import Modal from '../ui/Modal.svelte'
-  import { WORK_TREE, canTakeApart, changedLines, describeNote, joined, linesText, sourceLabel, sourceNote, summary, wrote } from './mailmap'
+  import { WORK_TREE, canTakeApart, changedLines, describeNote, faceColor, joined, linesText, sourceLabel, sourceNote, summary, wrote } from './mailmap'
   import { people as t } from './people.svelte'
   import SamePersonDialog from './SamePersonDialog.svelte'
   import { apartNote, asSuggested, suggestionLabel } from './suggest'
@@ -104,27 +104,20 @@
     return { destroy: () => io.disconnect() }
   }
 
-  /** A colour for someone's initials, the same each time for the same name. */
-  function colorOf(name: string): string {
-    let h = 0
-    for (const c of name) h = (h * 31 + c.codePointAt(0)!) >>> 0
-    return `var(--lane-${h % 6})`
-  }
+  const colorOf = faceColor
 
   const others = $derived(t.sources.filter((s) => s.source !== WORK_TREE))
 
   // Saying that two or more people are one. The dialog shows the line before anything changes.
   let joining = $state<app.SuggestedPerson[] | null>(null)
-  /** The person picked first, when joining two from the list by hand. */
-  let picking = $state<app.Person | null>(null)
   let openShared = $state(false)
   let openApart = $state(false)
   const same = (a: app.Person, b: app.Person) => a.name === b.name && a.email === b.email
 
   function joinWith(other: app.Person) {
-    if (!picking) return
-    joining = [asSuggested(picking), asSuggested(other)]
-    picking = null
+    if (!t.picking) return
+    joining = [asSuggested(t.picking), asSuggested(other)]
+    t.picking = null
   }
   let asking = $derived(!!t.suggestions && !t.query.trim() && t.suggestions.offered + t.suggestions.sharedCount + t.suggestions.apartCount > 0)
 
@@ -270,15 +263,15 @@
           {:else if t.list && !t.people.length}
             <Empty note="no match" compact>{t.query.trim() ? 'Nobody by that name or address.' : 'This history has no commits yet.'}</Empty>
           {:else}
-            {#if picking}
+            {#if t.picking}
               <div class="picking" role="status">
-                <span>Who is <strong>{picking.name || picking.email}</strong> the same person as? Choose them below.</span>
-                <button class="btn sm" onclick={() => (picking = null)}>Cancel</button>
+                <span>Who is <strong>{t.picking.name || t.picking.email}</strong> the same person as? Choose them below.</span>
+                <button class="btn sm" onclick={() => (t.picking = null)}>Cancel</button>
               </div>
             {/if}
             <ul class="list" aria-label="People">
               {#each t.people as p (p.name + '\n' + p.email)}
-                <li class="person" class:first={!!picking && same(picking, p)}>
+                <li class="person" class:first={!!t.picking && same(t.picking, p)}>
                   <span class="face" style:--c={colorOf(p.name)} aria-hidden="true">{initials(p.name)}</span>
                   <div class="who">
                     <div class="id">
@@ -300,9 +293,9 @@
                   </div>
                   <span class="n">{wrote(p.commits, p.coAuthored)}</span>
                   <span class="join">
-                    {#if !picking}
-                      <button class="btn sm quiet" title="Say that this is the same person as someone else in the list" onclick={() => (picking = p)}>Same person as…</button>
-                    {:else if !same(picking, p)}
+                    {#if !t.picking}
+                      <button class="btn sm quiet" title="Say that this is the same person as someone else in the list" onclick={() => (t.picking = p)}>Same person as…</button>
+                    {:else if !same(t.picking, p)}
                       <button class="btn sm secondary" onclick={() => joinWith(p)}>This one</button>
                     {/if}
                   </span>

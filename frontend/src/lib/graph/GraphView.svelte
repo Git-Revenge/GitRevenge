@@ -19,7 +19,7 @@
   import ViewMenu from './ViewMenu.svelte'
   import { isRows, menuViews } from './views'
   import RefChip from './RefChip.svelte'
-  import { bisectRow, DAY_H, dayCountLabel, dayLineLabel, dayLineSpoken, drawDayLine, drawFoldLine, drawRow, FOLD_H, FOLLOWER_H, gapLabel, sameDay, sealOf, startsRun, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
+  import { bisectRow, DAY_H, dayCountLabel, dayLineLabel, dayLineSpoken, drawDayLine, drawFoldLine, drawRow, authorSpan, FOLD_H, FOLLOWER_H, gapLabel, sameDay, sealOf, startsRun, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { branchMove, headAway, headLabel, isOwnMove, LANDING, moveAnnouncement, tipsOf, type Tips } from './follow'
   import { loadLabelWidth, nextLabelWidth, REFIT_AFTER_MS, saveLabelWidth } from './labelColumn'
   import { RowCache, type Page, type Ref, type Row } from './rowCache'
@@ -36,6 +36,7 @@
     onDrop,
     onSelectedRefs,
     onNote,
+    onAuthor,
     lead,
     wip,
     toolsHost,
@@ -65,6 +66,9 @@
     onDrop?: (source: Row, sourceRefs: Ref[], target: Row, targetRefs: Ref[], x: number, y: number) => void
     /** A click on a commit's note mark, after the commit is selected. */
     onNote?: (row: Row) => void
+    /** A click on a row's author, or Enter on the selected row: asks for the author's card.
+     * x and y are where in the window to put it, under the row, and above is the row's top. */
+    onAuthor?: (row: Row, x: number, y: number, above: number) => void
     /** auto is true for the automatic selection of HEAD when the graph first loads. */
     onSelect?: (row: Row | undefined, auto: boolean) => void
     /** Labels for the selected commit's refs, whenever they change. They can load after the selection. */
@@ -1106,6 +1110,38 @@
     return x >= from && x <= to
   }
 
+  /** Where commit i's row writes its author, across the view; null when the row doesn't. */
+  function authorAcross(i: number): [from: number, to: number, top: number, bottom: number] | null {
+    const row = cache.get(i)
+    const ctx = canvas?.getContext('2d')
+    if (!row || !columns || !ctx) return null
+    const head = cache.refsFor(row.id).some((r) => r.head)
+    const at = authorSpan(ctx, row, columns, isFollower(i), head, { prev: cache.get(i - 1), prev2: cache.get(i - 2) })
+    return at && [at.x0, at.x1, at.y0, at.y1]
+  }
+
+  /** Whether a point in the view is on commit i's author. */
+  function onAuthorText(i: number, x: number, y: number): boolean {
+    const at = onAuthor ? authorAcross(i) : null
+    if (!at) return false
+    const top = relY(i)
+    return x >= at[0] && x <= at[1] && y >= top + at[2] && y <= top + at[3]
+  }
+
+  /** Asks for the card about commit i's author, under its row: where the name is written,
+   * or where the row's text starts when it has none. */
+  function askAuthor(i: number) {
+    const row = cache.get(i)
+    if (!row || !onAuthor || !columns) return
+    const rect = scroller.getBoundingClientRect()
+    const top = Math.min(Math.max(relY(i), 0), rect.height - 8)
+    const bottom = Math.min(top + heightOf(i), rect.height)
+    onAuthor(row, rect.left + (authorAcross(i)?.[0] ?? columns.textX), rect.top + bottom + 2, rect.top + top)
+  }
+
+  /** Whether the pointer is on an author, which takes a click. */
+  let hoveredAuthor = false
+
   /** Shows the notes of the commit whose mark the pointer is on, and hides them otherwise. */
   function updateNoteCard() {
     const rect = scroller?.getBoundingClientRect()
@@ -1651,6 +1687,10 @@
       if (!fold) return
       e.preventDefault()
       toggleFold(fold, e.key === 'ArrowRight')
+    } else if (e.key === 'Enter' && selected >= 0 && onAuthor && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // Enter on a commit opens the card about its author: what a click on the name does.
+      e.preventDefault()
+      askAuthor(selected)
     }
   }
 
@@ -1848,7 +1888,10 @@
         select(i)
         // A click on the note mark also asks for the note itself.
         const row = cache.get(i)
-        if (row && onNoteMark(i, e.clientX - scroller.getBoundingClientRect().left)) onNote?.(row)
+        const rect = scroller.getBoundingClientRect()
+        if (row && onNoteMark(i, e.clientX - rect.left)) onNote?.(row)
+        // And one on the author, for the card about them.
+        else if (row && onAuthorText(i, e.clientX - rect.left, e.clientY - rect.top)) askAuthor(i)
       }}
       onmousedown={(e) => {
         if (e.button !== 0 || !onDrop) return
@@ -1870,10 +1913,14 @@
           schedule()
         }
         pointer = { x: e.clientX, y: e.clientY }
-        const over = foldAtY(e.clientY - scroller.getBoundingClientRect().top)?.key ?? ''
-        if (over !== hoveredFold) {
+        const rect = scroller.getBoundingClientRect()
+        const over = foldAtY(e.clientY - rect.top)?.key ?? ''
+        const author = i >= 0 && !drag?.active && onAuthorText(i, e.clientX - rect.left, e.clientY - rect.top)
+        if (over !== hoveredFold || author !== hoveredAuthor) {
           hoveredFold = over
-          scroller.style.cursor = over ? 'pointer' : ''
+          hoveredAuthor = author
+          // A fold's line and an author both take a click.
+          scroller.style.cursor = over || author ? 'pointer' : ''
           schedule()
         }
         updateExpanded()

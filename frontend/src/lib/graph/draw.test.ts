@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clip, DATE_COLUMN, noteMarkSpan, middleCut, fitLabelColumn, LABEL_COLUMN, labelColumnNeed, moreLabels, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine, bisectRow, startsRun, RUN_PAUSE, dayLineLabel, dayLineSpoken, gapLabel, dayCountLabel, strongAbove, strongBelow, selectionWash, thinned } from './draw'
+import { authorSpan, clip, DATE_COLUMN, noteMarkSpan, middleCut, fitLabelColumn, LABEL_COLUMN, labelColumnNeed, moreLabels, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine, bisectRow, startsRun, RUN_PAUSE, dayLineLabel, dayLineSpoken, gapLabel, dayCountLabel, strongAbove, strongBelow, selectionWash, thinned } from './draw'
 import type { Ref, Row } from './rowCache'
 
 describe('graph geometry', () => {
@@ -457,6 +457,51 @@ describe('metaLine', () => {
     const m = metaLine({ author: 'Ana', authorTime: at })
     expect(m).toMatch(/^Ana · /)
     expect(m).not.toMatch(/Today|Yesterday|Oct/)
+  })
+})
+
+// #839: a click on a row's author opens the card about them, so the row's drawing and its
+// hit test must agree on where the name is.
+describe('authorSpan', () => {
+  // Every character one pixel wide, so a width is a length.
+  const ctx = { save() {}, restore() {}, measureText: (s: string) => ({ width: s.length }) as TextMetrics, font: '', letterSpacing: '' } as unknown as CanvasRenderingContext2D
+  const row = (author: string, over: Partial<Row> = {}): Row => ({ index: 0, col: 0, color: 0, up: [], down: [], width: 1, id: 'x', parents: 1, author, authorTime: 1793500000, subject: 's', ...over })
+
+  it('is the name on the second line of a timeline row that starts a run', () => {
+    const lay = layoutColumns(1200, 100, 'comfortable')
+    const at = authorSpan(ctx, row('Sarah Lind'), lay, false, false)!
+    expect(at.x0).toBe(lay.textX)
+    // The name alone, not the time after it.
+    expect(at.x1 - at.x0).toBe('Sarah Lind'.length)
+    expect(at.y0).toBeGreaterThan(20)
+    expect(at.y1).toBeLessThanOrEqual(lay.m.rowH)
+  })
+
+  it('is nothing on a timeline row that carries on a run, which names nobody', () => {
+    expect(authorSpan(ctx, row('Sarah Lind'), layoutColumns(1200, 100, 'comfortable'), true, false)).toBeNull()
+  })
+
+  it('is the author column in compact, the whole height of the row', () => {
+    const lay = layoutColumns(1200, 100, 'compact')
+    const at = authorSpan(ctx, row('Sarah Lind'), lay, false, false)!
+    expect(at.x0).toBe(lay.authorX)
+    expect(at.x1 - at.x0).toBe(14) // a short name still gives something to hit
+    expect([at.y0, at.y1]).toEqual([0, lay.m.rowH])
+    const long = 'A Name Long Enough To Measure'
+    expect(authorSpan(ctx, row(long), lay, false, false)!.x1 - lay.authorX).toBe(long.length)
+  })
+
+  it('is the ditto in a run of compact rows, which stands for the name', () => {
+    const lay = layoutColumns(1200, 100, 'compact')
+    const long = 'A Name Long Enough To Measure'
+    const at = authorSpan(ctx, row(long), lay, false, false, { prev: row(long) })!
+    expect(at.x1 - at.x0).toBe(14)
+    // The checked-out commit always says its name.
+    expect(authorSpan(ctx, row(long), lay, false, true, { prev: row(long) })!.x1 - lay.authorX).toBe(long.length)
+  })
+
+  it('is nothing where compact has no room for an author column', () => {
+    expect(authorSpan(ctx, row('Sarah Lind'), layoutColumns(700, 100, 'compact'), false, false)).toBeNull()
   })
 })
 

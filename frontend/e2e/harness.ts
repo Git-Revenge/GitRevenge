@@ -298,6 +298,11 @@ const mounts = {
     host.style.cssText = 'display:block;height:100vh'
     const { default: RepoView } = await import('../src/lib/RepoView.svelte')
     mount(RepoView, { target: host, props: { path: '/r' } })
+    // What an author's card asks the People tab for, which the app shell would then show.
+    const { session } = await import('../src/lib/session.svelte')
+    session.tabs = [{ path: '/r', name: 'tidewater', head: 'main' } as never]
+    const { peopleTab } = await import('../src/lib/people/tab.svelte')
+    Object.assign(win, { __peopleTab: () => ({ open: peopleTab.open, repo: peopleTab.repo, ask: peopleTab.ask && JSON.parse(JSON.stringify(peopleTab.ask)) }) })
   },
   // The People tab, opened on a repository as the app shell opens it.
   async people() {
@@ -308,6 +313,8 @@ const mounts = {
     const { default: PeopleView } = await import('../src/lib/people/PeopleView.svelte')
     peopleTab.open = true
     peopleTab.wanted = '/r'
+    // Someone an author's card in the graph asked for.
+    if (scenario.peopleAsk) peopleTab.ask = scenario.peopleAsk as never
     mount(PeopleView, { target: host })
     // What the tab bar's close button does, and what the tab bar reads to mark an edit.
     Object.assign(win, { __closePeople: () => peopleTab.requestClose(), __peopleTab: () => ({ open: peopleTab.open, dirty: peopleTab.dirty }) })
