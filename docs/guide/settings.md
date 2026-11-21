@@ -23,6 +23,21 @@ With a repository's tab active, a **This repository** section adds settings that
 | **Clean up merged branches after each pull** | Deletes local branches whose upstream was deleted and that have nothing unpushed. [More](branch-care.md#cleaning-up-merged-branches). |
 | **Sync notes on fetch, pull and push** | Shares git notes with the remote. [More](branch-care.md#syncing-notes). |
 | **Hidden branches** | Patterns of branches to leave out of the sidebar and graph. [More](branch-care.md#hiding-branches). |
+| **Bot authors** | Patterns of authors that aren't people. [More](#bot-authors). |
+
+### Bot authors
+
+An author whose name ends in `[bot]`, such as `dependabot[bot]`, is always a bot. **Bot authors** adds your own: patterns matched against an author's name or email, with commas between them. `*` matches any run of characters and `?` any one, and case doesn't count.
+
+| Pattern | Matches |
+|---|---|
+| `Release Bot` | An author with exactly that name |
+| `*@bots.example.com` | Anyone committing from that domain |
+| `Deploy *` | `Deploy Service`, `Deploy Runner`, … |
+
+Two places use them. [Insights](insights.md#shipped) lists what a bot shipped with the dependency updates, and prints the patterns with a report's inputs, since they change what's in it. The Map's [Authors mode](experimental-views.md#authors) draws a bot apart and leaves it out until you ask for bots.
+
+In git config the setting is `gitrevenge.botAuthor`, once for each pattern.
 
 The settings under **This repository** are kept in the repository's git config, under `gitrevenge` keys, where the [Git Config tab](git-config.md) shows them with the rest; set them in your global config to make them your defaults everywhere. The app's own settings are saved to `settings.json`; see [where your data lives](install.md#where-your-data-lives). Git's own settings, such as your name, email and aliases, are edited in the [Git Config tab](git-config.md): choose **Edit git config…** under Git.
 

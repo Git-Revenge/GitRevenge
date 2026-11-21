@@ -21,8 +21,13 @@ Emily is back from two weeks away, and Tidewater has moved on without her. Befor
 
 7. **Go back to everything.** Click **×** beside the focus in the bar, or pick **Map** again from the view menu for another branch.
 
+8. **See who's been busy.** In the Map, turn the switch at the top left from **Branches** to **Authors**. Now each node is a person: bigger for more commits, closer in for a more recent one. Zoom in to **Two weeks** and the map is the fortnight Emily missed. Her own node says "that's you", small and at the edge.
+
+9. **See where they worked.** Choose **By area** beside the second switch, then double-click whoever is biggest. The folders their commits touched stand round them. Double-click a folder to go a level down, and click one for its card, which lists their latest commits there. Each goes to that commit in the timeline.
+
 ## Good to know
 
 - **Kinds and Fold** cut the timeline down without focusing. The **Kinds** menu above the graph hides whole kinds of branch, such as a bot's, and **Fold** turns a Bot or Docs lane's commits of a day into one line. See [filtering by kind](../guide/graph.md#filtering-by-kind).
 - **Pin a node** by dragging it somewhere, to keep a branch you're watching in the same place each visit. Double-click it to let it go.
+- **Bots are left out of Authors** until you choose **Everyone** or **Bots**. If a bot or an assistant commits under an ordinary name, add it to **Bot authors** in [Settings](../guide/settings.md#bot-authors). [Authors](../guide/experimental-views.md#authors) says what counts as a commit of someone's, and how one person under several names is put together.
 - **Needs care**, in the sidebar's Branches panel, lists branches whose upstream is gone or whose stack parent was merged, and the merged branches that are safe to delete. It's often the next stop after a look at the Map.
