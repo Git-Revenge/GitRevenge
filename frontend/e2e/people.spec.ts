@@ -100,7 +100,10 @@ test.describe('the People tab', () => {
     await expect(priya).toContainText('57 commits')
     await expect(priya.locator('.also')).toContainText('also Priya R priya@oldmill.example · 9 commits, line 1')
 
-    await priya.getByRole('button', { name: 'Take apart' }).click()
+    // A small text button, sized to its words: it once took on the text box's style.
+    const apart = priya.getByRole('button', { name: 'Take apart' })
+    expect((await apart.boundingBox())!.width).toBeLessThan(120)
+    await apart.click()
     // The line is gone from the text being edited, and nothing is saved yet.
     await expect(page.locator('.foot')).toContainText('1 line not saved')
     await expect.poll(async () => (await calls(page, 'People')).some((c) => (c[1] as { mailmap: { edited: boolean; text: string } }).mailmap.edited && (c[1] as { mailmap: { text: string } }).mailmap.text === '')).toBe(true)

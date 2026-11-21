@@ -223,7 +223,7 @@
           {/if}
         </div>
       {:else if plain && editable}
-        <textarea class="text" spellcheck="false" aria-label=".mailmap as text" value={t.doc.text} oninput={(e) => t.edit(e.currentTarget.value)}></textarea>
+        <textarea class="whole" spellcheck="false" aria-label=".mailmap as text" value={t.doc.text} oninput={(e) => t.edit(e.currentTarget.value)}></textarea>
       {:else}
         <div class="rules">
           {#if !lines.length}
@@ -773,7 +773,8 @@
     color: var(--ink-mute);
   }
 
-  .text {
+  /* Not named "text": the app's text buttons carry that class, and would take this on. */
+  .whole {
     flex: 1;
     margin: 12px 20px;
     resize: none;
