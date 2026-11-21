@@ -3098,6 +3098,7 @@ export namespace git {
 	    identities: number;
 	    commits: number;
 	    coAuthored: number;
+	    same: number;
 	    replaced: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -3116,6 +3117,7 @@ export namespace git {
 	        this.identities = source["identities"];
 	        this.commits = source["commits"];
 	        this.coAuthored = source["coAuthored"];
+	        this.same = source["same"];
 	        this.replaced = source["replaced"];
 	    }
 	}

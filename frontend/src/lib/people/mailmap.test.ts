@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { app, git } from '../../../wailsjs/go/models'
 import { canTakeApart, changedLines, describeNote, faceColor, joined, linesIn, linesText, sourceNote, summary, wrote } from './mailmap'
 
-const note = (over: Partial<git.MailmapNote>) => ({ line: 1, kind: 'map', identities: 0, commits: 0, coAuthored: 0, replaced: false, ...over }) as git.MailmapNote
+const note = (over: Partial<git.MailmapNote>) => ({ line: 1, kind: 'map', identities: 0, commits: 0, coAuthored: 0, same: 0, replaced: false, ...over }) as git.MailmapNote
 const identity = (name: string, email: string, lines: git.MailmapRef[] = []) => ({ name, email, commits: 1, coAuthored: 0, lines }) as app.PersonIdentity
 
 describe('wrote', () => {
@@ -100,6 +100,12 @@ describe('describeNote', () => {
 
   it('says when a line does nothing, and why', () => {
     expect(describeNote(note({}))).toEqual({ text: 'matches nobody now', tone: 'idle' })
+    // #854: a line that matches people and leaves them as written isn't a line about nobody.
+    expect(describeNote(note({ same: 1 }))).toEqual({ text: 'changes nothing: 1 name already reads this way', tone: 'idle' })
+    expect(describeNote(note({ same: 3 }))).toEqual({ text: 'changes nothing: 3 names already read this way', tone: 'idle' })
+    // One that joins someone says that, whoever else it leaves alone.
+    expect(describeNote(note({ identities: 1, commits: 3, same: 1 }))).toEqual({ text: 'joins 3 commits', tone: 'joins' })
+    expect(describeNote(note({ replaced: true, same: 1 }))).toEqual({ text: 'a later line replaces this', tone: 'idle' })
     expect(describeNote(note({ replaced: true, identities: 0 }))).toEqual({ text: 'a later line replaces this', tone: 'idle' })
     expect(describeNote(note({ kind: 'skipped', why: 'no address in < >' }))).toEqual({ text: 'git skips this: no address in < >', tone: 'bad' })
   })
