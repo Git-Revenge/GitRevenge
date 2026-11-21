@@ -1820,6 +1820,40 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class SamePersonRequest {
+	    identities: git.Identity[];
+	    name: string;
+	    email: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SamePersonRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.identities = this.convertValues(source["identities"], git.Identity);
+	        this.name = source["name"];
+	        this.email = source["email"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class SessionState {
 	    tabs: RepoTab[];
 	    active: string;
@@ -1998,6 +2032,122 @@ export namespace app {
 	        this.push = source["push"];
 	        this.merged = source["merged"];
 	        this.losses = this.convertValues(source["losses"], BranchLoss);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SuggestedPerson {
+	    name: string;
+	    email: string;
+	    commits: number;
+	    coAuthored: number;
+	    bot: boolean;
+	    identities: git.Identity[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SuggestedPerson(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.email = source["email"];
+	        this.commits = source["commits"];
+	        this.coAuthored = source["coAuthored"];
+	        this.bot = source["bot"];
+	        this.identities = this.convertValues(source["identities"], git.Identity);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Suggestion {
+	    key: string;
+	    kind: string;
+	    people: SuggestedPerson[];
+	    why?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Suggestion(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.kind = source["kind"];
+	        this.people = this.convertValues(source["people"], SuggestedPerson);
+	        this.why = source["why"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Suggestions {
+	    offers: Suggestion[];
+	    offered: number;
+	    shared: Suggestion[];
+	    sharedCount: number;
+	    apart: Suggestion[];
+	    apartCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Suggestions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.offers = this.convertValues(source["offers"], Suggestion);
+	        this.offered = source["offered"];
+	        this.shared = this.convertValues(source["shared"], Suggestion);
+	        this.sharedCount = source["sharedCount"];
+	        this.apart = this.convertValues(source["apart"], Suggestion);
+	        this.apartCount = source["apartCount"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2716,6 +2866,44 @@ export namespace git {
 	        this.path = source["path"];
 	        this.rule = this.convertValues(source["rule"], IgnoreLine);
 	        this.canExcept = source["canExcept"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class JoinPlan {
+	    lines: string[];
+	    at: number[];
+	    text: string;
+	    named: Identity[];
+	    blocked: Identity[];
+	
+	    static createFrom(source: any = {}) {
+	        return new JoinPlan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.lines = source["lines"];
+	        this.at = source["at"];
+	        this.text = source["text"];
+	        this.named = this.convertValues(source["named"], Identity);
+	        this.blocked = this.convertValues(source["blocked"], Identity);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

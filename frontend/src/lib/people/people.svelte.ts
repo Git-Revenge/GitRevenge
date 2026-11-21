@@ -1,4 +1,4 @@
-import { MailmapNotes, MailmapSources, People, ReadMailmapFile, SaveMailmap, WhoIs } from '../../../wailsjs/go/app/App.js'
+import { KeepApart, MailmapNotes, MailmapSources, People, PeopleSuggestions, PlanSamePerson, ReadMailmapFile, SaveMailmap, WhoIs } from '../../../wailsjs/go/app/App.js'
 import type { app, git } from '../../../wailsjs/go/models'
 import { errorText } from '../errors'
 import { WORK_TREE, removeLines } from './mailmap'
@@ -35,6 +35,8 @@ class PeopleState {
   people = $state<app.Person[]>([])
   query = $state('')
   notes = $state<git.MailmapNote[]>([])
+  /** Who looks like the same person: what's offered, what's left out, and what was answered. */
+  suggestions = $state<app.Suggestions | null>(null)
   error = $state('')
   /** Why the last save failed, until the next save, revert or reload. */
   saveError = $state('')
@@ -70,6 +72,7 @@ class PeopleState {
     this.list = null
     this.people = []
     this.notes = []
+    this.suggestions = null
     this.query = ''
     this.selected = WORK_TREE
     this.view = 'people'
@@ -118,14 +121,16 @@ class PeopleState {
     const n = ++this.#asked
     if (!this.list) this.reading = true
     try {
-      const [list, notes] = await Promise.all([
+      const [list, notes, suggestions] = await Promise.all([
         People(repo, { mailmap: this.#mailmap(), query: this.query, offset: 0, limit: Math.max(PAGE, this.people.length) } as app.PeopleRequest),
         MailmapNotes(repo, this.#mailmap(), this.selected),
+        PeopleSuggestions(repo, this.#mailmap()),
       ])
       if (n !== this.#asked || repo !== this.repo) return
       this.list = list
       this.people = list.people
       this.notes = notes
+      this.suggestions = suggestions
       this.error = ''
     } catch (e) {
       if (n === this.#asked) this.error = errorText(e)
@@ -188,6 +193,21 @@ class PeopleState {
 
   who(query: string) {
     return WhoIs(this.repo, this.#mailmap(), query)
+  }
+
+  /** The lines that would make these identities one person, shown as name and address. Nothing is written. */
+  plan(identities: git.Identity[], name: string, email: string) {
+    return PlanSamePerson(this.repo, this.#mailmap(), { identities, name, email } as app.SamePersonRequest)
+  }
+
+  /** Remembers that a suggestion is of different people, or forgets it, and asks again. */
+  async keepApart(key: string, apart: boolean) {
+    try {
+      await KeepApart(this.repo, key, apart)
+    } catch (e) {
+      this.error = errorText(e)
+    }
+    await this.refresh()
   }
 
   /**

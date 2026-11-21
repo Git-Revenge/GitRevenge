@@ -12,6 +12,8 @@
   import Modal from '../ui/Modal.svelte'
   import { WORK_TREE, canTakeApart, changedLines, describeNote, joined, linesText, sourceLabel, sourceNote, summary, wrote } from './mailmap'
   import { people as t } from './people.svelte'
+  import SamePersonDialog from './SamePersonDialog.svelte'
+  import { asSuggested, suggestionLabel } from './suggest'
   import { peopleTab } from './tab.svelte'
 
   // Re-read when the repository changes on disk, such as a .mailmap edited elsewhere.
@@ -111,11 +113,45 @@
 
   const others = $derived(t.sources.filter((s) => s.source !== WORK_TREE))
 
+  // Saying that two or more people are one. The dialog shows the line before anything changes.
+  let joining = $state<app.SuggestedPerson[] | null>(null)
+  /** The person picked first, when joining two from the list by hand. */
+  let picking = $state<app.Person | null>(null)
+  let openShared = $state(false)
+  let openApart = $state(false)
+  const same = (a: app.Person, b: app.Person) => a.name === b.name && a.email === b.email
+
+  function joinWith(other: app.Person) {
+    if (!picking) return
+    joining = [asSuggested(picking), asSuggested(other)]
+    picking = null
+  }
+  let asking = $derived(!!t.suggestions && !t.query.trim() && t.suggestions.offered + t.suggestions.sharedCount + t.suggestions.apartCount > 0)
+
   provideCommands(() => [
     { id: 'people.save', group: 'People', title: t.exists ? 'Save the mailmap' : 'Create the mailmap', shortcut: 'Mod+S', whenTyping: true, run: () => void (t.dirty && t.save()) },
     { id: 'people.view', group: 'People', title: t.view === 'people' ? 'Show the mailmap as text' : 'Show people', run: () => void (t.view = t.view === 'people' ? 'text' : 'people') },
   ])
 </script>
+
+{#snippet suggestion(s: app.Suggestion, mode: 'offer' | 'shared' | 'apart')}
+  <div class="offer">
+    <div class="about">
+      <span class="label">{suggestionLabel(s)}{s.why ? ` · ${s.why}` : ''}</span>
+      {#each s.people as p (p.name + '\n' + p.email)}
+        <span class="line"><span class="pname">{p.name || '(no name)'}</span> <span class="mail">{p.email}</span> <span class="why">· {wrote(p.commits, p.coAuthored)}</span></span>
+      {/each}
+    </div>
+    <div class="answer-to">
+      {#if mode === 'apart'}
+        <button class="btn sm" onclick={() => t.keepApart(s.key, false)}>Offer again</button>
+      {:else}
+        <button class="btn sm" onclick={() => (joining = s.people)}>Same person…</button>
+        {#if mode === 'offer'}<button class="btn sm quiet" title="Remembered for this repository, so it isn't offered again" onclick={() => t.keepApart(s.key, true)}>Different people</button>{/if}
+      {/if}
+    </div>
+  </div>
+{/snippet}
 
 <div class="view">
   <nav class="side" aria-label="Mailmap files">
@@ -180,6 +216,38 @@
               <p>This repository has no mailmap and doesn't need one. Names show as the commits have them, and everything here still works. A mailmap only matters once two names are one person.</p>
             </div>
           {/if}
+          {#if asking && t.suggestions}
+            {@const sg = t.suggestions}
+            <section class="suggest" aria-label="Likely the same person">
+              {#if sg.offered}
+                <div class="shead">
+                  <h2>Looks like the same person</h2>
+                  <span class="count">{sg.offered.toLocaleString()}</span>
+                  <span class="mute">Offers only. Nothing is joined unless you say so.</span>
+                </div>
+                {#each sg.offers as s (s.key)}{@render suggestion(s, 'offer')}{/each}
+                {#if sg.offered > sg.offers.length}<p class="rest">and {(sg.offered - sg.offers.length).toLocaleString()} more, which show as these are answered</p>{/if}
+              {/if}
+              {#if sg.sharedCount}
+                <button class="fold" aria-expanded={openShared} onclick={() => (openShared = !openShared)}>
+                  <span class="turn" class:open={openShared}><Icon name="chevron" size={12} /></span>
+                  <span>Bots and shared addresses</span>
+                  <span class="count">{sg.sharedCount.toLocaleString()}</span>
+                  <span class="mute">not suggested; open to join them yourself</span>
+                </button>
+                {#if openShared}{#each sg.shared as s (s.key)}{@render suggestion(s, 'shared')}{/each}{/if}
+              {/if}
+              {#if sg.apartCount}
+                <button class="fold" aria-expanded={openApart} onclick={() => (openApart = !openApart)}>
+                  <span class="turn" class:open={openApart}><Icon name="chevron" size={12} /></span>
+                  <span>Kept apart</span>
+                  <span class="count">{sg.apartCount.toLocaleString()}</span>
+                  <span class="mute">you said these are different people</span>
+                </button>
+                {#if openApart}{#each sg.apart as s (s.key)}{@render suggestion(s, 'apart')}{/each}{/if}
+              {/if}
+            </section>
+          {/if}
           <div class="bar">
             <label class="find">
               <Icon name="search" size={14} />
@@ -195,9 +263,15 @@
           {:else if t.list && !t.people.length}
             <Empty note="no match" compact>{t.query.trim() ? 'Nobody by that name or address.' : 'This history has no commits yet.'}</Empty>
           {:else}
+            {#if picking}
+              <div class="picking" role="status">
+                <span>Who is <strong>{picking.name || picking.email}</strong> the same person as? Choose them below.</span>
+                <button class="btn sm" onclick={() => (picking = null)}>Cancel</button>
+              </div>
+            {/if}
             <ul class="list" aria-label="People">
               {#each t.people as p (p.name + '\n' + p.email)}
-                <li class="person">
+                <li class="person" class:first={!!picking && same(picking, p)}>
                   <span class="face" style:--c={colorOf(p.name)} aria-hidden="true">{initials(p.name)}</span>
                   <div class="who">
                     <div class="id">
@@ -218,6 +292,13 @@
                     {/each}
                   </div>
                   <span class="n">{wrote(p.commits, p.coAuthored)}</span>
+                  <span class="join">
+                    {#if !picking}
+                      <button class="btn sm quiet" title="Say that this is the same person as someone else in the list" onclick={() => (picking = p)}>Same person as…</button>
+                    {:else if !same(picking, p)}
+                      <button class="btn sm" onclick={() => joinWith(p)}>This one</button>
+                    {/if}
+                  </span>
                 </li>
               {/each}
             </ul>
@@ -330,6 +411,10 @@
     <p class="aside">A commit always keeps what was written. A mailmap only changes what's shown.</p>
   </aside>
 </div>
+
+{#if joining}
+  <SamePersonDialog who={joining} onClose={() => (joining = null)} />
+{/if}
 
 {#if t.confirmCreate}
   <Modal title="Create .mailmap?" eyebrow="a new file" width={520} onClose={() => (t.confirmCreate = false)}>
@@ -678,6 +763,144 @@
     font-size: 12px;
     color: var(--ink-soft);
     white-space: nowrap;
+  }
+
+  /* Who looks like the same person. Offers sit above the list; what isn't offered folds away. */
+  .suggest {
+    display: flex;
+    flex-direction: column;
+    padding: 12px 0 4px;
+  }
+
+  .shead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    padding-bottom: 6px;
+  }
+
+  .shead h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 500;
+  }
+
+  .count {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--link);
+  }
+
+  .fold .count {
+    color: var(--ink-mute);
+  }
+
+  .offer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 10px 0;
+    border-top: 1px dashed var(--hairline);
+  }
+
+  .about {
+    flex: 1 1 320px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .label {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+
+  .line .why {
+    font-size: 13px;
+    color: var(--ink-mute);
+  }
+
+  .answer-to {
+    display: flex;
+    gap: 8px;
+  }
+
+  .rest {
+    margin: 0;
+    padding: 8px 0;
+    border-top: 1px dashed var(--hairline);
+    font-size: 13px;
+    font-style: italic;
+    color: var(--ink-mute);
+  }
+
+  .fold {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    width: 100%;
+    padding: 9px 0;
+    border: 0;
+    border-top: 1px dashed var(--hairline);
+    border-radius: 0;
+    background: transparent;
+    font-size: 14px;
+    color: var(--ink-soft);
+    text-align: left;
+  }
+
+  /* The chevron icon points down: turned to the side while its section is shut. */
+  .turn {
+    display: inline-flex;
+    transform: rotate(-90deg);
+  }
+
+  .turn.open {
+    transform: none;
+  }
+
+  .picking {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-top: 10px;
+    padding: 9px 12px;
+    border-radius: var(--r-md);
+    background: var(--selected);
+    font-size: 14px;
+  }
+
+  .picking span {
+    flex: 1 1 260px;
+  }
+
+  .person.first {
+    background: var(--selected);
+  }
+
+  .join {
+    flex: none;
+    display: flex;
+    min-width: 132px;
+    justify-content: flex-end;
+  }
+
+  /* Quiet until the row is pointed at or tabbed into; the "This one" buttons always show. */
+  .join .quiet {
+    opacity: 0;
+  }
+
+  .person:hover .join .quiet,
+  .person:focus-within .join .quiet {
+    opacity: 1;
   }
 
   .more {
