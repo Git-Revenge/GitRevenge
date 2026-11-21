@@ -299,6 +299,19 @@ const mounts = {
     const { default: RepoView } = await import('../src/lib/RepoView.svelte')
     mount(RepoView, { target: host, props: { path: '/r' } })
   },
+  // The People tab, opened on a repository as the app shell opens it.
+  async people() {
+    host.style.cssText = 'display:block;height:100vh'
+    const { session } = await import('../src/lib/session.svelte')
+    session.tabs = [{ path: '/r', name: 'tidewater', head: 'main' } as never]
+    const { peopleTab } = await import('../src/lib/people/tab.svelte')
+    const { default: PeopleView } = await import('../src/lib/people/PeopleView.svelte')
+    peopleTab.open = true
+    peopleTab.wanted = '/r'
+    mount(PeopleView, { target: host })
+    // What the tab bar's close button does, and what the tab bar reads to mark an edit.
+    Object.assign(win, { __closePeople: () => peopleTab.requestClose(), __peopleTab: () => ({ open: peopleTab.open, dirty: peopleTab.dirty }) })
+  },
   // The repository view under the operation strip, as the app shell stacks them.
   async bisect() {
     host.style.cssText = 'display:flex;flex-direction:column;height:100vh'
@@ -484,6 +497,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'repoView':
     await mounts.repoView()
+    break
+  case 'people':
+    await mounts.people()
     break
   case 'conflictView':
     await mounts.conflictView()

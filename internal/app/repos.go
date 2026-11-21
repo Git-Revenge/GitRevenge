@@ -46,6 +46,10 @@ type SessionState struct {
 	IgnoreTab string `json:"ignoreTab"`
 	// IgnoreTabID is Active's value for the Ignore rules tab.
 	IgnoreTabID string `json:"ignoreTabId"`
+	// PeopleTab is the repository the People tab showed last time, or "" if it was closed.
+	PeopleTab string `json:"peopleTab"`
+	// PeopleTabID is Active's value for the People tab.
+	PeopleTabID string `json:"peopleTabId"`
 }
 
 // FailedRepo is a saved tab that could not be reopened.
@@ -164,6 +168,8 @@ func (a *App) RestoreSession() (SessionState, error) {
 		InsightsTabID: settings.InsightsTabID,
 		IgnoreTab:     m.Settings().Get().IgnoreTab,
 		IgnoreTabID:   settings.IgnoreTabID,
+		PeopleTab:     m.Settings().Get().PeopleTab,
+		PeopleTabID:   settings.PeopleTabID,
 	}
 	// A tab's label is a git call or two: all of them at once, rather than one after another.
 	repos := m.List()

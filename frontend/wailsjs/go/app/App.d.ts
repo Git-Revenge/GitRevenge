@@ -180,7 +180,7 @@ export function LastCommitMessage(arg1:string):Promise<string>;
 
 export function LinkRules(arg1:string):Promise<links.Config>;
 
-export function MailmapNotes(arg1:string,arg2:string):Promise<Array<git.MailmapNote>>;
+export function MailmapNotes(arg1:string,arg2:app.MailmapText,arg3:string):Promise<Array<git.MailmapNote>>;
 
 export function MailmapSources(arg1:string):Promise<Array<git.MailmapSource>>;
 
@@ -333,6 +333,8 @@ export function SetInsightsThresholds(arg1:string,arg2:app.Thresholds):Promise<v
 export function SetKeybindings(arg1:Record<string, string>):Promise<void>;
 
 export function SetKindView(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function SetPeopleTab(arg1:string):Promise<void>;
 
 export function SetPreferences(arg1:app.Preferences):Promise<void>;
 

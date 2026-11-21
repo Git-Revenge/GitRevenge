@@ -4,6 +4,7 @@
   import { gitConfig } from './gitconfig/config.svelte'
   import { insights } from './insights/insights.svelte'
   import { ignoreRules } from './ignorerules/ignoreRules.svelte'
+  import { peopleTab } from './people/tab.svelte'
   import { bisect } from './bisect.svelte'
   import { session } from './session.svelte'
   import { theme } from './theme.svelte'
@@ -43,7 +44,7 @@
 
   $effect(() => {
     // Re-measure when the active tab, the set of tabs or their labels change.
-    void [session.active, session.tabs.map((t) => t.name + t.head), gitConfig.open, insights.open, ignoreRules.open, ignoreRules.repoName]
+    void [session.active, session.tabs.map((t) => t.name + t.head), gitConfig.open, insights.open, ignoreRules.open, ignoreRules.repoName, peopleTab.open, peopleTab.repoName]
     queueMicrotask(placeBar)
   })
 
@@ -113,6 +114,18 @@
           {#if ignoreRules.dirty.length > 0}<span class="dot" aria-label="unsaved changes" title="Unsaved changes">●</span>{/if}
         </button>
         <button class="close" aria-label="Close Ignore rules" title="Close (middle-click)" onclick={() => ignoreRules.requestClose()}>
+          <Icon name="close" size={12} />
+        </button>
+      </div>
+    {/if}
+    {#if peopleTab.open}
+      <div class="tab" class:active={session.active === session.peopleTabId} title="People">
+        <button class="label" onclick={() => session.select(session.peopleTabId)} onauxclick={(e) => e.button === 1 && peopleTab.requestClose()}>
+          <Icon name="people" size={14} />
+          People{#if peopleTab.repoName}<span class="head">{peopleTab.repoName}</span>{/if}
+          {#if peopleTab.dirty}<span class="dot" aria-label="unsaved changes" title="Unsaved changes">●</span>{/if}
+        </button>
+        <button class="close" aria-label="Close People" title="Close (middle-click)" onclick={() => peopleTab.requestClose()}>
           <Icon name="close" size={12} />
         </button>
       </div>

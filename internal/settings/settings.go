@@ -29,6 +29,9 @@ const InsightsTabID = "gitrevenge:insights"
 // IgnoreTabID is ActiveTab's value when the Ignore rules tab is selected.
 const IgnoreTabID = "gitrevenge:ignore"
 
+// PeopleTabID is ActiveTab's value when the People tab is selected.
+const PeopleTabID = "gitrevenge:people"
+
 // maxRecent caps the recently opened repositories list.
 const maxRecent = 20
 
@@ -39,8 +42,8 @@ type Settings struct {
 	Recent []RecentRepo `json:"recent"`
 	// OpenTabs holds the repository paths open as tabs, in tab order.
 	OpenTabs []string `json:"openTabs"`
-	// ActiveTab is the path of the selected tab, ConfigTabID, InsightsTabID or IgnoreTabID for those tabs,
-	// or empty.
+	// ActiveTab is the path of the selected tab, ConfigTabID, InsightsTabID, IgnoreTabID or
+	// PeopleTabID for those tabs, or empty.
 	ActiveTab string `json:"activeTab"`
 	// ConfigTab is the config file selected in the Git Config tab, or empty when that tab
 	// is closed.
@@ -51,6 +54,8 @@ type Settings struct {
 	// IgnoreTab is the repository the Ignore rules tab shows, or empty when that tab is
 	// closed.
 	IgnoreTab string `json:"ignoreTab,omitempty"`
+	// PeopleTab is the repository the People tab shows, or empty when that tab is closed.
+	PeopleTab string `json:"peopleTab,omitempty"`
 	// InsightsThresholds are the Insights tab's branch thresholds by scope ("repo:<path>" or
 	// "group:<name>"): days stale, days long-lived, commits behind, lines changed. A view
 	// preference; every export prints the values it used.

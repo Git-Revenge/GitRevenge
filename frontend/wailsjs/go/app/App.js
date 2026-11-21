@@ -346,8 +346,8 @@ export function LinkRules(arg1) {
   return window['go']['app']['App']['LinkRules'](arg1);
 }
 
-export function MailmapNotes(arg1, arg2) {
-  return window['go']['app']['App']['MailmapNotes'](arg1, arg2);
+export function MailmapNotes(arg1, arg2, arg3) {
+  return window['go']['app']['App']['MailmapNotes'](arg1, arg2, arg3);
 }
 
 export function MailmapSources(arg1) {
@@ -652,6 +652,10 @@ export function SetKeybindings(arg1) {
 
 export function SetKindView(arg1, arg2, arg3) {
   return window['go']['app']['App']['SetKindView'](arg1, arg2, arg3);
+}
+
+export function SetPeopleTab(arg1) {
+  return window['go']['app']['App']['SetPeopleTab'](arg1);
 }
 
 export function SetPreferences(arg1) {

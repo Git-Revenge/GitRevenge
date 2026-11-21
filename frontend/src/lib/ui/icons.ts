@@ -35,6 +35,8 @@ export const ICONS = {
   // Stacked branches: three layers, one on another.
   stack: ['M12 3 3.5 7.5 12 12l8.5-4.5z', 'm3.5 12 8.5 4.5 8.5-4.5', 'm3.5 16.5 8.5 4.5 8.5-4.5'],
   // Bot: a robot's head, antenna up.
+  // People: one person in front, another behind their shoulder.
+  people: [c(9, 8.5, 3.5), 'M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6', 'M16 5.2c1.7.4 3 1.7 3 3.3s-1.3 2.9-3 3.3', 'M18 14.3c2 .8 3.5 3 3.5 5.7'],
   bot: [rr(4.5, 8, 15, 11, 3), 'M12 8V5.5', c(12, 4, 1.5), dot(9.5, 13), dot(14.5, 13), 'M10 16h4', 'M2.5 12v3', 'M21.5 12v3'],
   // Feature: a young branch, a stem and two leaves.
   sprout: ['M12 21v-9', 'M12 12C12 8 9 5.5 4.5 5.5 4.5 10 7.5 12 12 12z', 'M12 15c0-3 2.5-5.5 7-5.5 0 4-3 5.5-7 5.5z'],

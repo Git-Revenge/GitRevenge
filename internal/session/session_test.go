@@ -251,6 +251,24 @@ func TestRestoreKeepsIgnoreTab(t *testing.T) {
 	}
 }
 
+func TestRestoreKeepsPeopleTab(t *testing.T) {
+	m, store := newManager(t)
+	r, err := m.Open(context.Background(), gittest.New(t).Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Update(func(s *settings.Settings) { s.PeopleTab = r.Path }); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.SetActive(settings.PeopleTabID); err != nil {
+		t.Fatal(err)
+	}
+	m.CloseAll()
+	if active, _ := m.Restore(context.Background()); active != settings.PeopleTabID {
+		t.Fatalf("active = %q, want the People tab", active)
+	}
+}
+
 func TestOnChangeReportsRepoChanges(t *testing.T) {
 	m, _ := newManager(t)
 	changes := make(chan watch.Kind, 16)

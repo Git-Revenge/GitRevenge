@@ -18,6 +18,8 @@ Two readings of "the mailmap" were on the table for those other places: the pinn
 - **What a commit says is never hidden.** The commit's own name and address stay in what the backend returns, and the commit panel shows them whenever the mailmap reads them as someone else. Copying and signatures use what the commit has.
 - **Search finds a person under every name.** A row matches by the mapped name and by the name it was written with. A query with an `@` is an address and matches addresses the same way; other queries leave addresses alone, so "github" doesn't match everyone with a no-reply address there.
 - **No commit changes.** A mailmap changes what is shown. Taking a line out puts every name back.
+- **A repository needs no mailmap, and the app never creates one unasked.** Everything works without one. Reading never writes. The People view edits the work tree's `.mailmap` only, shows what an edit does before it's saved, and where there's no `.mailmap` it asks before creating the file; the backend refuses to create one unless the call says the user agreed.
+- **The app reads mailmap text itself where it has to answer before a save:** the People view's list, its line notes and "Who is this?" follow git's rules in the app's own reader, checked against `git check-mailmap` in the tests. Everything that shows a saved mailmap's names still asks git.
 
 ## Consequences
 

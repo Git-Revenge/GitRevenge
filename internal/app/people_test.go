@@ -136,10 +136,10 @@ func TestPeopleFilterAndPages(t *testing.T) {
 
 func TestMailmapNotesForTextBeingEdited(t *testing.T) {
 	t.Parallel()
-	a, _, path := peopleRepo(t)
+	a, fx, path := peopleRepo(t)
 	text := "# Tidewater\nPriya Raman <priya@tidewater.example> <priya@oldmill.example>\nJo Whitlock <jo@tidewater.example> <jo@harbour.example>\nLeo Brandt leo@tidewater.example\n"
 
-	notes, err := a.MailmapNotes(path, text)
+	notes, err := a.MailmapNotes(path, MailmapText{Text: text, Edited: true}, git.MailmapWorkTree)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,8 +155,20 @@ func TestMailmapNotesForTextBeingEdited(t *testing.T) {
 	if n := notes[3]; n.Kind != git.MailmapSkipped || n.Why == "" {
 		t.Errorf("a line git skips = %+v", n)
 	}
-	if notes, err := a.MailmapNotes(path, ""); err != nil || notes == nil || len(notes) != 0 {
+	// With nothing being edited and no file saved, there are no lines to note.
+	if notes, err := a.MailmapNotes(path, MailmapText{}, git.MailmapWorkTree); err != nil || notes == nil || len(notes) != 0 {
 		t.Fatalf("no text gave %v, %v", notes, err)
+	}
+	// A source that's only read is noted from what's saved. mailmap.file is read last, so
+	// its lines still decide the names, beside the edit that decides Priya's address.
+	fx.WriteFile("mine.txt", "P. Raman <priya@oldmill.example>\nMaya O. <maya@tidewater.example>\n")
+	fx.Git("config", "mailmap.file", "mine.txt")
+	notes, err = a.MailmapNotes(path, MailmapText{Text: text, Edited: true}, git.MailmapFile)
+	if err != nil || len(notes) != 2 {
+		t.Fatalf("notes for mailmap.file = %+v, %v", notes, err)
+	}
+	if notes[0].Identities != 1 || notes[1].Identities != 1 || notes[1].Commits != 3 {
+		t.Errorf("mailmap.file's lines = %+v", notes)
 	}
 }
 
