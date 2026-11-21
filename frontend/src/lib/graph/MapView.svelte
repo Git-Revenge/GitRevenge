@@ -2,13 +2,40 @@
   // An experimental view with no commits in it: a node for each branch and tag, held around
   // the trunk. Size is commits, distance is how long since it moved. It's a way in to the
   // timeline, not a place to work: a node's card opens the timeline on it.
-  import { BranchMap, BranchMapGroup } from '../../../wailsjs/go/app/App.js'
+  //
+  // It has a second mode, Authors (#816): a node for each person who committed inside the
+  // span the rings cover, sized by how many commits and as far out as their last one is old.
+  import { BranchMap, BranchMapGroup, MapAuthorHistory, MapAuthors } from '../../../wailsjs/go/app/App.js'
   import { kindInfo } from '../branchKinds'
   import { errorText } from '../errors'
   import Loading from '../ui/Loading.svelte'
-  import { laneVar, relativeTime } from './draw'
+  import { initials, LANE_COUNT, laneVar, relativeTime } from './draw'
   import Icon from '../ui/Icon.svelte'
-  import { DEFAULT_SCALE, fittingScale, keyShows, layout, pinKey, SCALES, showingNodes, widestScale, WIP_R, wipPlace, zoomBy, type MapNode, type Placed, type Showing } from './mapLayout'
+  import {
+    AUTHORS_SCALE,
+    authorColor,
+    authorNode,
+    authorsScale,
+    authorsSummary,
+    DEFAULT_SCALE,
+    fittingScale,
+    keyShows,
+    layout,
+    pinKey,
+    SCALES,
+    showingNodes,
+    shownAuthors,
+    spanDays,
+    widestScale,
+    WIP_R,
+    wipPlace,
+    zoomBy,
+    type MapAuthor,
+    type MapNode,
+    type Placed,
+    type Showing,
+    type Who,
+  } from './mapLayout'
 
   let {
     path,
@@ -16,6 +43,7 @@
     onShow,
     onMenu,
     onSummary,
+    onAuthor,
     wip,
   }: {
     path: string
@@ -27,6 +55,8 @@
     onMenu?: (node: MapNode, x: number, y: number) => void
     /** What the map holds, for the bar: "8 branches · 13 tags". */
     onSummary?: (text: string) => void
+    /** Opens the timeline searching for an author, from their card in the Authors mode. */
+    onAuthor?: (name: string) => void
     /** The working tree: how many files have changed (null until known), whether its panel is
      * showing, and how to show it. It's drawn against the checked-out branch. */
     wip?: { changes: number | null; active: boolean; open: () => void }
@@ -58,8 +88,7 @@
         if (mine !== seq) return
         data = res as unknown as Data
         error = ''
-        onSummary?.(`${plural(data.branches, 'branch', 'branches')} · ${plural(data.tags, 'tag')}`)
-        if (picked && ![data.trunk, ...data.nodes].some((n) => keyOf(n) === picked)) picked = ''
+        if (mode === 'branches' && picked && ![data.trunk, ...data.nodes].some((n) => keyOf(n) === picked)) picked = ''
         // The groups that were open are read again, and one that's gone is forgotten.
         const groups = new Set(data.nodes.filter((n) => n.kind === 'group').map((n) => n.name))
         for (const name of Object.keys(opened)) {
@@ -119,39 +148,152 @@
       // The choice just isn't kept.
     }
   }
+
+  // The mode: branches and tags, or the people who wrote the commits. Kept for each repository.
+  type Mode = 'branches' | 'authors'
+  /** A choice kept for this repository, under `name`; `fallback` when none is, or it's unknown. */
+  function saved<T extends string>(name: string, known: readonly T[], fallback: T): T {
+    try {
+      const got = localStorage.getItem(`graph.map.${name}:${path}`)
+      return known.includes(got as T) ? (got as T) : fallback
+    } catch {
+      return fallback
+    }
+  }
+  /** Keeps a choice for this repository; the usual one isn't written down. */
+  function keep(name: string, value: string, usual: string) {
+    try {
+      if (value === usual) localStorage.removeItem(`graph.map.${name}:${path}`)
+      else localStorage.setItem(`graph.map.${name}:${path}`, value)
+    } catch {
+      // The choice just isn't kept.
+    }
+  }
+  let mode = $state<Mode>(saved('mode', ['branches', 'authors'], 'branches'))
+  function setMode(to: Mode) {
+    if (to === mode) return
+    mode = to
+    picked = ''
+    keep('mode', to, 'branches')
+  }
+  // Who the Authors mode shows: everyone, only people, or only bots. It opens on people: a
+  // dependency bot would otherwise be the biggest node most weeks.
+  let who = $state<Who>(saved('who', ['everyone', 'people', 'bots'], 'people'))
+  function setWho(to: Who) {
+    who = to
+    keep('who', to, 'people')
+  }
+
+  /** What the Authors mode draws (app.AuthorMap in Go), and the span of days it was read for. */
+  interface Authors {
+    authors: MapAuthor[]
+    people: number
+    bots: number
+    commits: number
+    days: number
+  }
+  let authorData = $state<Authors | null>(null)
+  /** The Authors mode is reading: a long history takes a few seconds. */
+  let reading = $state(false)
+  let shown = $derived(authorData ? shownAuthors(authorData.authors, who) : [])
+  let authorOf = $derived(new Map(shown.map((a) => [a.key, a])))
+
   /** The nodes to draw: the map's own and the branches of the groups that are open, less what
-   * the switch leaves out. */
-  let nodes = $derived(data ? showingNodes([...data.nodes, ...Object.values(opened).flatMap((g) => g.nodes)], showing) : [])
+   * the switch leaves out; or in the Authors mode, the authors. */
+  let nodes = $derived(mode === 'authors' ? shown.map(authorNode) : data ? showingNodes([...data.nodes, ...Object.values(opened).flatMap((g) => g.nodes)], showing) : [])
 
   // Zoom: what the rings mean. All the way in, the map is one week and each ring a day; out,
   // the rings become weeks, then months, then years. The level is kept between visits.
   // The level is kept for each repository: a year-old one and a twenty-year-old one want
   // different scales. Until one is chosen, the map opens at the level that fits most of it.
-  const zoomKey = () => `graph.map.zoom:${path}`
-  function savedZoom(): number | null {
+  // Each mode keeps its own: the zoom that fits a repository's branches often isn't the one
+  // that fits its people.
+  const zoomKey = (of: Mode = mode) => (of === 'authors' ? `graph.map.zoom.authors:${path}` : `graph.map.zoom:${path}`)
+  function savedZoom(of: Mode): number | null {
     try {
-      const got = localStorage.getItem(zoomKey())
+      const got = localStorage.getItem(zoomKey(of))
       const n = got === null ? NaN : Number(got)
       return Number.isInteger(n) ? zoomBy(n, 0) : null
     } catch {
       return null
     }
   }
-  let chosenZoom = $state(savedZoom())
-  /** As far out as it's worth going: the level that just holds the oldest node. */
-  let widest = $derived(data ? widestScale(nodes, now) : SCALES.length - 1)
+  let chosenZoom = $state(savedZoom('branches'))
+  let chosenAuthorZoom = $state(savedZoom('authors'))
+  /** As far out as it's worth going: the level that just holds the oldest node. The Authors
+   * mode only knows who's inside its span, so it can always look further back. */
+  let widest = $derived(mode === 'authors' || !data ? SCALES.length - 1 : widestScale(nodes, now))
   // The level that fits is judged by the map's own nodes: opening a group doesn't change it.
-  let zoom = $derived(Math.min(widest, chosenZoom ?? (data ? fittingScale(showingNodes(data.nodes, showing), now) : DEFAULT_SCALE)))
+  // In the Authors mode it's two months, or as far out as the trunk's last commit.
+  let zoom = $derived(
+    mode === 'authors'
+      ? (chosenAuthorZoom ?? (data?.trunk.name ? authorsScale(data.trunk.updated, now) : AUTHORS_SCALE))
+      : Math.min(widest, chosenZoom ?? (data ? fittingScale(showingNodes(data.nodes, showing), now) : DEFAULT_SCALE)),
+  )
   let scale = $derived(SCALES[zoom])
   function zoomTo(level: number) {
     if (level === zoom) return
-    chosenZoom = level
+    if (mode === 'authors') chosenAuthorZoom = level
+    else chosenZoom = level
     try {
       localStorage.setItem(zoomKey(), String(level))
     } catch {
       // The level just isn't kept.
     }
   }
+
+  // The Authors mode reads who wrote the commits inside the span the rings cover, again each
+  // time the zoom changes it. What's on screen stays until the answer comes.
+  let authorSeq = 0
+  $effect(() => {
+    void tick
+    if (mode !== 'authors' || !data?.trunk.name) return
+    const days = spanDays(zoom)
+    const mine = ++authorSeq
+    reading = true
+    MapAuthors(path, days)
+      .then((res) => {
+        if (mine !== authorSeq) return
+        authorData = { authors: (res?.authors ?? []) as unknown as MapAuthor[], people: res?.people ?? 0, bots: res?.bots ?? 0, commits: res?.commits ?? 0, days }
+        error = ''
+        reading = false
+        if (picked.startsWith('author:') && !authorData.authors.some((a) => `author:${a.key}` === picked)) picked = ''
+      })
+      .catch((e: unknown) => {
+        if (mine !== authorSeq) return
+        error = errorText(e)
+        reading = false
+      })
+  })
+
+  // What the map holds, for the bar above it.
+  $effect(() => {
+    if (!data) return
+    if (mode === 'branches') return onSummary?.(`${plural(data.branches, 'branch', 'branches')} · ${plural(data.tags, 'tag')}`)
+    if (!authorData) return onSummary?.('')
+    // "60 of 10,339 people" only when people are what's being shown and some were left out.
+    const people = who === 'bots' ? authorData.people : shown.filter((a) => !a.bot).length
+    onSummary?.(`${authorsSummary(authorData.people, authorData.bots, people)} in ${SCALES[zoom].period}`)
+  })
+
+  // An author's card says how much they've written in all, which is read when the card opens:
+  // a walk of the whole history, for that one person.
+  type History = { authored: number; coAuthored: number; first: number; last: number }
+  let histories = $state<Record<string, History | 'reading' | 'failed'>>({})
+  $effect(() => {
+    // A reload may have brought new commits: what was counted before is asked for again.
+    void tick
+    histories = {}
+  })
+  $effect(() => {
+    const au = picked.startsWith('author:') ? authorOf.get(picked.slice('author:'.length)) : undefined
+    if (!au || histories[au.key]) return
+    const key = au.key
+    histories = { ...histories, [key]: 'reading' }
+    MapAuthorHistory(path, au.identities as never)
+      .then((res) => (histories = { ...histories, [key]: res as History }))
+      .catch(() => (histories = { ...histories, [key]: 'failed' }))
+  })
   /** The wheel zooms a step for each notch: there's nothing here to scroll. */
   let wheeled = 0
   function onWheel(e: WheelEvent) {
@@ -223,7 +365,8 @@
   /** Tab order: the trunk, then the rest, newest first. */
   let ordered = $derived(placed ? [...placed.nodes].sort((a, b) => b.updated - a.updated || a.name.localeCompare(b.name)) : [])
   /** Where each line starts: the branch a tag hangs off, or the trunk. */
-  const holderOf = (n: Placed) => (n.parent && placed?.nodes.find((p) => p.name === n.parent && (p.kind === 'branch' || p.kind === 'remote' || p.kind === 'group'))) || placed?.trunk
+  const holderOf = (n: Placed) =>
+    (n.parent && placed?.nodes.find((p) => (p.id ?? p.name) === n.parent && (p.kind === 'branch' || p.kind === 'remote' || p.kind === 'group' || p.kind === 'author'))) || placed?.trunk
   /** The oldest tag has no tag before it to count from. */
   let firstTag = $derived.by(() => {
     if (!data || data.nodes.some((n) => n.kind === 'tags')) return ''
@@ -234,7 +377,8 @@
   /** The working tree's mark sits against whatever is checked out; with a detached HEAD, or a
    * checked-out branch that isn't shown, against the trunk. */
   let wipAt = $derived.by(() => {
-    if (!wip || !placed) return null
+    // The working tree belongs to a branch: the Authors mode has none to set it against.
+    if (!wip || !placed || mode === 'authors') return null
     const head = placed.trunk.head ? placed.trunk : (placed.nodes.find((n) => n.head) ?? placed.trunk)
     return { ...wipPlace(head, placed.trunk, width, height), on: head.name }
   })
@@ -244,6 +388,9 @@
   function colorOf(n: MapNode): string {
     if (n.kind === 'trunk') return laneVar(0)
     if (n.kind === 'tag' || n.kind === 'tags') return 'var(--accent-c)'
+    // A person takes one of the lanes' colours, the same one each time, and never the
+    // trunk's; a bot is drawn in the Bot kind's.
+    if (n.kind === 'author') return n.bot ? `var(${kindInfo('bot')?.token ?? '--ink-faint'})` : laneVar(1 + authorColor(n.name, LANE_COUNT - 1))
     const kind = kindInfo(n.branchKind)
     if (kind) return `var(${kind.token})`
     let h = 0
@@ -254,8 +401,31 @@
   function sizeLine(n: MapNode): string {
     if (n.kind === 'group') return plural(n.branches ?? 0, 'branch', 'branches')
     if (n.kind === 'tags' || n.kind === 'trunk') return plural(n.commits, 'commit')
-    if (n.kind === 'tag') return plural(n.commits, 'commit')
+    if (n.kind === 'tag' || n.kind === 'author') return plural(n.commits, 'commit')
     return n.commits ? plural(n.commits, 'commit') : `all in ${data?.trunk.name ?? 'the trunk'}`
+  }
+
+  /** How an author's commits in the span split: "12 written, 26 co-authored". Only said when
+   * some are co-authored, since otherwise the total says it. */
+  function split(au: MapAuthor): string {
+    return au.coAuthored ? `: ${au.authored.toLocaleString()} written, ${au.coAuthored.toLocaleString()} co-authored` : ''
+  }
+
+  /** What an author's card says of them, and a screen reader hears. */
+  function aboutAuthor(au: MapAuthor): string {
+    const when = relativeTime(au.updated, now)
+    const what = au.bot ? 'A bot. ' : ''
+    return `${what}${plural(au.commits, 'commit')} in ${scale.period}${split(au)}. Last commit ${when === 'now' ? 'just now' : when}.`
+  }
+
+  /** How much an author has written in all, once it's been read. */
+  function inAll(au: MapAuthor): string {
+    const h = histories[au.key]
+    if (!h || h === 'reading') return 'Counting their whole history…'
+    if (h === 'failed') return "Couldn't count their whole history."
+    const total = h.authored + h.coAuthored
+    const first = h.first ? ` First commit ${relativeTime(h.first, now)}.` : ''
+    return `${plural(total, 'commit')} in all${h.coAuthored ? ` (${h.coAuthored.toLocaleString()} co-authored)` : ''}.${first}`
   }
 
   /** What the card says of a node, and a screen reader hears of it. */
@@ -263,6 +433,14 @@
     const trunk = data?.trunk.name ?? 'the trunk'
     const when = relativeTime(n.updated, now)
     const moved = `Last moved ${when === 'now' ? 'just now' : when}.`
+    if (n.kind === 'author') {
+      const au = authorOf.get(n.id ?? '')
+      return au ? aboutAuthor(au) : plural(n.commits, 'commit')
+    }
+    if (n.kind === 'trunk' && mode === 'authors' && authorData) {
+      const by = [authorData.people ? plural(authorData.people, 'person', 'people') : '', authorData.bots ? plural(authorData.bots, 'bot') : ''].filter(Boolean).join(' and ')
+      return `${plural(n.commits, 'commit')}. ${authorData.commits ? `${authorData.commits.toLocaleString()} of them in ${scale.period}, by ${by}` : `None in ${scale.period}`}. Merges aren't counted.`
+    }
     if (n.kind === 'trunk') return `${plural(n.commits, 'commit')}. ${moved}`
     if (n.kind === 'group') {
       const more = opened[n.name]?.more ?? 0
@@ -275,15 +453,19 @@
     return `${where}${own} ${moved}`
   }
 
-  const shapeOf = (n: MapNode) => (n.kind === 'tag' || n.kind === 'tags' ? 'tag' : n.kind === 'remote' ? 'remote' : n.kind === 'branch' && !n.commits ? 'merged' : n.kind)
+  const shapeOf = (n: MapNode) => (n.kind === 'tag' || n.kind === 'tags' ? 'tag' : n.kind === 'remote' ? 'remote' : n.kind === 'branch' && !n.commits ? 'merged' : n.kind === 'author' && n.bot ? 'bot' : n.kind)
+  /** What marks where you are: the checked-out branch, or in the Authors mode, you. */
+  const hereWords = (n: MapNode) => (n.kind === 'author' ? 'that’s you' : 'you’re here')
   /** Opens a group, or folds it away again. */
   const toggleGroup = (name: string) => (opened[name] ? closeGroup(name) : void openGroup(name))
 
   /** The card sits beside its node, on whichever side has the room. */
   function cardPlace(n: Placed): string {
-    const w = 232
+    // An author's card holds more: their names, and what they've written in all.
+    const w = n.kind === 'author' ? 264 : 232
+    const tall = n.kind === 'author' ? 230 : 150
     const left = n.x + n.r + 14 + w < width ? n.x + n.r + 14 : Math.max(8, n.x - n.r - 14 - w)
-    const top = Math.min(Math.max(8, n.y - 30), Math.max(8, height - 150))
+    const top = Math.min(Math.max(8, n.y - 30), Math.max(8, height - tall))
     return `left: ${left}px; top: ${top}px; width: ${w}px;`
   }
 
@@ -312,7 +494,7 @@
     class:quiet={n.kind !== 'trunk' && !n.named}
     data-node={key}
     aria-pressed={picked === key}
-    aria-label="{n.name}{n.head ? ', checked out' : ''}. {about(n)}"
+    aria-label="{n.name}{n.head ? (n.kind === 'author' ? ', you' : ', checked out') : ''}. {about(n)}"
     style:left="{n.x}px"
     style:top="{n.y}px"
     style:--c={colorOf(n)}
@@ -330,24 +512,52 @@
     onpointercancel={nodeUp}
     ondblclick={() => (n.pinned ? unpin(key) : n.kind === 'group' ? toggleGroup(n.name) : undefined)}
     oncontextmenu={(e) => {
-      if (!onMenu || n.kind === 'tags' || n.kind === 'group') return
+      // A person isn't a commit: there's no menu to give them.
+      if (!onMenu || n.kind === 'tags' || n.kind === 'group' || n.kind === 'author') return
       e.preventDefault()
       onMenu(n, e.clientX, e.clientY)
     }}
   >
     <span class="shape">
       {#if n.kind === 'trunk'}
-        <b>{n.name}</b><span>{plural(n.commits, 'commit')}</span>{#if n.head}<i>you’re here</i>{/if}
+        <b>{n.name}</b><span>{plural(n.commits, 'commit')}</span>{#if n.head && mode === 'branches'}<i>you’re here</i>{/if}
       {:else if n.kind === 'group'}
         <b>{(n.branches ?? 0).toLocaleString()}</b>
+      {:else if n.kind === 'author' && n.bot}
+        <!-- A bot wears the Bot kind's icon where a person has initials, as in the timeline. -->
+        {#if n.size >= 20}<Icon name={kindInfo('bot')?.icon ?? 'bot'} size={Math.min(18, Math.round(n.size * 0.55))} />{/if}
+      {:else if n.kind === 'author'}
+        {#if n.size >= 24}<b>{initials(n.name)}</b>{/if}
       {/if}
     </span>
     {#if n.worktree}<span class="badge" title="Checked out in the worktree at {n.worktree}"><Icon name="worktree" size={12} /></span>{/if}
     {#if n.kind !== 'trunk'}
-      <span class="name" class:above={n.above}><b>{n.name}</b><small>{sizeLine(n)}</small>{#if n.head}<i>you’re here</i>{/if}</span>
+      <span class="name" class:above={n.above}><b>{n.name}</b><small>{sizeLine(n)}</small>{#if n.head}<i>{hereWords(n)}</i>{/if}</span>
     {/if}
   </button>
-  {#if picked === key}
+  {#if picked === key && n.kind === 'author'}
+    {@const au = authorOf.get(n.id ?? '')}
+    <div class="card" style={cardPlace(n)} role="group" aria-label="About {n.name}">
+      <b>{n.name}</b>
+      <span>{about(n)}</span>
+      {#if au}
+        <span aria-live="polite">{inAll(au)}</span>
+        {#if au.identities.length > 1}
+          <!-- Who was folded into this one person: a wrong fold shows here. -->
+          <span class="also">
+            Counted as one person:
+            {#each au.identities as id (id.name + ' ' + id.email)}
+              <span class="who"><b>{id.name || 'No name'}</b><span>{id.email}</span><small>{id.commits.toLocaleString()}</small></span>
+            {/each}
+          </span>
+        {/if}
+      {/if}
+      <span class="acts">
+        {#if onAuthor}<button class="btn sm text" onclick={() => onAuthor(n.name)}>Search the timeline for them</button>{/if}
+        {#if n.pinned}<button class="btn sm text" onclick={() => unpin(key)}>Let it go back to its place</button>{/if}
+      </span>
+    </div>
+  {:else if picked === key}
     <div class="card" style={cardPlace(n)} role="group" aria-label="About {n.name}">
       <b>{n.name}</b>
       <span>{about(n)}</span>
@@ -367,7 +577,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="map" bind:this={stage} bind:clientWidth={width} bind:clientHeight={height} onkeydown={onKey}>
   {#if error}
-    <p class="note" role="alert">Couldn't read the branches and tags: {error}</p>
+    <p class="note" role="alert">Couldn't read {mode === 'authors' && data ? 'who wrote the commits' : 'the branches and tags'}: {error}</p>
   {:else if !data}
     <Loading />
   {:else if !data.trunk.name}
@@ -404,12 +614,25 @@
     {/if}
     {/if}
 
-    <div class="nodes" role="group" aria-label="Branches and tags around {data.trunk.name}">
+    <div class="nodes" role="group" aria-label="{mode === 'authors' ? 'Authors' : 'Branches and tags'} around {data.trunk.name}" aria-busy={mode === 'authors' && reading}>
       {@render nodeButton(placed.trunk)}
       {#each ordered as n (keyOf(n))}
         {@render nodeButton(n)}
       {/each}
     </div>
+
+    {#if mode === 'authors' && (reading || (authorData && !nodes.length))}
+      <!-- Under the trunk: what the map is waiting for, or why it has nobody on it. -->
+      <p class="word" role="status" style:left="{placed.trunk.x}px" style:top="{placed.trunk.y + placed.trunk.r + 14}px">
+        {#if reading}
+          Reading who wrote what…
+        {:else if who === 'bots'}
+          No bots committed in {scale.period}.
+        {:else}
+          Nobody committed in {scale.period}.{zoom < widest ? ' Zoom out to look further back.' : ''}
+        {/if}
+      </p>
+    {/if}
 
     {#if keyShows(width, height)}
     {#if wip && wipAt}
@@ -419,10 +642,26 @@
       </button>
     {/if}
 
-    <div class="showing" role="group" aria-label="Branches to show">
-      {#each [['all', 'All'], ['local', 'Local'], ['remote', 'Remote']] as [which, label] (which)}
-        <button aria-pressed={showing === which} onclick={() => show(which as Showing)}>{label}</button>
-      {/each}
+    <!-- What the map is of, and under it what that mode leaves in. -->
+    <div class="choices">
+      <div class="choice" role="group" aria-label="What the map shows">
+        {#each [['branches', 'Branches'], ['authors', 'Authors']] as [which, label] (which)}
+          <button aria-pressed={mode === which} onclick={() => setMode(which as Mode)}>{label}</button>
+        {/each}
+      </div>
+      {#if mode === 'authors'}
+        <div class="choice" role="group" aria-label="Authors to show">
+          {#each [['everyone', 'Everyone'], ['people', 'People'], ['bots', 'Bots']] as [which, label] (which)}
+            <button aria-pressed={who === which} onclick={() => setWho(which as Who)}>{label}</button>
+          {/each}
+        </div>
+      {:else}
+        <div class="choice" role="group" aria-label="Branches to show">
+          {#each [['all', 'All'], ['local', 'Local'], ['remote', 'Remote']] as [which, label] (which)}
+            <button aria-pressed={showing === which} onclick={() => show(which as Showing)}>{label}</button>
+          {/each}
+        </div>
+      {/if}
     </div>
 
     <div class="zoom" role="group" aria-label="Zoom">
@@ -431,14 +670,26 @@
       <button class="btn sm quiet icon" aria-label="Zoom out" title="Zoom out: the rings mark more time (-)" disabled={zoom >= widest} onclick={() => zoomTo(zoomBy(zoom, 1, widest))}>−</button>
     </div>
 
-    <div class="legend">
-      <div><i class="k-branch"></i>Local branch</div>
-      <div><i class="k-remote"></i>Only on the remote</div>
-      <div><i class="k-group"></i>Several, under one path</div>
-      <div><i class="k-merged"></i>Nothing of its own left</div>
-      <div><i class="k-tag"></i>Tag</div>
-      {#if data.moreBranches}<div class="more">{plural(data.moreBranches, 'older branch', 'older branches')} not shown</div>{/if}
-    </div>
+    {#if mode === 'authors'}
+      {@const left = authorData && who !== 'bots' ? authorData.people - shown.filter((a) => !a.bot).length : 0}
+      <div class="legend">
+        <div><i class="k-person"></i>A person</div>
+        <div><i class="k-bot"></i>A bot</div>
+        <!-- Kept short: the key is as wide as the layout keeps clear for it. -->
+        <div class="more">Bigger: more commits</div>
+        <div class="more">Closer: committed lately</div>
+        {#if left > 0}<div class="more">{plural(left, 'person', 'people')} with fewer not shown</div>{/if}
+      </div>
+    {:else}
+      <div class="legend">
+        <div><i class="k-branch"></i>Local branch</div>
+        <div><i class="k-remote"></i>Only on the remote</div>
+        <div><i class="k-group"></i>Several, under one path</div>
+        <div><i class="k-merged"></i>Nothing of its own left</div>
+        <div><i class="k-tag"></i>Tag</div>
+        {#if data.moreBranches}<div class="more">{plural(data.moreBranches, 'older branch', 'older branches')} not shown</div>{/if}
+      </div>
+    {/if}
     {/if}
   {/if}
 </div>
@@ -610,6 +861,32 @@
     box-shadow: inset 0 0 0 2px var(--c);
   }
 
+  /* A person: a filled circle in their colour, with their initials when there's room, as the
+     timeline draws the start of a run. */
+  .node.is-author .shape,
+  .node.is-bot .shape {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 49% 51% 52% 48% / 51% 48% 52% 49%;
+    background: color-mix(in srgb, var(--c) 80%, var(--paper));
+    color: var(--on-accent);
+  }
+
+  .node.is-author .shape b {
+    font-family: var(--font-mono);
+    font-size: clamp(12px, calc(var(--size) * 0.34), 16px);
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  /* A bot isn't a person: paper inside a dashed line, and the Bot kind's icon. */
+  .node.is-bot .shape {
+    background: color-mix(in srgb, var(--c) 16%, var(--paper));
+    border: 1.5px dashed var(--c);
+    color: var(--ink-soft);
+  }
+
   .node.is-tag .shape {
     border-radius: 5px;
     background: color-mix(in srgb, var(--c) 72%, var(--paper));
@@ -750,6 +1027,65 @@
     align-items: flex-start;
   }
 
+  /* The names and emails folded into one person, each with its commits. */
+  .also {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    max-height: 96px;
+    overflow-y: auto;
+    color: var(--ink-mute);
+  }
+
+  /* The name and the count always show; a long email is what gives way. */
+  .also .who {
+    display: flex;
+    gap: 6px;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .also .who b {
+    flex: none;
+    max-width: 55%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+    color: var(--ink-soft);
+  }
+
+  .also .who span {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .also .who small {
+    flex: none;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+
+  /* A word under the trunk: what the map is waiting for, or why nobody is on it. */
+  .word {
+    position: absolute;
+    z-index: 2;
+    max-width: 260px;
+    margin: 0;
+    padding: 1px 8px;
+    border-radius: var(--r-sm);
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    font-family: var(--font-hand);
+    font-size: 19px;
+    line-height: 1.15;
+    text-align: center;
+    color: var(--ink-soft);
+    transform: translateX(-50%) rotate(-1.5deg);
+    pointer-events: none;
+  }
+
   .badge {
     position: absolute;
     left: calc(50% + var(--reach) * 0.7 - 2px);
@@ -802,11 +1138,19 @@
     outline-offset: 3px;
   }
 
-  .showing {
+  /* The switches: what the map is of, and under it what that mode leaves in. */
+  .choices {
     position: absolute;
     left: 12px;
     top: 10px;
     z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .choice {
     display: flex;
     gap: 2px;
     padding: 2px;
@@ -814,7 +1158,7 @@
     background: color-mix(in srgb, var(--paper-deep) 90%, transparent);
   }
 
-  .showing button {
+  .choice button {
     height: 24px;
     padding: 0 10px;
     border: none;
@@ -826,7 +1170,7 @@
     cursor: pointer;
   }
 
-  .showing button[aria-pressed='true'] {
+  .choice button[aria-pressed='true'] {
     background: var(--paper);
     color: var(--ink);
     box-shadow: 0 0 0 1px var(--paper-edge);
@@ -901,6 +1245,18 @@
     border-radius: 50%;
     border: 1.5px dashed var(--lane-3);
     box-shadow: 0 0 0 2px var(--paper), 0 0 0 3px color-mix(in srgb, var(--lane-3) 55%, transparent);
+  }
+
+  .legend .k-person {
+    border-radius: 50%;
+    background: var(--lane-2);
+  }
+
+  .legend .k-bot {
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 1.5px dashed var(--ink-faint);
+    background: color-mix(in srgb, var(--ink-faint) 16%, var(--paper));
   }
 
   .legend .k-merged {
