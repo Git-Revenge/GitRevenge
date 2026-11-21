@@ -1476,16 +1476,25 @@ test.describe('commit graph', () => {
 
     // #836: a mailmap changes who is shown, and the panel still says what the commit has.
     test('a commit the mailmap reads as someone else says what it was written with', async ({ page }) => {
-      const s = scenario()
+      // Written under a long no-reply address, which doesn't fit beside the words.
+      const wrote = { ...person, name: 'ana cruz', email: '1234567+ana-cruz-ito@users.noreply.github.example' }
+      const said = 'ana cruz <1234567+ana-cruz-ito@users.noreply.github.example>'
+      const s = scenario({ author: wrote, committer: wrote })
       const mapped = { name: 'Ana Cruz-Ito', email: 'ana@tidewater.example' }
       await open(page, 'repoView', { ...s, responses: { ...s.responses, CommitDetail: { ...s.responses.CommitDetail, author: mapped, committer: mapped } } })
       const box = (await page.locator('.scroller').boundingBox())!
       await page.mouse.click(box.x + 500, box.y + ROW + 26)
       const panel = page.getByRole('complementary', { name: 'Commit details' })
       await expect(panel.getByRole('button', { name: 'Ana Cruz-Ito' })).toBeVisible()
-      await expect(panel.locator('header .says')).toHaveText('This commit says Ana Cruz <ana@example.com>')
+      await expect(panel.locator('header .says')).toHaveText(`This commit says ${said}`)
+      // The name and address stay on one line, inside the panel, with the whole in a tooltip.
+      const identity = panel.locator('header .as-said')
+      await expect(identity).toHaveAttribute('title', said)
+      const [line, bounds] = [(await identity.boundingBox())!, (await panel.boundingBox())!]
+      expect(line.height).toBeLessThan(24)
+      expect(line.x + line.width).toBeLessThanOrEqual(bounds.x + bounds.width)
       await tab(page, 'Details').click()
-      await expect(panel.locator('.details .says').first()).toHaveText('The commit says Ana Cruz <ana@example.com>')
+      await expect(panel.locator('.details .says').first()).toHaveText(`The commit says ${said}`)
       await expect(panel.locator('.details .email')).toHaveText('ana@tidewater.example')
     })
 

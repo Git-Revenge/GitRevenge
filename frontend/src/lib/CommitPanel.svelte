@@ -405,7 +405,7 @@
       </div>
       {#if authorSays}
         <!-- A mailmap changes who is shown, never the commit. -->
-        <p class="says">This commit says <span class="as-said">{authorSays}</span></p>
+        <p class="says">This commit says <span class="as-said" title={authorSays}>{authorSays}</span></p>
       {/if}
       <div class="ids">
         <button class="btn sm secondary sha" onclick={() => copySha(c.id)} title="Copy the full SHA" aria-label="Copy SHA {c.id.slice(0, 7)}"
@@ -494,14 +494,14 @@
             <dd>
               {author.name}
               <span class="email" title={author.email}>{author.email}</span>
-              {#if authorSays}<span class="says">The commit says <span class="as-said">{authorSays}</span></span>{/if}
+              {#if authorSays}<span class="says">The commit says <span class="as-said" title={authorSays}>{authorSays}</span></span>{/if}
               <span class="when">{formatTime(c.author.time)}</span>
             </dd>
             {#if committer.name !== author.name || c.committer.time !== c.author.time}
               <dt class="meta">Committer</dt>
               <dd>
                 {committer.name}
-                {#if committerSays}<span class="says">The commit says <span class="as-said">{committerSays}</span></span>{/if}
+                {#if committerSays}<span class="says">The commit says <span class="as-said" title={committerSays}>{committerSays}</span></span>{/if}
                 <span class="when">{formatTime(c.committer.time)}</span>
               </dd>
             {/if}
@@ -594,12 +594,20 @@
     margin: 0;
     font-size: 13px;
     color: var(--ink-mute);
-    overflow-wrap: anywhere;
   }
 
+  /* The name and address stay together: on the line after the words when they don't fit
+     beside them, and cut short, with the whole of it in the tooltip, when a line can't
+     hold them either. */
   .as-said {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
     font-family: var(--font-mono);
     font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
     user-select: text;
   }
 
