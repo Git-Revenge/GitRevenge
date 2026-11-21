@@ -149,7 +149,17 @@ Settings, project groups, recent repositories and open tabs are kept in one file
 - **macOS:** `~/Library/Application Support/GitRevenge/settings.json`
 - **Linux:** `~/.config/GitRevenge/settings.json`, or under `$XDG_CONFIG_HOME` if you set it
 
-Backups of git config files you save in the [Git Config tab](git-config.md) go in a `config-backups` folder beside it. A repository's own settings, such as its branch kinds and smart links, are kept in its git config. Nothing about your repositories is stored anywhere else, and nothing is sent anywhere; see [what leaves your machine](#what-leaves-your-machine). If the file is ever damaged, the app moves it aside as `settings.json.corrupt-<timestamp>` and starts with defaults.
+Backups of git config files you save in the [Git Config tab](git-config.md) go in a `config-backups` folder beside it. A repository's own settings, such as its branch kinds and smart links, are kept in its git config.
+
+The trailers on each commit, such as `Signed-off-by` and `Closes`, are read from a repository's history once and kept in a cache, so they're never read twice:
+
+- **Windows:** `%LOCALAPPDATA%\GitRevenge\trailers`
+- **macOS:** `~/Library/Caches/GitRevenge/trailers`
+- **Linux:** `~/.cache/GitRevenge/trailers`, or under `$XDG_CACHE_HOME` if you set it
+
+Each file holds one repository's commit IDs and trailer text. Nothing is written into the repository. The cache is safe to delete at any time: the app reads the history again, in the background. A file that hasn't been opened for 90 days is removed.
+
+Nothing else about your repositories is stored anywhere, and nothing is sent anywhere; see [what leaves your machine](#what-leaves-your-machine). If the file is ever damaged, the app moves it aside as `settings.json.corrupt-<timestamp>` and starts with defaults.
 
 ## What leaves your machine
 

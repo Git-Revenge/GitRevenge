@@ -394,6 +394,8 @@ export function Theme():Promise<string>;
 
 export function TrailerHints(arg1:string):Promise<git.TrailerHints>;
 
+export function TrailerStatus(arg1:string):Promise<app.TrailerProgress>;
+
 export function TrustRepo(arg1:string):Promise<void>;
 
 export function TryLinkRule(arg1:string,arg2:links.Rule):Promise<app.LinkTry>;

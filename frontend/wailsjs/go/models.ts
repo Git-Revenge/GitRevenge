@@ -2205,6 +2205,28 @@ export namespace app {
 		}
 	}
 	
+	export class TrailerProgress {
+	    path: string;
+	    reading: boolean;
+	    read: number;
+	    total: number;
+	    done: boolean;
+	    commits: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TrailerProgress(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.reading = source["reading"];
+	        this.read = source["read"];
+	        this.total = source["total"];
+	        this.done = source["done"];
+	        this.commits = source["commits"];
+	    }
+	}
 	export class TrustQuestion {
 	    path: string;
 	    name: string;

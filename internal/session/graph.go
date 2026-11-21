@@ -48,6 +48,9 @@ type graphLoader struct {
 	rules func() branchkind.Rules
 	// stackOverrides returns the repository's stack parent overrides; nil skips stacks.
 	stackOverrides func() map[string]string
+	// onReload, if set, is called as each load of the graph starts: whatever else is kept
+	// about the history may be behind too.
+	onReload func()
 
 	mu sync.Mutex
 	// started is set once a first load has been asked for. A tab restored at launch isn't
@@ -418,6 +421,9 @@ func (l *graphLoader) report(p GraphProgress) {
 // graph off-screen and swap it in once it reaches the read-ahead limit or ends, so a
 // refresh never blanks the view.
 func (l *graphLoader) reload() {
+	if l.onReload != nil {
+		l.onReload()
+	}
 	l.mu.Lock()
 	if l.stopped {
 		// A reload asked for as the tab closes: by a change the watcher saw a moment before,

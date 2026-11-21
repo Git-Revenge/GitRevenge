@@ -92,6 +92,7 @@ func (a *App) sessions() (*session.Manager, error) {
 			a.sess.SetReadAhead(n)
 		}
 		a.sess.OnGraph(a.emitGraphProgress)
+		a.sess.OnTrailers(a.trailerDir(), a.emitTrailerProgress)
 		a.sess.OnWatchFailed(func(path string, err error) { a.notice(path, watchFailedMessage(err)) })
 		a.sess.OnShown(func(path string, late bool) {
 			// The repository's own settings live in its config, which nothing was watching.

@@ -3,6 +3,7 @@ import { EventsOn } from '../../wailsjs/runtime/runtime.js'
 import type { GraphProgress } from './graph/rowCache'
 import type { ConflictInfo } from './insights/model'
 import type { Prompt } from './promptOrigin'
+import type { TrailerStatus } from './trailerProgress'
 
 /** What a repository's watcher saw change (watch.Kind in Go). */
 export type ChangeKind = 'head' | 'refs' | 'index' | 'state' | 'config' | 'worktree'
@@ -21,6 +22,8 @@ export interface BackendEvents {
   'gitconfig:changed': { path: string }
   /** GraphProgress: how far a repository's commit graph has loaded. */
   'graph:progress': GraphProgress
+  /** TrailerProgress: how far reading a repository's trailers has got. */
+  'trailers:progress': TrailerStatus & { path: string }
   /** NetProgress: a fetch, pull, push or clone's progress. */
   'net:progress': { path: string; op: string; phase: string; percent: number; line: string }
   /** Prompt: git, ssh or a server is asking for a credential. */

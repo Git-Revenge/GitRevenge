@@ -19,6 +19,7 @@
   import { session } from './lib/session.svelte'
   import StartPage from './lib/StartPage.svelte'
   import TabBar from './lib/TabBar.svelte'
+  import TrailerProgress from './lib/TrailerProgress.svelte'
   import { theme } from './lib/theme.svelte'
   import { prefs } from './lib/prefs.svelte'
   import { update } from './lib/update.svelte'
@@ -267,6 +268,7 @@
     <footer class="status">
       <span class="meta">git {env.gitVersion}</span>
       <span class="meta">{env.lfsVersion ? env.lfsVersion.replace(/^git-lfs\/(\S+).*/, 'lfs $1') : 'git-lfs not found'}</span>
+      <TrailerProgress path={session.activeTab?.path ?? ''} />
       <span class="spacer"></span>
       <span class="about">
         <button class="heart" onclick={() => (commands.aboutOpen = true)} aria-label="Sponsor Git Revenge" title="Sponsor Git Revenge"><Icon name="heart" size={14} /></button>

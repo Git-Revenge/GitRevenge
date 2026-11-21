@@ -74,6 +74,7 @@ const sidebars = {
             { type: 'doc', id: 'adr/linux-first-class', label: 'ADR-0010 Linux is first-class' },
             { type: 'doc', id: 'adr/repository-settings-in-git-config', label: 'ADR-0011 Repository settings in git config' },
             { type: 'doc', id: 'adr/names-follow-gits-mailmap', label: "ADR-0012 Names follow git's mailmap" },
+            { type: 'doc', id: 'adr/trailers-read-once-and-kept', label: 'ADR-0013 Trailers read once and kept' },
           ],
         },
       ],

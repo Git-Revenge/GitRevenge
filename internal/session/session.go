@@ -19,6 +19,7 @@ import (
 	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/graph"
 	"github.com/git-revenge/gitrevenge/internal/settings"
+	"github.com/git-revenge/gitrevenge/internal/trailerindex"
 	"github.com/git-revenge/gitrevenge/internal/trust"
 	"github.com/git-revenge/gitrevenge/internal/watch"
 )
@@ -42,9 +43,10 @@ type Repo struct {
 	Objects   *git.ObjectReader
 	// watcher runs only while the repository is on screen (see Manager.rewatch), which
 	// guards it with watchMu.
-	watcher *watch.Watcher
-	graph   *graphLoader
-	changes changeGate
+	watcher  *watch.Watcher
+	graph    *graphLoader
+	trailers *trailerReader
+	changes  changeGate
 }
 
 // changeGate holds back reports of changes while an operation runs.
@@ -164,8 +166,13 @@ func Rules(rs settings.RepoSettings) branchkind.Rules {
 func (r *Repo) close() {
 	r.Git.Close()
 	r.graph.stop()
+	r.trailers.close()
 	_ = r.Objects.Close()
 }
+
+// Trailers returns the repository's trailer index: every commit's trailers, read in the
+// background and kept (see trailerindex). It may still be filling.
+func (r *Repo) Trailers() *trailerindex.Index { return r.trailers.index }
 
 // Manager owns the open repositories. It is safe for concurrent use.
 type Manager struct {
@@ -182,6 +189,9 @@ type Manager struct {
 	// startWatch is watch.New, except in tests.
 	startWatch func(watch.Options) (*watch.Watcher, error)
 	onGraph    func(path string, p GraphProgress)
+	onTrailers func(path string, st trailerindex.Status)
+	// trailerDir is where trailer indexes are kept; "" keeps them in memory only.
+	trailerDir string
 	// readAhead overrides DefaultReadAhead; tests use it.
 	readAhead int
 	// wait is watchWait, except in tests.
@@ -210,6 +220,16 @@ func (m *Manager) OnGraph(fn func(path string, p GraphProgress)) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.onGraph = fn
+}
+
+// OnTrailers registers fn to hear how far reading a repository's trailers has got, and
+// says where trailer indexes are kept: a folder of the app's own, never the repository.
+// With dir "" they're kept in memory and read again each launch. Call it before opening
+// repositories.
+func (m *Manager) OnTrailers(dir string, fn func(path string, st trailerindex.Status)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.trailerDir, m.onTrailers = dir, fn
 }
 
 // OnChange registers fn to be called (from a background goroutine) when an open
@@ -423,11 +443,25 @@ func (m *Manager) add(root, gitDir, commonDir string) *Repo {
 	if ahead <= 0 {
 		ahead = DefaultReadAhead
 	}
+	onTrailers := m.onTrailers
+	r.trailers = newTrailerReader(trailerindex.Open(m.trailerDir, commonDir), r.Git, func(st trailerindex.Status) {
+		if onTrailers != nil {
+			onTrailers(root, st)
+		}
+	})
 	r.graph = newGraphLoader(r.Git, ahead, func(p GraphProgress) {
 		if onGraph != nil {
 			onGraph(root, p)
 		}
+		// The trailers are read once the graph has what it wants for now: the first screen
+		// of commits comes before a walk of the whole history.
+		if p.Done || p.Paused {
+			r.trailers.kick()
+		}
 	})
+	// Whatever made the graph load again, a commit or a fetch among them, may have brought
+	// commits whose trailers haven't been read.
+	r.graph.onReload = r.trailers.refsMoved
 	store := m.settings
 	r.graph.rules = func() branchkind.Rules { return Rules(store.Get().Repo(root)) }
 	r.graph.stackOverrides = func() map[string]string { return store.Get().Repo(root).StackParents }

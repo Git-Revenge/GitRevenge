@@ -26,6 +26,20 @@ var (
 	paragraphs  = regexp.MustCompile(`\n[ \t]*\n`)
 )
 
+// TrailerParserVersion says which reading of a message's trailers this is. The trailer
+// index keeps what MessageTrailers returned for every commit, on disk, so raise this
+// whenever SplitTrailers or MessageTrailers would answer differently for a message they
+// have already read: the index is then read again from the history.
+const TrailerParserVersion = 1
+
+// MessageTrailers returns the trailers of a whole commit message: its subject, a blank
+// line, and a body. The subject is never a trailer, though "fix: the gauge" looks like one.
+func MessageTrailers(message string) []Trailer {
+	_, body, _ := strings.Cut(message, "\n")
+	_, trailers := SplitTrailers(strings.TrimSpace(body))
+	return trailers
+}
+
 // SplitTrailers separates a message body's trailers from the rest of it. As in git, the
 // trailers are the last paragraph when every line in it is a trailer or an indented
 // continuation of one. Closing references count as trailers too, and so does a paragraph

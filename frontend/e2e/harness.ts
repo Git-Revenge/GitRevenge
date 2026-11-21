@@ -304,6 +304,11 @@ const mounts = {
     const { peopleTab } = await import('../src/lib/people/tab.svelte')
     Object.assign(win, { __peopleTab: () => ({ open: peopleTab.open, repo: peopleTab.repo, ask: peopleTab.ask && JSON.parse(JSON.stringify(peopleTab.ask)) }) })
   },
+  // The status bar's line about reading trailers, for the repository on screen.
+  async trailerProgress() {
+    const { default: TrailerProgress } = await import('../src/lib/TrailerProgress.svelte')
+    mount(TrailerProgress, { target: host, props: { path: '/r' } })
+  },
   // The People tab, opened on a repository as the app shell opens it.
   async people() {
     host.style.cssText = 'display:block;height:100vh'
@@ -507,6 +512,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'people':
     await mounts.people()
+    break
+  case 'trailerProgress':
+    await mounts.trailerProgress()
     break
   case 'conflictView':
     await mounts.conflictView()
