@@ -95,6 +95,30 @@ Function .onInit
    !insertmacro wails.checkArchitecture
 FunctionEnd
 
+# Whose PATH the launchers' folder goes on: everyone's for the usual install, which runs as
+# an administrator, and the current user's for one built to run without.
+!if "${REQUEST_EXECUTION_LEVEL}" == "user"
+  !define PATH_SCOPE "user"
+!else
+  !define PATH_SCOPE "machine"
+!endif
+
+# Puts $INSTDIR\bin on the PATH (ACTION "add") or takes it off ("remove"), then tells running
+# programs the environment changed, so the next terminal opened has it. The app makes the edit
+# (internal/pathenv), because NSIS can't safely: it reads a registry string into a
+# 1024-character buffer, so a longer PATH would come back empty and be written back that way.
+!macro gitrevenge.path ACTION
+    ClearErrors
+    ExecWait '"$INSTDIR\${PRODUCT_EXECUTABLE}" --installer-path ${ACTION} ${PATH_SCOPE} "$INSTDIR\bin"' $0
+    ${If} ${Errors}
+        DetailPrint "Couldn't ${ACTION} the PATH entry: ${PRODUCT_EXECUTABLE} didn't start"
+    ${ElseIf} $0 != 0
+        DetailPrint "Couldn't ${ACTION} the PATH entry (exit code $0)"
+    ${Else}
+        SendMessage ${HWND_BROADCAST} ${WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=5000
+    ${EndIf}
+!macroend
+
 # Versions before 1.0 installed into "Ris Adams\Git Revenge" under another uninstall key.
 # Upgrading from one runs its own uninstaller quietly, from wherever it was installed, so
 # Apps & features lists one Git Revenge. Settings live in %APPDATA% and aren't touched.
@@ -123,9 +147,24 @@ Section
 
     !insertmacro wails.webview2runtime
 
+    # What a terminal runs as "gitrevenge": a .cmd for cmd and PowerShell, and a script for Git
+    # Bash, which doesn't run a .cmd by its bare name. They have a folder of their own to go on
+    # the PATH, so that uninstall.exe doesn't become a command as well.
+    SetOutPath "$INSTDIR\bin"
+    File "launcher\gitrevenge.cmd"
+    File "launcher\gitrevenge"
+
     SetOutPath $INSTDIR
 
+    ClearErrors
     !insertmacro wails.files
+    # The error flag is set when the app couldn't be written and that was ignored, which leaves
+    # the copy from before. The install stops there: this installer and its uninstaller run the
+    # app to edit the PATH, and an older copy would take that as an ordinary start.
+    ${If} ${Errors}
+        Abort "Git Revenge couldn't be replaced. Close it and run this installer again."
+    ${EndIf}
+    !insertmacro gitrevenge.path "add"
 
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
     CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
@@ -140,6 +179,9 @@ Section "uninstall"
     !insertmacro wails.setShellContext
 
     RMDir /r "$AppData\${PRODUCT_EXECUTABLE}" # Remove the WebView2 DataPath
+
+    # Before the app is deleted, since it's what takes the entry off.
+    !insertmacro gitrevenge.path "remove"
 
     RMDir /r $INSTDIR
 

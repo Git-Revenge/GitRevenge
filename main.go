@@ -12,6 +12,7 @@ import (
 
 	"github.com/git-revenge/gitrevenge/internal/app"
 	"github.com/git-revenge/gitrevenge/internal/askpass"
+	"github.com/git-revenge/gitrevenge/internal/pathenv"
 )
 
 //go:embed all:frontend/dist
@@ -21,6 +22,12 @@ func main() {
 	// Started by git or ssh to ask for a credential: relay it to the running app and exit.
 	if askpass.IsHelper() {
 		os.Exit(askpass.RunHelper(os.Stdout, os.Stderr))
+	}
+
+	// Started by the Windows installer or uninstaller to put the launcher's folder on the
+	// PATH, or take it off: do that and exit.
+	if code, handled := pathenv.Run(os.Args[1:], os.Stderr); handled {
+		os.Exit(code)
 	}
 
 	carryOverWebStorage()

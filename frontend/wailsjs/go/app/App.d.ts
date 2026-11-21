@@ -158,6 +158,8 @@ export function InsightsTags(arg1:string):Promise<Array<git.TagInfo>>;
 
 export function InsightsThresholds(arg1:string):Promise<app.Thresholds>;
 
+export function InstallCommandLineTool():Promise<string>;
+
 export function Integrate(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
 export function InteractiveRebase(arg1:string,arg2:string,arg3:Array<git.RebaseItem>):Promise<void>;

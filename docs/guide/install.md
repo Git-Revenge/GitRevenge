@@ -20,6 +20,20 @@ Git Revenge is free, and there's nothing to sign up for. Download the Windows in
 
 When a new release comes out, the app tells you at startup. You can also check by hand with **Check for updates** in the command palette. That check is the only request the app makes on its own, and [Settings](settings.md) turns it off.
 
+## From a terminal
+
+Installing Git Revenge also gives you a `gitrevenge` command, which opens the app from a terminal:
+
+```sh
+gitrevenge
+```
+
+- **Windows:** the installer adds `C:\Program Files\Git Revenge\bin` to the system `PATH`, and uninstalling takes it off again. That folder holds only the command, which works in cmd, PowerShell and Git Bash. A terminal that was already open doesn't see the change: open a new one.
+- **macOS:** Homebrew links the command when it installs the app. If you installed from the disk image, open the command palette and choose **Install the gitrevenge command**. It writes a short script to `/usr/local/bin/gitrevenge`, and macOS asks for an administrator's password first, because that folder belongs to the system. If you move the app, install the command again.
+- **Linux:** the packages install the app as `/usr/bin/gitrevenge`.
+
+The command opens the app as its icon does, with the tabs you had open. It doesn't take a repository to open yet.
+
 ## What you need
 
 - **git 2.40 or newer.** Git Revenge doesn't bundle git. It finds the one on your `PATH`, or you can point it at a specific one in [Settings](settings.md).

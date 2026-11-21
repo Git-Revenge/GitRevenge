@@ -4,7 +4,8 @@
   import type { app } from '../wailsjs/go/models'
   import { BrowserOpenURL } from '../wailsjs/runtime/runtime.js'
   import CommandPalette from './lib/CommandPalette.svelte'
-  import { commands, provideCommands, type Command } from './lib/commands.svelte'
+  import { cliCommands } from './lib/cli'
+  import { commands, isMac, provideCommands, type Command } from './lib/commands.svelte'
   import ErrorBanner from './lib/ErrorBanner.svelte'
   import { gitConfig } from './lib/gitconfig/config.svelte'
   import { insights } from './lib/insights/insights.svelte'
@@ -74,6 +75,7 @@
         run: () => session.run(() => theme.toggleDensity()),
       },
     ]
+    list.push(...cliCommands(isMac))
     list.push({ id: 'gitconfig.global', group: 'Git config', title: 'Edit global git config', keywords: 'gitconfig settings user name email alias', run: () => gitConfig.show() })
     list.push({
       id: 'insights.open',

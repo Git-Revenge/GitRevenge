@@ -1,0 +1,4 @@
+#!/bin/sh
+# Starts Git Revenge from Git Bash and other POSIX shells on Windows, which don't run
+# gitrevenge.cmd by its bare name. It returns at once, as the .cmd does.
+"$(dirname "$0")/../gitrevenge.exe" "$@" >/dev/null 2>&1 &

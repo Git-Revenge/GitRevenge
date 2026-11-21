@@ -11,6 +11,8 @@ InstallerSwitches:
   Silent: /S
   SilentWithProgress: /S
 UpgradeBehavior: install
+Commands:
+  - gitrevenge
 Dependencies:
   PackageDependencies:
     - PackageIdentifier: Git.Git
