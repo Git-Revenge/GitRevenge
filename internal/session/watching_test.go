@@ -134,6 +134,52 @@ func TestShowingARepositoryThatHasntChangedKeepsItsGraph(t *testing.T) {
 	}
 }
 
+func TestASavedMailmapReloadsTheGraph(t *testing.T) {
+	m, _ := newManager(t)
+	fx := gittest.New(t)
+	fx.Linear(3)
+	r, err := m.Open(context.Background(), fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitGraph(t, r, 3)
+	before, _ := r.Graph()
+	if who := before.Rows(0, 1)[0].Author; who != "Test User" {
+		t.Fatalf("before any mailmap a row shows %q", who)
+	}
+	if r.graph.mailmapMoved(context.Background(), false) || r.graph.mailmapMoved(context.Background(), true) {
+		t.Fatal("the mailmap reads as changed when nothing was")
+	}
+
+	// Saved to the work tree, not committed: no ref moves, and the names still change.
+	fx.WriteFile(".mailmap", "Jane Doe <jane@example.com> <test@example.com>\n")
+	if !r.graph.mailmapMoved(context.Background(), false) {
+		t.Fatal("a saved .mailmap wasn't noticed")
+	}
+	r.graph.refresh(context.Background())
+	waitGraph(t, r, 3)
+	after, _ := r.Graph()
+	if after == before {
+		t.Fatal("a saved .mailmap didn't reload the graph")
+	}
+	if who := after.Rows(0, 1)[0].Author; who != "Jane Doe" {
+		t.Fatalf("after the mailmap a row shows %q, want Jane Doe", who)
+	}
+
+	// Once read, it's settled: showing the repository again reads nothing.
+	r.graph.refresh(context.Background())
+	if again, loading := r.Graph(); again != after || loading {
+		t.Fatalf("an unchanged mailmap was read again (loading %v)", loading)
+	}
+
+	// A mailmap.file setting counts as well, and is found when the settings change.
+	fx.WriteFile("people.txt", "Jo Whitlock <jo@example.com> <jane@example.com>\n")
+	fx.Git("config", "mailmap.file", "people.txt")
+	if !r.graph.mailmapMoved(context.Background(), true) {
+		t.Fatal("a mailmap.file setting wasn't noticed")
+	}
+}
+
 func TestTabsThatShowRepositoriesWatchThem(t *testing.T) {
 	m, store := newManager(t)
 	one, two := gittest.New(t), gittest.New(t)

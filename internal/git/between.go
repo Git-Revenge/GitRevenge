@@ -39,7 +39,7 @@ func (r *Repo) CommitsBetween(ctx context.Context, exclude, include string, limi
 	return parseCommitLines(out), total, nil
 }
 
-const commitLineFormat = "%H%x00%h%x00%an%x00%P%x00%s"
+const commitLineFormat = "%H%x00%h%x00%aN%x00%P%x00%s"
 
 func parseCommitLines(out string) []CommitLine {
 	var commits []CommitLine

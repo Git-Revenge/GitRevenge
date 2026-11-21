@@ -46,6 +46,41 @@ func TestSearch(t *testing.T) {
 	}
 }
 
+func TestSearchFindsAnAuthorUnderEveryName(t *testing.T) {
+	g := New()
+	commits := []git.LogCommit{
+		// One person, read through a mailmap: shown as Sarah Lind, written two ways.
+		{ID: "abcdef0000000000000000000000000000000001", AuthorName: "Sarah Lind", AuthorEmail: "sarah@tidewater.example", WrittenName: "slind", WrittenEmail: "slind@users.noreply.example", Subject: "Tide table"},
+		{ID: "abcdef0000000000000000000000000000000002", AuthorName: "Sarah Lind", AuthorEmail: "sarah@tidewater.example", WrittenName: "Sarah Lind", WrittenEmail: "sarah@tidewater.example", Subject: "Units"},
+		{ID: "abcdef0000000000000000000000000000000003", AuthorName: "Sam Ortiz", AuthorEmail: "sam@users.noreply.example", WrittenName: "Sam Ortiz", WrittenEmail: "sam@users.noreply.example", Subject: "Alerts"},
+	}
+	for _, c := range commits {
+		if err := g.Add(c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tests := []struct {
+		q    string
+		want []int
+	}{
+		{"sarah", []int{0, 1}},              // the name the mailmap gives
+		{"slind", []int{0}},                 // the name one commit was written with
+		{"slind@users", []int{0}},           // an address a commit has
+		{"@tidewater.example", []int{0, 1}}, // the address the mailmap gives
+		{"noreply", []int{}},                // not an address, so addresses aren't searched
+		{"@users.noreply", []int{0, 2}},     // an address, so they are
+	}
+	for _, tt := range tests {
+		got := g.Search(tt.q, 100)
+		if !slices.Equal(got.Rows, tt.want) || got.Total != len(tt.want) {
+			t.Errorf("Search(%q) = %v (total %d), want %v", tt.q, got.Rows, got.Total, tt.want)
+		}
+	}
+	if rows := g.Rows(0, 1); rows[0].Author != "Sarah Lind" {
+		t.Errorf("a row shows %q, want the name the mailmap gives", rows[0].Author)
+	}
+}
+
 func TestSearchLimitKeepsTotal(t *testing.T) {
 	g := searchGraph(t)
 	got := g.Search("a", 2)

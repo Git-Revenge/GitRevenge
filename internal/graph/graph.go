@@ -133,6 +133,14 @@ func (cp checkpoint) unpack(parents []oid) state {
 	return st
 }
 
+// author is who wrote a commit: as the mailmap reads them, which is the name a row shows,
+// and as the commit has them, which search still finds. A history has few of these next to
+// its commits (45,000 for the Linux kernel's 1.5 million), so each commit holds an index.
+type author struct {
+	name, email       string
+	written, writtenE string
+}
+
 // Graph holds commits and their layout. It is safe for one writer and many readers.
 type Graph struct {
 	mu sync.RWMutex
@@ -144,8 +152,8 @@ type Graph struct {
 	parents      []oid
 	index        map[oid]int32
 	authorIdx    []int32
-	authors      []string
-	authorLookup map[string]int32
+	authors      []author
+	authorLookup map[author]int32
 	times        []int64
 	subjects     []string
 
@@ -168,7 +176,7 @@ func New() *Graph {
 	return &Graph{
 		parentStart:  []int32{0},
 		index:        map[oid]int32{},
-		authorLookup: map[string]int32{},
+		authorLookup: map[author]int32{},
 	}
 }
 
@@ -291,11 +299,12 @@ func (g *Graph) Add(c git.LogCommit) error {
 	base := int32(len(g.parents))
 	g.parents = append(g.parents, ps...)
 	g.parentStart = append(g.parentStart, int32(len(g.parents)))
-	a, ok := g.authorLookup[c.AuthorName]
+	who := author{name: c.AuthorName, email: c.AuthorEmail, written: c.WrittenName, writtenE: c.WrittenEmail}
+	a, ok := g.authorLookup[who]
 	if !ok {
 		a = int32(len(g.authors))
-		g.authors = append(g.authors, c.AuthorName)
-		g.authorLookup[c.AuthorName] = a
+		g.authors = append(g.authors, who)
+		g.authorLookup[who] = a
 	}
 	g.authorIdx = append(g.authorIdx, a)
 	g.times = append(g.times, c.AuthorTime)
@@ -422,7 +431,7 @@ func (g *Graph) rows(start, count int, pack bool) []Row {
 		r.Col, r.Color = step(&st, &g.cfg, g.ids[i], ps, g.parentStart[i], &r, pack)
 		r.ID = hex.EncodeToString(g.ids[i][:g.hashLen])
 		r.Parents = len(ps)
-		r.Author = g.authors[g.authorIdx[i]]
+		r.Author = g.authors[g.authorIdx[i]].name
 		r.AuthorTime = g.times[i]
 		r.Subject = g.subjects[i]
 		out = append(out, r)

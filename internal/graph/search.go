@@ -17,6 +17,11 @@ type SearchResult struct {
 // Search finds rows whose subject or author contains query (case-insensitive), or whose
 // commit ID starts with query when it looks like hex. At most limit row indices are
 // returned; Total still counts every match.
+//
+// An author matches by the name the mailmap gives them and by the name the commit has, so
+// someone is found under any name they committed with. A query with an @ in it is an
+// address, and matches their addresses the same way; any other query leaves addresses
+// alone, or "github" would find everyone with a no-reply address there.
 func (g *Graph) Search(query string, limit int) SearchResult {
 	res := SearchResult{Rows: []int{}}
 	q := strings.TrimSpace(query)
@@ -32,10 +37,18 @@ func (g *Graph) Search(query string, limit int) SearchResult {
 	}
 	match := folder(q)
 
+	address := strings.Contains(q, "@")
+
 	g.mu.RLock()
 	defer g.mu.RUnlock()
+	// Asked once for each author, not once for each of their commits.
+	byAuthor := make([]bool, len(g.authors))
+	for i, a := range g.authors {
+		byAuthor[i] = match(a.name) || (a.written != a.name && match(a.written)) ||
+			(address && (match(a.email) || (a.writtenE != a.email && match(a.writtenE))))
+	}
 	for i := range g.ids {
-		hit := match(g.subjects[i]) || match(g.authors[g.authorIdx[i]])
+		hit := byAuthor[g.authorIdx[i]] || match(g.subjects[i])
 		if !hit && prefix != nil && hasHexPrefix(g.ids[i][:], prefix, q) {
 			hit = true
 		}
