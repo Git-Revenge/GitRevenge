@@ -12,7 +12,7 @@
 //        subst T: A:\demo
 //   2. Build the demo once, so its global git config exists. The script lives in
 //      https://github.com/Git-Revenge/demo-repos; this uses the tag DEMO_REPOS_TAG names:
-//        curl -fsSL https://github.com/Git-Revenge/demo-repos/releases/download/v1.0.0/demo-repo.sh -o demo-repo.sh
+//        curl -fsSL https://github.com/Git-Revenge/demo-repos/releases/download/v2.0.0/demo-repo.sh -o demo-repo.sh
 //        bash demo-repo.sh /t/
 //   3. Point the app's settings at a scratch folder and its global git config at the demo's,
 //      so your own repositories and config stay out of the shots, and start it:
@@ -49,7 +49,7 @@ const BASH = process.env.BASH_EXE ?? 'C:\\Program Files\\Git\\bin\\bash.exe'
 const REPO = path.win32.join(DEMO, 'tidewater')
 // The demo-repos release the docs' pictures are built from (its semver says when a move
 // changes them; see its README). Moving it means retaking them.
-const DEMO_REPOS_TAG = 'v1.0.0'
+const DEMO_REPOS_TAG = 'v2.0.0'
 const WIDTH = 1280
 const HEIGHT = 800
 
@@ -86,7 +86,7 @@ async function reset(page, open = ['tidewater'], { clean = false, branch } = {})
   await page.evaluate(async () => {
     // Tabs that aren't repositories stay open across a reload.
     const pause = (ms) => new Promise((r) => setTimeout(r, ms))
-    for (const name of ['Insights', 'Git Config', 'Ignore rules']) {
+    for (const name of ['Insights', 'Git Config', 'Ignore rules', 'People']) {
       const close = document.querySelector(`[aria-label="Close ${name}"]`)
       if (!close) continue
       close.click()
@@ -1247,6 +1247,101 @@ scenes.ignoreRules = (page) =>
     await sleep(1200)
     await park(p)
   })
+
+// ── People and the mailmap ────────────────────────────────────────────────────────────
+// Tidewater has one person under two addresses, Jessica Nguyen, and no .mailmap.
+
+/** The line that joins Jessica's two addresses, as the Same person dialog writes it. */
+const JESSICA = 'Jessica Nguyen <jessica@tidewater.example> <jessica.nguyen@harbourmail.example>'
+
+/** Opens the People tab and waits for everyone the history names. */
+async function people(p, { show = false } = {}) {
+  // A file a scene has just written has the app reading the repository again, and a palette
+  // opened in the middle of that can miss the first letters typed into it.
+  await untilSettled(p)
+  await palette(p, 'See people', { show })
+  await waiting(() => p.waitForSelector('ul[aria-label="People"] li', { timeout: 90000 }))
+  await sleep(700)
+}
+
+scenes.people = (page) =>
+  stills(page, 'people', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await people(p)
+    await p.waitForSelector(byText('Same person…'))
+    await park(p)
+  })
+
+scenes.peopleSamePerson = (page) =>
+  stills(page, 'people-same-person', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await people(p)
+    await click(p, byText('Same person…'), { pause: 600 })
+    // The line is worked out by the backend, a moment after the dialog opens.
+    await p.waitForSelector('[role=dialog] pre.lines')
+    await sleep(500)
+    await park(p)
+  })
+
+scenes.peopleText = (page) =>
+  stills(page, 'people-text', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    // A mailmap with a line of each kind the notes tell apart: one a later line replaces, one
+    // that joins, one about someone who isn't in the history, and one git can't read.
+    writeFileSync(
+      path.join(REPO, '.mailmap'),
+      [
+        '# One line for each address someone has used.',
+        JESSICA.replace('Jessica', 'Jess'),
+        JESSICA,
+        'Kevin Walsh <kevin@contractors.example> <kev@oldmill.example>',
+        'Marcus Johnson',
+        '',
+      ].join('\n'),
+    )
+    await sleep(1500)
+    await people(p)
+    await click(p, `::-p-xpath(//div[@role='group'][@aria-label='Show']/button[normalize-space(.)='Text'])`, { pause: 600 })
+    await p.waitForSelector('.rules .rule .what')
+    await click(p, 'aside.check input', { pause: 200 })
+    await p.keyboard.type('jessica.nguyen@harbourmail.example')
+    await p.waitForSelector('aside.check .answer strong')
+    await sleep(600)
+    await park(p)
+  })
+
+scenes.authorCard = (page) =>
+  stills(page, 'author-card', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    writeFileSync(path.join(REPO, '.mailmap'), `${JESSICA}\n`)
+    await sleep(1500)
+    // One of the two commits she made under the other address.
+    await selectCommit(p, 'Correct the drifting gauge at Gull Point')
+    await click(p, 'aside[aria-label="Commit details"] button.author', { pause: 500 })
+    // The count reads the whole history the first time.
+    await waiting(() => p.waitForFunction(() => /commits?/.test(document.querySelector('[role=dialog][aria-label^="About"] [role=status]')?.textContent ?? '') && !document.body.innerText.includes('Counting'), { timeout: 90000 }))
+    await sleep(400)
+    await park(p)
+  })
+
+scenes.mailmapAnim = (page) =>
+  animation(
+    page,
+    'mailmap',
+    (p) => reset(p, ['tidewater'], { clean: true }),
+    async (p) => {
+      await people(p, { show: true })
+      await sleep(900)
+      await click(p, byText('Same person…'), { pause: 500 })
+      await waiting(() => p.waitForSelector('[role=dialog] pre.lines'))
+      await sleep(1600)
+      await click(p, byText('Add the line'), { pause: 1500 })
+      await click(p, byText('Create .mailmap…'), { pause: 1600 })
+      await click(p, `::-p-xpath(//*[@role='dialog']//button[normalize-space(.)='Create .mailmap'])`, { pause: 600 })
+      await untilGit(() => existsSync(path.join(REPO, '.mailmap')))
+      await sleep(1800)
+    },
+  )
 
 scenes.links = (page) =>
   stills(page, 'links', async (p) => {

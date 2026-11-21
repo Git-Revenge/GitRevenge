@@ -98,6 +98,7 @@ On macOS, read <kbd>⌘</kbd> wherever this page says <kbd>Ctrl</kbd>. Press <kb
 | New branch | <kbd>Ctrl</kbd>+<kbd>B</kbd> |
 | Search commits | <kbd>Ctrl</kbd>+<kbd>F</kbd> |
 | Next or previous search match | <kbd>Enter</kbd> / <kbd>Shift</kbd>+<kbd>Enter</kbd> |
+| About the selected commit's author | <kbd>Enter</kbd>, in the graph |
 | Move the selection | <kbd>↑</kbd> / <kbd>↓</kbd> |
 | Move a page | <kbd>Page Up</kbd> / <kbd>Page Down</kbd> |
 | First or last commit | <kbd>Home</kbd> / <kbd>End</kbd> |
