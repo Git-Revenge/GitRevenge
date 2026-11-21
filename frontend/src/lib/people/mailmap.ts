@@ -1,5 +1,5 @@
 import type { app, git } from '../../../wailsjs/go/models'
-import { joinLines, splitLines } from '../ignorerules/rules'
+import { splitLines } from '../ignorerules/rules'
 
 /** The work tree's mailmap: the one file the app writes. */
 export const WORK_TREE = '.mailmap'
@@ -14,12 +14,6 @@ export function sourceNote(s: Pick<git.MailmapSource, 'source' | 'exists'>): str
   if (s.source === WORK_TREE) return s.exists ? 'shared · committed with the repository' : 'none in this repository'
   if (s.source === 'mailmap.file') return 'from mailmap.file in your git config · read only here'
   return 'from mailmap.blob in your git config · read only here'
-}
-
-/** The text with these 1-based lines taken out. */
-export function removeLines(text: string, lines: number[]): string {
-  const drop = new Set(lines)
-  return joinLines(splitLines(text).filter((_, i) => !drop.has(i + 1)))
 }
 
 const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`

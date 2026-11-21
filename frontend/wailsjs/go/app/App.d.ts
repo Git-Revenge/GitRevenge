@@ -166,6 +166,8 @@ export function InteractiveRebase(arg1:string,arg2:string,arg3:Array<git.RebaseI
 
 export function IssueURL(arg1:string):Promise<string>;
 
+export function KeepApart(arg1:string,arg2:string,arg3:boolean):Promise<void>;
+
 export function Keybindings():Promise<Record<string, string>>;
 
 export function LFS(arg1:string):Promise<app.LFSInfo>;
@@ -208,7 +210,13 @@ export function OwnMoveAge(arg1:string):Promise<number>;
 
 export function People(arg1:string,arg2:app.PeopleRequest):Promise<app.PeopleList>;
 
+export function PeopleSuggestions(arg1:string,arg2:app.MailmapText):Promise<app.Suggestions>;
+
 export function PlanBisect(arg1:string,arg2:string,arg3:string):Promise<app.BisectPlan>;
+
+export function PlanSamePerson(arg1:string,arg2:app.MailmapText,arg3:app.SamePersonRequest):Promise<git.JoinPlan>;
+
+export function PlanTakeApart(arg1:string,arg2:app.MailmapText,arg3:git.Identity):Promise<git.ApartPlan>;
 
 export function Preferences():Promise<app.Preferences>;
 

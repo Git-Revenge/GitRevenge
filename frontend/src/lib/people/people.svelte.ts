@@ -1,7 +1,7 @@
-import { MailmapNotes, MailmapSources, People, ReadMailmapFile, SaveMailmap, WhoIs } from '../../../wailsjs/go/app/App.js'
+import { KeepApart, MailmapNotes, MailmapSources, People, PeopleSuggestions, PlanSamePerson, PlanTakeApart, ReadMailmapFile, SaveMailmap, WhoIs } from '../../../wailsjs/go/app/App.js'
 import type { app, git } from '../../../wailsjs/go/models'
 import { errorText } from '../errors'
-import { WORK_TREE, removeLines } from './mailmap'
+import { WORK_TREE } from './mailmap'
 import { peopleTab } from './tab.svelte'
 
 /** How many people are asked for at a time. */
@@ -35,6 +35,10 @@ class PeopleState {
   people = $state<app.Person[]>([])
   query = $state('')
   notes = $state<git.MailmapNote[]>([])
+  /** Who looks like the same person: what's offered, what's left out, and what was answered. */
+  suggestions = $state<app.Suggestions | null>(null)
+  /** What the last Take apart did to others on the same line, until the next edit. */
+  apart = $state<git.ApartPlan | null>(null)
   error = $state('')
   /** Why the last save failed, until the next save, revert or reload. */
   saveError = $state('')
@@ -70,6 +74,8 @@ class PeopleState {
     this.list = null
     this.people = []
     this.notes = []
+    this.suggestions = null
+    this.apart = null
     this.query = ''
     this.selected = WORK_TREE
     this.view = 'people'
@@ -118,14 +124,16 @@ class PeopleState {
     const n = ++this.#asked
     if (!this.list) this.reading = true
     try {
-      const [list, notes] = await Promise.all([
+      const [list, notes, suggestions] = await Promise.all([
         People(repo, { mailmap: this.#mailmap(), query: this.query, offset: 0, limit: Math.max(PAGE, this.people.length) } as app.PeopleRequest),
         MailmapNotes(repo, this.#mailmap(), this.selected),
+        PeopleSuggestions(repo, this.#mailmap()),
       ])
       if (n !== this.#asked || repo !== this.repo) return
       this.list = list
       this.people = list.people
       this.notes = notes
+      this.suggestions = suggestions
       this.error = ''
     } catch (e) {
       if (n === this.#asked) this.error = errorText(e)
@@ -169,13 +177,24 @@ class PeopleState {
     if (!this.doc) return
     this.doc = { ...this.doc, text }
     this.saveError = ''
+    this.apart = null
     this.#soon()
   }
 
-  /** Takes an identity away from the person it was joined to, by removing the lines that joined it. */
-  takeApart(id: app.PersonIdentity) {
+  /**
+   * Takes an identity away from the person it was joined to, and nobody else. The line that
+   * joined it may have joined others too; the plan keeps them, with lines of their own, and
+   * `apart` holds what it did to them so the view can say.
+   */
+  async takeApart(id: app.PersonIdentity) {
     if (!this.doc) return
-    this.edit(removeLines(this.doc.text, id.lines.filter((l) => l.source === WORK_TREE).map((l) => l.line)))
+    try {
+      const plan = await PlanTakeApart(this.repo, this.#mailmap(), { name: id.name, email: id.email } as git.Identity)
+      this.edit(plan.text)
+      if (plan.kept.length || plan.lost.length) this.apart = plan
+    } catch (e) {
+      this.error = errorText(e)
+    }
   }
 
   revert() {
@@ -183,11 +202,27 @@ class PeopleState {
     this.doc = { ...this.doc, text: this.doc.base }
     this.saveError = ''
     this.confirmCreate = false
+    this.apart = null
     void this.refresh()
   }
 
   who(query: string) {
     return WhoIs(this.repo, this.#mailmap(), query)
+  }
+
+  /** The lines that would make these identities one person, shown as name and address. Nothing is written. */
+  plan(identities: git.Identity[], name: string, email: string) {
+    return PlanSamePerson(this.repo, this.#mailmap(), { identities, name, email } as app.SamePersonRequest)
+  }
+
+  /** Remembers that a suggestion is of different people, or forgets it, and asks again. */
+  async keepApart(key: string, apart: boolean) {
+    try {
+      await KeepApart(this.repo, key, apart)
+    } catch (e) {
+      this.error = errorText(e)
+    }
+    await this.refresh()
   }
 
   /**
@@ -208,6 +243,8 @@ class PeopleState {
       await SaveMailmap(this.repo, d.base, d.text, create)
       const now = await ReadMailmapFile(this.repo, WORK_TREE)
       this.doc = { base: now, text: now }
+      // The note about what a Take apart did was about the edit, which is now saved.
+      this.apart = null
       await this.load()
     } catch (e) {
       this.saveError = errorText(e)
@@ -221,6 +258,7 @@ class PeopleState {
     this.doc = { base: now, text: now }
     this.error = ''
     this.saveError = ''
+    this.apart = null
     await this.load()
   }
 }

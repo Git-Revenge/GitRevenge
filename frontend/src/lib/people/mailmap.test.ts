@@ -1,23 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { app, git } from '../../../wailsjs/go/models'
-import { canTakeApart, changedLines, describeNote, joined, linesText, removeLines, sourceNote, summary, wrote } from './mailmap'
+import { canTakeApart, changedLines, describeNote, joined, linesText, sourceNote, summary, wrote } from './mailmap'
 
 const note = (over: Partial<git.MailmapNote>) => ({ line: 1, kind: 'map', identities: 0, commits: 0, coAuthored: 0, replaced: false, ...over }) as git.MailmapNote
 const identity = (name: string, email: string, lines: git.MailmapRef[] = []) => ({ name, email, commits: 1, coAuthored: 0, lines }) as app.PersonIdentity
-
-describe('removeLines', () => {
-  it('takes out the lines named and keeps the rest in order', () => {
-    expect(removeLines('# people\nA <a@x>\nB <b@x>\nC <c@x>\n', [2, 4])).toBe('# people\nB <b@x>\n')
-  })
-
-  it('leaves nothing when every line goes', () => {
-    expect(removeLines('A <a@x>\n', [1])).toBe('')
-  })
-
-  it('ignores lines that are not there', () => {
-    expect(removeLines('A <a@x>\n', [7])).toBe('A <a@x>\n')
-  })
-})
 
 describe('wrote', () => {
   it('says commits, credits, or both', () => {

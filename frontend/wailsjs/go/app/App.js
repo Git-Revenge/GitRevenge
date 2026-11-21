@@ -318,6 +318,10 @@ export function IssueURL(arg1) {
   return window['go']['app']['App']['IssueURL'](arg1);
 }
 
+export function KeepApart(arg1, arg2, arg3) {
+  return window['go']['app']['App']['KeepApart'](arg1, arg2, arg3);
+}
+
 export function Keybindings() {
   return window['go']['app']['App']['Keybindings']();
 }
@@ -402,8 +406,20 @@ export function People(arg1, arg2) {
   return window['go']['app']['App']['People'](arg1, arg2);
 }
 
+export function PeopleSuggestions(arg1, arg2) {
+  return window['go']['app']['App']['PeopleSuggestions'](arg1, arg2);
+}
+
 export function PlanBisect(arg1, arg2, arg3) {
   return window['go']['app']['App']['PlanBisect'](arg1, arg2, arg3);
+}
+
+export function PlanSamePerson(arg1, arg2, arg3) {
+  return window['go']['app']['App']['PlanSamePerson'](arg1, arg2, arg3);
+}
+
+export function PlanTakeApart(arg1, arg2, arg3) {
+  return window['go']['app']['App']['PlanTakeApart'](arg1, arg2, arg3);
 }
 
 export function Preferences() {
