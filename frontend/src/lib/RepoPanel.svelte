@@ -8,7 +8,7 @@
   import type { DialogSpec } from './Dialog.svelte'
   import { errorText } from './errors'
   import { ignoreRules } from './ignorerules/ignoreRules.svelte'
-  import { people } from './people/people.svelte'
+  import { peopleTab } from './people/tab.svelte'
   import LFSDialog from './LFSDialog.svelte'
   import { canOpenWorktree, canRemoveWorktree, folderName, lfsNames, matchesFilter, submoduleStatus, worktreeNames, worktreeStatus, worktreeTooltip } from './repoPanel'
   import { session } from './session.svelte'
@@ -198,7 +198,7 @@
   <section>
     <ul>
       <li>
-        <button class="row lfs" onclick={() => people.show(path)} title="See who this repository's history names, and say which names are one person in its .mailmap">
+        <button class="row lfs" onclick={() => peopleTab.show(path)} title="Who this history names, and its .mailmap">
           <span class="icon"><Icon name="people" size={14} /></span>
           <span class="name">People</span>
         </button>

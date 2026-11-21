@@ -10,7 +10,7 @@
   import { gitConfig } from './lib/gitconfig/config.svelte'
   import { insights } from './lib/insights/insights.svelte'
   import { ignoreRules } from './lib/ignorerules/ignoreRules.svelte'
-  import { people } from './lib/people/people.svelte'
+  import { peopleTab } from './lib/people/tab.svelte'
   import Lazy from './lib/ui/Lazy.svelte'
   import OperationBanner from './lib/OperationBanner.svelte'
   import PromptDialog from './lib/PromptDialog.svelte'
@@ -105,13 +105,13 @@
     if (session.active === session.ignoreTabId)
       list.push({ id: 'tabs.close', group: 'Tabs', title: 'Close Ignore rules', keywords: 'tab', shortcut: 'Mod+W', whenTyping: true, run: () => ignoreRules.requestClose() })
     if (session.active === session.peopleTabId)
-      list.push({ id: 'tabs.close', group: 'Tabs', title: 'Close People', keywords: 'tab', shortcut: 'Mod+W', whenTyping: true, run: () => people.requestClose() })
+      list.push({ id: 'tabs.close', group: 'Tabs', title: 'Close People', keywords: 'tab', shortcut: 'Mod+W', whenTyping: true, run: () => peopleTab.requestClose() })
     if (session.activeTab) {
       const repo = session.activeTab.path
       list.push({ id: 'ignore.open', group: 'Repository', title: 'Edit ignore rules', keywords: 'gitignore exclude ignored files', run: () => ignoreRules.show(repo) })
-      list.push({ id: 'people.open', group: 'Repository', title: 'See people', keywords: 'mailmap authors names identities who', run: () => people.show(repo) })
+      list.push({ id: 'people.open', group: 'Repository', title: 'See people', keywords: 'mailmap authors names identities who', run: () => peopleTab.show(repo) })
     }
-    if (session.tabs.length > 0 || gitConfig.open || insights.open || ignoreRules.open || people.open) {
+    if (session.tabs.length > 0 || gitConfig.open || insights.open || ignoreRules.open || peopleTab.open) {
       // Cycle through the start page and every tab.
       const order = [
         '',
@@ -119,7 +119,7 @@
         ...(gitConfig.open ? [session.configTabId] : []),
         ...(insights.open ? [session.insightsTabId] : []),
         ...(ignoreRules.open ? [session.ignoreTabId] : []),
-        ...(people.open ? [session.peopleTabId] : []),
+        ...(peopleTab.open ? [session.peopleTabId] : []),
       ]
       const step = (d: number) => () => session.select(order[(order.indexOf(session.active) + d + order.length) % order.length])
       list.push(
@@ -149,7 +149,7 @@
       await gitConfig.restore(session.savedConfigTab)
       await insights.restore(session.savedInsightsTab)
       await ignoreRules.restore(session.savedIgnoreTab)
-      await people.restore(session.savedPeopleTab)
+      peopleTab.restore(session.savedPeopleTab)
       void update.startup()
     }
   })
@@ -200,16 +200,6 @@
     <div class="form-actions">
       <InkButton variant="secondary" onclick={() => (ignoreRules.confirmClose = false)}>Keep editing</InkButton>
       <InkButton variant="danger" onclick={() => ignoreRules.close()}>Discard and close</InkButton>
-    </div>
-  </Modal>
-{/if}
-
-{#if people.confirmClose}
-  <Modal title="Discard unsaved changes to the mailmap?" onClose={() => (people.confirmClose = false)}>
-    <p>Closing People discards your unsaved changes to <code>.mailmap</code>. Nothing has been written.</p>
-    <div class="form-actions">
-      <InkButton variant="secondary" onclick={() => (people.confirmClose = false)}>Keep editing</InkButton>
-      <InkButton variant="danger" onclick={() => people.close()}>Discard and close</InkButton>
     </div>
   </Modal>
 {/if}
@@ -268,7 +258,7 @@
         <Lazy load={() => import('./lib/insights/InsightsView.svelte')} />
       {:else if session.active === session.ignoreTabId && ignoreRules.open}
         <Lazy load={() => import('./lib/ignorerules/IgnoreRulesView.svelte')} />
-      {:else if session.active === session.peopleTabId && people.open}
+      {:else if session.active === session.peopleTabId && peopleTab.open}
         <Lazy load={() => import('./lib/people/PeopleView.svelte')} />
       {:else}
         <StartPage />

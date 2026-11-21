@@ -12,11 +12,17 @@
   import Modal from '../ui/Modal.svelte'
   import { WORK_TREE, canTakeApart, changedLines, describeNote, joined, linesText, sourceLabel, sourceNote, summary, wrote } from './mailmap'
   import { people as t } from './people.svelte'
+  import { peopleTab } from './tab.svelte'
 
   // Re-read when the repository changes on disk, such as a .mailmap edited elsewhere.
   $effect(() => {
     void session.revision[t.repo]
     void t.load()
+  })
+
+  // The tab bar marks an unsaved edit, and closing asks about it, without loading this view.
+  $effect(() => {
+    peopleTab.dirty = t.dirty
   })
 
   let editable = $derived(t.source?.source === WORK_TREE)
@@ -116,7 +122,7 @@
     {#if session.tabs.length > 1}
       <label class="repo">
         <span class="visually-hidden">Repository</span>
-        <select value={t.repo} disabled={t.dirty} title={t.dirty ? 'Save or revert your edits to switch repository' : 'Repository'} onchange={(e) => void (t.setRepo(e.currentTarget.value), t.load())}>
+        <select value={t.repo} disabled={t.dirty} title={t.dirty ? 'Save or revert your edits to switch repository' : 'Repository'} onchange={(e) => peopleTab.setRepo(e.currentTarget.value)}>
           {#each session.tabs as tab (tab.path)}<option value={tab.path}>{tab.name}</option>{/each}
         </select>
       </label>
@@ -334,6 +340,16 @@
     <div class="form-actions">
       <InkButton variant="secondary" onclick={() => (t.confirmCreate = false)}>Not now</InkButton>
       <InkButton variant="primary" disabled={t.busy} onclick={() => t.save(true)}>Create .mailmap</InkButton>
+    </div>
+  </Modal>
+{/if}
+
+{#if peopleTab.confirmClose}
+  <Modal title="Discard unsaved changes to the mailmap?" onClose={() => (peopleTab.confirmClose = false)}>
+    <p>Closing People discards your unsaved changes to <code>.mailmap</code>. Nothing has been written.</p>
+    <div class="form-actions">
+      <InkButton variant="secondary" onclick={() => (peopleTab.confirmClose = false)}>Keep editing</InkButton>
+      <InkButton variant="danger" onclick={() => peopleTab.close()}>Discard and close</InkButton>
     </div>
   </Modal>
 {/if}

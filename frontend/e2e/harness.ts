@@ -304,11 +304,13 @@ const mounts = {
     host.style.cssText = 'display:block;height:100vh'
     const { session } = await import('../src/lib/session.svelte')
     session.tabs = [{ path: '/r', name: 'tidewater', head: 'main' } as never]
-    const { people } = await import('../src/lib/people/people.svelte')
+    const { peopleTab } = await import('../src/lib/people/tab.svelte')
     const { default: PeopleView } = await import('../src/lib/people/PeopleView.svelte')
-    people.open = true
-    people.wanted = '/r'
+    peopleTab.open = true
+    peopleTab.wanted = '/r'
     mount(PeopleView, { target: host })
+    // What the tab bar's close button does, and what the tab bar reads to mark an edit.
+    Object.assign(win, { __closePeople: () => peopleTab.requestClose(), __peopleTab: () => ({ open: peopleTab.open, dirty: peopleTab.dirty }) })
   },
   // The repository view under the operation strip, as the app shell stacks them.
   async bisect() {

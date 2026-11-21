@@ -149,4 +149,31 @@ test.describe('the People tab', () => {
     await expect(card).toContainText('A commit says Priya R <priya@oldmill.example>')
     await expect.poll(async () => (await calls(page, 'WhoIs')).at(-1)?.[2]).toBe('priya@oldmill.example')
   })
+
+  // The tab bar loads with the app and the view doesn't, so the tab bar only knows whether
+  // there's an unsaved edit, and the view is what asks before one is thrown away.
+  test('closing with an unsaved edit asks first', async ({ page }) => {
+    type Win = { __closePeople: () => Promise<void>; __peopleTab: () => { open: boolean; dirty: boolean } }
+    const tab = () => page.evaluate(() => (window as unknown as Win).__peopleTab())
+    const close = () => page.evaluate(() => void (window as unknown as Win).__closePeople())
+    await open(page, 'people', { responses: withMailmap })
+    await expect.poll(tab).toEqual({ open: true, dirty: false })
+
+    await list(page).getByRole('listitem').filter({ hasText: 'Priya Raman' }).getByRole('button', { name: 'Take apart' }).click()
+    await expect.poll(tab).toEqual({ open: true, dirty: true })
+
+    await close()
+    const ask = page.getByRole('dialog', { name: 'Discard unsaved changes to the mailmap?' })
+    await expect(ask).toContainText('Nothing has been written')
+    await ask.getByRole('button', { name: 'Keep editing' }).click()
+    await expect(ask).toHaveCount(0)
+    await expect.poll(tab).toEqual({ open: true, dirty: true })
+
+    await close()
+    await page.getByRole('dialog', { name: 'Discard unsaved changes to the mailmap?' }).getByRole('button', { name: 'Discard and close' }).click()
+    await expect.poll(tab).toEqual({ open: false, dirty: false })
+    expect(await calls(page, 'SaveMailmap')).toHaveLength(0)
+    // Closed is remembered, so the tab doesn't come back at the next launch.
+    await expect.poll(async () => (await calls(page, 'SetPeopleTab')).at(-1)).toEqual([''])
+  })
 })

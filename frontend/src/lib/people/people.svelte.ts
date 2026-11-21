@@ -1,8 +1,8 @@
-import { MailmapNotes, MailmapSources, People, ReadMailmapFile, SaveMailmap, SetPeopleTab, WhoIs } from '../../../wailsjs/go/app/App.js'
+import { MailmapNotes, MailmapSources, People, ReadMailmapFile, SaveMailmap, WhoIs } from '../../../wailsjs/go/app/App.js'
 import type { app, git } from '../../../wailsjs/go/models'
 import { errorText } from '../errors'
-import { session } from '../session.svelte'
 import { WORK_TREE, removeLines } from './mailmap'
+import { peopleTab } from './tab.svelte'
 
 /** How many people are asked for at a time. */
 export const PAGE = 100
@@ -14,16 +14,15 @@ interface Doc {
 }
 
 /**
- * The People tab: who one repository's history names, how its mailmap reads them, and the
- * mailmap itself. It shows a repository open as a tab; if that tab closes, it moves to another.
+ * What the People tab shows: who one repository's history names, how its mailmap reads
+ * them, and the mailmap itself. It loads with the view; the tab itself (open or not, which
+ * repository) is peopleTab, which the app shell holds. It outlives the view, so an edit is
+ * still there after a look at another tab.
  *
  * A repository needs no mailmap. Everything here works without one, and nothing is written
  * until the user saves. Where there's no .mailmap, saving first asks whether to create it.
  */
-class PeopleTab {
-  open = $state(false)
-  /** The repository the tab was opened for. */
-  wanted = $state('')
+class PeopleState {
   sources = $state<git.MailmapSource[]>([])
   /** The source showing in Text. */
   selected = $state(WORK_TREE)
@@ -43,13 +42,10 @@ class PeopleTab {
   /** True while the history is being read for the first time: on a long one that takes seconds. */
   reading = $state(false)
   loadingMore = $state(false)
-  confirmClose = $state(false)
   /** Set while the user is asked whether to create the repository's first .mailmap. */
   confirmCreate = $state(false)
 
-  /** The repository shown: the one asked for while it's open, else the first open one. */
-  repo = $derived(session.tabs.find((t) => t.path === this.wanted)?.path ?? session.tabs[0]?.path ?? '')
-  repoName = $derived(session.tabs.find((t) => t.path === this.repo)?.name ?? '')
+  repo = $derived(peopleTab.repo)
   /** The work tree's .mailmap, which is always listed, whether or not it exists. */
   shared = $derived(this.sources.find((s) => s.source === WORK_TREE))
   exists = $derived(this.shared?.exists ?? false)
@@ -58,35 +54,13 @@ class PeopleTab {
   hasMore = $derived(!!this.list && this.people.length < this.list.matching)
 
   #loadedFor = ''
+  #closes = 0
   #asked = 0
   #timer: ReturnType<typeof setTimeout> | undefined
 
   /** The mailmap text names are read through: the edit when there is one, else what's saved. */
   #mailmap(): app.MailmapText {
     return { text: this.doc?.text ?? '', edited: this.dirty } as app.MailmapText
-  }
-
-  /** Opens the tab on a repository and selects it. */
-  async show(repo: string) {
-    this.open = true
-    if (repo && repo !== this.wanted) this.setRepo(repo)
-    await session.select(session.peopleTabId)
-    await this.load()
-  }
-
-  /** Restores the tab from the last session. */
-  async restore(saved: string) {
-    if (!saved) return
-    this.open = true
-    this.wanted = saved
-    await this.load()
-  }
-
-  setRepo(repo: string) {
-    if (this.dirty) return
-    this.wanted = repo
-    this.#forget()
-    void SetPeopleTab(repo).catch(() => {})
   }
 
   #forget() {
@@ -98,23 +72,23 @@ class PeopleTab {
     this.notes = []
     this.query = ''
     this.selected = WORK_TREE
+    this.view = 'people'
     this.error = ''
     this.saveError = ''
+    this.confirmCreate = false
     this.#loadedFor = ''
   }
 
   /** Reads the files and the people, keeping an unsaved edit. */
   async load() {
     const repo = this.repo
-    if (!repo) {
+    // The tab was closed since this last showed, or shows another repository: start afresh.
+    if (this.#closes !== peopleTab.closes || this.#loadedFor !== repo) {
       this.#forget()
-      return
-    }
-    if (this.#loadedFor !== repo) {
-      this.#forget()
+      this.#closes = peopleTab.closes
       this.#loadedFor = repo
-      void SetPeopleTab(repo).catch(() => {})
     }
+    if (!repo) return
     this.error = ''
     try {
       const sources = await MailmapSources(repo)
@@ -249,22 +223,6 @@ class PeopleTab {
     this.saveError = ''
     await this.load()
   }
-
-  /** Closes the tab, first asking if that would discard an unsaved edit. */
-  requestClose() {
-    if (this.dirty) this.confirmClose = true
-    else void this.close()
-  }
-
-  async close() {
-    this.confirmClose = false
-    this.confirmCreate = false
-    if (session.active === session.peopleTabId) await session.select(session.tabs.at(-1)?.path ?? '')
-    this.open = false
-    this.wanted = ''
-    this.#forget()
-    void SetPeopleTab('').catch(() => {})
-  }
 }
 
-export const people = new PeopleTab()
+export const people = new PeopleState()

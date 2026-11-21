@@ -4,7 +4,7 @@
   import { gitConfig } from './gitconfig/config.svelte'
   import { insights } from './insights/insights.svelte'
   import { ignoreRules } from './ignorerules/ignoreRules.svelte'
-  import { people } from './people/people.svelte'
+  import { peopleTab } from './people/tab.svelte'
   import { bisect } from './bisect.svelte'
   import { session } from './session.svelte'
   import { theme } from './theme.svelte'
@@ -44,7 +44,7 @@
 
   $effect(() => {
     // Re-measure when the active tab, the set of tabs or their labels change.
-    void [session.active, session.tabs.map((t) => t.name + t.head), gitConfig.open, insights.open, ignoreRules.open, ignoreRules.repoName, people.open, people.repoName]
+    void [session.active, session.tabs.map((t) => t.name + t.head), gitConfig.open, insights.open, ignoreRules.open, ignoreRules.repoName, peopleTab.open, peopleTab.repoName]
     queueMicrotask(placeBar)
   })
 
@@ -118,14 +118,14 @@
         </button>
       </div>
     {/if}
-    {#if people.open}
+    {#if peopleTab.open}
       <div class="tab" class:active={session.active === session.peopleTabId} title="People">
-        <button class="label" onclick={() => session.select(session.peopleTabId)} onauxclick={(e) => e.button === 1 && people.requestClose()}>
+        <button class="label" onclick={() => session.select(session.peopleTabId)} onauxclick={(e) => e.button === 1 && peopleTab.requestClose()}>
           <Icon name="people" size={14} />
-          People{#if people.repoName}<span class="head">{people.repoName}</span>{/if}
-          {#if people.dirty}<span class="dot" aria-label="unsaved changes" title="Unsaved changes">●</span>{/if}
+          People{#if peopleTab.repoName}<span class="head">{peopleTab.repoName}</span>{/if}
+          {#if peopleTab.dirty}<span class="dot" aria-label="unsaved changes" title="Unsaved changes">●</span>{/if}
         </button>
-        <button class="close" aria-label="Close People" title="Close (middle-click)" onclick={() => people.requestClose()}>
+        <button class="close" aria-label="Close People" title="Close (middle-click)" onclick={() => peopleTab.requestClose()}>
           <Icon name="close" size={12} />
         </button>
       </div>
