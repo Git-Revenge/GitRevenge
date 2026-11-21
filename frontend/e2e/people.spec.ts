@@ -167,21 +167,23 @@ test.describe('the People tab', () => {
   })
 
   test('Text says what each line does', async ({ page }) => {
-    const text = `# Tidewater\n${line}\nJo Whitlock <jo@tidewater.example> <jo@harbour.example>\nLeo Brandt leo@tidewater.example\n`
-    const note = (n: number, kind: string, over: object = {}) => ({ line: n, kind, identities: 0, commits: 0, coAuthored: 0, replaced: false, ...over })
+    const text = `# Tidewater\n${line}\nJo Whitlock <jo@tidewater.example> <jo@harbour.example>\nLeo Brandt leo@tidewater.example\nMaya Okafor <maya@tidewater.example>\n`
+    const note = (n: number, kind: string, over: object = {}) => ({ line: n, kind, identities: 0, commits: 0, coAuthored: 0, same: 0, replaced: false, ...over })
     await open(page, 'people', {
       responses: {
         ...withMailmap,
         ReadMailmapFile: text,
-        MailmapNotes: [note(1, 'comment'), note(2, 'map', { identities: 1, commits: 9 }), note(3, 'map'), note(4, 'skipped', { why: 'no address in < >' })],
+        MailmapNotes: [note(1, 'comment'), note(2, 'map', { identities: 1, commits: 9 }), note(3, 'map'), note(4, 'skipped', { why: 'no address in < >' }), note(5, 'map', { same: 1 })],
       },
     })
     await page.getByRole('button', { name: 'Text', exact: true }).click()
     const rows = page.locator('.rules .rule')
-    await expect(rows).toHaveCount(4)
+    await expect(rows).toHaveCount(5)
     await expect(rows.nth(1).locator('.what')).toHaveText('joins 9 commits')
     await expect(rows.nth(2).locator('.what')).toHaveText('matches nobody now')
     await expect(rows.nth(3).locator('.what')).toHaveText('git skips this: no address in < >')
+    // #854: Maya's line matches her and leaves her as she is, which isn't matching nobody.
+    await expect(rows.nth(4).locator('.what')).toHaveText('changes nothing: 1 name already reads this way')
     await expect(rows.nth(0).locator('.what')).toHaveText('')
 
     // The whole file can be edited as one box, and that edit isn't saved either.

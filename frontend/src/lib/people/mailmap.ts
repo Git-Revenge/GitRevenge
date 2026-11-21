@@ -78,6 +78,9 @@ export function describeNote(n: git.MailmapNote): { text: string; tone: NoteTone
   if (n.kind === 'skipped') return { text: `git skips this: ${n.why ?? 'it has no address'}`, tone: 'bad' }
   if (n.kind !== 'map') return { text: '', tone: '' }
   if (n.replaced) return { text: 'a later line replaces this', tone: 'idle' }
+  // A line can match people and leave them as their commits have them: the proper spelling
+  // of a name, where everyone already uses it. That isn't a line about nobody.
+  if (!n.identities && n.same) return { text: `changes nothing: ${count(n.same, 'name')} already ${n.same === 1 ? 'reads' : 'read'} this way`, tone: 'idle' }
   if (!n.identities) return { text: 'matches nobody now', tone: 'idle' }
   const who = n.identities > 1 ? `${count(n.identities, 'name')} · ` : ''
   if (!n.commits) return { text: `joins ${who}${count(n.coAuthored, 'co-author credit')}`, tone: 'joins' }

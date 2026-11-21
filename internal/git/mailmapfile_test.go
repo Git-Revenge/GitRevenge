@@ -186,6 +186,7 @@ func TestMailmapNotes(t *testing.T) {
 		kind                            string
 		identities, commits, coAuthored int
 		replaced                        bool
+		same                            int
 	}
 	want := []row{
 		{kind: MailmapComment},
@@ -193,13 +194,14 @@ func TestMailmapNotes(t *testing.T) {
 		{kind: MailmapMapping}, // matches nobody now
 		{kind: MailmapSkipped},
 		{kind: MailmapMapping, replaced: true}, // the next line names the same address
-		{kind: MailmapMapping, identities: 1, commits: 3},
-		{kind: MailmapMapping}, // maps Maya to herself: joins nothing
+		// Renames "sam", and matches "Sam Ortiz", who is already spelled that way.
+		{kind: MailmapMapping, identities: 1, commits: 3, same: 1},
+		{kind: MailmapMapping, same: 1}, // maps Maya to herself: applies, and joins nothing
 	}
 	for i, w := range want {
 		n := notes[i]
-		if n.Kind != w.kind || n.Identities != w.identities || n.Commits != w.commits || n.CoAuthored != w.coAuthored || n.Replaced != w.replaced {
-			t.Errorf("line %d = kind %s, %d identities, %d commits, %d co-authored, replaced %v\nwant %+v", i+1, n.Kind, n.Identities, n.Commits, n.CoAuthored, n.Replaced, w)
+		if n.Kind != w.kind || n.Identities != w.identities || n.Commits != w.commits || n.CoAuthored != w.coAuthored || n.Replaced != w.replaced || n.Same != w.same {
+			t.Errorf("line %d = kind %s, %d identities, %d commits, %d co-authored, replaced %v, same %d\nwant %+v", i+1, n.Kind, n.Identities, n.Commits, n.CoAuthored, n.Replaced, n.Same, w)
 		}
 	}
 	if notes[3].Why == "" {

@@ -268,6 +268,10 @@ type MailmapNote struct {
 	Identities int `json:"identities"`
 	Commits    int `json:"commits"`
 	CoAuthored int `json:"coAuthored"`
+	// Same is how many identities the line applies to and leaves as their commits have
+	// them. A line that says which spelling of a name is the proper one does this to
+	// whoever already uses it: it matches them, and changes nothing.
+	Same int `json:"same"`
 	// Replaced means a later line, in this source or one read after it, says something
 	// else for everything this line said.
 	Replaced bool `json:"replaced"`
@@ -289,14 +293,16 @@ func (m *Mailmap) Notes(source, text string, history []HistoryIdentity) []Mailma
 	}
 	for _, h := range history {
 		shown, by := m.Resolve(h.Identity)
-		if shown == h.Identity {
-			continue // a line that maps someone to themselves joins nothing
-		}
 		for _, at := range by {
 			if at.Source != source || at.Line < 1 || at.Line > len(notes) {
 				continue
 			}
 			n := &notes[at.Line-1]
+			if shown == h.Identity {
+				// The line maps someone to themselves: it applies, and joins nothing.
+				n.Same++
+				continue
+			}
 			n.Identities++
 			n.Commits += h.Authored
 			n.CoAuthored += h.CoAuthored
