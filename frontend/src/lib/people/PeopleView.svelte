@@ -144,9 +144,9 @@
     </div>
     <div class="answer-to">
       {#if mode === 'apart'}
-        <button class="btn sm" onclick={() => t.keepApart(s.key, false)}>Offer again</button>
+        <button class="btn sm secondary" onclick={() => t.keepApart(s.key, false)}>Offer again</button>
       {:else}
-        <button class="btn sm" onclick={() => (joining = s.people)}>Same person…</button>
+        <button class="btn sm secondary" onclick={() => (joining = s.people)}>Same person…</button>
         {#if mode === 'offer'}<button class="btn sm quiet" title="Remembered for this repository, so it isn't offered again" onclick={() => t.keepApart(s.key, true)}>Different people</button>{/if}
       {/if}
     </div>
@@ -296,7 +296,7 @@
                     {#if !picking}
                       <button class="btn sm quiet" title="Say that this is the same person as someone else in the list" onclick={() => (picking = p)}>Same person as…</button>
                     {:else if !same(picking, p)}
-                      <button class="btn sm" onclick={() => joinWith(p)}>This one</button>
+                      <button class="btn sm secondary" onclick={() => joinWith(p)}>This one</button>
                     {/if}
                   </span>
                 </li>
