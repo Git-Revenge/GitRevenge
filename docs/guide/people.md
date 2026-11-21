@@ -96,6 +96,7 @@ Only lines in the repository's `.mailmap` can be taken apart here. A join that c
 **Text**, at the top right, shows the file one line to a row, each with what it does now:
 
 - **joins 2 commits**, or how many names and commits it joins;
+- **changes nothing**, for a line whose people already read that way, such as one that only names the proper spelling for an address;
 - **matches nobody now**, for a line about someone who isn't in the history;
 - **a later line replaces this**, for a line git no longer uses;
 - **git skips this**, with why, for a line git can't read.
