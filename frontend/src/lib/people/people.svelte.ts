@@ -1,7 +1,7 @@
-import { KeepApart, MailmapNotes, MailmapSources, People, PeopleSuggestions, PlanSamePerson, ReadMailmapFile, SaveMailmap, WhoIs } from '../../../wailsjs/go/app/App.js'
+import { KeepApart, MailmapNotes, MailmapSources, People, PeopleSuggestions, PlanSamePerson, PlanTakeApart, ReadMailmapFile, SaveMailmap, WhoIs } from '../../../wailsjs/go/app/App.js'
 import type { app, git } from '../../../wailsjs/go/models'
 import { errorText } from '../errors'
-import { WORK_TREE, removeLines } from './mailmap'
+import { WORK_TREE } from './mailmap'
 import { peopleTab } from './tab.svelte'
 
 /** How many people are asked for at a time. */
@@ -37,6 +37,8 @@ class PeopleState {
   notes = $state<git.MailmapNote[]>([])
   /** Who looks like the same person: what's offered, what's left out, and what was answered. */
   suggestions = $state<app.Suggestions | null>(null)
+  /** What the last Take apart did to others on the same line, until the next edit. */
+  apart = $state<git.ApartPlan | null>(null)
   error = $state('')
   /** Why the last save failed, until the next save, revert or reload. */
   saveError = $state('')
@@ -73,6 +75,7 @@ class PeopleState {
     this.people = []
     this.notes = []
     this.suggestions = null
+    this.apart = null
     this.query = ''
     this.selected = WORK_TREE
     this.view = 'people'
@@ -174,13 +177,24 @@ class PeopleState {
     if (!this.doc) return
     this.doc = { ...this.doc, text }
     this.saveError = ''
+    this.apart = null
     this.#soon()
   }
 
-  /** Takes an identity away from the person it was joined to, by removing the lines that joined it. */
-  takeApart(id: app.PersonIdentity) {
+  /**
+   * Takes an identity away from the person it was joined to, and nobody else. The line that
+   * joined it may have joined others too; the plan keeps them, with lines of their own, and
+   * `apart` holds what it did to them so the view can say.
+   */
+  async takeApart(id: app.PersonIdentity) {
     if (!this.doc) return
-    this.edit(removeLines(this.doc.text, id.lines.filter((l) => l.source === WORK_TREE).map((l) => l.line)))
+    try {
+      const plan = await PlanTakeApart(this.repo, this.#mailmap(), { name: id.name, email: id.email } as git.Identity)
+      this.edit(plan.text)
+      if (plan.kept.length || plan.lost.length) this.apart = plan
+    } catch (e) {
+      this.error = errorText(e)
+    }
   }
 
   revert() {
@@ -188,6 +202,7 @@ class PeopleState {
     this.doc = { ...this.doc, text: this.doc.base }
     this.saveError = ''
     this.confirmCreate = false
+    this.apart = null
     void this.refresh()
   }
 
@@ -228,6 +243,8 @@ class PeopleState {
       await SaveMailmap(this.repo, d.base, d.text, create)
       const now = await ReadMailmapFile(this.repo, WORK_TREE)
       this.doc = { base: now, text: now }
+      // The note about what a Take apart did was about the edit, which is now saved.
+      this.apart = null
       await this.load()
     } catch (e) {
       this.saveError = errorText(e)
@@ -241,6 +258,7 @@ class PeopleState {
     this.doc = { base: now, text: now }
     this.error = ''
     this.saveError = ''
+    this.apart = null
     await this.load()
   }
 }

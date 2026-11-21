@@ -216,6 +216,8 @@ export function PlanBisect(arg1:string,arg2:string,arg3:string):Promise<app.Bise
 
 export function PlanSamePerson(arg1:string,arg2:app.MailmapText,arg3:app.SamePersonRequest):Promise<git.JoinPlan>;
 
+export function PlanTakeApart(arg1:string,arg2:app.MailmapText,arg3:git.Identity):Promise<git.ApartPlan>;
+
 export function Preferences():Promise<app.Preferences>;
 
 export function PreviewIgnore(arg1:string,arg2:git.IgnoreTarget,arg3:string):Promise<git.IgnorePreview>;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { app } from '../../../wailsjs/go/models'
-import { asSuggested, identitiesOf, identityText, joinTitle, planAction, planHeading, suggestionLabel } from './suggest'
+import { apartNote, asSuggested, identitiesOf, identityText, joinTitle, planAction, planHeading, suggestionLabel } from './suggest'
 
 const id = (name: string, email: string) => ({ name, email })
 
@@ -26,6 +26,23 @@ describe('asSuggested', () => {
   it('keeps who they are and drops what the dialog has no use for', () => {
     const p = { name: 'Sam Ortiz', email: 'sam@x', commits: 3, coAuthored: 1, bot: false, identities: [{ name: 'sam', email: 'sam@x', commits: 1, coAuthored: 0, lines: [{ source: '.mailmap', line: 2 }] }] } as app.Person
     expect(asSuggested(p)).toEqual({ name: 'Sam Ortiz', email: 'sam@x', commits: 3, coAuthored: 1, bot: false, identities: [id('sam', 'sam@x')] })
+  })
+})
+
+describe('apartNote', () => {
+  it('says who else the line joined and that they stay joined', () => {
+    expect(apartNote({ kept: [id('S. Ortiz', 'pair@x')], lost: [], added: ['a'] } as never)).toBe("That line also joined S. Ortiz <pair@x>. It's still joined, by a line that names it.")
+    expect(apartNote({ kept: [id('S. Ortiz', 'pair@x'), id('Samuel', 'pair@x')], lost: [], added: ['a', 'b'] } as never)).toBe(
+      "That line also joined S. Ortiz <pair@x>, Samuel <pair@x>. They're still joined, by lines that name them.",
+    )
+  })
+
+  it('says who came apart too', () => {
+    expect(apartNote({ kept: [], lost: [id('', 'pair@x')], added: [] } as never)).toBe('<pair@x> came apart as well: no line could keep it joined.')
+  })
+
+  it('says nothing when nobody else was on the line', () => {
+    expect(apartNote({ kept: [], lost: [], added: [] } as never)).toBe('')
   })
 })
 

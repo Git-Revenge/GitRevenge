@@ -180,6 +180,47 @@ func TestPlanSamePersonFromASuggestion(t *testing.T) {
 	}
 }
 
+// Taking one name apart leaves the others a line joined where they were, and writes nothing.
+func TestPlanTakeApartKeepsTheOthers(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "o1.txt", "one")
+	commitAs(fx, "sam", "pair@tidewater.example", "o2.txt", "two")
+	commitAs(fx, "S. Ortiz", "pair@tidewater.example", "o3.txt", "three")
+	path := openForMap(t, a, fx)
+	text := "Sam Ortiz <sam@tidewater.example> <pair@tidewater.example>\n"
+	edited := MailmapText{Text: text, Edited: true}
+	if list, err := a.People(path, PeopleRequest{Mailmap: edited}); err != nil || list.Everyone != 1 {
+		t.Fatalf("before: %d people, %v", list.Everyone, err)
+	}
+
+	plan, err := a.PlanTakeApart(path, edited, git.Identity{Name: "sam", Email: "pair@tidewater.example"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "Sam Ortiz <sam@tidewater.example> S. Ortiz <pair@tidewater.example>\n"; plan.Text != want || len(plan.Kept) != 1 || plan.Kept[0].Name != "S. Ortiz" || len(plan.Lost) != 0 {
+		t.Fatalf("plan = %+v", plan)
+	}
+	// Through the planned text there are two people: Sam, still with the other spelling, and sam.
+	list, err := a.People(path, PeopleRequest{Mailmap: MailmapText{Text: plan.Text, Edited: true}})
+	if err != nil || list.Everyone != 2 {
+		t.Fatalf("after: %d people, %v", list.Everyone, err)
+	}
+	if sam := person(t, list, "Sam Ortiz"); sam.Commits != 2 || len(sam.Identities) != 2 {
+		t.Fatalf("Sam Ortiz after = %+v, want the other spelling still joined", sam)
+	}
+	if _, err := os.Stat(filepath.Join(fx.Dir, ".mailmap")); err == nil {
+		t.Fatal("planning created a .mailmap")
+	}
+
+	// Someone nothing joins: the text comes back as it was.
+	plan, err = a.PlanTakeApart(path, edited, git.Identity{Name: "Sam Ortiz", Email: "sam@tidewater.example"})
+	if err != nil || plan.Text != text || len(plan.Removed) != 0 {
+		t.Fatalf("an identity no line joins: %+v, %v", plan, err)
+	}
+}
+
 func TestSuggestLeavesOutAnAddressUnlikeNamesShare(t *testing.T) {
 	who := func(name, email string, commits int) Person {
 		return Person{Name: name, Email: email, Commits: commits, Identities: []PersonIdentity{{Name: name, Email: email, Commits: commits}}}

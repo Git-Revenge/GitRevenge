@@ -13,7 +13,7 @@
   import { WORK_TREE, canTakeApart, changedLines, describeNote, joined, linesText, sourceLabel, sourceNote, summary, wrote } from './mailmap'
   import { people as t } from './people.svelte'
   import SamePersonDialog from './SamePersonDialog.svelte'
-  import { asSuggested, suggestionLabel } from './suggest'
+  import { apartNote, asSuggested, suggestionLabel } from './suggest'
   import { peopleTab } from './tab.svelte'
 
   // Re-read when the repository changes on disk, such as a .mailmap edited elsewhere.
@@ -204,6 +204,13 @@
           <button class="btn sm" onclick={() => t.reload()}>Reload from disk</button>
         </div>
       {/if}
+      {#if t.apart}
+        <!-- Taking one name apart rewrote a line that joined others too: say what it did. -->
+        <div class="took" role="status">
+          <span>{apartNote(t.apart)} Text shows the lines. Nothing is saved until you save.</span>
+          <button class="btn sm quiet" onclick={() => (t.apart = null)}>Dismiss</button>
+        </div>
+      {/if}
 
       {#if !t.doc}
         <Loading label="Reading…" />
@@ -286,7 +293,7 @@
                         <span class="mail">{id.email}</span>
                         <span class="why">· {wrote(id.commits, id.coAuthored)}{id.lines.length ? `, ${linesText(id.lines)}` : ''}</span>
                         {#if canTakeApart(id)}
-                          <button class="btn sm text" title="Removes {linesText(id.lines)} of .mailmap. Nothing is saved until you save." onclick={() => t.takeApart(id)}>Take apart</button>
+                          <button class="btn sm text" title="Removes {linesText(id.lines)} of .mailmap, and keeps anyone else it joins. Nothing is saved until you save." onclick={() => t.takeApart(id)}>Take apart</button>
                         {/if}
                       </div>
                     {/each}
@@ -597,6 +604,24 @@
     border-radius: var(--r-md);
     background: var(--danger-wash);
     font-size: 13px;
+  }
+
+  /* What a Take apart did to others on the line: news, not a fault. */
+  .took {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 12px 20px 0;
+    padding: 10px 12px;
+    border-radius: var(--r-md);
+    background: var(--selected);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+
+  .took span {
+    flex: 1;
+    min-width: 0;
   }
 
   .people {

@@ -54,3 +54,19 @@ export function identityText(id: Pick<git.Identity, 'name' | 'email'>): string {
   if (id.name && id.email) return `${id.name} <${id.email}>`
   return id.name || `<${id.email}>`
 }
+
+/**
+ * What taking someone apart did to the others on the same line: a line for one address joins
+ * every name under it, so the others get lines of their own. Said in words because those
+ * lines have to spell the names the first line left out.
+ */
+export function apartNote(plan: Pick<git.ApartPlan, 'kept' | 'lost' | 'added'>): string {
+  const out: string[] = []
+  const all = (ids: git.Identity[]) => ids.map(identityText).join(', ')
+  if (plan.kept.length) {
+    const one = plan.kept.length === 1
+    out.push(`That line also joined ${all(plan.kept)}. ${one ? "It's" : "They're"} still joined, by ${plan.added.length === 1 ? `a line that names ${one ? 'it' : 'them'}` : 'lines that name them'}.`)
+  }
+  if (plan.lost.length) out.push(`${all(plan.lost)} came apart as well: no line could keep ${plan.lost.length === 1 ? 'it' : 'them'} joined.`)
+  return out.join(' ')
+}

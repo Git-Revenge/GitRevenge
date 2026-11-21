@@ -258,3 +258,31 @@ func (a *App) PlanSamePerson(path string, mm MailmapText, req SamePersonRequest)
 	}
 	return plan, nil
 }
+
+// PlanTakeApart works out the .mailmap text that takes one identity away from the person
+// it's joined to, and nobody else: a line that joined others as well is replaced by lines
+// that keep them. It writes nothing; the view takes the text as its edit. mm is the
+// .mailmap as it's being edited.
+func (a *App) PlanTakeApart(path string, mm MailmapText, who git.Identity) (git.ApartPlan, error) {
+	empty := git.ApartPlan{Removed: []int{}, Added: []string{}, Kept: []git.Identity{}, Lost: []git.Identity{}}
+	r, err := a.openRepo(path)
+	if err != nil {
+		return empty, err
+	}
+	ctx := context.Background()
+	history, err := a.historyPeople(ctx, r)
+	if err != nil {
+		return empty, err
+	}
+	text := mm.Text
+	if !mm.Edited {
+		if text, err = r.Git.ReadMailmapSource(ctx, git.MailmapWorkTree); err != nil {
+			return empty, err
+		}
+	}
+	read, err := r.Git.MailmapReader(ctx)
+	if err != nil {
+		return empty, err
+	}
+	return git.PlanApart(text, read, history.ids, who), nil
+}

@@ -2315,6 +2315,58 @@ export namespace app {
 
 export namespace git {
 	
+	export class Identity {
+	    name: string;
+	    email: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Identity(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.email = source["email"];
+	    }
+	}
+	export class ApartPlan {
+	    text: string;
+	    removed: number[];
+	    added: string[];
+	    kept: Identity[];
+	    lost: Identity[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ApartPlan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.text = source["text"];
+	        this.removed = source["removed"];
+	        this.added = source["added"];
+	        this.kept = this.convertValues(source["kept"], Identity);
+	        this.lost = this.convertValues(source["lost"], Identity);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class AuthorHistory {
 	    authored: number;
 	    coAuthored: number;
@@ -2679,20 +2731,7 @@ export namespace git {
 	        this.commit = source["commit"];
 	    }
 	}
-	export class Identity {
-	    name: string;
-	    email: string;
 	
-	    static createFrom(source: any = {}) {
-	        return new Identity(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.email = source["email"];
-	    }
-	}
 	export class IgnoreLine {
 	    source: string;
 	    line: number;

@@ -37,7 +37,9 @@ const joined = {
 }
 
 const noMailmap = { MailmapSources: [{ source: '.mailmap', path: '/r/.mailmap', exists: false, editable: true, lines: 0 }], ReadMailmapFile: '', People: asWritten, MailmapNotes: [], WhoIs: [] }
-const withMailmap = { MailmapSources: [{ source: '.mailmap', path: '/r/.mailmap', exists: true, editable: true, lines: 1 }], ReadMailmapFile: `${line}\n`, People: joined, MailmapNotes: [], WhoIs: [] }
+// Taking Priya's old identity apart removes the one line, which joined nobody else.
+const takenApart = { text: '', removed: [1], added: [], kept: [], lost: [] }
+const withMailmap = { MailmapSources: [{ source: '.mailmap', path: '/r/.mailmap', exists: true, editable: true, lines: 1 }], ReadMailmapFile: `${line}\n`, People: joined, MailmapNotes: [], WhoIs: [], PlanTakeApart: takenApart }
 
 const save = (page: Page) => page.locator('.foot').getByRole('button', { name: /mailmap/ })
 const list = (page: Page) => page.getByRole('list', { name: 'People' })
@@ -104,16 +106,64 @@ test.describe('the People tab', () => {
     const apart = priya.getByRole('button', { name: 'Take apart' })
     expect((await apart.boundingBox())!.width).toBeLessThan(120)
     await apart.click()
+    // The backend is asked about that one identity, with the text as it stands.
+    await expect.poll(() => calls(page, 'PlanTakeApart')).toEqual([['/r', { text: `${line}\n`, edited: false }, { name: 'Priya R', email: 'priya@oldmill.example' }]])
     // The line is gone from the text being edited, and nothing is saved yet.
     await expect(page.locator('.foot')).toContainText('1 line not saved')
     await expect.poll(async () => (await calls(page, 'People')).some((c) => (c[1] as { mailmap: { edited: boolean; text: string } }).mailmap.edited && (c[1] as { mailmap: { text: string } }).mailmap.text === '')).toBe(true)
     expect(await calls(page, 'SaveMailmap')).toHaveLength(0)
+    // Nobody else was on that line, so there's nothing more to say.
+    await expect(page.getByRole('status')).toHaveCount(0)
 
     // The file exists, so saving it needs no question.
     await expect(save(page)).toHaveText('Save .mailmap')
     await save(page).click()
     await expect.poll(() => calls(page, 'SaveMailmap')).toEqual([['/r', `${line}\n`, '', false]])
     await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  // #838: a line for one address joins every name under it. Taking one apart keeps the rest,
+  // and says so, because the lines that keep them spell names the first line left out.
+  test('taking one name apart keeps the others the line joined, and says so', async ({ page }) => {
+    const kept = 'Priya Raman <priya@tidewater.example> P. Raman <priya@oldmill.example>'
+    const narrowed = { text: `${kept}\n`, removed: [1], added: [kept], kept: [{ name: 'P. Raman', email: 'priya@oldmill.example' }], lost: [] }
+    await open(page, 'people', { responses: { ...withMailmap, PlanTakeApart: narrowed } })
+    await list(page).getByRole('listitem').filter({ hasText: 'Priya Raman' }).getByRole('button', { name: 'Take apart' }).click()
+
+    const note = page.getByRole('status')
+    await expect(note).toContainText("That line also joined P. Raman <priya@oldmill.example>. It's still joined, by a line that names it.")
+    await expect(note).toContainText('Nothing is saved until you save.')
+    // The edit is the narrowed text, not the line simply removed.
+    await expect.poll(async () => (await calls(page, 'People')).some((c) => (c[1] as { mailmap: { text: string } }).mailmap.text === `${kept}\n`)).toBe(true)
+    await page.getByRole('button', { name: 'Text', exact: true }).click()
+    await expect(page.locator('.rules .rule .pat').first()).toHaveText(kept)
+
+    await note.getByRole('button', { name: 'Dismiss' }).click()
+    await expect(note).toHaveCount(0)
+    expect(await calls(page, 'SaveMailmap')).toHaveLength(0)
+  })
+
+  // The note is about an edit. Once that's saved there's nothing left to tell; it stayed on
+  // screen after a save until a run in the real app showed it.
+  test('the note about a narrowed line goes once the edit is saved', async ({ page }) => {
+    const kept = 'Priya Raman <priya@tidewater.example> P. Raman <priya@oldmill.example>'
+    const narrowed = { text: `${kept}\n`, removed: [1], added: [kept], kept: [{ name: 'P. Raman', email: 'priya@oldmill.example' }], lost: [] }
+    await open(page, 'people', { responses: { ...withMailmap, PlanTakeApart: narrowed } })
+    await list(page).getByRole('listitem').filter({ hasText: 'Priya Raman' }).getByRole('button', { name: 'Take apart' }).click()
+    await expect(page.getByRole('status')).toContainText('That line also joined')
+    await save(page).click()
+    await expect.poll(() => calls(page, 'SaveMailmap')).toHaveLength(1)
+    await expect(page.getByRole('status')).toHaveCount(0)
+  })
+
+  test('taking apart says who else came apart when no line could keep them', async ({ page }) => {
+    const lost = { text: '', removed: [1], added: [], kept: [], lost: [{ name: '', email: 'priya@oldmill.example' }] }
+    await open(page, 'people', { responses: { ...withMailmap, PlanTakeApart: lost } })
+    await list(page).getByRole('listitem').filter({ hasText: 'Priya Raman' }).getByRole('button', { name: 'Take apart' }).click()
+    await expect(page.getByRole('status')).toContainText('<priya@oldmill.example> came apart as well: no line could keep it joined.')
+    // Reverting drops the edit and the note with it.
+    await page.locator('.foot').getByRole('button', { name: 'Revert' }).click()
+    await expect(page.getByRole('status')).toHaveCount(0)
   })
 
   test('Text says what each line does', async ({ page }) => {

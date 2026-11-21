@@ -418,6 +418,10 @@ export function PlanSamePerson(arg1, arg2, arg3) {
   return window['go']['app']['App']['PlanSamePerson'](arg1, arg2, arg3);
 }
 
+export function PlanTakeApart(arg1, arg2, arg3) {
+  return window['go']['app']['App']['PlanTakeApart'](arg1, arg2, arg3);
+}
+
 export function Preferences() {
   return window['go']['app']['App']['Preferences']();
 }
