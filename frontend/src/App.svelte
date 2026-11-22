@@ -11,6 +11,7 @@
   import { insights } from './lib/insights/insights.svelte'
   import { ignoreRules } from './lib/ignorerules/ignoreRules.svelte'
   import { peopleTab } from './lib/people/tab.svelte'
+  import { trailerCare } from './lib/filters/careDialog.svelte'
   import Lazy from './lib/ui/Lazy.svelte'
   import OperationBanner from './lib/OperationBanner.svelte'
   import PromptDialog from './lib/PromptDialog.svelte'
@@ -111,6 +112,7 @@
       const repo = session.activeTab.path
       list.push({ id: 'ignore.open', group: 'Repository', title: 'Edit ignore rules', keywords: 'gitignore exclude ignored files', run: () => ignoreRules.show(repo) })
       list.push({ id: 'people.open', group: 'Repository', title: 'See people', keywords: 'mailmap authors names identities who', run: () => peopleTab.show(repo) })
+      list.push({ id: 'trailers.care', group: 'Repository', title: 'Trailer care', keywords: 'smart filters trailers keys rules join spelling reviewed-by closes fixes', run: () => trailerCare.show(repo) })
     }
     if (session.tabs.length > 0 || gitConfig.open || insights.open || ignoreRules.open || peopleTab.open) {
       // Cycle through the start page and every tab.
@@ -177,6 +179,9 @@
 
 {#if commands.aboutOpen}
   <Lazy load={() => import('./lib/about/AboutDialog.svelte')} {version} onClose={() => (commands.aboutOpen = false)} />
+{/if}
+{#if trailerCare.repo}
+  <Lazy load={() => import('./lib/filters/TrailerCare.svelte')} repo={trailerCare.repo} onClose={() => trailerCare.close()} />
 {/if}
 
 {#if gitConfig.confirmClose}

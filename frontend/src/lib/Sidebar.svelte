@@ -7,6 +7,7 @@
   import type { Ref } from './graph/rowCache'
   import { provideCommands, type Command } from './commands.svelte'
   import type { MenuItem } from './ContextMenu.svelte'
+  import { trailerCare } from './filters/careDialog.svelte'
   import RepoPanel from './RepoPanel.svelte'
   import Lazy from './ui/Lazy.svelte'
   import { session } from './session.svelte'
@@ -457,7 +458,7 @@
 
     {#if filtersWanted}
       <div class="scroll" hidden={ui.panel !== 'filters'}>
-        <Lazy load={() => import('./filters/SmartFiltersPanel.svelte')} {path} {filter} picks={filterPicks} pins={pinnedKeys} {onPin} {onMenu} open={ui.open} onPick={(key: string, value: string) => onFilterPick?.(key, value)} onSearch={(q: string) => onSearch?.(q)} onStatus={(s: { matches: number }) => (filterMatches = s.matches)} />
+        <Lazy load={() => import('./filters/SmartFiltersPanel.svelte')} {path} {filter} picks={filterPicks} pins={pinnedKeys} {onPin} {onMenu} onCare={() => trailerCare.show(path)} open={ui.open} onPick={(key: string, value: string) => onFilterPick?.(key, value)} onSearch={(q: string) => onSearch?.(q)} onStatus={(s: { matches: number }) => (filterMatches = s.matches)} />
       </div>
     {/if}
 

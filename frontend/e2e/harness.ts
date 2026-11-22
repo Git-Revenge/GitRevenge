@@ -309,6 +309,13 @@ const mounts = {
     const { peopleTab } = await import('../src/lib/people/tab.svelte')
     Object.assign(win, { __peopleTab: () => ({ open: peopleTab.open, repo: peopleTab.repo, ask: peopleTab.ask && JSON.parse(JSON.stringify(peopleTab.ask)) }) })
   },
+  // Trailer care, the dialog where a repository says how its trailers are read.
+  async trailerCare() {
+    const { default: TrailerCare } = await import('../src/lib/filters/TrailerCare.svelte')
+    const { session } = await import('../src/lib/session.svelte')
+    session.tabs = [{ path: '/r', name: 'tidewater', head: 'main' } as never]
+    mount(TrailerCare, { target: host, props: { repo: '/r', onClose: record('close') } })
+  },
   // The strip above the graph while a smart filter is on.
   async filterStrip() {
     const { default: FilterStrip } = await import('../src/lib/filters/FilterStrip.svelte')
@@ -532,6 +539,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'filterStrip':
     await mounts.filterStrip()
+    break
+  case 'trailerCare':
+    await mounts.trailerCare()
     break
   case 'conflictView':
     await mounts.conflictView()
