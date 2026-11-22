@@ -3,6 +3,7 @@ package git
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -176,6 +177,9 @@ func (r *Repo) readMailmapSource(ctx context.Context, s MailmapSource) (text str
 		}
 		return normalizeMailmapText(string(out)), true, nil
 	}
+	if !mailmapFile(s) {
+		return "", false, nil
+	}
 	data, err := os.ReadFile(s.Path)
 	if errors.Is(err, os.ErrNotExist) {
 		return "", false, nil
@@ -184,6 +188,20 @@ func (r *Repo) readMailmapSource(ctx context.Context, s MailmapSource) (text str
 		return "", false, err
 	}
 	return normalizeMailmapText(string(data)), true, nil
+}
+
+// mailmapFile reports whether a source on disk is a file git would read a mailmap from.
+// The work tree's .mailmap is committed with the repository, and git opens it without
+// following a link (since 2.32), so a .mailmap that is a link is no mailmap: it could lead
+// anywhere outside the repository. mailmap.file is the user's own setting and may be a link,
+// as a file kept with their dotfiles often is, but whatever it leads to must be a file: a
+// device such as /dev/zero would be read for ever.
+func mailmapFile(s MailmapSource) bool {
+	if s.Source == MailmapWorkTree && isLink(s.Path) {
+		return false
+	}
+	info, err := os.Stat(s.Path)
+	return err != nil || info.Mode().IsRegular() // a missing file is read as missing
 }
 
 // normalizeMailmapText gives text "\n" line endings and one final newline, or "" for none.
@@ -231,8 +249,18 @@ var (
 // A repository works without a mailmap, so one is never created in passing: when there's
 // no .mailmap, text is written only with create set, which says the user agreed to the new
 // file. Otherwise ErrNoMailmap is returned and nothing is written.
+//
+// A .mailmap that is a symbolic link is refused with ErrSymlink: git doesn't read one, and
+// writing to it would change the file it points at, which may be outside the repository.
+// Anything else that isn't a file, such as a folder, is refused too.
 func (r *Repo) WriteMailmap(_ context.Context, base, text string, create bool) error {
 	p := filepath.Join(r.dir, MailmapWorkTree)
+	if isLink(p) {
+		return fmt.Errorf("%s %w, which git doesn't read as a mailmap", MailmapWorkTree, ErrSymlink)
+	}
+	if info, err := os.Stat(p); err == nil && !info.Mode().IsRegular() {
+		return fmt.Errorf("%s isn't a file", MailmapWorkTree)
+	}
 	lines, eol, err := readLines(p)
 	if err != nil {
 		return err

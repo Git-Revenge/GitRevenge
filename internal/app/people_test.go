@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
@@ -238,6 +239,27 @@ func TestSaveMailmapAsksBeforeCreating(t *testing.T) {
 	err = a.SaveMailmap(path, "something else\n", line, false)
 	if err == nil || err.Error() != "The .mailmap changed on disk since you started editing, so it wasn't saved. Reload it to see the change, then make your edits again." {
 		t.Fatalf("with a stale base: %v", err)
+	}
+}
+
+// A .mailmap that is a link isn't saved through, and the reason is given in words (#892).
+func TestSaveMailmapRefusesALink(t *testing.T) {
+	t.Parallel()
+	a, fx, path := peopleRepo(t)
+	outside := filepath.Join(t.TempDir(), "elsewhere")
+	if err := os.WriteFile(outside, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(fx.Dir, ".mailmap")); err != nil {
+		t.Skipf("can't make a symbolic link here: %v", err)
+	}
+	line := "Priya Raman <priya@tidewater.example> <priya@oldmill.example>\n"
+	err := a.SaveMailmap(path, "", line, true)
+	if err == nil || !strings.HasPrefix(err.Error(), "This repository's .mailmap is a symbolic link.") {
+		t.Fatalf("saving through a link: %v", err)
+	}
+	if data, _ := os.ReadFile(outside); len(data) != 0 {
+		t.Fatalf("the file the link points at now holds %q", data)
 	}
 }
 
