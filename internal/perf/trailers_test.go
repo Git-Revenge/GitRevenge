@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -29,15 +30,16 @@ const (
 	targetTrailerCare = 5 * time.Second
 )
 
-// countingMessages says how many commits a read asked git for.
+// countingMessages says how many commits a read asked git for. A long walk is read by
+// several readers at once, so it counts with an atomic.
 type countingMessages struct {
 	trailerindex.Source
-	read int
+	read atomic.Int64
 }
 
 func (c *countingMessages) CommitMessages(ctx context.Context, m git.MessageRange, each func(id, message string) error) error {
 	return c.Source.CommitMessages(ctx, m, func(id, message string) error {
-		c.read++
+		c.read.Add(1)
 		return each(id, message)
 	})
 }
@@ -72,7 +74,7 @@ func TestTrailerIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 	st := x.Status()
-	t.Logf("first read: %d commits, %d with trailers, in %s", first.read, st.Commits, time.Since(start).Round(time.Second))
+	t.Logf("first read: %d commits, %d with trailers, in %s", first.read.Load(), st.Commits, time.Since(start).Round(time.Second))
 	t.Logf("held in memory: %d MB", (heapNow()-before)>>20)
 	var size int64
 	if entries, err := os.ReadDir(dir); err == nil {
@@ -123,7 +125,7 @@ func TestTrailerIndex(t *testing.T) {
 	asked := 0
 	start = time.Now()
 	reading := x.Reading(trailerindex.Rules{
-		Total: first.read,
+		Total: int(first.read.Load()),
 		Commits: func(ids []string) map[string]string {
 			asked = len(ids)
 			full, err := r.CommitIDs(ctx, ids)
@@ -226,9 +228,9 @@ func TestTrailerIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 	took = time.Since(start)
-	t.Logf("opened again: %d commits read, %d held, in %s", again.read, y.Status().Commits, took.Round(time.Millisecond))
-	if again.read != 0 {
-		t.Errorf("opening again read %d commits, want none", again.read)
+	t.Logf("opened again: %d commits read, %d held, in %s", again.read.Load(), y.Status().Commits, took.Round(time.Millisecond))
+	if again.read.Load() != 0 {
+		t.Errorf("opening again read %d commits, want none", again.read.Load())
 	}
 	if y.Status().Commits != st.Commits {
 		t.Errorf("opened again it holds %d commits, had %d", y.Status().Commits, st.Commits)

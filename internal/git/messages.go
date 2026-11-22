@@ -23,8 +23,10 @@ type MessageRange struct {
 	// Tips and Not are full object ids, of commits or of tags.
 	Tips []string
 	Not  []string
-	// Skip leaves out that many commits from the start of the walk.
+	// Skip leaves out that many commits from the start of the walk, and Max, when above 0,
+	// stops after that many: a slice of the walk, which several readers can take side by side.
 	Skip int
+	Max  int
 }
 
 // stdin is the range as git reads revisions from standard input: more ids than a command
@@ -66,6 +68,9 @@ func (r *Repo) CommitMessages(ctx context.Context, m MessageRange, each func(id,
 	if m.Skip > 0 {
 		args = append(args, "--skip="+strconv.Itoa(m.Skip))
 	}
+	if m.Max > 0 {
+		args = append(args, "--max-count="+strconv.Itoa(m.Max))
+	}
 	return r.streamCmd(ctx, Cmd{Args: args, Stdin: in}, func(rd io.Reader) error {
 		br := bufio.NewReaderSize(rd, 256*1024)
 		for {
@@ -86,8 +91,8 @@ func (r *Repo) CommitMessages(ctx context.Context, m MessageRange, each func(id,
 	})
 }
 
-// CountMessages returns how many commits CommitMessages would read for the range, Skip
-// aside. It's quick where the repository has a commit-graph file.
+// CountMessages returns how many commits CommitMessages would read for the range, Skip and
+// Max aside. It's quick where the repository has a commit-graph file.
 func (r *Repo) CountMessages(ctx context.Context, m MessageRange) (int, error) {
 	if len(m.Tips) == 0 {
 		return 0, nil
