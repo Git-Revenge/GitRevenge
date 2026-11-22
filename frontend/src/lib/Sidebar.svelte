@@ -8,7 +8,7 @@
   import { provideCommands, type Command } from './commands.svelte'
   import type { MenuItem } from './ContextMenu.svelte'
   import RepoPanel from './RepoPanel.svelte'
-  import SmartFiltersPanel from './filters/SmartFiltersPanel.svelte'
+  import Lazy from './ui/Lazy.svelte'
   import { session } from './session.svelte'
   import Icon from './ui/Icon.svelte'
   import type { IconName } from './ui/Icon.svelte'
@@ -443,7 +443,7 @@
 
     {#if filtersWanted}
       <div class="scroll" hidden={ui.panel !== 'filters'}>
-        <SmartFiltersPanel {path} {filter} query={search} open={ui.open} onPick={(q) => onSearch?.(q)} onStatus={(s) => (filterMatches = s.matches)} />
+        <Lazy load={() => import('./filters/SmartFiltersPanel.svelte')} {path} {filter} query={search} open={ui.open} onPick={(q: string) => onSearch?.(q)} onStatus={(s: { matches: number }) => (filterMatches = s.matches)} />
       </div>
     {/if}
 
