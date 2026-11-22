@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
@@ -139,5 +140,51 @@ func TestClosingWithAFilterOnDoesNotHang(t *testing.T) {
 	case <-time.After(30 * time.Second):
 		// The test's cleanup closes the app too and would hang behind this one: stop here.
 		panic("closing hung: the end of a trailer read is waiting for the lock that closing holds")
+	}
+}
+
+// A key is held back when nearly every commit has it. Under Only these the graph holds only
+// what the filter keeps, and the history is as long as it was: the key a filter is on, on
+// every commit the graph now shows, is still a key on some of the history (#880).
+func TestAFilterDoesNotMakeItsKeyLookLikeItIsOnEveryCommit(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.Linear(15)
+	for i := range 55 {
+		fx.Git("commit", "-q", "--allow-empty", "-m", "Fix "+strconv.Itoa(i), "-m", "Changelog: fixed")
+	}
+	path := openForMap(t, a, fx)
+	trailersRead(t, a, path)
+	graphRows(t, a, path, 70)
+	offered := func() bool {
+		t.Helper()
+		panel, err := a.TrailerPanel(path, "", 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, k := range panel.Keys {
+			if k.Key.ID == "changelog" {
+				return true
+			}
+		}
+		return false
+	}
+	if !offered() {
+		t.Fatal("with no filter, the panel doesn't offer Changelog, which is on 55 of 70 commits")
+	}
+
+	fixed := []trailerindex.Pick{{Key: "changelog", Value: "text:fixed"}}
+	if state, err := a.SetTrailerFilter(path, fixed, true); err != nil || state.Kept != 55 {
+		t.Fatalf("the filter = %+v, %v, want 55 kept", state, err)
+	}
+	graphRows(t, a, path, 55)
+	// A reading is looked at again once it's a moment old.
+	time.Sleep(rulesGoodFor + 300*time.Millisecond)
+	if !offered() {
+		t.Fatal("under Only these, the panel holds Changelog back: its 55 commits were measured against the 55 the graph shows, not the 70 the history has")
+	}
+	if state, err := a.TrailerFilter(path); err != nil || state.Kept != 55 || state.Total != 70 {
+		t.Fatalf("the filter afterwards = %+v, %v, want 55 of 70", state, err)
 	}
 }
