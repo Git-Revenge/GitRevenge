@@ -7,12 +7,15 @@ import (
 	"time"
 )
 
-// A commit with a quarter of a million trailers is counted in time that grows with them, not
+// A commit with 400,000 trailers is counted in time that grows with them, not
 // with their square, and still counts once for each key and value however often it says
 // them, past the point where once moves from a list to a set (#893).
+//
+// It takes about a second here, and minutes the old way. Like the parser's test
+// (git.TestLongMessagesAreReadInLinearTime) it isn't run in parallel, and is given a minute,
+// for CI's slower runners under the race detector.
 func TestACommitWithManyTrailersIsCountedOnce(t *testing.T) {
-	t.Parallel()
-	const lines, values, others = 250000, 100000, 50
+	const lines, values, others = 400000, 160000, 50
 	var b strings.Builder
 	for i := range lines {
 		// Each value is said two or three times, and the other keys over and over.
@@ -58,7 +61,7 @@ func TestACommitWithManyTrailersIsCountedOnce(t *testing.T) {
 	}()
 	select {
 	case <-done:
-	case <-time.After(20 * time.Second):
-		panic("still counting a commit's trailers after 20 seconds")
+	case <-time.After(time.Minute):
+		panic("still counting a commit's trailers after a minute")
 	}
 }

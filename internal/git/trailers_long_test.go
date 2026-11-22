@@ -27,8 +27,11 @@ func inTime(limit time.Duration, fn func()) {
 // short trailer paragraphs. Each of these took minutes when every line or paragraph copied
 // everything before it. The trailer index reads every commit in the background, and closing
 // a tab waits for the commit being read, so one such commit held the app up.
+//
+// It takes a quarter of a second here, and minutes the old way. It isn't run in parallel,
+// and is given a minute: on CI's macOS runner, under the race detector and beside the
+// package's other tests, it once took more than 20 seconds.
 func TestLongMessagesAreReadInLinearTime(t *testing.T) {
-	t.Parallel()
 	const lines = 200000
 
 	var carried strings.Builder
@@ -47,7 +50,7 @@ func TestLongMessagesAreReadInLinearTime(t *testing.T) {
 		fmt.Fprintf(&paras, "\nK%d: v\n", i)
 	}
 
-	inTime(20*time.Second, func() {
+	inTime(time.Minute, func() {
 		got := MessageTrailers(carried.String())
 		if want := "v" + strings.Repeat(" more", lines); len(got) != 1 || got[0].Value != want {
 			t.Errorf("a trailer carried on over %d lines: %d trailers", lines, len(got))
