@@ -125,6 +125,10 @@ class InsightsTab {
 
   private listening = false
   private timer: ReturnType<typeof setTimeout> | undefined
+  /** Bumped each time a scope is chosen, so what's read for one isn't set once another has
+   * been chosen. Comparing scopes wouldn't tell: `scope` is $state, and in a browser gives
+   * back a proxy of the object it was set to, which is never that object (#886). */
+  private choice = 0
   /** Bumped by each load, so an older one's late results are dropped. */
   private generation = 0
 
@@ -195,6 +199,7 @@ class InsightsTab {
 
   async setScope(s: Scope | null) {
     this.scope = s
+    const choice = ++this.choice
     // A recompute still waiting was for the scope before this one.
     clearTimeout(this.timer)
     if (!s) return
@@ -205,7 +210,7 @@ class InsightsTab {
     if (s.kind === 'repo') {
       const [tags, branches] = await Promise.all([InsightsTags(s.id).catch(() => null), InsightsReleaseBranches(s.id, '').catch(() => null)])
       // Another scope was chosen while those were read: what follows is its to set.
-      if (this.scope !== s) return
+      if (choice !== this.choice) return
       this.tags = [...(tags ?? []), ...(branches ?? []).map((b) => ({ name: b.name, time: b.forkTime, branch: true }))].sort((a, b) => b.time - a.time || a.name.localeCompare(b.name))
     } else {
       this.tags = []
@@ -215,7 +220,7 @@ class InsightsTab {
       session.error = `Using the default thresholds: ${errorText(e)}`
       return null
     })) ?? ({ ...DEFAULT_THRESHOLDS } as app.Thresholds)
-    if (this.scope !== s) return
+    if (choice !== this.choice) return
     this.thresholds = thresholds
     await this.load()
   }
