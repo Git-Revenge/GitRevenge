@@ -2,6 +2,9 @@
 
 Emily is writing the release notes. Tidewater's pull requests say what kind of change they are in a `Changelog` trailer, and the ones that close an issue say so with `Closes`. She wants every fix that closed an issue, and then to read the history with each commit's `Changelog` beside it.
 
+![Filtering to the fixes, finding the ones that closed an issue, highlighting them in place, then pinning Changelog and filtering from a chip](../img/read-the-changelog-light.webp#gh-light-mode-only)
+![Filtering to the fixes, finding the ones that closed an issue, highlighting them in place, then pinning Changelog and filtering from a chip](../img/read-the-changelog-dark.webp#gh-dark-mode-only)
+
 ## Steps
 
 1. **Open the Smart filters panel.** Click **Smart filters** in the sidebar's rail. It lists the keys Tidewater's history uses, most commits first: `Changelog`, `Reviewed-by`, `Closes`, `Co-authored-by`. Under each are its values, with how many commits have each.

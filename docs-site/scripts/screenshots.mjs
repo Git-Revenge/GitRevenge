@@ -12,7 +12,7 @@
 //        subst T: A:\demo
 //   2. Build the demo once, so its global git config exists. The script lives in
 //      https://github.com/Git-Revenge/demo-repos; this uses the tag DEMO_REPOS_TAG names:
-//        curl -fsSL https://github.com/Git-Revenge/demo-repos/releases/download/v2.0.0/demo-repo.sh -o demo-repo.sh
+//        curl -fsSL https://github.com/Git-Revenge/demo-repos/releases/download/v3.0.0/demo-repo.sh -o demo-repo.sh
 //        bash demo-repo.sh /t/
 //   3. Point the app's settings at a scratch folder and its global git config at the demo's,
 //      so your own repositories and config stay out of the shots, and start it:
@@ -49,7 +49,7 @@ const BASH = process.env.BASH_EXE ?? 'C:\\Program Files\\Git\\bin\\bash.exe'
 const REPO = path.win32.join(DEMO, 'tidewater')
 // The demo-repos release the docs' pictures are built from (its semver says when a move
 // changes them; see its README). Moving it means retaking them.
-const DEMO_REPOS_TAG = 'v2.0.0'
+const DEMO_REPOS_TAG = 'v3.0.0'
 const WIDTH = 1280
 const HEIGHT = 800
 
@@ -100,6 +100,7 @@ async function reset(page, open = ['tidewater'], { clean = false, branch } = {})
     // A scene of an experimental view leaves it showing and switched on: every other scene is
     // of the rows, with the experimental views off as they are by default.
     await window.go.app.App.SetGraphView('')
+    await window.go.app.App.SetGraphDensity('')
     const prefs = await window.go.app.App.Preferences()
     if (prefs.experimentalViews?.length) await window.go.app.App.SetPreferences({ ...prefs, experimentalViews: [] })
   })
@@ -129,7 +130,8 @@ async function reset(page, open = ['tidewater'], { clean = false, branch } = {})
     }
     // The sidebar remembers its panel, filter and sort for each repository, and a diff the
     // layout it was last shown in.
-    for (const key of Object.keys(localStorage)) if (/^gitrevenge\.(sidebar|rightPanel):/.test(key)) localStorage.removeItem(key)
+    // So does a smart filter its mode, and the Smart filters panel that it has offered a pin.
+    for (const key of Object.keys(localStorage)) if (/^gitrevenge\.(sidebar|rightPanel|filterMode|pinOffer):/.test(key)) localStorage.removeItem(key)
     localStorage.removeItem('gitrevenge.diffLayout')
     localStorage.removeItem('gitrevenge.renderPreviews')
   }, DEMO)
@@ -815,7 +817,7 @@ scenes.searchAnim = (page) =>
       await p.keyboard.down('Control')
       await p.keyboard.press('a')
       await p.keyboard.up('Control')
-      await type(p, 'Priya', 80)
+      await type(p, 'Sarah', 80)
       await keys(p, 'Enter', { hold: 900 })
       await keys(p, 'Enter', { hold: 900 })
       await keys(p, 'Enter', { hold: 1200 })
@@ -1077,8 +1079,19 @@ async function insightsTab(p, view, { group = false } = {}) {
     await sleep(4000)
   }
   if (view !== 'Overview') await click(p, `::-p-xpath(//nav[contains(@class,"rail")]//button[starts-with(normalize-space(.), "${view}")])`, { pause: 1500 })
-  // Conflict checks finish in the background; give them time to land.
-  await sleep(1500)
+  // Results, then the conflict checks, which run in the background. A shot taken before they
+  // land says "Computing…", and the next scene's rebuild of the demo races the trial merges.
+  await waiting(() =>
+    p.waitForFunction(
+      // Copy summary is offered once there are results, in every view.
+      () =>
+        [...document.querySelectorAll('.insights .exports button')].some((b) => b.textContent.includes('Copy summary')) &&
+        !document.querySelector('.insights .busy') &&
+        !/checking/.test(document.querySelector('.insights .main')?.innerText ?? ''),
+      { timeout: 120000, polling: 250 },
+    ),
+  )
+  await sleep(800)
   await p.mouse.move(WIDTH - 2, HEIGHT - 2)
   mouse = { x: WIDTH - 2, y: HEIGHT - 2 }
   await sleep(400)
@@ -1382,6 +1395,210 @@ scenes.ruler = (page) =>
     async (p) => {
       const g = await (await p.$('.scroller')).boundingBox()
       return { x: g.x, y: g.y, width: g.width + 16, height: Math.min(g.height, 560) }
+    },
+  )
+
+// ── Smart filters ───────────────────────────────────────────────────────────────────────
+
+const FILTERS = `ul[aria-label="Smart filters"]`
+/** A key in the Smart filters panel, and a value under it, by the names they show. */
+const filterKey = (key) => `::-p-xpath(//ul[@aria-label='Smart filters']/li[@aria-level='1'][span[contains(@class,'name')][starts-with(normalize-space(.), ${JSON.stringify(key)})]])`
+const filterValue = (key, value) =>
+  `::-p-xpath(//ul[@aria-label='Smart filters']/li[@aria-level='1'][span[contains(@class,'name')][starts-with(normalize-space(.), ${JSON.stringify(key)})]]/following-sibling::li[@aria-level='2'][span[contains(@class,'name')][normalize-space(.)=${JSON.stringify(value)}]][1])`
+const FILTER_STRIP = '[role=group][aria-label="Smart filter"]'
+const filterMode = (mode) => `::-p-xpath(//div[@aria-label='What a filter does to other commits']/button[normalize-space(.)=${JSON.stringify(mode)}])`
+
+/** Waits until the history's trailers are read. The panel offers, once for each repository,
+ * to pin a label: that's answered here, so the panel shows its keys alone. */
+async function trailersRead(p) {
+  await waiting(() =>
+    p.evaluate(async () => {
+      const A = window.go.app.App
+      const repo = (await A.RestoreSession()).tabs[0].path
+      for (let i = 0; i < 450 && !(await A.TrailerStatus(repo)).done; i++) await new Promise((r) => setTimeout(r, 200))
+      localStorage.setItem(`gitrevenge.pinOffer:${repo}`, '1')
+    }),
+  )
+}
+
+/** Opens the Smart filters panel. */
+async function smartFilters(p, { pause = 400 } = {}) {
+  await click(p, rail('Smart filters'), { pause })
+  await waiting(() => p.waitForSelector(`${FILTERS} li.value`, { timeout: 60000 }))
+  await sleep(500)
+}
+
+/** Pins trailer keys to the graph's rows, as the pin beside each in the panel does. */
+async function pinKeys(p, keys) {
+  await trailersRead(p)
+  const pinned = await p.evaluate(async (keys) => {
+    const A = window.go.app.App
+    const repo = (await A.RestoreSession()).tabs[0].path
+    let pins = []
+    for (const key of keys) pins = await A.SetTrailerPin(repo, key, true)
+    return pins.length
+  }, keys)
+  if (pinned !== keys.length) throw new Error(`pinned ${pinned} keys, wanted ${keys.join(', ')}`)
+  await p.reload({ waitUntil: 'networkidle0' })
+  await overlay(p)
+  await p.waitForSelector('.scroller')
+  await untilSettled(p, () => !!document.querySelector('.row.ref') && !document.body.innerText.includes('Loading history'))
+  await sleep(1200)
+}
+
+/** Where a pinned key's chip is on the graph, which is drawn on a canvas: the first place the
+ * pointer would be offered a filter. */
+const chipAt = (p) =>
+  p.evaluate(() => {
+    const el = document.querySelector('.scroller')
+    const b = el.getBoundingClientRect()
+    for (let y = b.top + 24; y < b.bottom - 8; y += 4) {
+      for (let x = b.left + 120; x < b.right - 40; x += 5) {
+        el.dispatchEvent(new MouseEvent('mousemove', { clientX: x, clientY: y, bubbles: true }))
+        if (el.title.startsWith('Filter the graph to')) return { x: x + 14, y }
+      }
+    }
+    return null
+  })
+
+scenes.smartFilters = (page) =>
+  stills(
+    page,
+    'smart-filters-panel',
+    async (p) => {
+      await reset(p, ['tidewater'], { clean: true })
+      await trailersRead(p)
+      await smartFilters(p)
+      await park(p)
+    },
+    { ...SIDEBAR, height: 640 },
+  )
+
+/** The graph filtered to the fixes, in one of a filter's two modes. */
+async function fixes(p, mode) {
+  await reset(p, ['tidewater'], { clean: true })
+  await trailersRead(p)
+  await smartFilters(p)
+  await click(p, filterValue('Changelog', 'fixed'), { pause: 500 })
+  await p.waitForSelector(FILTER_STRIP)
+  if (mode !== 'Only these') {
+    await click(p, filterMode(mode), { pause: 500 })
+    // The whole history is loaded again, and the selected commit is found in it.
+    await sleep(2500)
+  }
+  await untilSettled(p, () => !!document.querySelector('aside[aria-label="Commit details"] h2'))
+  await sleep(700)
+  await park(p)
+}
+
+scenes.smartFilterOnly = (page) => stills(page, 'smart-filter-only', (p) => fixes(p, 'Only these'))
+
+scenes.smartFilterHighlight = (page) => stills(page, 'smart-filter-highlight', (p) => fixes(p, 'Highlight'))
+
+scenes.smartFilterPinned = (page) =>
+  stills(page, 'smart-filter-pinned', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await pinKeys(p, ['Changelog'])
+    // Down past the branches still being worked on, to where main's commits follow one another:
+    // those are the ones that say what kind of change they are.
+    const g = await (await p.$('.scroller')).boundingBox()
+    await p.mouse.move(g.x + g.width / 2, g.y + g.height / 2)
+    await p.mouse.wheel({ deltaY: 620 })
+    await sleep(600)
+    await untilSettled(p)
+    await park(p)
+  })
+
+/** Compact rows give a pinned key a column, when the graph has the room: the panel on the
+ * right and the sidebar's panel are hidden for it. */
+scenes.smartFilterCompact = (page) =>
+  stills(page, 'smart-filter-compact', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await p.evaluate(() => window.go.app.App.SetGraphDensity('compact'))
+    await pinKeys(p, ['Changelog'])
+    await hidePanel(p)
+    await palette(p, 'Hide the sidebar panel')
+    await sleep(800)
+    await untilSettled(p)
+    await park(p)
+  })
+
+scenes.searchSuggest = (page) =>
+  stills(
+    page,
+    'search-suggestions',
+    async (p) => {
+      await reset(p, ['tidewater'], { clean: true })
+      await trailersRead(p)
+      const box = await p.waitForSelector('::-p-aria(Search commits)')
+      await box.click()
+      await p.keyboard.type('reviewed-by:')
+      await p.waitForSelector('[role=listbox][aria-label="Search suggestions"] [role=option] + [role=option]')
+      await sleep(600)
+    },
+    async (p) => {
+      const g = await (await p.$('.scroller')).boundingBox()
+      return { x: g.x, y: 40, width: WIDTH - g.x, height: 420 }
+    },
+  )
+
+scenes.trailerCare = (page) =>
+  stills(page, 'trailer-care', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await trailersRead(p)
+    await palette(p, 'Trailer care')
+    await waiting(() => p.waitForSelector('[role=dialog] #care-keys', { timeout: 60000 }))
+    await sleep(700)
+    await park(p)
+  })
+
+scenes.changelogAnim = (page) =>
+  animation(
+    page,
+    'read-the-changelog',
+    async (p) => {
+      await reset(p, ['tidewater'], { clean: true })
+      await trailersRead(p)
+    },
+    async (p) => {
+      await smartFilters(p, { pause: 900 })
+      await sleep(600)
+      // Every fix.
+      await click(p, filterValue('Changelog', 'fixed'), { pause: 400 })
+      await waiting(() => p.waitForSelector(FILTER_STRIP))
+      await sleep(1700)
+      // Of those, the ones that closed an issue.
+      await keys(p, 'Ctrl+F', { hold: 400 })
+      await type(p, 'has:closes', 90)
+      await sleep(800)
+      await keys(p, 'Enter', { hold: 1300 })
+      await keys(p, 'Enter', { hold: 1300 })
+      // Why this commit is here: the line the filter picked.
+      const trailers = `::-p-xpath(//aside[@aria-label='Commit details']//button[@role='tab'][normalize-space(.)='Trailers'])`
+      if (await p.$(trailers)) await click(p, trailers, { pause: 1800 })
+      // The search is cleared, and the fixes are shown in place.
+      await click(p, '::-p-aria(Search commits)', { pause: 200 })
+      await p.keyboard.down('Control')
+      await p.keyboard.press('a')
+      await p.keyboard.up('Control')
+      await p.keyboard.press('Delete')
+      await p.keyboard.press('Escape')
+      await sleep(500)
+      await click(p, filterMode('Highlight'), { pause: 2000 })
+      await click(p, `${FILTER_STRIP} button.btn.text`, { pause: 1100 })
+      // Changelog on every row that has it.
+      const key = await centre(p, filterKey('Changelog'))
+      await glide(p, key.x, key.y)
+      await sleep(500)
+      await click(p, 'button.pin[aria-label^="Pin Changelog"]', { pause: 400 })
+      await untilSettled(p)
+      await sleep(1800)
+      // And a chip filters to its value.
+      const chip = await chipAt(p)
+      if (!chip) throw new Error('no chip on the graph to click')
+      await clickAt(p, chip.x, chip.y, { pause: 400 })
+      await waiting(() => p.waitForSelector(FILTER_STRIP))
+      await sleep(1800)
     },
   )
 
