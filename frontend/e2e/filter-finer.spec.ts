@@ -11,6 +11,8 @@ const emit = (page: Page, rows: number) =>
   page.evaluate((n) => (window as unknown as { __emit: (name: string, d: object) => void }).__emit('graph:progress', { path: '/repo', rows: n, done: true, paused: false, estimate: n }), rows)
 const respond = (page: Page, r: object) => page.evaluate((x) => (window as unknown as { __respond: (r: object) => void }).__respond(x), r)
 const selects = async (page: Page) => (await events(page, 'select')).map((e) => (e[0] as { id?: string } | undefined)?.id)
+/** What the backend answers for a commit the filter has kept out of the graph it looked in. */
+const FILTERED_OUT = -2
 /** Swaps the graph for one of these commits, in this order, as a filter that changes does. */
 const graphOf = (page: Page, commits: number[]) => page.evaluate((c) => (window as unknown as { __graph: (c: number[]) => void }).__graph(c), commits)
 const upTo = (n: number) => Array.from({ length: n }, (_, i) => i)
@@ -50,7 +52,7 @@ test.describe('under a filter that takes commits out', () => {
 
     // The filter changes and commit 2 isn't in the graph any more.
     await graphOf(page, upTo(30).filter((n) => n % 3 === 0))
-    await respond(page, { CommitRow: -1 })
+    await respond(page, { CommitRow: FILTERED_OUT })
     await emit(page, 10)
     await expect.poll(async () => (await calls(page, 'CommitRow')).some((c) => c[1] === id(2))).toBe(true)
     await page.waitForTimeout(500)
@@ -78,7 +80,7 @@ test.describe('under a filter that takes commits out', () => {
 
     // The filter hides commit 2.
     await graphOf(page, upTo(30).filter((n) => n % 3 === 0))
-    await respond(page, { CommitRow: -1 })
+    await respond(page, { CommitRow: FILTERED_OUT })
     await emit(page, 10)
     await expect.poll(async () => (await calls(page, 'CommitRow')).some((c) => c[1] === id(2))).toBe(true)
     await page.waitForTimeout(400)
@@ -97,6 +99,36 @@ test.describe('under a filter that takes commits out', () => {
     await emit(page, 30)
     await expect.poll(async () => (await selects(page)).at(-1)).toBe(id(2))
     expect(await selects(page)).not.toContain(id(6))
+  })
+
+  // The mode button says Highlight the moment it's clicked, and the rows are the ones Only
+  // these left until the graph is loaded again. What hid the commit is what the backend says
+  // of the rows it looked in (#881).
+  test('a switch to Highlight, before the rows have changed, still knows the filter hid the commit', async ({ page }) => {
+    // The graph as it's mounted once the mode has been switched: no longer told it's sparse.
+    await open(page, 'graph', { graphRows: 30, responses: head(id(0)) })
+    const grid = page.getByRole('grid', { name: 'Commit history' })
+    await grid.focus()
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('ArrowDown')
+    await expect.poll(async () => (await selects(page)).at(-1)).toBe(id(2))
+    const before = (await selects(page)).length
+
+    // The rows are still the filter's, and commit 2 isn't among them: row 2 is commit 6.
+    await graphOf(page, upTo(30).filter((n) => n % 3 === 0))
+    await respond(page, { CommitRow: FILTERED_OUT })
+    await emit(page, 10)
+    await expect.poll(async () => (await calls(page, 'CommitRow')).some((c) => c[1] === id(2))).toBe(true)
+    await page.waitForTimeout(600)
+    expect(await selects(page)).not.toContain(id(6))
+    expect((await selects(page)).length).toBe(before)
+
+    // The whole history loads, and the commit is selected at its own row.
+    await graphOf(page, upTo(30))
+    await respond(page, { CommitRow: 2 })
+    await emit(page, 30)
+    await expect.poll(async () => (await selects(page)).length).toBeGreaterThan(before)
+    expect((await selects(page)).at(-1)).toBe(id(2))
   })
 
   test('without a filter, a commit that is gone gives its place to the next, as before', async ({ page }) => {

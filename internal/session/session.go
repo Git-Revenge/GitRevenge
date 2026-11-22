@@ -112,15 +112,24 @@ func (r *Repo) DemandRows(row int) { r.graph.Demand(row) }
 // FindRow returns the graph row of the commit id, reading on through the history until it
 // appears. It returns false if the commit isn't in the history.
 func (r *Repo) FindRow(ctx context.Context, id string) (int, bool, error) {
-	g, err := r.graph.LoadUntil(ctx, func(g *graph.Graph) bool {
+	row, ok, _, err := r.LocateRow(ctx, id)
+	return row, ok, err
+}
+
+// LocateRow is FindRow, and says as well whether the graph it looked in was narrowed by a
+// smart filter. A commit that isn't in such a graph may still be in the history: the filter
+// keeps it out. The two come from the same graph, so they can't disagree when a reload
+// swaps one graph for another.
+func (r *Repo) LocateRow(ctx context.Context, id string) (row int, found, narrowed bool, err error) {
+	g, narrowed, err := r.graph.loadUntil(ctx, func(g *graph.Graph) bool {
 		_, ok := g.RowOf(id)
 		return ok
 	})
 	if err != nil || g == nil {
-		return -1, false, err
+		return -1, false, false, err
 	}
-	row, ok := g.RowOf(id)
-	return row, ok, nil
+	row, found = g.RowOf(id)
+	return row, found, narrowed, nil
 }
 
 // FullGraph returns the graph once the whole history has loaded, for searching it.
