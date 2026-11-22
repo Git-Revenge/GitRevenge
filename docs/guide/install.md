@@ -159,6 +159,8 @@ The trailers on each commit, such as `Signed-off-by` and `Closes`, are read from
 
 Each file holds one repository's commit IDs and trailer text. Nothing is written into the repository. The cache is safe to delete at any time: the app reads the history again, in the background. A file that hasn't been opened for 90 days is removed.
 
+The window remembers its layout, such as which panel a repository had open and the mode of its smart filter, in its web view's own storage, which names a repository by its path: `%APPDATA%\gitrevenge.exe` on Windows (the uninstaller removes it), `~/Library/WebKit/com.gitrevenge.gitrevenge` on macOS, and WebKitGTK's folder for the app, usually `~/.local/share/gitrevenge`, on Linux.
+
 Nothing else about your repositories is stored anywhere, and nothing is sent anywhere; see [what leaves your machine](#what-leaves-your-machine). If the file is ever damaged, the app moves it aside as `settings.json.corrupt-<timestamp>` and starts with defaults.
 
 ## What leaves your machine
