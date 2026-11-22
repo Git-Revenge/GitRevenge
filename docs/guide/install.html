@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="generator" content="Docusaurus v3.10.2">
 <title data-rh="true">Installing | Git Revenge</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" name="twitter:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" property="og:url" content="https://gitrevenge.com/docs/guide/install"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Installing | Git Revenge"><meta data-rh="true" name="description" content="Git Revenge is free, and there&#x27;s nothing to sign up for. Download the Windows installer or the macOS disk image from the latest release, or install with winget, Homebrew, apt or dnf. Each download is under 20 MB."><meta data-rh="true" property="og:description" content="Git Revenge is free, and there&#x27;s nothing to sign up for. Download the Windows installer or the macOS disk image from the latest release, or install with winget, Homebrew, apt or dnf. Each download is under 20 MB."><link data-rh="true" rel="icon" href="/img/favicon.svg"><link data-rh="true" rel="canonical" href="https://gitrevenge.com/docs/guide/install"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/guide/install" hreflang="en"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/guide/install" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Installing","item":"https://gitrevenge.com/docs/guide/install"}]}</script><link rel="apple-touch-icon" href="/img/apple-touch-icon.png"><link rel="stylesheet" href="/assets/css/styles.1bf894f5.css">
-<script src="/assets/js/runtime~main.0b7cde14.js" defer="defer"></script>
-<script src="/assets/js/main.011347d1.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.7812290d.js" defer="defer"></script>
+<script src="/assets/js/main.75a80fc4.js" defer="defer"></script>
 </head>
 <body>
 <svg style="display: none;"><defs>
@@ -103,7 +103,15 @@
 <li class=""><strong>macOS:</strong> <code>~/Library/Application Support/GitRevenge/settings.json</code></li>
 <li class=""><strong>Linux:</strong> <code>~/.config/GitRevenge/settings.json</code>, or under <code>$XDG_CONFIG_HOME</code> if you set it</li>
 </ul>
-<p>Backups of git config files you save in the <a class="" href="/docs/guide/git-config">Git Config tab</a> go in a <code>config-backups</code> folder beside it. A repository&#x27;s own settings, such as its branch kinds and smart links, are kept in its git config. Nothing about your repositories is stored anywhere else, and nothing is sent anywhere; see <a href="#what-leaves-your-machine" class="">what leaves your machine</a>. If the file is ever damaged, the app moves it aside as <code>settings.json.corrupt-&lt;timestamp&gt;</code> and starts with defaults.</p>
+<p>Backups of git config files you save in the <a class="" href="/docs/guide/git-config">Git Config tab</a> go in a <code>config-backups</code> folder beside it. A repository&#x27;s own settings, such as its branch kinds and smart links, are kept in its git config.</p>
+<p>The trailers on each commit, such as <code>Signed-off-by</code> and <code>Closes</code>, are read from a repository&#x27;s history once and kept in a cache, so they&#x27;re never read twice:</p>
+<ul>
+<li class=""><strong>Windows:</strong> <code>%LOCALAPPDATA%\GitRevenge\trailers</code></li>
+<li class=""><strong>macOS:</strong> <code>~/Library/Caches/GitRevenge/trailers</code></li>
+<li class=""><strong>Linux:</strong> <code>~/.cache/GitRevenge/trailers</code>, or under <code>$XDG_CACHE_HOME</code> if you set it</li>
+</ul>
+<p>Each file holds one repository&#x27;s commit IDs and trailer text. Nothing is written into the repository. The cache is safe to delete at any time: the app reads the history again, in the background. A file that hasn&#x27;t been opened for 90 days is removed.</p>
+<p>Nothing else about your repositories is stored anywhere, and nothing is sent anywhere; see <a href="#what-leaves-your-machine" class="">what leaves your machine</a>. If the file is ever damaged, the app moves it aside as <code>settings.json.corrupt-&lt;timestamp&gt;</code> and starts with defaults.</p>
 <h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="what-leaves-your-machine">What leaves your machine<a href="#what-leaves-your-machine" class="hash-link" aria-label="Direct link to What leaves your machine" title="Direct link to What leaves your machine" translate="no">​</a></h2>
 <p>Git Revenge is local-first. It makes one request of its own, and everything else that reaches the network is something you asked for. The <a class="" href="/docs/privacy">privacy policy</a> covers the website and the download channels too.</p>
 
