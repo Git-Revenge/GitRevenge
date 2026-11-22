@@ -17,6 +17,8 @@ export function AddWorktree(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function AnswerPrompt(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
+export function AnswerTrailerQuestion(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<app.TrailerCare>;
+
 export function ArrivedCommits(arg1:string,arg2:string,arg3:string):Promise<app.Arrived>;
 
 export function AuthorCard(arg1:string,arg2:string):Promise<app.AuthorCard>;
@@ -363,7 +365,11 @@ export function SetTheme(arg1:string):Promise<void>;
 
 export function SetTrailerFilter(arg1:string,arg2:Array<trailerindex.Pick>,arg3:boolean):Promise<app.TrailerFilterState>;
 
+export function SetTrailerKind(arg1:string,arg2:string,arg3:string):Promise<app.TrailerCare>;
+
 export function SetTrailerPin(arg1:string,arg2:string,arg3:boolean):Promise<Array<app.TrailerPin>>;
+
+export function SetTrailerPlace(arg1:string,arg2:string,arg3:string):Promise<app.TrailerCare>;
 
 export function SetUpdateChecks(arg1:boolean):Promise<void>;
 
@@ -396,6 +402,8 @@ export function TakeProblem(arg1:string):Promise<app.Problem>;
 export function TakeTrustQuestion():Promise<app.TrustQuestion>;
 
 export function Theme():Promise<string>;
+
+export function TrailerCare(arg1:string):Promise<app.TrailerCare>;
 
 export function TrailerFilter(arg1:string):Promise<app.TrailerFilterState>;
 
@@ -432,6 +440,8 @@ export function UndoBisect(arg1:string):Promise<void>;
 export function UndoIgnore(arg1:string,arg2:app.IgnoreAdded):Promise<void>;
 
 export function UndoState(arg1:string):Promise<app.UndoInfo>;
+
+export function UndoTrailerJoin(arg1:string,arg2:string,arg3:string):Promise<app.TrailerCare>;
 
 export function UnsetGitConfig(arg1:string,arg2:string,arg3:string):Promise<app.ConfigDoc>;
 

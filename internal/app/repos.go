@@ -234,6 +234,7 @@ func (a *App) CloseRepo(path string) error {
 	// A smart filter lasts until its tab closes.
 	a.trailerFilters.set(path, nil)
 	a.trailerPins.touch(path)
+	a.trailerCares.forget(path)
 	return m.Close(path)
 }
 
