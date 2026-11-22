@@ -112,7 +112,7 @@ test.describe("an author's card", () => {
     await panel(page).getByRole('button', { name: 'Ana Cruz' }).click()
     await card(page).getByRole('button', { name: 'Search the timeline for them' }).click()
     await expect(card(page)).toHaveCount(0)
-    await expect(page.getByRole('searchbox', { name: 'Search commits' })).toHaveValue('Ana Cruz')
+    await expect(page.getByRole('combobox', { name: 'Search commits' })).toHaveValue('Ana Cruz')
     await expect.poll(() => calls(page, 'SearchGraph')).toContainEqual(['/r', 'Ana Cruz'])
   })
 

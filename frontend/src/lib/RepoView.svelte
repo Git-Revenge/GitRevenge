@@ -4,7 +4,7 @@
   import type { app } from '../../wailsjs/go/models'
   import { onBackend } from './events'
   import FilterStrip from './filters/FilterStrip.svelte'
-  import { loadOnly, saveOnly, togglePick } from './filters/filters'
+  import { hasPick, loadOnly, saveOnly, togglePick } from './filters/filters'
   import { theme as colorTheme } from './theme.svelte'
   import { repoReads } from './repoReads'
   import { provideCommands } from './commands.svelte'
@@ -118,6 +118,11 @@
     }
     const rows = await session.run(() => TrailerFilterRows(path))
     if (n === filterAsk) highlight = rows?.rows ?? []
+  }
+
+  /** A value picked in the search box joins the filter; one that's there already stays. */
+  function addPick(key: string, value: string) {
+    if (!hasPick(filter.picks, key, value)) void setFilter([...filter.picks, { key, value }])
   }
 
   function setMode(next: boolean) {
@@ -382,7 +387,7 @@
       <FilterStrip {filter} {only} {onlyOffered} onRemove={(p) => setFilter(togglePick(filter.picks, p.key, p.value))} onAdd={() => sidebar?.show('filters')} onMode={setMode} onClear={() => setFilter([])} />
     {/if}
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filter.picks.length > 0} {highlight} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filter.picks.length > 0} {highlight} onFilterAdd={addPick} onFilterDrop={() => filter.picks.length && setFilter(filter.picks.slice(0, -1))} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           openMenu(commitMenuItems(row, refs, ctx), x, y)}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)

@@ -46,7 +46,7 @@ test.describe('the Map view', () => {
     await page.setViewportSize({ width: 1200, height: 700 })
     await open(page, 'graph', scenario())
     await expect(page.locator('.status .meta')).toHaveText('6 branches · 8 tags')
-    await expect(page.getByRole('searchbox', { name: 'Search commits' })).toBeHidden()
+    await expect(page.getByRole('combobox', { name: 'Search commits' })).toBeHidden()
   })
 
   test('names every node and says how many commits it has', async ({ page }) => {

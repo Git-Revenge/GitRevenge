@@ -755,3 +755,58 @@ func (r *Reading) Filter(picks []Pick) map[string]struct{} {
 	}
 	return kept
 }
+
+// CountWithin says how many of the kept commits have each of some values of a key: what
+// picking a value would leave of a filter that's already on. The key is named by its ID or
+// by any spelling of it, the values by ID. It's one pass, however many values.
+func (r *Reading) CountWithin(key string, values []string, kept map[string]struct{}) []int {
+	counts := make([]int, len(values))
+	k, ok := r.keyAt[KeyID(key)]
+	if !ok || len(values) == 0 || len(kept) == 0 {
+		return counts
+	}
+	place := make(map[string]int, len(values))
+	for i, v := range values {
+		place[v] = i
+	}
+	which := map[int32]int{}
+	for n, c := range r.vals {
+		if i, ok := place[c.id]; ok {
+			which[int32(n)] = i
+		}
+	}
+	if len(which) == 0 {
+		return counts
+	}
+	hit := make([]bool, len(values))
+	for c := 0; c < len(r.first)-1; c++ {
+		mine := r.pairs[r.first[c]:r.first[c+1]]
+		some := false
+		for j := 0; j < len(mine); j += 2 {
+			if r.keyOf[mine[j]] != int32(k) {
+				continue
+			}
+			if several := r.several[mine[j+1]]; several != nil {
+				for _, v := range several {
+					if i, ok := which[v]; ok {
+						hit[i], some = true, true
+					}
+				}
+			} else if i, ok := which[r.valueOf[mine[j+1]]]; ok {
+				hit[i], some = true, true
+			}
+		}
+		if !some {
+			continue
+		}
+		// Only a commit with one of the values is looked up: its id is spelled out for that.
+		_, in := kept[hex.EncodeToString(r.ids[c*r.idSize:(c+1)*r.idSize])]
+		for i, h := range hit {
+			if h && in {
+				counts[i]++
+			}
+			hit[i] = false
+		}
+	}
+	return counts
+}

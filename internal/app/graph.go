@@ -219,6 +219,26 @@ func rowsOf(g *graph.Graph, ids []string, limit int) graph.SearchResult {
 	return res
 }
 
+// rowsBut returns every row of the graph but the ones some commits are on: what a search
+// that begins with "-" finds.
+func rowsBut(g *graph.Graph, ids []string, limit int) graph.SearchResult {
+	skip := make([]bool, g.Len())
+	skipped := 0
+	for _, id := range ids {
+		if row, ok := g.RowOf(id); ok && !skip[row] {
+			skip[row] = true
+			skipped++
+		}
+	}
+	res := graph.SearchResult{Rows: make([]int, 0, min(limit, len(skip)-skipped)), Total: len(skip) - skipped}
+	for row := 0; row < len(skip) && len(res.Rows) < limit; row++ {
+		if !skip[row] {
+			res.Rows = append(res.Rows, row)
+		}
+	}
+	return res
+}
+
 // maxLaneNames caps how many lanes one LaneNames call names: a view shows a few dozen.
 const maxLaneNames = 400
 
