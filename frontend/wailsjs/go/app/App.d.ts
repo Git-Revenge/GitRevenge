@@ -7,6 +7,7 @@ import {session} from '../models';
 import {settings} from '../models';
 import {links} from '../models';
 import {graph} from '../models';
+import {trailerindex} from '../models';
 
 export function AddGitConfigValue(arg1:string,arg2:string,arg3:string):Promise<app.ConfigDoc>;
 
@@ -360,6 +361,8 @@ export function SetStagedContent(arg1:string,arg2:string,arg3:string,arg4:string
 
 export function SetTheme(arg1:string):Promise<void>;
 
+export function SetTrailerFilter(arg1:string,arg2:Array<trailerindex.Pick>,arg3:boolean):Promise<app.TrailerFilterState>;
+
 export function SetUpdateChecks(arg1:boolean):Promise<void>;
 
 export function SetWebLinks(arg1:string,arg2:boolean):Promise<void>;
@@ -391,6 +394,10 @@ export function TakeProblem(arg1:string):Promise<app.Problem>;
 export function TakeTrustQuestion():Promise<app.TrustQuestion>;
 
 export function Theme():Promise<string>;
+
+export function TrailerFilter(arg1:string):Promise<app.TrailerFilterState>;
+
+export function TrailerFilterRows(arg1:string):Promise<graph.SearchResult>;
 
 export function TrailerHints(arg1:string):Promise<git.TrailerHints>;
 

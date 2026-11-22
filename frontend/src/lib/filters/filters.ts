@@ -46,17 +46,56 @@ export function valueName(v: Value): string {
 }
 
 /**
- * The search that finds the commits with a value: "Reviewed-by: Sam Ortiz". Picking a
- * value in the panel runs it, and the value is the picked one while it's what the graph is
- * searching for.
+ * A key and value as a search would write them: "Reviewed-by: Sam Ortiz", or "Changelog:"
+ * for a whole key. A key held back from the list is still searched for this way.
  */
 export function queryFor(key: Key, value?: Value): string {
   return value ? `${key.label}: ${valueName(value)}` : `${key.label}:`
 }
 
-/** Whether a search is the one a value's pick runs, whatever the letter case. */
-export function isPicked(query: string, key: Key, value: Value): boolean {
-  return query.trim().toLowerCase() === queryFor(key, value).toLowerCase()
+/** Whether a value is one of the filter's picks. */
+export function hasPick(picks: { key: string; value: string }[], key: string, value: string): boolean {
+  return picks.some((p) => p.key === key && p.value === value)
+}
+
+/** The picks with one value added, or taken out if it was there: what a click on it asks for. */
+export function togglePick(picks: { key: string; value: string }[], key: string, value: string): { key: string; value: string }[] {
+  const rest = picks.filter((p) => !(p.key === key && p.value === value))
+  const out = rest.length === picks.length ? [...picks, { key, value }] : rest
+  return out.map((p) => ({ key: p.key, value: p.value }))
+}
+
+/** A picked value on its chip: a person by name, anything else as it is. */
+export function chipText(p: { valueLabel: string; kind: string }): string {
+  return valueName({ label: p.valueLabel, kind: p.kind })
+}
+
+/** "11 of 212 commits", or "11 commits" until the history has been counted. */
+export function keptText(kept: number, total: number): string {
+  if (total > 0) return `${kept.toLocaleString()} of ${total.toLocaleString()} commits`
+  return commitsText(kept)
+}
+
+type ModeStore = Pick<Storage, 'getItem' | 'setItem'>
+const modeKey = (path: string) => `gitrevenge.filterMode:${path}`
+
+/** Whether a repository's filter shows only its commits: the default, unless Highlight was
+ * the last mode chosen for it on this computer. */
+export function loadOnly(path: string, store: ModeStore): boolean {
+  try {
+    return store.getItem(modeKey(path)) !== 'highlight'
+  } catch {
+    return true
+  }
+}
+
+/** Remembers the mode for a repository. It's a convenience, so a blocked store is ignored. */
+export function saveOnly(path: string, only: boolean, store: ModeStore): void {
+  try {
+    store.setItem(modeKey(path), only ? 'only' : 'highlight')
+  } catch {
+    // The filter still works; it just starts as Only these next time.
+  }
 }
 
 /** "24 more…" */

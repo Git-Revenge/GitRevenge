@@ -1,8 +1,8 @@
 <script lang="ts">
   // The sidebar's Smart filters panel: what the trailers on a repository's commits offer to
   // filter by. Each key is a folder, with the kind of thing its values are beside it, and its
-  // values under it with how many commits have each. Picking a value searches the graph for
-  // it; picking it again clears the search.
+  // values under it with how many commits have each. Picking a value filters the graph to
+  // it; picking it again takes it out of the filter.
   //
   // Nothing here is written to a commit. It's a reading of what's there already, and the
   // name is "Smart filters", never "tags", which means git tags.
@@ -15,25 +15,28 @@
   import { matchParts } from '../sidebarTree'
   import Empty from '../ui/Empty.svelte'
   import Icon from '../ui/Icon.svelte'
-  import { commitsText, folderKey, heldText, heldWhy, isOpen, isPicked, kindWord, moreText, queryFor, soFar, valueName } from './filters'
+  import { commitsText, folderKey, hasPick, heldText, heldWhy, isOpen, kindWord, moreText, queryFor, soFar, valueName } from './filters'
 
   let {
     path,
     filter,
-    query,
+    picks,
     open,
     onPick,
+    onSearch,
     onStatus,
   }: {
     path: string
     /** The sidebar's filter: narrows the keys by name, and the rest to their values. */
     filter: string
-    /** What the graph is searching for, so the value that search is for shows as picked. */
-    query: string
+    /** The values the graph is filtered by, which show as picked. */
+    picks: { key: string; value: string }[]
     /** The sidebar's open folders, by key: this panel's are kept with the branch folders'. */
     open: Record<string, boolean>
-    /** Searches the graph for text, or with "" clears its search. */
-    onPick: (search: string) => void
+    /** Adds a value to the graph's filter, or takes it out if it's there. */
+    onPick: (key: string, value: string) => void
+    /** Searches the graph for text: a key held back from the list can still be searched for. */
+    onSearch: (search: string) => void
     /** Reports how many keys and values match the filter, for the rail's count. */
     onStatus?: (status: { matches: number }) => void
   } = $props()
@@ -139,8 +142,8 @@
     activeId = row.id
     if (row.type === 'key') toggle(row.k, row.open)
     else if (row.type === 'more') void more(row.k)
-    // Picking the picked value clears it.
-    else onPick(isPicked(query, row.k.key, row.v) ? '' : queryFor(row.k.key, row.v))
+    // Picking a picked value takes it out again.
+    else onPick(row.k.key.id, row.v.id)
   }
 
   let typed = ''
@@ -220,7 +223,7 @@
           <span class="meta count" aria-label={commitsText(key.commits)}>{key.commits.toLocaleString()}</span>
         </li>
       {:else if row.type === 'value'}
-        {@const picked = isPicked(query, row.k.key, row.v)}
+        {@const picked = hasPick(picks, row.k.key.id, row.v.id)}
         {@const parts = matchParts(row.label, filter)}
         <li
           id={rowId(i)}
@@ -230,7 +233,7 @@
           class="row value"
           class:active={i === active}
           class:picked
-          title={picked ? `Showing ${queryFor(row.k.key, row.v)}. Click to clear.` : `${row.v.label}: ${commitsText(row.v.commits)}. Click to find them.`}
+          title={picked ? `Filtering by ${queryFor(row.k.key, row.v)}. Click to take it out.` : `${row.v.label}: ${commitsText(row.v.commits)}. Click to filter the graph to them.`}
           onclick={() => act(row)}
         >
           <span class="name">{parts.pre}{#if parts.hit}<mark>{parts.hit}</mark>{/if}{parts.post}</span>
@@ -266,7 +269,7 @@
         {#each panel.held as k (k.id)}
           <li>
             <!-- Held back from the list, not from search. -->
-            <button class="row value" title="Not offered as a filter: {heldWhy(k.held)}. Click to search for it all the same." onclick={() => onPick(queryFor(k))}>
+            <button class="row value" title="Not offered as a filter: {heldWhy(k.held)}. Click to search for it all the same." onclick={() => onSearch(queryFor(k))}>
               <span class="name">{k.label}</span>
               <span class="meta why">{heldWhy(k.held)}</span>
               <span class="meta count" aria-label={commitsText(k.commits)}>{k.commits.toLocaleString()}</span>

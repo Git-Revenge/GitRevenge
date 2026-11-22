@@ -230,7 +230,8 @@ const mounts = {
         onContext: record('context'),
         onMenu: record('menu'),
         openDialog: record('dialog'),
-        search: scenario.search ?? '',
+        filterPicks: scenario.filterPicks ?? [],
+        onFilterPick: record('filter'),
         onSearch: record('search'),
       },
     })
@@ -305,6 +306,15 @@ const mounts = {
     session.tabs = [{ path: '/r', name: 'tidewater', head: 'main' } as never]
     const { peopleTab } = await import('../src/lib/people/tab.svelte')
     Object.assign(win, { __peopleTab: () => ({ open: peopleTab.open, repo: peopleTab.repo, ask: peopleTab.ask && JSON.parse(JSON.stringify(peopleTab.ask)) }) })
+  },
+  // The strip above the graph while a smart filter is on.
+  async filterStrip() {
+    const { default: FilterStrip } = await import('../src/lib/filters/FilterStrip.svelte')
+    const s: NonNullable<Scenario['filterStrip']> = scenario.filterStrip ?? { filter: null }
+    mount(FilterStrip, {
+      target: host,
+      props: { filter: s.filter as never, only: s.only ?? true, onlyOffered: s.onlyOffered ?? true, onRemove: record('remove'), onAdd: record('add'), onMode: record('mode'), onClear: record('clear') },
+    })
   },
   // The status bar's line about reading trailers, for the repository on screen.
   async trailerProgress() {
@@ -517,6 +527,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'trailerProgress':
     await mounts.trailerProgress()
+    break
+  case 'filterStrip':
+    await mounts.filterStrip()
     break
   case 'conflictView':
     await mounts.conflictView()

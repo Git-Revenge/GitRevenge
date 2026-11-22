@@ -698,3 +698,60 @@ func (r *Reading) Commits(key, value string) []string {
 	}
 	return out
 }
+
+// Pick is one value picked to filter by: a key and one of its values, both by ID.
+type Pick struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+// Value returns one value of a key by its ID. The key is named by its ID or any spelling.
+func (r *Reading) Value(key, value string) (Value, bool) {
+	at, ok := r.keyAt[KeyID(key)]
+	if !ok {
+		return Value{}, false
+	}
+	for _, v := range r.values[at] {
+		if v.ID == value {
+			return v, true
+		}
+	}
+	return Value{}, false
+}
+
+// Filter returns the ids of the commits a set of picks keeps. Picks of one key are
+// either-or: a commit with any of those values passes for that key. Picks of different
+// keys must all hold. No picks keep nothing, since that's no filter at all.
+func (r *Reading) Filter(picks []Pick) map[string]struct{} {
+	byKey := map[string]map[string]bool{}
+	var order []string
+	for _, p := range picks {
+		id := KeyID(p.Key)
+		if byKey[id] == nil {
+			byKey[id] = map[string]bool{}
+			order = append(order, id)
+		}
+		byKey[id][p.Value] = true
+	}
+	var kept map[string]struct{}
+	for _, key := range order {
+		values := byKey[key]
+		ids := r.CommitsWhere(key, func(v Value) bool { return values[v.ID] })
+		next := make(map[string]struct{}, len(ids))
+		for _, id := range ids {
+			if kept == nil {
+				next[id] = struct{}{}
+			} else if _, ok := kept[id]; ok {
+				next[id] = struct{}{}
+			}
+		}
+		kept = next
+		if len(kept) == 0 {
+			break
+		}
+	}
+	if kept == nil {
+		kept = map[string]struct{}{}
+	}
+	return kept
+}

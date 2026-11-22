@@ -706,6 +706,10 @@ export function SetTheme(arg1) {
   return window['go']['app']['App']['SetTheme'](arg1);
 }
 
+export function SetTrailerFilter(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SetTrailerFilter'](arg1, arg2, arg3);
+}
+
 export function SetUpdateChecks(arg1) {
   return window['go']['app']['App']['SetUpdateChecks'](arg1);
 }
@@ -768,6 +772,14 @@ export function TakeTrustQuestion() {
 
 export function Theme() {
   return window['go']['app']['App']['Theme']();
+}
+
+export function TrailerFilter(arg1) {
+  return window['go']['app']['App']['TrailerFilter'](arg1);
+}
+
+export function TrailerFilterRows(arg1) {
+  return window['go']['app']['App']['TrailerFilterRows'](arg1);
 }
 
 export function TrailerHints(arg1) {

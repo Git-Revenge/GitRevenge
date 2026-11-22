@@ -42,6 +42,13 @@ type TrailerProgress struct {
 }
 
 func (a *App) emitTrailerProgress(path string, st trailerindex.Status) {
+	// A filter keeps more once more of the history is read, or a new commit's trailers are:
+	// when a read ends, what the filter shows is worked out again.
+	if !st.Reading && a.trailerFilters.get(path) != nil {
+		if r, err := a.openRepo(path); err == nil {
+			a.applyTrailerFilter(r)
+		}
+	}
 	a.emit("trailers:progress", TrailerProgress{Path: path, Status: st})
 }
 

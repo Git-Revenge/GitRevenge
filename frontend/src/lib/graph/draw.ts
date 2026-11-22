@@ -754,6 +754,9 @@ export interface RowExtra {
   arrived?: boolean
   /** In the timeline, the commit carries on a run: one line, FOLLOWER_H tall. */
   follower?: boolean
+  /** The graph is filtered to some of its commits: the rows aren't neighbours any more, so
+   * the lane between them is dashed. */
+  sparse?: boolean
 }
 
 /** How strong the wash is on a row still in question during a bisect. */
@@ -990,12 +993,15 @@ export function drawRow(
   }
   // The lanes that pass straight through arrive packed, and only the ones in view are read.
   const [firstCol, lastCol] = lanesInView(lay)
+  // Under a filter the commits on a lane aren't each other's parents: the line says so.
+  if (extra.sparse) ctx.setLineDash([3, 4])
   for (const s of row.up) if (s.from === s.to) straight(s.from, s.color, s.kind, y, mid, strongAbove(s.from, near) ? y : null)
   eachPass(row, firstCol, lastCol, (col, lane, kind) => straight(col, lane, kind, y, mid, strongAbove(col, near) ? y : null))
   for (const s of row.down) if (s.from === s.to) straight(s.from, s.color, s.kind, mid, y + h, strongBelow(s.from, near) ? y + h : null)
   eachPass(row, firstCol, lastCol, (col, lane, kind) => straight(col, lane, kind, mid, y + h, strongBelow(col, near) ? y + h : null))
   for (const s of row.up) if (s.from !== s.to) link(s, y, mid, false)
   for (const s of row.down) if (s.from !== s.to) link(s, mid, y + h, true)
+  if (extra.sparse) ctx.setLineDash([])
   ctx.globalAlpha = before
   ctx.lineWidth = LINE_WIDTH
   if (docs) ctx.globalAlpha *= MUTED

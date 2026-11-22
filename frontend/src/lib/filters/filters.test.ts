@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { commitsText, heldText, heldWhy, isOpen, isPicked, kindWord, moreText, queryFor, soFar, valueName } from './filters'
+import { chipText, commitsText, hasPick, heldText, heldWhy, isOpen, keptText, kindWord, loadOnly, moreText, queryFor, saveOnly, soFar, togglePick, valueName } from './filters'
 
 const key = (label: string, kind = 'person') => ({ id: label.toLowerCase(), label, kind })
 const value = (label: string, kind = 'person') => ({ label, kind })
@@ -33,19 +33,77 @@ describe('valueName', () => {
   })
 })
 
-describe('queryFor and isPicked', () => {
+describe('queryFor', () => {
   it('writes the search that finds a value, and the one for a whole key', () => {
     expect(queryFor(key('Reviewed-by'), value('Sam Ortiz <sam@tidewater.example>'))).toBe('Reviewed-by: Sam Ortiz')
     expect(queryFor(key('Closes', 'ticket'), value('#12', 'ticket'))).toBe('Closes: #12')
     expect(queryFor(key('Changelog', 'label'))).toBe('Changelog:')
   })
 
-  it('knows the search it wrote, whatever the case or the space around it', () => {
-    const k = key('Changelog', 'label')
-    expect(isPicked('Changelog: fixed', k, value('fixed', 'label'))).toBe(true)
-    expect(isPicked('  changelog: FIXED ', k, value('fixed', 'label'))).toBe(true)
-    expect(isPicked('Changelog: fix', k, value('fixed', 'label'))).toBe(false)
-    expect(isPicked('', k, value('fixed', 'label'))).toBe(false)
+})
+
+describe('picks', () => {
+  const fixed = { key: 'changelog', value: 'text:fixed' }
+  const sam = { key: 'reviewed-by', value: 'person:Sam Ortiz <sam@tidewater.example>' }
+
+  it('knows a picked value', () => {
+    expect(hasPick([fixed], 'changelog', 'text:fixed')).toBe(true)
+    expect(hasPick([fixed], 'changelog', 'text:added')).toBe(false)
+    expect(hasPick([], 'changelog', 'text:fixed')).toBe(false)
+  })
+
+  it('adds a value that is not picked, and takes out one that is', () => {
+    expect(togglePick([fixed], sam.key, sam.value)).toEqual([fixed, sam])
+    expect(togglePick([fixed, sam], fixed.key, fixed.value)).toEqual([sam])
+    expect(togglePick([fixed], fixed.key, fixed.value)).toEqual([])
+  })
+
+  it('sends only what the backend asks for, whatever came with the picks', () => {
+    const shown = [{ ...fixed, keyLabel: 'Changelog', valueLabel: 'fixed', kind: 'label' }]
+    expect(togglePick(shown, sam.key, sam.value)).toEqual([fixed, sam])
+  })
+
+  it('shows a person by name on a chip, and anything else as it is', () => {
+    expect(chipText({ valueLabel: 'Sam Ortiz <sam@tidewater.example>', kind: 'person' })).toBe('Sam Ortiz')
+    expect(chipText({ valueLabel: '#12', kind: 'ticket' })).toBe('#12')
+  })
+})
+
+describe('keptText', () => {
+  it('says how many of how many, or how many while the total is unknown', () => {
+    expect(keptText(11, 212)).toBe('11 of 212 commits')
+    expect(keptText(1, 0)).toBe('1 commit')
+    expect(keptText(0, 212)).toBe('0 of 212 commits')
+  })
+})
+
+describe('the mode a repository last used', () => {
+  const store = () => {
+    const kept: Record<string, string> = {}
+    return { getItem: (k: string) => kept[k] ?? null, setItem: (k: string, v: string) => void (kept[k] = v) }
+  }
+
+  it('is Only these until Highlight is chosen, for each repository apart', () => {
+    const s = store()
+    expect(loadOnly('/r', s)).toBe(true)
+    saveOnly('/r', false, s)
+    expect(loadOnly('/r', s)).toBe(false)
+    expect(loadOnly('/other', s)).toBe(true)
+    saveOnly('/r', true, s)
+    expect(loadOnly('/r', s)).toBe(true)
+  })
+
+  it('is Only these when the store cannot be read', () => {
+    const blocked = {
+      getItem: () => {
+        throw new Error('blocked')
+      },
+      setItem: () => {
+        throw new Error('blocked')
+      },
+    }
+    expect(loadOnly('/r', blocked)).toBe(true)
+    expect(() => saveOnly('/r', false, blocked)).not.toThrow()
   })
 })
 

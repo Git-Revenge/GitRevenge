@@ -149,6 +149,14 @@ func (r *Repo) SetFocus(focus Focus) { r.graph.SetFocus(focus) }
 // Focus returns what the graph is focused on.
 func (r *Repo) Focus() Focus { return r.graph.Focus() }
 
+// SetFilter narrows the graph to the commits filter keeps, or back to everything with nil,
+// for this session only, and reloads it.
+func (r *Repo) SetFilter(filter *Filter) { r.graph.SetFilter(filter) }
+
+// Filtered reports whether a filter is narrowing the graph, how many commits the load under
+// it has looked through so far, and how many the history has in all (0 until counted).
+func (r *Repo) Filtered() (on bool, looked, total int) { return r.graph.Filtered() }
+
 // Rules returns the branch rules (kinds and hide patterns) in a repository's settings.
 func Rules(rs settings.RepoSettings) branchkind.Rules {
 	overrides := map[branchkind.Kind][]string{}

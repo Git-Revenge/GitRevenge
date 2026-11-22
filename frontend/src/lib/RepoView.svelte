@@ -1,6 +1,11 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import { CommitRow } from '../../wailsjs/go/app/App.js'
+  import { CommitRow, SetTrailerFilter, TrailerFilter, TrailerFilterRows } from '../../wailsjs/go/app/App.js'
+  import type { app } from '../../wailsjs/go/models'
+  import { onBackend } from './events'
+  import FilterStrip from './filters/FilterStrip.svelte'
+  import { loadOnly, saveOnly, togglePick } from './filters/filters'
+  import { theme as colorTheme } from './theme.svelte'
   import { repoReads } from './repoReads'
   import { provideCommands } from './commands.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
@@ -79,8 +84,79 @@
     if (diff?.mode === 'commit') diff = null
   }
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
-  /** What the graph is searching for, which the sidebar's Smart filters panel marks. */
-  let graphQuery = $state('')
+  let sidebar = $state<Sidebar>()
+
+  // The smart filter: the values picked in the sidebar's panel, which narrow the graph. It
+  // lasts until it's cleared or the tab closes, and the backend holds it; which of its two
+  // modes this repository last used is remembered here.
+  const noFilter = { picks: [], only: true, kept: 0, total: 0 } as unknown as app.TrailerFilterState
+  let filter = $state<app.TrailerFilterState>(noFilter)
+  let filterOnly = $state(loadOnly(untrack(() => path), localStorage))
+  // Taking commits out would break the Horizontal view's lanes: there a filter highlights.
+  let onlyOffered = $derived(colorTheme.view !== 'horizontal')
+  let only = $derived(filterOnly && onlyOffered)
+  /** The rows a highlighting filter keeps in ink. */
+  let highlight = $state<number[] | null>(null)
+  let filterAsk = 0
+
+  async function setFilter(picks: { key: string; value: string }[]) {
+    const n = ++filterAsk
+    // Only what names a pick goes back: the labels that came with it are the backend's to give.
+    const asked = picks.map((p) => ({ key: p.key, value: p.value }))
+    const next = await session.run(() => SetTrailerFilter(path, asked as never, only))
+    if (n !== filterAsk || !next) return
+    // Under Only these the graph is other commits now: where it was scrolled to means nothing.
+    if (only || filter.only) graph?.top()
+    filter = next
+    await loadHighlight(n)
+  }
+
+  async function loadHighlight(n = ++filterAsk) {
+    if (!filter.picks.length || only) {
+      highlight = null
+      return
+    }
+    const rows = await session.run(() => TrailerFilterRows(path))
+    if (n === filterAsk) highlight = rows?.rows ?? []
+  }
+
+  function setMode(next: boolean) {
+    filterOnly = next
+    saveOnly(path, next, localStorage)
+  }
+
+  // The mode in force changed, by a click or by a switch of view: tell the backend.
+  $effect(() => {
+    void only
+    untrack(() => {
+      if (filter.picks.length && filter.only !== only) void setFilter(filter.picks)
+    })
+  })
+
+  // A tab shows the filter it had: the backend keeps it while the tab is open.
+  $effect(() => {
+    const repo = path
+    void TrailerFilter(repo)
+      .then((f) => {
+        if (repo !== path) return
+        filter = f ?? noFilter
+        void loadHighlight()
+      })
+      .catch(() => {})
+  })
+
+  // New commits, or more of the history read, change what a filter keeps and where its rows are.
+  $effect(() =>
+    onBackend('graph:progress', (p) => {
+      if (p.path !== path || !p.done || !filter.picks.length) return
+      void TrailerFilter(path)
+        .then((f) => {
+          filter = f ?? noFilter
+          void loadHighlight()
+        })
+        .catch(() => {})
+    }),
+  )
   /** The card about a commit's author, while one is open: whose, and where it goes. */
   let authorCard = $state<{ sha: string; name: string; x: number; y: number; above: number; opener?: HTMLElement } | null>(null)
   // The card is about a commit in this repository: it goes when another one shows.
@@ -276,8 +352,10 @@
 
 <div class="repo" bind:clientWidth={windowWidth}>
   <Sidebar
+    bind:this={sidebar}
     {path}
-    search={graphQuery}
+    filterPicks={filter.picks}
+    onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))}
     onSearch={(q) => graph?.search(q)}
     selectedCommit={selected?.id}
     onPick={pick}
@@ -300,8 +378,11 @@
     </div>
     <!-- The graph stays mounted while a diff is open, so scroll position and selection
          survive returning to it. -->
+    {#if filter.picks.length && !diff && !rebaseBase}
+      <FilterStrip {filter} {only} {onlyOffered} onRemove={(p) => setFilter(togglePick(filter.picks, p.key, p.value))} onAdd={() => sidebar?.show('filters')} onMode={setMode} onClear={() => setFilter([])} />
+    {/if}
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} onQuery={(q) => (graphQuery = q)} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filter.picks.length > 0} {highlight} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           openMenu(commitMenuItems(row, refs, ctx), x, y)}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)

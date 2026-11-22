@@ -3,7 +3,7 @@ import { branch, calls, events, open } from './support'
 
 // The sidebar's Smart filters panel (#828): what a repository's trailers offer to filter
 // by. The backend is stubbed, so these check what the panel shows, what it asks for, and
-// what a pick does: a filter is a search of the graph, and nothing is ever written.
+// what a pick does: it adds a value to the graph's filter, and nothing is ever written.
 
 const value = (label: string, kind: string, commits: number, over: object = {}) => ({ id: `${kind}:${label}`, label, kind, commits, ...over })
 const key = (label: string, kind: string, commits: number, over: object = {}) => ({ id: label.toLowerCase(), label, spellings: [{ text: label, commits }], kind, commits, lines: commits, values: 1, held: '', known: true, ...over })
@@ -61,22 +61,26 @@ test.describe('the Smart filters panel', () => {
     await expect(item(page, 'revert if the feed changes')).toHaveCount(0)
   })
 
-  test('picking a value searches the graph for it, and picking it again clears the search', async ({ page }) => {
+  test('picking a value asks for it to be filtered by', async ({ page }) => {
     await show(page)
     await item(page, 'Sam Ortiz').click()
-    expect(await events(page, 'search')).toEqual([['Reviewed-by: Sam Ortiz']])
+    expect(await events(page, 'filter')).toEqual([['reviewed-by', 'person:Sam Ortiz <sam@tidewater.example>']])
     await item(page, 'fixed').click()
-    expect((await events(page, 'search')).at(-1)).toEqual(['Changelog: fixed'])
+    expect((await events(page, 'filter')).at(-1)).toEqual(['changelog', 'label:fixed'])
+    // A pick is a filter, not a search.
+    expect(await events(page, 'search')).toEqual([])
   })
 
-  test('the value the graph is searching for is the picked one', async ({ page }) => {
-    await show(page, scenario({}, { search: 'changelog: fixed' }))
+  test('the values the graph is filtered by are the picked ones', async ({ page }) => {
+    await show(page, scenario({}, { filterPicks: [{ key: 'changelog', value: 'label:fixed' }, { key: 'reviewed-by', value: 'person:Sam Ortiz <sam@tidewater.example>' }] }))
     const fixed = item(page, 'fixed')
     await expect(fixed).toHaveAttribute('aria-selected', 'true')
     await expect(fixed).toHaveClass(/picked/)
+    await expect(item(page, 'Sam Ortiz')).toHaveAttribute('aria-selected', 'true')
     await expect(item(page, 'added')).toHaveAttribute('aria-selected', 'false')
+    // Picking a picked value asks for the same thing: whoever holds the filter takes it out.
     await fixed.click()
-    expect(await events(page, 'search')).toEqual([['']])
+    expect(await events(page, 'filter')).toEqual([['changelog', 'label:fixed']])
   })
 
   test('"more…" brings the rest of a key\'s values', async ({ page }) => {
@@ -149,7 +153,7 @@ test.describe('the Smart filters panel', () => {
     await page.keyboard.press('ArrowDown')
     await expect(active()).toContainText('Sam Ortiz')
     await page.keyboard.press('Enter')
-    expect(await events(page, 'search')).toEqual([['Reviewed-by: Sam Ortiz']])
+    expect(await events(page, 'filter')).toEqual([['reviewed-by', 'person:Sam Ortiz <sam@tidewater.example>']])
     // Left goes to the key, and again closes it.
     await page.keyboard.press('ArrowLeft')
     await expect(active()).toContainText('Reviewed-by')
