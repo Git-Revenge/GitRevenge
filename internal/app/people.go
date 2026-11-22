@@ -380,6 +380,8 @@ func (a *App) SetPeopleTab(repo string) error {
 // A repository with no .mailmap gets one only with create set, which the view sends after
 // the user has agreed to the new file. Without it nothing is written.
 func (a *App) SaveMailmap(path, base, text string, create bool) error {
+	// What trailers are read through may have changed: the next reading looks again.
+	defer a.trailerReadings.touch("")
 	r, err := a.openRepo(path)
 	if err != nil {
 		return err

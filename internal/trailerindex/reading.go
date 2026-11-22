@@ -555,6 +555,113 @@ func (r *Reading) Values(key string) []Value {
 	return slices.Clone(r.values[at])
 }
 
+// Top returns up to n of a key's values to show, and how many there are in all: most
+// commits first, with bots after everyone else, since a bot's thousand commits say less
+// than a person's ten. match narrows the values to those it accepts; nil takes them all.
+// The key is named by its ID or by any spelling of it.
+func (r *Reading) Top(key string, n int, match func(Value) bool) (top []Value, matching int) {
+	top = []Value{}
+	at, ok := r.keyAt[KeyID(key)]
+	if !ok {
+		return top, 0
+	}
+	var bots []Value
+	for _, v := range r.values[at] {
+		if match != nil && !match(v) {
+			continue
+		}
+		matching++
+		switch {
+		case v.Bot && len(bots) < n:
+			bots = append(bots, v)
+		case !v.Bot && len(top) < n:
+			top = append(top, v)
+		}
+	}
+	if room := n - len(top); room > 0 {
+		top = append(top, bots[:min(room, len(bots))]...)
+	}
+	return top, matching
+}
+
+// ContainsFold reports whether s contains sub, whatever the case of either's ASCII
+// letters. sub must already be in lower case. It allocates nothing, which matters when a
+// keystroke asks it of a million values.
+func ContainsFold(s, lowerSub string) bool {
+	if lowerSub == "" {
+		return true
+	}
+	for i := 0; i+len(lowerSub) <= len(s); i++ {
+		j := 0
+		for j < len(lowerSub) {
+			c := s[i+j]
+			if c >= 'A' && c <= 'Z' {
+				c += 'a' - 'A'
+			}
+			if c != lowerSub[j] {
+				break
+			}
+			j++
+		}
+		if j == len(lowerSub) {
+			return true
+		}
+	}
+	return false
+}
+
+// CommitsWhere returns the ids of the commits that have a key with any value match
+// accepts, in one pass however many values that is. The key is named by its ID or by any
+// spelling of it. A nil match takes every commit with the key.
+func (r *Reading) CommitsWhere(key string, match func(Value) bool) []string {
+	out := []string{}
+	k, ok := r.keyAt[KeyID(key)]
+	if !ok {
+		return out
+	}
+	var wanted []bool
+	if match != nil {
+		at := make(map[string]int32, len(r.vals))
+		for n, c := range r.vals {
+			at[c.id] = int32(n)
+		}
+		wanted = make([]bool, len(r.vals))
+		some := false
+		for _, v := range r.values[k] {
+			if match(v) {
+				wanted[at[v.ID]], some = true, true
+			}
+		}
+		if !some {
+			return out
+		}
+	}
+	has := func(n uint32) bool {
+		if wanted == nil {
+			return true
+		}
+		if several := r.several[n]; several != nil {
+			for _, v := range several {
+				if wanted[v] {
+					return true
+				}
+			}
+			return false
+		}
+		return wanted[r.valueOf[n]]
+	}
+	for c := 0; c < len(r.first)-1; c++ {
+		mine := r.pairs[r.first[c]:r.first[c+1]]
+		for j := 0; j < len(mine); j += 2 {
+			if r.keyOf[mine[j]] == int32(k) && has(mine[j+1]) {
+				out = append(out, hex.EncodeToString(r.ids[c*r.idSize:(c+1)*r.idSize]))
+				break
+			}
+		}
+	}
+	return out
+}
+
 // Commits returns the ids of the commits that have a key with a value, both named by ID. An
 // empty value asks for every commit with the key.
 func (r *Reading) Commits(key, value string) []string {

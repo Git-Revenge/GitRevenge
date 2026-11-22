@@ -1,7 +1,8 @@
 import { panelMatches, type PanelKey, type Panels, type SortOrder } from './sidebarTree'
 
-/** One of the rail's panels. Repository isn't a ref panel, so it isn't in the tree. */
-export type SidebarPanel = PanelKey | 'repo'
+/** One of the rail's panels. Smart filters and Repository aren't ref panels, so they aren't
+ * in the tree. */
+export type SidebarPanel = PanelKey | 'filters' | 'repo'
 
 /** What the sidebar remembers for each repository, on this computer. */
 export interface SidebarState {
@@ -18,7 +19,7 @@ export const DEFAULT_WIDTH = 236
 export const MIN_WIDTH = 160
 export const MAX_WIDTH = 560
 
-const PANELS: readonly SidebarPanel[] = ['branches', 'remotes', 'tags', 'stashes', 'repo']
+const PANELS: readonly SidebarPanel[] = ['branches', 'remotes', 'tags', 'filters', 'stashes', 'repo']
 
 export function defaultSidebar(): SidebarState {
   return { panel: 'branches', collapsed: false, width: DEFAULT_WIDTH, open: {}, sort: 'name' }

@@ -147,6 +147,11 @@ func (a *App) SearchGraph(path, query string) (graph.SearchResult, error) {
 		}
 		return rowsOf(g, ids, maxSearchRows), nil
 	}
+	// A trailer the repository's commits write is found in the trailer index, once that has
+	// read the whole history. Until then, the keys in common use are searched for with git.
+	if res, ok := a.trailerSearch(context.Background(), r, g, query); ok {
+		return res, nil
+	}
 	if q, ok := git.ParseTrailerQuery(query); ok {
 		ctx, done := a.latest.start("search", path)
 		defer done()

@@ -37,6 +37,7 @@
     onSelectedRefs,
     onNote,
     onAuthor,
+    onQuery,
     lead,
     wip,
     toolsHost,
@@ -66,6 +67,9 @@
     onDrop?: (source: Row, sourceRefs: Ref[], target: Row, targetRefs: Ref[], x: number, y: number) => void
     /** A click on a commit's note mark, after the commit is selected. */
     onNote?: (row: Row) => void
+    /** What the search box holds, whenever it changes: a smart filter picked in the sidebar is
+     * a search, and the sidebar shows which one is on. */
+    onQuery?: (query: string) => void
     /** A click on a row's author, or Enter on the selected row: asks for the author's card.
      * x and y are where in the window to put it, under the row, and above is the row's top. */
     onAuthor?: (row: Row, x: number, y: number, above: number) => void
@@ -1024,6 +1028,7 @@
   // Search state. matchSet is only used for dimming when every match fits in the result.
   let searchInput: HTMLInputElement
   let query = $state('')
+  $effect(() => onQuery?.(query))
   let matches = $state<number[]>([])
   let matchTotal = $state(0)
   let matchSet: Set<number> | null = null

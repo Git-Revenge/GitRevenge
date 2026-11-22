@@ -69,6 +69,8 @@ func (a *App) RepoPreferences(path string) (RepoPreferences, error) {
 // whose patterns equal its defaults is stored as using the defaults, so later changes to
 // the defaults reach it.
 func (a *App) SetRepoPreferences(path string, p RepoPreferences) error {
+	// What trailers are read through may have changed: the next reading looks again.
+	defer a.trailerReadings.touch("")
 	if strings.TrimSpace(path) == "" {
 		return userError("No repository is open.")
 	}

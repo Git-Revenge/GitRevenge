@@ -8,6 +8,7 @@
   import { provideCommands, type Command } from './commands.svelte'
   import type { MenuItem } from './ContextMenu.svelte'
   import RepoPanel from './RepoPanel.svelte'
+  import Lazy from './ui/Lazy.svelte'
   import { session } from './session.svelte'
   import Icon from './ui/Icon.svelte'
   import type { IconName } from './ui/Icon.svelte'
@@ -30,8 +31,13 @@
     onMenu,
     onManageWorktrees,
     openDialog,
+    search = '',
+    onSearch,
   }: {
     path: string
+    /** What the graph is searching for, and how to search it: a smart filter is a search. */
+    search?: string
+    onSearch?: (query: string) => void
     /** The commit selected in the graph; refs pointing at it show as selected. */
     selectedCommit?: string
     onPick: (ref: Ref) => void
@@ -50,6 +56,7 @@
     { key: 'branches', label: 'Branches', icon: 'branch', empty: 'No branches yet.' },
     { key: 'remotes', label: 'Remotes', icon: 'remote', empty: 'No remote branches. Add a remote to get some.' },
     { key: 'tags', label: 'Tags', icon: 'tag', empty: 'No tags yet.' },
+    { key: 'filters', label: 'Smart filters', icon: 'filter', empty: '' },
     { key: 'stashes', label: 'Stashes', icon: 'stash', empty: 'No stashes.' },
     { key: 'repo', label: 'Repository', icon: 'submodule', empty: '' },
   ]
@@ -70,9 +77,16 @@
   let hiddenCount = $derived(refs.filter((r) => r.hidden).length)
   let repoAttention = $state(0)
   let repoMatches = $state(0)
+  let filterMatches = $state(0)
+  // The Smart filters panel asks the backend for what it shows, so it's made the first time
+  // it's wanted, by showing it or by filtering, and stays for the rail's count after that.
+  let filtersWanted = $state(false)
+  $effect(() => {
+    if (ui.panel === 'filters' || filter.trim()) filtersWanted = true
+  })
 
   let panels = $derived(buildPanels(refs, { showHidden: showingHidden, sort: ui.sort }))
-  let current = $derived(ui.panel === 'repo' ? null : panels[ui.panel])
+  let current = $derived(ui.panel === 'repo' || ui.panel === 'filters' ? null : panels[ui.panel])
   let careOn = $derived(care && ui.panel === 'branches')
   let merged = $derived(session.merged[path] ?? {})
   let deletable = $state<string[]>([])
@@ -80,7 +94,7 @@
   let rows = $derived(current ? panelRows(current, { open: ui.open, query: filter, care: careOn, merged }) : [])
   let filtering = $derived(filter.trim().length > 0)
   let needCare = $derived(careCount(panels.branches))
-  let matches = $derived(!filtering ? 0 : current ? panelMatches(current, filter) : repoMatches)
+  let matches = $derived(!filtering ? 0 : current ? panelMatches(current, filter) : ui.panel === 'filters' ? filterMatches : repoMatches)
   // An empty panel names one with matches, the Repository panel last.
   let elsewhere = $derived.by(() => {
     if (rows.length > 0 || !filtering) return null
@@ -194,7 +208,7 @@
    * attention, and what it means for screen readers. */
   function badge(key: SidebarPanel): { count: number; text: string; dot?: boolean } {
     if (filtering) {
-      const count = key === 'repo' ? repoMatches : panelMatches(panels[key], filter)
+      const count = key === 'repo' ? repoMatches : key === 'filters' ? filterMatches : panelMatches(panels[key], filter)
       return { count, text: count === 1 ? '1 match' : `${count} matches` }
     }
     if (key === 'branches') return { count: needCare, text: needCare === 1 ? '1 needs care' : `${needCare} need care`, dot: true }
@@ -339,6 +353,7 @@
     <header>
       <div class="heading">
         <h2>{tab.label}</h2>
+        {#if ui.panel === 'filters'}<span class="hand from">from trailers</span>{/if}
         {#if ui.panel === 'branches' || ui.panel === 'remotes' || ui.panel === 'tags'}
           <button
             class="btn sm quiet sort"
@@ -375,7 +390,7 @@
       {/if}
     </header>
 
-    <div class="scroll" class:narrowed={filtering || careOn} bind:this={list} bind:clientHeight={viewHeight} onscroll={(e) => (scrollTop = e.currentTarget.scrollTop)} hidden={ui.panel === 'repo'}>
+    <div class="scroll" class:narrowed={filtering || careOn} bind:this={list} bind:clientHeight={viewHeight} onscroll={(e) => (scrollTop = e.currentTarget.scrollTop)} hidden={ui.panel === 'repo' || ui.panel === 'filters'}>
       <ul
         bind:this={tree}
         role="tree"
@@ -425,6 +440,12 @@
         </p>
       {/if}
     </div>
+
+    {#if filtersWanted}
+      <div class="scroll" hidden={ui.panel !== 'filters'}>
+        <Lazy load={() => import('./filters/SmartFiltersPanel.svelte')} {path} {filter} query={search} open={ui.open} onPick={(q: string) => onSearch?.(q)} onStatus={(s: { matches: number }) => (filterMatches = s.matches)} />
+      </div>
+    {/if}
 
     <!-- Stays mounted so the rail's badge knows about submodules from the start. -->
     <div class="scroll repo-panel" hidden={ui.panel !== 'repo'}>
@@ -501,6 +522,13 @@
     gap: 2px;
     min-height: 28px;
     padding-left: 4px;
+  }
+
+  /* Where Smart filters come from, in the margin's hand. */
+  .from {
+    margin-left: 8px;
+    color: var(--accent-a);
+    white-space: nowrap;
   }
 
   h2 {

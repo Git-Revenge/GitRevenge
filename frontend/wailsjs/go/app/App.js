@@ -778,6 +778,14 @@ export function TrailerKeys(arg1) {
   return window['go']['app']['App']['TrailerKeys'](arg1);
 }
 
+export function TrailerMore(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['TrailerMore'](arg1, arg2, arg3, arg4);
+}
+
+export function TrailerPanel(arg1, arg2, arg3) {
+  return window['go']['app']['App']['TrailerPanel'](arg1, arg2, arg3);
+}
+
 export function TrailerStatus(arg1) {
   return window['go']['app']['App']['TrailerStatus'](arg1);
 }

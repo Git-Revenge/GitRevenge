@@ -120,6 +120,105 @@ func TestTrailerKeysAreReadThroughTheRepositorysRules(t *testing.T) {
 	}
 }
 
+// A search written "Key: value" is a trailer search when the repository's commits write
+// that key, whatever the key is, and it finds a value as it's shown.
+func TestSearchFindsAnyTrailerTheRepositoryWrites(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "a.txt", "fix: crash on an empty feed", "Changelog: fixed", "Closes #1")
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "b.txt", "Round tide heights", "Changelog: added", "Reviewed-by: sarah lind <slind@users.noreply.example>", "Closes #12")
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "c.txt", "Raise an alert on high wind", "changelog: Fixed", "Reviewed-by: Sarah Lind <sarah@tidewater.example>")
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "d.txt", "docs: the plan", "docs: a sentence with a colon in")
+	fx.WriteFile(".mailmap", "Sarah Lind <sarah@tidewater.example> <slind@users.noreply.example>\n")
+	path := openForMap(t, a, fx)
+	trailersRead(t, a, path)
+	found := func(query string) int {
+		t.Helper()
+		res, err := a.SearchGraph(path, query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res.Total
+	}
+
+	// Changelog isn't a key any list knows: this repository writes it, in two spellings.
+	if n := found("Changelog: fixed"); n != 2 {
+		t.Errorf("Changelog: fixed found %d commits, want both spellings of the key and of the value", n)
+	}
+	if n := found("changelog:"); n != 3 {
+		t.Errorf("every commit with the key: %d, want 3", n)
+	}
+	// Sarah is found by the name she's shown under, however the commit wrote it.
+	if n := found("Reviewed-by: Sarah Lind"); n != 2 {
+		t.Errorf("Reviewed-by: Sarah Lind found %d, want the commit under her old name too", n)
+	}
+	// A number matches whole.
+	if n := found("Closes: #1"); n != 1 {
+		t.Errorf("Closes: #1 found %d, want one: #12 isn't it", n)
+	}
+	// No commit has a trailer spelled "fix", so this is a search of subjects, as before.
+	if n := found("fix: crash"); n != 1 {
+		t.Errorf("fix: crash found %d, want the subject", n)
+	}
+	// A key on one commit is probably a sentence: the subject that starts the same is found too.
+	if n := found("docs:"); n != 1 {
+		t.Errorf("docs: found %d, want the one commit, by its subject and its trailer alike", n)
+	}
+	if n := found("Changelog: nothing like this"); n != 0 {
+		t.Errorf("a value nobody wrote found %d", n)
+	}
+}
+
+// What the sidebar's panel is given: the keys worth offering with their first values, the
+// ones held back, and what the sidebar's filter matches.
+func TestTrailerPanel(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	people := []string{"Sam Ortiz <sam@tidewater.example>", "Sarah Lind <sarah@tidewater.example>", "Maya Okafor <maya@tidewater.example>"}
+	for i := range 6 {
+		commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "a.txt", "Commit "+string(rune('a'+i)), "Reviewed-by: "+people[i%3], "Changelog: "+[]string{"fixed", "added"}[i%2])
+	}
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "b.txt", "Start the docs", "docs: add the plan and a README")
+	path := openForMap(t, a, fx)
+	trailersRead(t, a, path)
+
+	panel, err := a.TrailerPanel(path, "", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(panel.Keys) != 2 || panel.MoreKeys != 0 || panel.Matches != 0 || !panel.Status.Done {
+		t.Fatalf("panel = %+v, want the two keys worth offering", panel)
+	}
+	if len(panel.Held) != 1 || panel.Held[0].ID != "docs" || panel.Held[0].Held != trailerindex.HeldRare {
+		t.Fatalf("held = %+v, want the sentence shaped like a trailer", panel.Held)
+	}
+	var reviewed TrailerPanelKey
+	for _, k := range panel.Keys {
+		if k.Key.ID == "reviewed-by" {
+			reviewed = k
+		}
+	}
+	if len(reviewed.Top) != 2 || reviewed.More != 1 || reviewed.Key.Kind != trailerindex.KindPerson {
+		t.Fatalf("reviewed-by = %+v, want two of its three people and one more", reviewed)
+	}
+
+	// By a key's name: the key, with its values as they were.
+	byKey, err := a.TrailerPanel(path, "CHANGE", 0)
+	if err != nil || len(byKey.Keys) != 1 || byKey.Keys[0].Key.ID != "changelog" || len(byKey.Keys[0].Top) != 2 || byKey.Matches != 1 {
+		t.Fatalf("by a key's name = %+v, %v", byKey, err)
+	}
+	// By a value: only the keys that have it, and only it under them.
+	byValue, err := a.TrailerPanel(path, "sarah", 0)
+	if err != nil || len(byValue.Keys) != 1 || byValue.Keys[0].Key.ID != "reviewed-by" || len(byValue.Keys[0].Top) != 1 || byValue.Keys[0].More != 0 || byValue.Matches != 1 {
+		t.Fatalf("by a value = %+v, %v", byValue, err)
+	}
+	if none, err := a.TrailerPanel(path, "nothing like this", 0); err != nil || len(none.Keys) != 0 || none.Matches != 0 || none.Keys == nil {
+		t.Fatalf("a filter nothing matches = %+v, %v", none, err)
+	}
+}
+
 // Opening a repository reads its trailers in the background, into a file of the app's own
 // and nothing in the repository.
 func TestOpeningARepositoryReadsItsTrailers(t *testing.T) {
