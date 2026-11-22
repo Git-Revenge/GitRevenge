@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"sync"
 
 	"github.com/git-revenge/gitrevenge/internal/fsutil"
@@ -226,6 +227,56 @@ func (a *App) TrailerFilterRows(path string) (graph.SearchResult, error) {
 	}
 	all.Rows = ticks
 	return all, nil
+}
+
+// TrailerFilterStep returns the row of the next commit the repository's filter keeps after
+// row from, or with dir below 0 the one before it, going round from the end to the start as a
+// search does: what the strip's buttons step to under Highlight. from of -1 starts before the
+// first row. It's -1 when the filter keeps nothing, or there's no filter. Unlike
+// TrailerFilterRows it skips nothing, however long the history.
+func (a *App) TrailerFilterStep(path string, from, dir int) (int, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return -1, err
+	}
+	f := a.trailerFilters.get(r.Path)
+	if f == nil {
+		return -1, nil
+	}
+	g, err := r.FullGraph(context.Background())
+	if err != nil || g == nil {
+		return -1, err
+	}
+	keep := a.trailerReading(context.Background(), r).Filter(f.picks)
+	ids := make([]string, 0, len(keep))
+	for id := range keep {
+		ids = append(ids, id)
+	}
+	rows := rowsOf(g, ids, len(ids)).Rows
+	return stepRow(rows, from, dir), nil
+}
+
+// stepRow is the row after from in rows, sorted, or before it with dir below 0, going round
+// at either end; -1 when rows is empty.
+func stepRow(rows []int, from, dir int) int {
+	if len(rows) == 0 {
+		return -1
+	}
+	if dir < 0 {
+		i, _ := slices.BinarySearch(rows, from)
+		if i == 0 {
+			return rows[len(rows)-1]
+		}
+		return rows[i-1]
+	}
+	i, found := slices.BinarySearch(rows, from)
+	if found {
+		i++
+	}
+	if i >= len(rows) {
+		return rows[0]
+	}
+	return rows[i]
 }
 
 // TrailerFilterDays says how many commits were authored in each of some spans of time, in

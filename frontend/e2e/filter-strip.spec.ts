@@ -37,6 +37,22 @@ test.describe('the filter strip', () => {
     expect(await events(page, 'mode')).toEqual([[false]])
   })
 
+  // Enter on the graph stays the author's card, so stepping between highlighted commits has
+  // its own buttons (#866). Under Only these every row is a match: the arrow keys step.
+  test('under Highlight, steps between the commits the filter keeps', async ({ page }) => {
+    await open(page, 'filterStrip', { filterStrip: { filter: { picks: [fixed], only: false, kept: 11, total: 212 }, only: false } })
+    await strip(page).getByRole('button', { name: 'Next match' }).click()
+    await strip(page).getByRole('button', { name: 'Previous match' }).click()
+    expect(await events(page, 'step')).toEqual([[1], [-1]])
+  })
+
+  test('has no step buttons under Only these, nor when the filter keeps nothing', async ({ page }) => {
+    await open(page, 'filterStrip', { filterStrip: { filter: { picks: [fixed], only: true, kept: 11, total: 212 }, only: true } })
+    await expect(strip(page).getByRole('button', { name: 'Next match' })).toHaveCount(0)
+    await open(page, 'filterStrip', { filterStrip: { filter: { picks: [fixed], only: false, kept: 0, total: 212 }, only: false } })
+    await expect(strip(page).getByRole('button', { name: 'Next match' })).toBeDisabled()
+  })
+
   test('offers only Highlight where taking commits out would break the lanes', async ({ page }) => {
     await open(page, 'filterStrip', { filterStrip: { filter: { picks: [fixed], only: false, kept: 11, total: 0 }, only: false, onlyOffered: false } })
     const onlyThese = modes(page).getByRole('button', { name: 'Only these' })
@@ -101,6 +117,25 @@ test.describe('filtering the graph from the sidebar', () => {
     await strip(page).getByRole('button', { name: 'Clear' }).click()
     await expect.poll(async () => (await calls(page, 'SetTrailerFilter')).at(-1)).toEqual(['/r', [], false])
     await expect(strip(page)).toHaveCount(0)
+  })
+
+  test('the step buttons go to the row the backend gives, from the selected one', async ({ page }) => {
+    const highlighting = { picks: [fixed], only: false, kept: 2, total: 212 }
+    await page.addInitScript(() => localStorage.setItem('gitrevenge.filterMode:/r', 'highlight'))
+    await open(page, 'repoView', { graphRows: 6, responses: { ...responses, TrailerFilter: highlighting, SetTrailerFilter: highlighting, TrailerFilterStep: 4 } })
+    await expect(modes(page).getByRole('button', { name: 'Highlight' })).toHaveAttribute('aria-pressed', 'true')
+    await strip(page).getByRole('button', { name: 'Next match' }).click()
+    await expect.poll(async () => (await calls(page, 'TrailerFilterStep')).length).toBe(1)
+    const [asked] = await calls(page, 'TrailerFilterStep')
+    expect(asked[0]).toBe('/r')
+    expect(asked[2]).toBe(1)
+    // Row 4 is selected: the commit panel asks about its commit.
+    const asked4 = (id: string) => async () => (await calls(page, 'CommitDetail')).some((c) => c[1] === id)
+    await expect.poll(asked4('4'.padStart(40, '0'))).toBe(true)
+    await respond(page, { TrailerFilterStep: 1 })
+    await strip(page).getByRole('button', { name: 'Previous match' }).click()
+    await expect.poll(async () => (await calls(page, 'TrailerFilterStep')).at(-1)).toEqual(['/r', 4, -1])
+    await expect.poll(asked4('1'.padStart(40, '0'))).toBe(true)
   })
 
   test('a tab that had a filter shows it again', async ({ page }) => {

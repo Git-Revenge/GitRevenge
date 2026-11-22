@@ -814,6 +814,10 @@ export function TrailerFilterRows(arg1) {
   return window['go']['app']['App']['TrailerFilterRows'](arg1);
 }
 
+export function TrailerFilterStep(arg1, arg2, arg3) {
+  return window['go']['app']['App']['TrailerFilterStep'](arg1, arg2, arg3);
+}
+
 export function TrailerHints(arg1) {
   return window['go']['app']['App']['TrailerHints'](arg1);
 }

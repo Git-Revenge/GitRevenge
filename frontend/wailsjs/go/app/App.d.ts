@@ -415,6 +415,8 @@ export function TrailerFilterLines(arg1:string,arg2:string):Promise<Array<git.Tr
 
 export function TrailerFilterRows(arg1:string):Promise<graph.SearchResult>;
 
+export function TrailerFilterStep(arg1:string,arg2:number,arg3:number):Promise<number>;
+
 export function TrailerHints(arg1:string):Promise<git.TrailerHints>;
 
 export function TrailerKeys(arg1:string):Promise<app.TrailerKeys>;

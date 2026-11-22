@@ -245,3 +245,59 @@ func TestCommitRowSaysWhenAFilterKeepsTheCommitOut(t *testing.T) {
 		t.Fatalf("under Highlight, a commit that isn't in the history = %d, want %d", got, rowAbsent)
 	}
 }
+
+// The strip's buttons step between the commits a highlighting filter keeps (#866): every one,
+// in order, going round at the ends as a search does.
+func TestTrailerFilterStepGoesThroughEveryMatch(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "a.txt", "One", "Changelog: fixed")
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "b.txt", "Two", "Changelog: added")
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "c.txt", "Three", "Changelog: fixed")
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "d.txt", "Four")
+	path := openForMap(t, a, fx)
+	trailersRead(t, a, path)
+	graphRows(t, a, path, 4)
+	step := func(from, dir int) int {
+		t.Helper()
+		row, err := a.TrailerFilterStep(path, from, dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return row
+	}
+	if got := step(-1, 1); got != -1 {
+		t.Fatalf("with no filter, the step is to row %d, want -1", got)
+	}
+	// Newest first: Four is row 0, Three row 1, Two row 2, One row 3. The fixes are 1 and 3.
+	fixed := []trailerindex.Pick{{Key: "changelog", Value: "text:fixed"}}
+	if _, err := a.SetTrailerFilter(path, fixed, false); err != nil {
+		t.Fatal(err)
+	}
+	graphRows(t, a, path, 4)
+	for _, c := range []struct{ from, dir, want int }{
+		{-1, 1, 1}, {0, 1, 1}, {1, 1, 3}, {2, 1, 3}, {3, 1, 1},
+		{3, -1, 1}, {2, -1, 1}, {1, -1, 3}, {0, -1, 3},
+	} {
+		if got := step(c.from, c.dir); got != c.want {
+			t.Errorf("from row %d, dir %d: row %d, want %d", c.from, c.dir, got, c.want)
+		}
+	}
+}
+
+func TestStepRow(t *testing.T) {
+	t.Parallel()
+	if got := stepRow(nil, 3, 1); got != -1 {
+		t.Errorf("no rows: %d", got)
+	}
+	rows := []int{2, 5, 9}
+	for _, c := range []struct{ from, dir, want int }{
+		{-1, 1, 2}, {2, 1, 5}, {3, 1, 5}, {9, 1, 2}, {10, 1, 2},
+		{9, -1, 5}, {6, -1, 5}, {2, -1, 9}, {-1, -1, 9}, {0, -1, 9},
+	} {
+		if got := stepRow(rows, c.from, c.dir); got != c.want {
+			t.Errorf("stepRow(%v, %d, %d) = %d, want %d", rows, c.from, c.dir, got, c.want)
+		}
+	}
+}

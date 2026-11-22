@@ -140,7 +140,7 @@ Search moves between matches. A **smart filter** changes what the graph shows: p
 A strip above the graph says how many commits the filter keeps, with a chip for each value, **+ Filter**, and **Clear**. It has two modes:
 
 - **Only these**, the default, takes the other commits out. Those that stay are strung on one dashed line, and each day's line says how many it kept of how many the day had.
-- **Highlight** leaves everything, fades what doesn't match, and ticks each match on the [ruler](#the-ruler).
+- **Highlight** leaves everything, fades what doesn't match, and ticks each match on the [ruler](#the-ruler). The arrows in the strip step from match to match.
 
 ![A filter on as Only these: the strip above the graph, and only the commits it keeps](../img/smart-filter-only-light.webp#gh-light-mode-only)
 ![A filter on as Only these: the strip above the graph, and only the commits it keeps](../img/smart-filter-only-dark.webp#gh-dark-mode-only)

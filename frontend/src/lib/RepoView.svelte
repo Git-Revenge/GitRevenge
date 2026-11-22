@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import { CommitRow, SetTrailerFilter, SetTrailerPin, TrailerFilter, TrailerFilterRows, TrailerPins } from '../../wailsjs/go/app/App.js'
+  import { CommitRow, SetTrailerFilter, SetTrailerPin, TrailerFilter, TrailerFilterRows, TrailerFilterStep, TrailerPins } from '../../wailsjs/go/app/App.js'
   import type { app } from '../../wailsjs/go/models'
   import { onBackend } from './events'
   import FilterStrip from './filters/FilterStrip.svelte'
@@ -153,6 +153,12 @@
   let trailersUnread = $derived(filter.picks.length && trailersRead?.reading && trailersRead.total > 0 ? Math.max(0, 1 - trailersRead.read / trailersRead.total) : 0)
   /** Names the filter that's on, for whoever shows what it picked. */
   let filterSig = $derived(filter.picks.map((p) => `${p.key}=${p.value}`).join('|'))
+
+  /** The next commit a highlighting filter keeps after the selected one, or the one before. */
+  async function step(dir: 1 | -1) {
+    const row = await session.run(() => TrailerFilterStep(path, graph?.selectedRow() ?? -1, dir))
+    if (row !== undefined && row >= 0) graph.reveal(row)
+  }
 
   function setMode(next: boolean) {
     filterOnly = next
@@ -415,7 +421,7 @@
     <!-- The graph stays mounted while a diff is open, so scroll position and selection
          survive returning to it. -->
     {#if filter.picks.length && !diff && !rebaseBase}
-      <FilterStrip {filter} {only} {onlyOffered} onRemove={(p) => setFilter(togglePick(filter.picks, p.key, p.value))} onAdd={() => sidebar?.show('filters')} onMode={setMode} onClear={() => setFilter([])} />
+      <FilterStrip {filter} {only} {onlyOffered} onRemove={(p) => setFilter(togglePick(filter.picks, p.key, p.value))} onAdd={() => sidebar?.show('filters')} onMode={setMode} onClear={() => setFilter([])} onStep={step} />
     {/if}
     <div class="graph" class:hidden={diff || rebaseBase}>
       <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filter.picks.length > 0} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFilterDrop={() => filter.picks.length && setFilter(filter.picks.slice(0, -1))} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
