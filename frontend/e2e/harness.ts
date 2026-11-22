@@ -230,6 +230,8 @@ const mounts = {
         onContext: record('context'),
         onMenu: record('menu'),
         openDialog: record('dialog'),
+        search: scenario.search ?? '',
+        onSearch: record('search'),
       },
     })
   },

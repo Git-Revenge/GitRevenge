@@ -396,6 +396,10 @@ export function TrailerHints(arg1:string):Promise<git.TrailerHints>;
 
 export function TrailerKeys(arg1:string):Promise<app.TrailerKeys>;
 
+export function TrailerMore(arg1:string,arg2:string,arg3:string,arg4:number):Promise<app.TrailerPanelKey>;
+
+export function TrailerPanel(arg1:string,arg2:string,arg3:number):Promise<app.TrailerPanel>;
+
 export function TrailerStatus(arg1:string):Promise<app.TrailerProgress>;
 
 export function TrailerValues(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number):Promise<app.TrailerValues>;

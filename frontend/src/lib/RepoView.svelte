@@ -79,6 +79,8 @@
     if (diff?.mode === 'commit') diff = null
   }
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
+  /** What the graph is searching for, which the sidebar's Smart filters panel marks. */
+  let graphQuery = $state('')
   /** The card about a commit's author, while one is open: whose, and where it goes. */
   let authorCard = $state<{ sha: string; name: string; x: number; y: number; above: number; opener?: HTMLElement } | null>(null)
   // The card is about a commit in this repository: it goes when another one shows.
@@ -275,6 +277,8 @@
 <div class="repo" bind:clientWidth={windowWidth}>
   <Sidebar
     {path}
+    search={graphQuery}
+    onSearch={(q) => graph?.search(q)}
     selectedCommit={selected?.id}
     onPick={pick}
     onActivate={(ref) => checkoutRef(path, ref)}
@@ -297,7 +301,7 @@
     <!-- The graph stays mounted while a diff is open, so scroll position and selection
          survive returning to it. -->
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} onQuery={(q) => (graphQuery = q)} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           openMenu(commitMenuItems(row, refs, ctx), x, y)}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)

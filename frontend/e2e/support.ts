@@ -25,6 +25,8 @@ export interface Scenario {
   /** Which preview the preview dialog shows; a merge unless said. */
   previewKind?: 'merge' | 'rebase'
   theme?: 'light' | 'dark'
+  /** What the graph is searching for, as the sidebar is told. */
+  search?: string
   /** Someone the People tab is opened on, as an author's card in the graph asks. */
   peopleAsk?: { person: unknown; pick: boolean }
   /** Gives the graph a working tree to show, with this many changed files. */

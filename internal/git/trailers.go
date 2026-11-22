@@ -103,6 +103,17 @@ var commonTrailerKeys = map[string]bool{
 	"bug": true, "change-id": true,
 }
 
+// SplitTrailerQuery splits a search written "Key: value" into its two parts, whatever the
+// key is. Whether it's a trailer search is for the caller to say: by ParseTrailerQuery's
+// list of keys, or by which keys a repository's commits really write.
+func SplitTrailerQuery(q string) (key, value string, ok bool) {
+	m := trailerQueryRE.FindStringSubmatch(strings.TrimSpace(q))
+	if m == nil {
+		return "", "", false
+	}
+	return m[1], m[2], true
+}
+
 // ParseTrailerQuery reads a search like "Co-authored-by: ada" or "Closes: #12" as a trailer
 // search. The key must look like a trailer: ending in "-by", or a common one such as
 // Closes, Fixes or Link. Conventional-commit searches like "fix: crash" stay text searches.

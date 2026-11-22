@@ -95,6 +95,7 @@ func (a *App) sessions() (*session.Manager, error) {
 		a.sess.OnTrailers(a.trailerDir(), a.emitTrailerProgress)
 		a.sess.OnWatchFailed(func(path string, err error) { a.notice(path, watchFailedMessage(err)) })
 		a.sess.OnShown(func(path string, late bool) {
+			a.trailerReadings.touch(path)
 			// The repository's own settings live in its config, which nothing was watching.
 			a.syncRepoConfigSoon(path)
 			// The active tab's view opens after its repository is watched, and reads
@@ -106,6 +107,8 @@ func (a *App) sessions() (*session.Manager, error) {
 			}
 		})
 		a.sess.OnChange(func(path string, k watch.Kind) {
+			// A mailmap, a smart link or a bot pattern changes how trailers are read.
+			a.trailerReadings.touch(path)
 			// The repository's own settings live in its config.
 			if k&watch.Config != 0 {
 				a.syncRepoConfigSoon(path)

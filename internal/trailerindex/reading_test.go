@@ -306,6 +306,55 @@ func TestReadingHoldsBackWhatIsNotWorthFiltering(t *testing.T) {
 	}
 }
 
+// The first few values to show: most commits first, bots after people, narrowed on request.
+func TestReadingTop(t *testing.T) {
+	t.Parallel()
+	var commits []string
+	for range 9 {
+		commits = append(commits, "Signed-off-by: dependabot[bot] <bot@users.noreply.example>")
+	}
+	for i := range 6 {
+		commits = append(commits, "Signed-off-by: "+[]string{"Sam Ortiz <sam@tidewater.example>", "Sarah Lind <sarah@tidewater.example>", "Maya Okafor <maya@tidewater.example>"}[i%3])
+	}
+	x, _ := indexOf(commits...)
+	r := x.Reading(Rules{Person: func(name, email string) (string, string, bool) { return name, email, strings.HasSuffix(name, "[bot]") }})
+
+	top, all := r.Top("Signed-off-by", 2, nil)
+	if all != 4 || len(top) != 2 || top[0].Bot || top[1].Bot {
+		t.Fatalf("top two = %v of %d, want two people before the bot", valueLabels(top), all)
+	}
+	top, _ = r.Top("signed-off-by", 10, nil)
+	if len(top) != 4 || !top[3].Bot || top[3].Commits != 9 {
+		t.Fatalf("all four = %v, want the bot last for all its commits", valueLabels(top))
+	}
+	top, all = r.Top("signed-off-by", 10, func(v Value) bool { return ContainsFold(v.Label, "sa") })
+	if all != 2 || len(top) != 2 {
+		t.Fatalf("narrowed = %v of %d, want Sam and Sarah", valueLabels(top), all)
+	}
+	if none, n := r.Top("nothing", 3, nil); n != 0 || none == nil || len(none) != 0 {
+		t.Fatalf("a key nobody wrote = %v, %d", none, n)
+	}
+}
+
+func TestContainsFold(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		s, sub string
+		want   bool
+	}{
+		{"Sarah Lind <sarah@tidewater.example>", "lind", true},
+		{"SARAH LIND", "sarah l", true},
+		{"Sarah", "sarahh", false},
+		{"", "a", false},
+		{"anything", "", true},
+		{"Zoë", "zoë", true},
+	} {
+		if got := ContainsFold(c.s, c.sub); got != c.want {
+			t.Errorf("ContainsFold(%q, %q) = %v", c.s, c.sub, got)
+		}
+	}
+}
+
 func TestReadingHoldsWhileTheIndexStaysAsItIs(t *testing.T) {
 	t.Parallel()
 	x, _ := indexOf("Closes: #12")

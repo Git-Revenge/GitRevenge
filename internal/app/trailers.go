@@ -4,11 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
+	"github.com/git-revenge/gitrevenge/internal/fsutil"
 	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/graph"
 	"github.com/git-revenge/gitrevenge/internal/links"
 	"github.com/git-revenge/gitrevenge/internal/session"
 	"github.com/git-revenge/gitrevenge/internal/trailerindex"
@@ -54,6 +59,30 @@ type keptReading struct {
 	making  sync.Mutex
 	key     string
 	reading *trailerindex.Reading
+	// stale is set when the app hears the repository changed.
+	stale atomic.Bool
+	// checked is when the rules were last looked at, and gen the index's state then.
+	// Looking takes three git commands, and the sidebar's filter asks on every keystroke,
+	// so a look is good for a moment, unless the repository is known to have changed.
+	checked time.Time
+	gen     uint64
+}
+
+// rulesGoodFor is how long a look at a repository's mailmap, bot patterns and smart links
+// is trusted without looking again. A change the app hears of ends it at once (see touch).
+const rulesGoodFor = 2 * time.Second
+
+// touch says the repository at path may have changed what its trailers are read through,
+// so the next reading looks at the rules again. An empty path says so of every repository,
+// as a change to the global git config does.
+func (rs *trailerReadings) touch(path string) {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	for p, k := range rs.kept {
+		if path == "" || fsutil.SamePath(p, path) {
+			k.stale.Store(true)
+		}
+	}
 }
 
 // trailerReading returns the repository's trailers as something to filter by, working it
@@ -75,6 +104,13 @@ func (a *App) trailerReading(ctx context.Context, r *session.Repo) *trailerindex
 	defer k.making.Unlock()
 
 	index := r.Trailers()
+	if k.reading != nil && k.gen == index.Gen() && !k.stale.Load() && time.Since(k.checked) < rulesGoodFor {
+		return k.reading
+	}
+	k.stale.Store(false)
+	k.gen = index.Gen()
+	// The moment counts from when the look is over: a first reading can take seconds.
+	defer func() { k.checked = time.Now() }()
 	bots := a.branchRules(r.Path)
 	linked := a.linkConfig(ctx, r.Git)
 	_, total := r.GraphStatus()
@@ -134,6 +170,168 @@ func (a *App) TrailerKeys(path string) (TrailerKeys, error) {
 	}
 	reading := a.trailerReading(context.Background(), r)
 	return TrailerKeys{Keys: reading.Keys(), Status: r.Trailers().Status()}, nil
+}
+
+// A reference by number, which has to match whole: "#1" isn't in "#12".
+var wholeNumber = regexp.MustCompile(`^#\d+$`)
+
+// trailerSearch answers a search written "Key: value" from the trailer index, when Key is
+// one the repository's commits write, under any spelling of it. ok is false when the search
+// isn't one for the index: it isn't written that way, the key is nobody's, or the history is
+// still being read and the index would answer for only part of it.
+//
+// What a repository writes decides what's a trailer search, not a list of keys: "Changelog:
+// fixed" is one where commits have a Changelog trailer. A search like "fix: crash" stays a
+// search of subjects unless some commit has a trailer spelled "Fix".
+//
+// Values are matched as they're shown, so a person is found under the name the mailmap
+// gives them, whichever name the commit used.
+func (a *App) trailerSearch(ctx context.Context, r *session.Repo, g *graph.Graph, query string) (graph.SearchResult, bool) {
+	key, value, ok := git.SplitTrailerQuery(query)
+	if !ok || !r.Trailers().Status().Done {
+		return graph.SearchResult{}, false
+	}
+	reading := a.trailerReading(ctx, r)
+	k, found := reading.Key(key)
+	if !found || !slices.ContainsFunc(k.Spellings, func(s trailerindex.Spelling) bool { return strings.EqualFold(s.Text, key) }) {
+		return graph.SearchResult{}, false
+	}
+	var match func(trailerindex.Value) bool
+	switch {
+	case value == "":
+	case wholeNumber.MatchString(value):
+		whole := regexp.MustCompile(`(^|\D)` + regexp.QuoteMeta(value) + `(\D|$)`)
+		match = func(v trailerindex.Value) bool { return whole.MatchString(v.Label) }
+	default:
+		lower := strings.ToLower(value)
+		match = func(v trailerindex.Value) bool { return trailerindex.ContainsFold(v.Label, lower) }
+	}
+	res := rowsOf(g, reading.CommitsWhere(k.ID, match), maxSearchRows)
+	if k.Held != trailerindex.HeldRare {
+		return res, true
+	}
+	// A key on a commit or two is likely a sentence with a colon in, and the search may be
+	// for words in a subject after all, as "docs: the plan" is. Both are looked for.
+	text := g.Search(query, maxSearchRows)
+	extra := 0
+	for _, row := range res.Rows {
+		if _, there := slices.BinarySearch(text.Rows, row); !there {
+			text.Rows = append(text.Rows, row)
+			extra++
+		}
+	}
+	slices.Sort(text.Rows)
+	text.Total += extra
+	if len(text.Rows) > maxSearchRows {
+		text.Rows = text.Rows[:maxSearchRows]
+	}
+	return text, true
+}
+
+// TrailerPanelKey is one key in the Smart filters panel, with the first of its values.
+type TrailerPanelKey struct {
+	Key trailerindex.Key `json:"key"`
+	// Top are the values to show under it, people before bots, and More how many more it
+	// has, or with a query how many more match.
+	Top  []trailerindex.Value `json:"top"`
+	More int                  `json:"more"`
+}
+
+// TrailerPanel is what the sidebar's Smart filters panel shows.
+type TrailerPanel struct {
+	// Keys are the keys offered as filters, most commits first: all of them, or with a
+	// query the ones it matches by their name or by a value. MoreKeys is how many more
+	// there are than the panel is given at once.
+	Keys     []TrailerPanelKey `json:"keys"`
+	MoreKeys int               `json:"moreKeys"`
+	// Held are the keys not offered, each with why.
+	Held []trailerindex.Key `json:"held"`
+	// Matches is how many keys and values the query matches, for the rail's count; 0 with
+	// no query.
+	Matches int `json:"matches"`
+	// Status says how far reading the history has got: until it's done, counts are of
+	// what's read so far.
+	Status trailerindex.Status `json:"status"`
+}
+
+const (
+	// trailerPanelKeys is how many keys the panel is given at once. The Linux kernel
+	// offers nine hundred; past the first couple of hundred the filter box is the way in.
+	trailerPanelKeys = 200
+	// trailerPanelValues is how many values show under a key when the request doesn't say.
+	trailerPanelValues = 6
+)
+
+// TrailerPanel returns what the Smart filters panel shows for the repository at path. query
+// is the sidebar's filter: it narrows the keys to those whose name contains it, and the
+// rest to their values that do, whatever the case. perKey is how many values to give for
+// each key; 0 or less means the default.
+func (a *App) TrailerPanel(path, query string, perKey int) (TrailerPanel, error) {
+	out := TrailerPanel{Keys: []TrailerPanelKey{}, Held: []trailerindex.Key{}}
+	r, err := a.openRepo(path)
+	if err != nil {
+		return out, err
+	}
+	reading := a.trailerReading(context.Background(), r)
+	out.Status = r.Trailers().Status()
+	if perKey <= 0 {
+		perKey = trailerPanelValues
+	}
+	q := strings.ToLower(strings.TrimSpace(query))
+	for _, k := range reading.Keys() {
+		if k.Held != "" {
+			out.Held = append(out.Held, k)
+			continue
+		}
+		shown, matches, ok := panelKey(reading, k, q, perKey)
+		if !ok {
+			continue
+		}
+		out.Matches += matches
+		if len(out.Keys) >= trailerPanelKeys {
+			out.MoreKeys++
+			continue
+		}
+		out.Keys = append(out.Keys, shown)
+	}
+	return out, nil
+}
+
+// panelKey is one key as the panel shows it under a filter q, in lower case: with the
+// first n of its values when its name matches or there's no filter, and otherwise with the
+// first n of its values that match. matches counts what the filter matched, the key's name
+// and its values, and ok is false when it matched nothing of the key.
+func panelKey(reading *trailerindex.Reading, k trailerindex.Key, q string, n int) (shown TrailerPanelKey, matches int, ok bool) {
+	byValue := func(v trailerindex.Value) bool { return trailerindex.ContainsFold(v.Label, q) }
+	byName := q == "" || trailerindex.ContainsFold(k.Label, q) || slices.ContainsFunc(k.Spellings, func(s trailerindex.Spelling) bool { return trailerindex.ContainsFold(s.Text, q) })
+	if byName {
+		top, all := reading.Top(k.ID, n, nil)
+		if q != "" {
+			// Its values count too where they match, though all of them show.
+			_, hits := reading.Top(k.ID, 0, byValue)
+			matches = 1 + hits
+		}
+		return TrailerPanelKey{Key: k, Top: top, More: all - len(top)}, matches, true
+	}
+	top, all := reading.Top(k.ID, n, byValue)
+	return TrailerPanelKey{Key: k, Top: top, More: all - len(top)}, all, all > 0
+}
+
+// TrailerMore returns one key of the Smart filters panel with its first n values, for
+// "24 more…". key is the key's ID and query the sidebar's filter, as in TrailerPanel.
+func (a *App) TrailerMore(path, key, query string, n int) (TrailerPanelKey, error) {
+	empty := TrailerPanelKey{Top: []trailerindex.Value{}}
+	r, err := a.openRepo(path)
+	if err != nil {
+		return empty, err
+	}
+	reading := a.trailerReading(context.Background(), r)
+	k, found := reading.Key(key)
+	if !found {
+		return empty, userError("No commit has that trailer any more.")
+	}
+	shown, _, _ := panelKey(reading, k, strings.ToLower(strings.TrimSpace(query)), max(n, 1))
+	return shown, nil
 }
 
 // TrailerValues is a page of one key's values.

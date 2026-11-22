@@ -50,6 +50,8 @@ func (a *App) LinkRules(path string) (links.Config, error) {
 // SaveLinkRule writes a rule to its config. was is its name before an edit in the same
 // config, or "" for a new rule.
 func (a *App) SaveLinkRule(path string, rule links.Rule, was string) error {
+	// What trailers are read through may have changed: the next reading looks again.
+	defer a.trailerReadings.touch("")
 	ctx := context.Background()
 	g, inRepo, err := a.linkGit(ctx, path)
 	if err != nil {
@@ -63,6 +65,8 @@ func (a *App) SaveLinkRule(path string, rule links.Rule, was string) error {
 
 // RemoveLinkRule deletes a rule from its config.
 func (a *App) RemoveLinkRule(path, scope, name string) error {
+	// What trailers are read through may have changed: the next reading looks again.
+	defer a.trailerReadings.touch("")
 	ctx := context.Background()
 	g, _, err := a.linkGit(ctx, path)
 	if err != nil {
@@ -73,6 +77,8 @@ func (a *App) RemoveLinkRule(path, scope, name string) error {
 
 // ReorderLinkRules puts one config's rules in the given order.
 func (a *App) ReorderLinkRules(path, scope string, names []string) error {
+	// What trailers are read through may have changed: the next reading looks again.
+	defer a.trailerReadings.touch("")
 	ctx := context.Background()
 	g, _, err := a.linkGit(ctx, path)
 	if err != nil {
