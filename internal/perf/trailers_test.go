@@ -184,8 +184,9 @@ func TestTrailerIndex(t *testing.T) {
 		t.Errorf("finding the questions took %s, target %s", took, targetTrailerCare)
 	}
 
-	// A page of graph rows asks for each commit's chips: the first asking sorts the commits
-	// by id, once, and after that a page is answered while the user scrolls.
+	// A page of graph rows asks for each commit's chips. The commits are found by id through
+	// the index's order, sorted while the reading was made, so even the first asking is quick:
+	// it's on the graph's own call (#898).
 	ids, err := r.ReadString(ctx, "rev-list", "--max-count=400", "HEAD")
 	if err != nil {
 		t.Fatal(err)
@@ -207,7 +208,10 @@ func TestTrailerIndex(t *testing.T) {
 		chips += len(reading.Chips(id, pinned))
 	}
 	took = time.Since(start)
-	t.Logf("chips for %v: the first lookup (which sorts the commits) in %s; a page of %d rows, %d chips, in %s", pinned, first400.Round(time.Millisecond), len(page), chips, took)
+	t.Logf("chips for %v: the first lookup in %s; a page of %d rows, %d chips, in %s", pinned, first400, len(page), chips, took)
+	if first400 > targetTrailerQuery {
+		t.Errorf("the first lookup of chips took %s, target %s", first400, targetTrailerQuery)
+	}
 	if took > targetTrailerQuery {
 		t.Errorf("a page of chips took %s, target %s", took, targetTrailerQuery)
 	}

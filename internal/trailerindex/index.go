@@ -54,6 +54,12 @@ type Index struct {
 
 	// refs counts who has the index open (see Open).
 	refs int
+
+	// order is the numbers of the commits held, in the order of their ids, as of the last
+	// time it was asked for (see orderOf). orderMu guards it, apart from mu, since keeping it
+	// up is work that mustn't hold up a read of the history.
+	orderMu sync.Mutex
+	order   []uint32
 }
 
 // pass is one read of the history: from its tips, stopping at not.
@@ -400,23 +406,24 @@ func (x *Index) Commits(key, value string) []string {
 // commit is held: one that isn't may have none, or may not have been read yet.
 func (x *Index) Trailers(id string) ([]git.Trailer, bool) {
 	raw, err := hex.DecodeString(id)
+	// What's held only grows and is never changed, so the look is at the index as it is now
+	// without holding anyone up (as Reading does).
 	x.mu.RLock()
-	defer x.mu.RUnlock()
-	if err != nil || len(raw) != x.idSize {
+	ids, first, pairs, strs, size := x.ids, x.first, x.pairs, x.strs, x.idSize
+	x.mu.RUnlock()
+	if err != nil {
 		return nil, false
 	}
-	for i := 0; i < x.commitsLocked(); i++ {
-		if string(x.ids[i*x.idSize:(i+1)*x.idSize]) != string(raw) {
-			continue
-		}
-		mine := x.pairs[x.first[i]:x.first[i+1]]
-		out := make([]git.Trailer, 0, len(mine)/2)
-		for j := 0; j < len(mine); j += 2 {
-			out = append(out, git.Trailer{Key: x.strs[mine[j]], Value: x.strs[mine[j+1]]})
-		}
-		return out, true
+	c, ok := find(ids, size, x.orderOf(ids, size, len(first)-1), raw)
+	if !ok {
+		return nil, false
 	}
-	return nil, false
+	mine := pairs[first[c]:first[c+1]]
+	out := make([]git.Trailer, 0, len(mine)/2)
+	for j := 0; j < len(mine); j += 2 {
+		out = append(out, git.Trailer{Key: strs[mine[j]], Value: strs[mine[j+1]]})
+	}
+	return out, true
 }
 
 // write appends frames to the index's file. An index with no file keeps going in memory.
