@@ -286,8 +286,10 @@ func (x *Index) Keys() []KeyStat {
 	gen := x.gen
 	stats := map[uint32]*KeyStat{}
 	values := map[uint64]struct{}{}
+	var keys once
 	for i := 0; i < x.commitsLocked(); i++ {
 		mine := x.pairs[x.first[i]:x.first[i+1]]
+		keys.reset()
 		for j := 0; j < len(mine); j += 2 {
 			key, value := mine[j], mine[j+1]
 			st := stats[key]
@@ -296,13 +298,8 @@ func (x *Index) Keys() []KeyStat {
 				stats[key] = st
 			}
 			st.Lines++
-			// A commit counts once for a key, however many trailers it has under it. A
-			// commit has few trailers, so looking back through them is the quick way.
-			again := false
-			for k := 0; k < j; k += 2 {
-				again = again || mine[k] == key
-			}
-			if !again {
+			// A commit counts once for a key, however many trailers it has under it.
+			if keys.first(uint64(key)) {
 				st.Commits++
 			}
 			pair := uint64(key)<<32 | uint64(value)
@@ -328,6 +325,48 @@ func (x *Index) Keys() []KeyStat {
 	return slices.Clone(out)
 }
 
+// fewTrailers is how many different things once keeps in a list. Nearly every commit has
+// fewer trailers than this, and looking back through so few is quicker than a set.
+const fewTrailers = 32
+
+// once says whether a thing is met for the first time within one commit's trailers: a
+// commit counts once for a key or a value, however many times it says it. A commit's
+// things are kept in a short list, and past fewTrailers in a set, since looking back
+// through a long list would take time growing with the square of the commit's trailers,
+// and a crafted commit can have hundreds of thousands (#893).
+type once struct {
+	list []uint64
+	set  map[uint64]struct{}
+}
+
+// reset starts on the next commit.
+func (o *once) reset() {
+	o.list = o.list[:0]
+	o.set = nil
+}
+
+// first reports whether v hasn't been met in this commit yet, and remembers it.
+func (o *once) first(v uint64) bool {
+	if o.set != nil {
+		if _, ok := o.set[v]; ok {
+			return false
+		}
+		o.set[v] = struct{}{}
+		return true
+	}
+	if slices.Contains(o.list, v) {
+		return false
+	}
+	o.list = append(o.list, v)
+	if len(o.list) > fewTrailers {
+		o.set = make(map[uint64]struct{}, 4*len(o.list))
+		for _, have := range o.list {
+			o.set[have] = struct{}{}
+		}
+	}
+	return true
+}
+
 // ValueStat is one value of a key, and how many commits have it.
 type ValueStat struct {
 	Value   string `json:"value"`
@@ -343,17 +382,13 @@ func (x *Index) Values(key string) []ValueStat {
 		return []ValueStat{}
 	}
 	counts := map[uint32]int{}
+	var values once
 	for i := 0; i < x.commitsLocked(); i++ {
 		mine := x.pairs[x.first[i]:x.first[i+1]]
+		values.reset()
 		for j := 0; j < len(mine); j += 2 {
-			if mine[j] != k {
-				continue
-			}
-			again := false
-			for p := 0; p < j; p += 2 {
-				again = again || (mine[p] == k && mine[p+1] == mine[j+1])
-			}
-			if !again {
+			// A commit counts once for a value, however many times it says it.
+			if mine[j] == k && values.first(uint64(mine[j+1])) {
 				counts[mine[j+1]]++
 			}
 		}

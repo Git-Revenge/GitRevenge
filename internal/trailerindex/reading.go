@@ -458,18 +458,17 @@ func (x *Index) Reading(rules Rules) *Reading {
 	for i := range tallies {
 		tallies[i].by, tallies[i].spelled = map[int32]int32{}, map[uint32]int{}
 	}
-	var seenKeys []int32
-	var seenPairs []uint64
+	var seenKeys, seenPairs once
 	var one [1]int32
 	for c := range commits {
 		mine := r.pairs[r.first[c]:r.first[c+1]]
-		seenKeys, seenPairs = seenKeys[:0], seenPairs[:0]
+		seenKeys.reset()
+		seenPairs.reset()
 		for j := 0; j < len(mine); j += 2 {
 			k := r.keyOf[mine[j]]
 			t := &tallies[k]
 			t.lines++
-			if !slices.Contains(seenKeys, k) {
-				seenKeys = append(seenKeys, k)
+			if seenKeys.first(uint64(uint32(k))) {
 				t.commits++
 				t.spelled[mine[j]]++
 			}
@@ -479,9 +478,7 @@ func (x *Index) Reading(rules Rules) *Reading {
 				named = one[:]
 			}
 			for _, v := range named {
-				pair := uint64(uint32(k))<<32 | uint64(uint32(v))
-				if !slices.Contains(seenPairs, pair) {
-					seenPairs = append(seenPairs, pair)
+				if seenPairs.first(uint64(uint32(k))<<32 | uint64(uint32(v))) {
 					t.by[v]++
 				}
 			}

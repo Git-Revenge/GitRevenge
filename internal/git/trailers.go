@@ -54,20 +54,29 @@ func SplitTrailers(body string) (rest string, trailers []Trailer) {
 	paras := paragraphs.Split(strings.TrimRight(body[:cut], " \t\n"), -1)
 	keep := len(paras)
 	var notes []string
+	// Each paragraph's trailers, last paragraph first; put in order once, at the end, so a
+	// message of many short paragraphs isn't copied again for each.
+	var found [][]Trailer
+	n := 0
 	for keep > 0 {
 		// Only the message's last paragraph may have other lines among its trailers.
 		t, others := parseTrailerParagraph(paras[keep-1], keep == len(paras))
 		if t == nil {
 			break
 		}
-		trailers = append(t, trailers...)
+		found = append(found, t)
+		n += len(t)
 		keep--
 		if others != nil {
 			notes = others
 		}
 	}
-	if len(trailers) == 0 {
+	if n == 0 {
 		return body, nil
+	}
+	trailers = make([]Trailer, 0, n)
+	for _, t := range slices.Backward(found) {
+		trailers = append(trailers, t...)
 	}
 	left := slices.Clone(paras[:keep])
 	if notes != nil {
@@ -131,6 +140,21 @@ func parseTrailerParagraph(para string, mixed bool) (out []Trailer, others []str
 	// Counted as git counts them: a line git writes is a trailer line though it has no
 	// key, and a note's continuation lines are lines that aren't.
 	trailerLines, otherLines := 0, 0
+	// The lines carrying on the last trailer or other line, joined to it once it ends: adding
+	// each as it came would copy all before it again, which for a long run is very slow.
+	var more []string
+	carried := func() {
+		if len(more) == 0 {
+			return
+		}
+		switch last {
+		case trailer:
+			out[len(out)-1].Value += " " + strings.Join(more, " ")
+		case other:
+			others[len(others)-1] += "\n" + strings.Join(more, "\n")
+		}
+		more = more[:0]
+	}
 	for line := range strings.SplitSeq(para, "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
@@ -139,14 +163,15 @@ func parseTrailerParagraph(para string, mixed bool) (out []Trailer, others []str
 		if line[0] == ' ' || line[0] == '\t' {
 			switch last {
 			case trailer:
-				out[len(out)-1].Value += " " + strings.TrimSpace(line)
+				more = append(more, strings.TrimSpace(line))
 				continue
 			case other:
-				others[len(others)-1] += "\n" + line
+				more = append(more, line)
 				otherLines++
 				continue
 			}
 		}
+		carried()
 		// Git reads past a comment line among the trailers: it's neither one of them nor a
 		// line against them.
 		if line[0] == '#' {
@@ -182,6 +207,7 @@ func parseTrailerParagraph(para string, mixed bool) (out []Trailer, others []str
 		last = trailer
 		trailerLines++
 	}
+	carried()
 	switch {
 	case len(others) == 0:
 		return out, nil
