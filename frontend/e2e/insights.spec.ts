@@ -61,3 +61,32 @@ test.describe('Insights, opened', () => {
     await expect(page.getByRole('region', { name: 'Insights' }).getByRole('heading', { level: 1 })).toHaveText('tidewater')
   })
 })
+
+test('a branch with every flag keeps room for its name', async ({ page }) => {
+  const name = 'origin/fix/fix-alerts-with-no-station-name-at-craig'
+  const branch = {
+    name,
+    sha: 'a'.repeat(40),
+    local: false,
+    author: 'David Ramirez',
+    lastCommit: 1791000000,
+    firstCommit: 1789000000,
+    behind: 80,
+    added: 900,
+    removed: 20,
+    paths: [],
+    staleDays: 20,
+    ageDays: 30,
+    flags: ['stale', 'longLived', 'drifting', 'large'],
+  }
+  await open(page, 'insights', { responses: { ...scenario.responses, InsightsBranches: { window: win, branches: [branch] } } })
+  const shown = page.getByRole('region', { name: 'Insights' }).locator('code.branch', { hasText: name })
+  await expect(shown).toBeVisible()
+  const row = shown.locator('xpath=ancestor::div[contains(@class,"row")][1]')
+  const [nameBox, rowBox] = [await shown.boundingBox(), await row.boundingBox()]
+  // At least half the row, and no more than three lines of it.
+  expect(nameBox!.width).toBeGreaterThanOrEqual(rowBox!.width * 0.45)
+  const lineHeight = await shown.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight) || 20)
+  expect(nameBox!.height).toBeLessThanOrEqual(lineHeight * 3 + 1)
+})
+

@@ -652,6 +652,9 @@
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 6px;
+    /* Flags wrap before the branch's name is squeezed: a branch with four of them otherwise
+       kept them on one line and left its name a few letters wide (#888). */
+    max-width: 50%;
   }
 
   .rework {
