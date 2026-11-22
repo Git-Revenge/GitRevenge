@@ -105,6 +105,19 @@ func (rs *trailerReadings) touch(path string) {
 	}
 }
 
+// forget lets go of the reading of the repository at path, as its tab closes (#903). A
+// reading shares the trailer index's arrays, so a kept one would keep the whole index in
+// memory after the index itself was closed: 142 MB for the Linux kernel.
+func (rs *trailerReadings) forget(path string) {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	for p := range rs.kept {
+		if fsutil.SamePath(p, path) {
+			delete(rs.kept, p)
+		}
+	}
+}
+
 // peek returns the reading last worked out for the repository at path, without working one
 // out, and whether it still stands for an index at gen with nothing heard to have changed.
 func (rs *trailerReadings) peek(path string, gen uint64) (*trailerindex.Reading, bool) {

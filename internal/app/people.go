@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/git-revenge/gitrevenge/internal/fsutil"
 	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/session"
 	"github.com/git-revenge/gitrevenge/internal/settings"
@@ -80,6 +81,19 @@ func (a *App) historyPeople(ctx context.Context, r *session.Repo) (*historyPeopl
 	p.mu.Unlock()
 	close(w.done)
 	return w.res, w.err
+}
+
+// forget lets go of what was read of the repository at path, as its tab closes (#903). A read
+// still under way finishes for whoever is waiting on it, and isn't kept.
+func (p *peopleReads) forget(path string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for kept := range p.kept {
+		if fsutil.SamePath(kept, path) {
+			delete(p.kept, kept)
+			delete(p.keys, kept)
+		}
+	}
 }
 
 // MailmapText is the mailmap text to read names through.
