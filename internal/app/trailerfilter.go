@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/git-revenge/gitrevenge/internal/fsutil"
+	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/graph"
 	"github.com/git-revenge/gitrevenge/internal/session"
 	"github.com/git-revenge/gitrevenge/internal/trailerindex"
@@ -57,6 +58,27 @@ type trailerFilters struct {
 type repoFilter struct {
 	picks []trailerindex.Pick
 	only  bool
+	// keep is what the picks keep while the filter highlights, for marking rows as they're
+	// handed out; nil under Only these, where every row of the graph is one of them.
+	keep map[string]struct{}
+}
+
+// highlighted returns the commits a repository's filter keeps while it highlights, or nil
+// when nothing is being highlighted.
+func (fs *trailerFilters) highlighted(path string) map[string]struct{} {
+	if f := fs.get(path); f != nil {
+		fs.mu.Lock()
+		defer fs.mu.Unlock()
+		return f.keep
+	}
+	return nil
+}
+
+// setHighlighted records what a repository's filter keeps while it highlights.
+func (fs *trailerFilters) setHighlighted(f *repoFilter, keep map[string]struct{}) {
+	fs.mu.Lock()
+	f.keep = keep
+	fs.mu.Unlock()
 }
 
 func (fs *trailerFilters) get(path string) *repoFilter {
@@ -152,18 +174,26 @@ func (a *App) applyTrailerFilter(r *session.Repo) TrailerFilterState {
 	keep := reading.Filter(f.picks)
 	state.Kept = len(keep)
 	if !f.only {
+		a.trailerFilters.setHighlighted(f, keep)
 		r.SetFilter(nil)
 		return state
 	}
+	a.trailerFilters.setHighlighted(f, nil)
 	// The same picks keep more once more of the history has been read, or a commit made.
 	sig, _ := json.Marshal([]any{f.picks, reading.Gen(), len(keep)})
 	r.SetFilter(&session.Filter{Keep: keep, Sig: string(sig)})
 	return state
 }
 
-// TrailerFilterRows returns the graph rows of the commits the repository's filter keeps,
-// for Highlight: the rows that keep their ink. It searches the whole history, as a search
-// does, so it first reads the rest of the graph.
+// rulerTicks is about how many rows TrailerFilterRows gives: a ruler is a few hundred
+// pixels tall, and a tick can't be finer than one.
+const rulerTicks = 4000
+
+// TrailerFilterRows returns graph rows of the commits the repository's filter keeps, for
+// the ruler under Highlight: one for each stretch of the history that has any, which is
+// all of them until the history is longer than a ruler can show. Total is exact. Which
+// rows keep their ink isn't read from here: each row says so itself (see GraphRows). It
+// looks through the whole history, as a search does, so it first reads the rest of the graph.
 func (a *App) TrailerFilterRows(path string) (graph.SearchResult, error) {
 	none := graph.SearchResult{Rows: []int{}}
 	r, err := a.openRepo(path)
@@ -183,5 +213,65 @@ func (a *App) TrailerFilterRows(path string) (graph.SearchResult, error) {
 	for id := range keep {
 		ids = append(ids, id)
 	}
-	return rowsOf(g, ids, maxSearchRows), nil
+	all := rowsOf(g, ids, len(ids))
+	stretch := max(1, g.Len()/rulerTicks)
+	if stretch == 1 {
+		return all, nil
+	}
+	ticks := make([]int, 0, rulerTicks)
+	for _, row := range all.Rows {
+		if n := len(ticks); n == 0 || row/stretch != ticks[n-1]/stretch {
+			ticks = append(ticks, row)
+		}
+	}
+	all.Rows = ticks
+	return all, nil
+}
+
+// TrailerFilterDays says how many commits were authored in each of some spans of time, in
+// the history the filter of the repository at path is looking through: what a day held
+// before Only these took commits out of it, for "1 of 3 commits" on its line. spans is
+// starts and ends in turn, in Unix seconds, an end not included. The list is empty with no
+// filter narrowing the graph, or while the history is still being looked through.
+func (a *App) TrailerFilterDays(path string, spans []int64) ([]int, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return []int{}, err
+	}
+	pairs := make([][2]int64, 0, len(spans)/2)
+	for i := 0; i+1 < len(spans); i += 2 {
+		pairs = append(pairs, [2]int64{spans[i], spans[i+1]})
+	}
+	counts, ok := r.Authored(pairs)
+	if !ok {
+		return []int{}, nil
+	}
+	return counts, nil
+}
+
+// TrailerFilterLines returns the trailers of one commit that the filter of the repository
+// at path picks, as the commit wrote them: the lines to mark in its details. A person is
+// matched as they're shown, so a line under an old name is marked too.
+func (a *App) TrailerFilterLines(path, sha string) ([]git.Trailer, error) {
+	none := []git.Trailer{}
+	r, err := a.openRepo(path)
+	if err != nil {
+		return none, err
+	}
+	f := a.trailerFilters.get(r.Path)
+	if f == nil {
+		return none, nil
+	}
+	lines, held := r.Trailers().Trailers(sha)
+	hits, ok := a.trailerReading(context.Background(), r).Picked(sha, f.picks)
+	// The reading may be a moment older than the index: only a commit both know is marked.
+	if !held || !ok || len(hits) != len(lines) {
+		return none, nil
+	}
+	for i, line := range lines {
+		if hits[i] {
+			none = append(none, line)
+		}
+	}
+	return none, nil
 }

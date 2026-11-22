@@ -73,6 +73,9 @@ type graphLoader struct {
 	// looked is how many commits the load under it has looked through.
 	filter *Filter
 	looked int
+	// times are the author times of every commit the last finished load under a filter
+	// looked through, sorted: what a day held before the filter took commits out of it.
+	times []int64
 	// total is how many commits the history being loaded has, filter aside; 0 until counted.
 	total    int
 	current  *graph.Graph
@@ -218,6 +221,27 @@ func (l *graphLoader) SetFilter(filter *Filter) {
 	if changed && started {
 		l.reload()
 	}
+}
+
+// Authored says how many commits of the history under the filter were authored in each of
+// some spans of time, each a start and an end in Unix seconds, the end not included: what a
+// day held before the filter took commits out of it. ok is false with no filter, or while
+// the history is still being looked through.
+func (l *graphLoader) Authored(spans [][2]int64) (counts []int, ok bool) {
+	l.mu.Lock()
+	times := l.times
+	on := l.filter != nil
+	l.mu.Unlock()
+	if !on || times == nil {
+		return nil, false
+	}
+	counts = make([]int, len(spans))
+	for i, span := range spans {
+		from, _ := slices.BinarySearch(times, span[0])
+		to, _ := slices.BinarySearch(times, span[1])
+		counts[i] = max(0, to-from)
+	}
+	return counts, true
 }
 
 // Filtered reports whether a filter is narrowing the graph, how many commits the load
@@ -497,6 +521,7 @@ func (l *graphLoader) reload() {
 	focus := l.focus
 	filter := l.filter
 	l.looked = 0
+	l.times = nil
 	// Counted before the lock is let go, so that stop, which takes it to say nothing more
 	// loads, never starts waiting with a load about to be added.
 	l.wg.Add(1)
@@ -652,6 +677,7 @@ func (l *graphLoader) reload() {
 		// held is the one waiting.
 		var held *git.LogCommit
 		looked := 0
+		var times []int64
 		err := l.repo.Log(ctx, opts, func(c git.LogCommit) error {
 			if hidden[c.ID] {
 				return nil
@@ -664,6 +690,7 @@ func (l *graphLoader) reload() {
 			}
 			if filter != nil {
 				looked++
+				times = append(times, c.AuthorTime)
 				if looked%1024 == 0 {
 					l.mu.Lock()
 					l.looked = looked
@@ -712,8 +739,10 @@ func (l *graphLoader) reload() {
 		}
 		if filter != nil {
 			l.mu.Lock()
-			if ctx.Err() == nil {
+			if ctx.Err() == nil && err == nil {
 				l.looked = looked
+				slices.Sort(times)
+				l.times = times
 			}
 			l.mu.Unlock()
 		}

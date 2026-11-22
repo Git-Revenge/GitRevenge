@@ -397,6 +397,10 @@ export function Theme():Promise<string>;
 
 export function TrailerFilter(arg1:string):Promise<app.TrailerFilterState>;
 
+export function TrailerFilterDays(arg1:string,arg2:Array<number>):Promise<Array<number>>;
+
+export function TrailerFilterLines(arg1:string,arg2:string):Promise<Array<git.Trailer>>;
+
 export function TrailerFilterRows(arg1:string):Promise<graph.SearchResult>;
 
 export function TrailerHints(arg1:string):Promise<git.TrailerHints>;

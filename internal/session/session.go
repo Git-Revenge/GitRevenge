@@ -153,6 +153,10 @@ func (r *Repo) Focus() Focus { return r.graph.Focus() }
 // for this session only, and reloads it.
 func (r *Repo) SetFilter(filter *Filter) { r.graph.SetFilter(filter) }
 
+// Authored says how many commits of the history under the smart filter were authored in each
+// of some spans of time: see graphLoader.Authored.
+func (r *Repo) Authored(spans [][2]int64) ([]int, bool) { return r.graph.Authored(spans) }
+
 // Filtered reports whether a filter is narrowing the graph, how many commits the load under
 // it has looked through so far, and how many the history has in all (0 until counted).
 func (r *Repo) Filtered() (on bool, looked, total int) { return r.graph.Filtered() }

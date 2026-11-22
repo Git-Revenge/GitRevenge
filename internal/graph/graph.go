@@ -73,6 +73,9 @@ type Row struct {
 	Width int `json:"width"`
 	// Kind is the branch kind of the lane the commit sits on, or "" (see SetTipKinds).
 	Kind string `json:"kind,omitempty"`
+	// Match marks a commit a highlighting smart filter keeps. The graph doesn't know about
+	// filters: whoever hands rows to a window says so here.
+	Match bool `json:"match,omitempty"`
 
 	ID         string `json:"id"`
 	Parents    int    `json:"parents"`

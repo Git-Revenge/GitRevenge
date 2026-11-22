@@ -159,9 +159,23 @@ export function gapLabel(newerSeconds: number, olderSeconds: number): string {
 /** A day's commits as its line counts them: "41 commits", "1 commit", with the people once
  * there's more than one ("31 commits · 6 people"), and a plus when the day runs on past what's
  * loaded ("41+ commits"). */
-export function dayCountLabel(commits: number, people: number, complete: boolean): string {
-  const n = `${commits.toLocaleString()}${complete ? '' : '+'} ${commits === 1 && complete ? 'commit' : 'commits'}`
-  return people > 1 ? `${n} · ${people.toLocaleString()} people` : n
+export function dayCountLabel(commits: number, people: number, complete: boolean, filter: { of?: number; matches?: number } = {}): string {
+  const many = `${commits.toLocaleString()}${complete ? '' : '+'}`
+  // A filter that takes commits out: the day says how many it had, "1 of 3 commits".
+  const of = filter.of !== undefined && complete && filter.of >= commits ? filter.of : undefined
+  const n = of !== undefined ? `${many} of ${of.toLocaleString()} ${of === 1 ? 'commit' : 'commits'}` : `${many} ${commits === 1 && complete ? 'commit' : 'commits'}`
+  const who = people > 1 ? `${n} · ${people.toLocaleString()} people` : n
+  // A filter that highlights: how many of the day's commits are its own.
+  return filter.matches ? `${who} · ${filter.matches.toLocaleString()} ${filter.matches === 1 ? 'match' : 'matches'}` : who
+}
+
+/** The first second of the day a time falls in, here, and of the day after. */
+export function dayBounds(unixSeconds: number): [number, number] {
+  const d = new Date(unixSeconds * 1000)
+  d.setHours(0, 0, 0, 0)
+  const from = d.getTime() / 1000
+  d.setDate(d.getDate() + 1)
+  return [from, d.getTime() / 1000]
 }
 
 /** A day line, the row above a day's first commit. */

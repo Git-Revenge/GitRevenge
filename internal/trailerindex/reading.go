@@ -810,3 +810,48 @@ func (r *Reading) CountWithin(key string, values []string, kept map[string]struc
 	}
 	return counts
 }
+
+// Picked says which of one commit's trailers a set of picks names: for each of its
+// trailers, in the order the commit has them, whether its key is picked with that value. ok
+// is false for a commit the reading doesn't hold.
+func (r *Reading) Picked(id string, picks []Pick) (hits []bool, ok bool) {
+	raw, err := hex.DecodeString(id)
+	if err != nil || len(raw) != r.idSize {
+		return nil, false
+	}
+	want := map[int32]map[string]bool{}
+	for _, p := range picks {
+		k, known := r.keyAt[KeyID(p.Key)]
+		if !known {
+			continue
+		}
+		if want[int32(k)] == nil {
+			want[int32(k)] = map[string]bool{}
+		}
+		want[int32(k)][p.Value] = true
+	}
+	for c := 0; c < len(r.first)-1; c++ {
+		if string(r.ids[c*r.idSize:(c+1)*r.idSize]) != string(raw) {
+			continue
+		}
+		mine := r.pairs[r.first[c]:r.first[c+1]]
+		hits = make([]bool, len(mine)/2)
+		for j := 0; j < len(mine); j += 2 {
+			values := want[r.keyOf[mine[j]]]
+			if values == nil {
+				continue
+			}
+			if several := r.several[mine[j+1]]; several != nil {
+				for _, v := range several {
+					if values[r.vals[v].id] {
+						hits[j/2] = true
+					}
+				}
+			} else if v := r.valueOf[mine[j+1]]; v >= 0 && values[r.vals[v].id] {
+				hits[j/2] = true
+			}
+		}
+		return hits, true
+	}
+	return nil, false
+}

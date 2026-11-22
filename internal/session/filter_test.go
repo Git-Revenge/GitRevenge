@@ -26,6 +26,9 @@ func TestFilterKeepsOnlyItsCommitsOnOneLane(t *testing.T) {
 	if on, _, _ := r.Filtered(); on {
 		t.Fatal("a graph nobody filtered says it's filtered")
 	}
+	if _, ok := r.Authored([][2]int64{{0, 1 << 62}}); ok {
+		t.Fatal("a graph nobody filtered counts what a filter passed over")
+	}
 
 	keep := map[string]struct{}{ids[1]: {}, ids[3]: {}, side: {}}
 	r.SetFilter(&Filter{Keep: keep, Sig: "one"})
@@ -50,6 +53,14 @@ func TestFilterKeepsOnlyItsCommitsOnOneLane(t *testing.T) {
 	}
 	if on, looked, total := r.Filtered(); !on || looked != 7 || total != 7 {
 		t.Fatalf("filtered = %v, having looked through %d of %d commits, want all 7", on, looked, total)
+	}
+
+	// What a span of time held before the filter: every commit looked through, kept or not.
+	rows = g.Rows(0, 3)
+	when := rows[1].AuthorTime
+	counts, ok := r.Authored([][2]int64{{0, 1 << 62}, {0, 1}, {when, when + 1}})
+	if !ok || counts[0] != 7 || counts[1] != 0 || counts[2] < 1 {
+		t.Fatalf("authored = %v, %v, want all 7, none before time began, and at least the commit itself", counts, ok)
 	}
 
 	// Another filter replaces it, and one that keeps nothing shows nothing.

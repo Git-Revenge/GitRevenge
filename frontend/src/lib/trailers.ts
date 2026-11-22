@@ -106,6 +106,12 @@ export function groupTrailers(trailers: TrailerLine[]): TrailerGroups {
 }
 
 /** Keys offered even when a repository's history doesn't use them yet. */
+/** One trailer line as a single word, whatever the case of its key: for telling whether a
+ * line is among some others, such as the ones a smart filter picks. */
+export function lineKey(key: string, value: string): string {
+  return `${key.toLowerCase()}\n${value}`
+}
+
 export const COMMON_TRAILER_KEYS = ['Co-authored-by', 'Closes', 'Fixes', 'Refs', 'Reviewed-by', 'Signed-off-by']
 
 /** The history's keys first, as it spells them, then the common ones it doesn't use. */

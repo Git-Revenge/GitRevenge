@@ -20,6 +20,8 @@ export interface Row {
   width: number
   /** The branch kind of the lane the commit sits on, if any. */
   kind?: string
+  /** A smart filter that highlights keeps this commit: it keeps its ink while the rest fade. */
+  match?: boolean
   id: string
   parents: number
   author: string

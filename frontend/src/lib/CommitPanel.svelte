@@ -1,6 +1,6 @@
 <script lang="ts">
   import { errorText } from './errors'
-  import { CommitDetail, CommitNotes, CommitSignatures, SetCommitNote } from '../../wailsjs/go/app/App.js'
+  import { CommitDetail, CommitNotes, CommitSignatures, SetCommitNote, TrailerFilterLines } from '../../wailsjs/go/app/App.js'
   import type { MenuItem } from './ContextMenu.svelte'
   import { commands } from './commands.svelte'
   import { linkTitle, type LinkPart } from './links/links'
@@ -17,7 +17,7 @@
   import type { DiffTarget } from './diff/DiffView.svelte'
   import { session } from './session.svelte'
   import { reflow } from './text'
-  import { asPerson, groupTrailers, valueParts } from './trailers'
+  import { asPerson, groupTrailers, lineKey, valueParts } from './trailers'
   import { shownAs, writtenAs } from './people'
   import Markdown from './Markdown.svelte'
   import Icon, { type IconName } from './ui/Icon.svelte'
@@ -35,6 +35,7 @@
     onAuthor,
     onMenu,
     showNotes = 0,
+    filterSig = '',
   }: {
     /** Goes up each time the graph's note mark is clicked: the notes come into view. */
     showNotes?: number
@@ -42,6 +43,9 @@
     onMenu?: (items: MenuItem[], x: number, y: number) => void
     path: string
     commitId: string
+    /** Names the smart filter that's on, or "" with none: the trailers it picks on this commit
+     * are marked, and looked up again whenever this changes. */
+    filterSig?: string
     /** Labels for the branches and tags on the commit. */
     refs?: RefLabel[]
     openFile: (t: DiffTarget) => void
@@ -63,6 +67,29 @@
   function trailerQuery(key: string, value: string): string {
     return `${key}: ${asPerson(value)?.name ?? value}`
   }
+
+  // The trailers of this commit that the smart filter picks: they're why it's in the graph,
+  // or why it kept its ink. A person is matched as the filter shows them, which only the
+  // backend knows, so it says which lines.
+  let pickedLines = $state<string[]>([])
+  $effect(() => {
+    const id = commitId
+    if (!filterSig) {
+      pickedLines = []
+      return
+    }
+    let stale = false
+    void TrailerFilterLines(path, id)
+      .then((lines) => {
+        if (!stale) pickedLines = (lines ?? []).map((l) => lineKey(l.key, l.value))
+      })
+      .catch(() => {})
+    return () => {
+      stale = true
+    }
+  })
+  const isPicked = (key: string, value: string) => pickedLines.includes(lineKey(key, value))
+  const PICKED = 'The smart filter picked this'
 
   let info = $state<app.CommitInfo | null>(null)
 
@@ -337,7 +364,7 @@
       {#each rows as row (row.key)}
         <dt class="meta">{row.label}</dt>
         <dd class="trailer-values">
-          {#each row.values as v, i (i)}<span class="trailer">{@render trailerValue(row.key, v)}</span>{/each}
+          {#each row.values as v, i (i)}<span class="trailer" class:picked={isPicked(row.key, v)} title={isPicked(row.key, v) ? PICKED : undefined}>{@render trailerValue(row.key, v)}</span>{/each}
         </dd>
       {/each}
     </dl>
@@ -467,7 +494,7 @@
             <dl class="trailers as-written" aria-label="Trailers">
               {#each c.trailers as t, i (i)}
                 <dt class="meta">{t.key}</dt>
-                <dd class="trailer">{@render trailerValue(t.key, t.value)}</dd>
+                <dd class="trailer" class:picked={isPicked(t.key, t.value)} title={isPicked(t.key, t.value) ? PICKED : undefined}>{@render trailerValue(t.key, t.value)}</dd>
               {/each}
             </dl>
           {:else}
@@ -480,13 +507,13 @@
                   {#each g.people as row (row.key)}
                     <dt class="meta">{row.label}</dt>
                     <dd class="trailer-values">
-                      {#each row.values as v, i (i)}<span class="trailer">{@render trailerValue(row.key, v)}</span>{/each}
+                      {#each row.values as v, i (i)}<span class="trailer" class:picked={isPicked(row.key, v)} title={isPicked(row.key, v) ? PICKED : undefined}>{@render trailerValue(row.key, v)}</span>{/each}
                     </dd>
                   {/each}
                   {#if g.cc.length}
                     <dt class="meta">Cc</dt>
                     <dd class="trailer-values">
-                      {#each ccOpen ? g.cc : g.cc.slice(0, CC_SHOWN) as v, i (i)}<span class="trailer">{@render trailerValue('Cc', v)}</span>{/each}
+                      {#each ccOpen ? g.cc : g.cc.slice(0, CC_SHOWN) as v, i (i)}<span class="trailer" class:picked={isPicked('Cc', v)} title={isPicked('Cc', v) ? PICKED : undefined}>{@render trailerValue('Cc', v)}</span>{/each}
                       {#if g.cc.length > CC_SHOWN}
                         <button class="btn sm text" aria-expanded={ccOpen} onclick={() => (ccOpen = !ccOpen)}>{ccOpen ? 'Show fewer' : `+ ${g.cc.length - CC_SHOWN} more`}</button>
                       {/if}
@@ -753,6 +780,14 @@
     font-size: 14px;
     font-weight: 500;
     color: var(--ink-soft);
+  }
+
+  /* A trailer the smart filter picked: washed as the filter's chip is. */
+  .trailer.picked {
+    margin-left: -5px;
+    padding: 0 5px;
+    border-radius: var(--r-sm);
+    background: var(--selected);
   }
 
   .trailer-values {

@@ -778,6 +778,14 @@ export function TrailerFilter(arg1) {
   return window['go']['app']['App']['TrailerFilter'](arg1);
 }
 
+export function TrailerFilterDays(arg1, arg2) {
+  return window['go']['app']['App']['TrailerFilterDays'](arg1, arg2);
+}
+
+export function TrailerFilterLines(arg1, arg2) {
+  return window['go']['app']['App']['TrailerFilterLines'](arg1, arg2);
+}
+
 export function TrailerFilterRows(arg1) {
   return window['go']['app']['App']['TrailerFilterRows'](arg1);
 }
