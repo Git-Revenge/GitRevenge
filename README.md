@@ -52,7 +52,7 @@ Installing also gives you a `gitrevenge` command that opens the app [from a term
 
 ## Development
 
-You'll need Go 1.27.3+, Node 24+, and the [Wails v2 CLI](https://wails.io/docs/gettingstarted/installation) at the version pinned in `go.mod`:
+You'll need Go 1.27.4+, Node 24+, and the [Wails v2 CLI](https://wails.io/docs/gettingstarted/installation) at the version pinned in `go.mod`:
 
 ```sh
 go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0

@@ -1,6 +1,6 @@
 module github.com/git-revenge/gitrevenge
 
-go 1.27.3
+go 1.27.4
 
 ignore ./frontend/node_modules
 

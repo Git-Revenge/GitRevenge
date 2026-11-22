@@ -53,6 +53,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 - The Ignore rules tab no longer shows a file from the repository it was on before, when that one was slow to read. (#782)
 - A commit's trailers are read when another line sits among them, as git reads them: a bracketed note between the sign-offs, as the Linux kernel writes, a `(cherry picked from commit …)` line, comment lines, or a `Conflicts:` list under them. Such a commit used to show no trailers at all, and wasn't found by a trailer search. The other lines stay in the message. (#860)
 
+### Security
+
+- Built with Go 1.27.4, which fixes GO-2026-6859 in Go's HTTP server. Git Revenge runs no HTTP server of its own, so it wasn't exposed, but the release no longer carries the flaw. (#894)
+
 ## [1.0.1] - 2026-11-18
 
 ### Added
