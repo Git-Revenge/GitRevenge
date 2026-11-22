@@ -53,6 +53,10 @@ func (a *App) emitTrailerProgress(path string, st trailerindex.Status) {
 			}
 		}()
 	}
+	// The same goes for the chips of pinned keys on the graph's rows.
+	if !st.Reading && a.trailerPins.pinsKept(path) {
+		a.refreshChips(path)
+	}
 	a.emit("trailers:progress", TrailerProgress{Path: path, Status: st})
 }
 
@@ -70,6 +74,8 @@ type keptReading struct {
 	making  sync.Mutex
 	key     string
 	reading *trailerindex.Reading
+	// last is the same reading, for whoever only wants what's already there (see peek).
+	last atomic.Pointer[trailerindex.Reading]
 	// stale is set when the app hears the repository changed.
 	stale atomic.Bool
 	// checked is when the rules were last looked at, and gen the index's state then.
@@ -94,6 +100,19 @@ func (rs *trailerReadings) touch(path string) {
 			k.stale.Store(true)
 		}
 	}
+}
+
+// peek returns the reading last worked out for the repository at path, without working one
+// out, and whether it still stands for an index at gen with nothing heard to have changed.
+func (rs *trailerReadings) peek(path string, gen uint64) (*trailerindex.Reading, bool) {
+	rs.mu.Lock()
+	k := rs.kept[path]
+	rs.mu.Unlock()
+	if k == nil {
+		return nil, false
+	}
+	reading := k.last.Load()
+	return reading, reading != nil && reading.Gen() == gen && !k.stale.Load()
 }
 
 // trailerReading returns the repository's trailers as something to filter by, working it
@@ -161,6 +180,7 @@ func (a *App) trailerReading(ctx context.Context, r *session.Repo) *trailerindex
 		}
 	}
 	k.reading, k.key = index.Reading(rules), string(sig)
+	k.last.Store(k.reading)
 	return k.reading
 }
 

@@ -53,6 +53,45 @@ export function queryFor(key: Key, value?: Value): string {
   return value ? `${key.label}: ${valueName(value)}` : `${key.label}:`
 }
 
+/** A key's word endings that are one key (endings in Go's trailerindex). */
+const ENDINGS: Record<string, string> = { close: 'closes', closed: 'closes', fix: 'fixes', fixed: 'fixes', resolve: 'resolves', resolved: 'resolves', ref: 'refs', reference: 'refs', references: 'refs' }
+
+/** The ID of the key a spelling belongs to, as the trailer index joins keys: whatever the
+ * letter case, and with "Closed" and "Close" as "Closes" (KeyID in Go). */
+export function keyId(spelling: string): string {
+  const lower = spelling.trim().toLowerCase()
+  return ENDINGS[lower] ?? lower
+}
+
+/** What the pin beside a key says it does. */
+export function pinLabel(key: string, pinned: boolean): string {
+  return pinned ? `Unpin ${key} from the graph’s rows` : `Pin ${key} to the graph’s rows`
+}
+
+type OfferStore = Pick<Storage, 'getItem' | 'setItem'>
+const offerKey = (path: string) => `gitrevenge.pinOffer:${path}`
+
+/** The key the panel offers to pin, once for a repository: its most used label, while nothing
+ * is pinned and the offer hasn't been answered. Row space is scarce, so it's only an offer. */
+export function pinOffer<K extends { id: string; kind: string; held: string }>(keys: K[], pinned: string[], path: string, store: OfferStore): K | undefined {
+  if (pinned.length) return undefined
+  try {
+    if (store.getItem(offerKey(path))) return undefined
+  } catch {
+    return undefined
+  }
+  return keys.find((k) => k.kind === 'label' && !k.held)
+}
+
+/** Remembers that the offer to pin was answered, either way, for a repository. */
+export function answerPinOffer(path: string, store: OfferStore): void {
+  try {
+    store.setItem(offerKey(path), '1')
+  } catch {
+    // It's offered again next time, which is no harm.
+  }
+}
+
 /** Whether a value is one of the filter's picks. */
 export function hasPick(picks: { key: string; value: string }[], key: string, value: string): boolean {
   return picks.some((p) => p.key === key && p.value === value)

@@ -884,6 +884,7 @@ export namespace app {
 	    loading: boolean;
 	    paused: boolean;
 	    estimate: number;
+	    chips?: Record<string, Array<trailerindex.Chip>>;
 	
 	    static createFrom(source: any = {}) {
 	        return new GraphPage(source);
@@ -897,6 +898,7 @@ export namespace app {
 	        this.loading = source["loading"];
 	        this.paused = source["paused"];
 	        this.estimate = source["estimate"];
+	        this.chips = this.convertValues(source["chips"], Array<trailerindex.Chip>, true);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2366,6 +2368,24 @@ export namespace app {
 		}
 	}
 	
+	export class TrailerPin {
+	    key: string;
+	    label: string;
+	    kind: string;
+	    scope: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TrailerPin(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.label = source["label"];
+	        this.kind = source["kind"];
+	        this.scope = source["scope"];
+	    }
+	}
 	export class TrailerProgress {
 	    path: string;
 	    reading: boolean;
@@ -4016,6 +4036,26 @@ export namespace settings {
 
 export namespace trailerindex {
 	
+	export class Chip {
+	    key: string;
+	    keyLabel: string;
+	    value: string;
+	    label: string;
+	    kind: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Chip(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.keyLabel = source["keyLabel"];
+	        this.value = source["value"];
+	        this.label = source["label"];
+	        this.kind = source["kind"];
+	    }
+	}
 	export class Spelling {
 	    text: string;
 	    commits: number;

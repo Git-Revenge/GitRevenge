@@ -24,6 +24,8 @@ export interface BackendEvents {
   'graph:progress': GraphProgress
   /** TrailerProgress: how far reading a repository's trailers has got. */
   'trailers:progress': TrailerStatus & { path: string }
+  /** The chips of pinned trailer keys on a repository's graph rows may have changed: its path. */
+  'trailers:rows': string
   /** NetProgress: a fetch, pull, push or clone's progress. */
   'net:progress': { path: string; op: string; phase: string; percent: number; line: string }
   /** Prompt: git, ssh or a server is asking for a credential. */

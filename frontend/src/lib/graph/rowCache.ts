@@ -22,6 +22,8 @@ export interface Row {
   kind?: string
   /** A smart filter that highlights keeps this commit: it keeps its ink while the rest fade. */
   match?: boolean
+  /** The commit's values for the trailer keys pinned to rows, if it has any. */
+  chips?: RowChip[]
   id: string
   parents: number
   author: string
@@ -60,9 +62,21 @@ export interface Ref {
   updated?: number
 }
 
+/** A pinned trailer key's value on a commit (trailerindex.Chip in Go): what a pick is made of,
+ * and how to show it. */
+export interface RowChip {
+  key: string
+  keyLabel: string
+  value: string
+  label: string
+  kind: string
+}
+
 export interface Page {
   rows: Row[]
   refs: Record<string, Ref[]>
+  /** The chips of the commits in rows that have any, by commit. */
+  chips?: Record<string, RowChip[]>
   total: number
   loading: boolean
   /** The reader stopped ahead of the viewport; asking for later rows resumes it. */

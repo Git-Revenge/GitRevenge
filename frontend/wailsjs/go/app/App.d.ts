@@ -363,6 +363,8 @@ export function SetTheme(arg1:string):Promise<void>;
 
 export function SetTrailerFilter(arg1:string,arg2:Array<trailerindex.Pick>,arg3:boolean):Promise<app.TrailerFilterState>;
 
+export function SetTrailerPin(arg1:string,arg2:string,arg3:boolean):Promise<Array<app.TrailerPin>>;
+
 export function SetUpdateChecks(arg1:boolean):Promise<void>;
 
 export function SetWebLinks(arg1:string,arg2:boolean):Promise<void>;
@@ -410,6 +412,8 @@ export function TrailerKeys(arg1:string):Promise<app.TrailerKeys>;
 export function TrailerMore(arg1:string,arg2:string,arg3:string,arg4:number):Promise<app.TrailerPanelKey>;
 
 export function TrailerPanel(arg1:string,arg2:string,arg3:number):Promise<app.TrailerPanel>;
+
+export function TrailerPins(arg1:string):Promise<Array<app.TrailerPin>>;
 
 export function TrailerStatus(arg1:string):Promise<app.TrailerProgress>;
 

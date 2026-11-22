@@ -21,7 +21,7 @@
   import RefChip from './RefChip.svelte'
   import SearchSuggest from './SearchSuggest.svelte'
   import { completion, isKey, stepRow, type Suggestion, type Suggestions } from './suggest'
-  import { bisectRow, DAY_H, dayBounds, dayCountLabel, dayLineLabel, dayLineSpoken, drawDayLine, drawFoldLine, drawRow, authorSpan, FOLD_H, FOLLOWER_H, gapLabel, sameDay, sealOf, startsRun, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
+  import { bisectRow, chipId, chipName, chipValue, type ChipSpan, DAY_H, dayBounds, dayCountLabel, dayLineLabel, dayLineSpoken, drawDayLine, drawFoldLine, drawRow, authorSpan, FOLD_H, FOLLOWER_H, gapLabel, sameDay, sealOf, startsRun, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { branchMove, headAway, headLabel, isOwnMove, LANDING, moveAnnouncement, tipsOf, type Tips } from './follow'
   import { loadLabelWidth, nextLabelWidth, REFIT_AFTER_MS, saveLabelWidth } from './labelColumn'
   import { RowCache, type Page, type Ref, type Row } from './rowCache'
@@ -42,6 +42,8 @@
     sparse = false,
     highlight = null,
     trailersUnread = 0,
+    filterPicks = [],
+    onFilterPick,
     onFilterAdd,
     onFilterDrop,
     lead,
@@ -82,6 +84,11 @@
     /** While a smart filter is on, the share of the history whose trailers aren't read yet:
      * the ruler's foot is hatched for it. */
     trailersUnread?: number
+    /** The values the smart filter holds: a row's chip for one of them is filled. */
+    filterPicks?: { key: string; value: string }[]
+    /** Puts a trailer value in the smart filter, or takes it out if it's there: a click on a
+     * pinned key's chip. Without it the chips are only read. */
+    onFilterPick?: (key: string, value: string) => void
     /** Adds a trailer value to the smart filter. With it, the search box suggests the keys
      * and values that what's typed could mean. */
     onFilterAdd?: (key: string, value: string) => void
@@ -1186,7 +1193,12 @@
 
   const cache = new RowCache(
     // The generated binding types mirror rowCache's; the cast only bridges class vs interface.
-    async (start, count) => (await GraphRows(path, start, count)) as unknown as Page,
+    async (start, count) => {
+      const page = (await GraphRows(path, start, count)) as unknown as Page
+      // A row carries its own chips, for the keys pinned to rows.
+      if (page.chips) for (const row of page.rows) row.chips = page.chips[row.id]
+      return page
+    },
     () => {
       total = cache.total
       loading = cache.loading
@@ -1232,6 +1244,7 @@
       link: token('--link'),
       teal: token('--accent-a'),
       note: token('--accent-c'),
+      plum: token('--accent-b'),
       edge: token('--paper-edge'),
     })
   }
@@ -1293,6 +1306,32 @@
 
   /** Whether the pointer is on an author, which takes a click. */
   let hoveredAuthor = false
+
+  // The chips of pinned trailer keys, as last painted: by commit, where each was drawn. A
+  // click on one puts its value in the smart filter.
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const chipSpans = new Map<number, ChipSpan[]>()
+  /** The chip the pointer is on, as chipId names it, or "". */
+  let hoveredChip = ''
+  const chipPicked = (chip: { key: string; value: string }) => filterPicks.some((p) => p.key === chip.key && p.value === chip.value)
+  /** The chip of commit i at a point in the view, if it's one that takes a click. */
+  function chipAt(i: number, x: number, y: number) {
+    if (!onFilterPick) return undefined
+    return chipSpans.get(i)?.find((s) => s.chip && x >= s.x0 && x <= s.x1 && y >= s.y0 && y <= s.y1)?.chip
+  }
+  // A chip is filled while its value is in the filter.
+  $effect(() => {
+    void filterPicks
+    untrack(schedule)
+  })
+  // The backend says when the chips may have changed: a key pinned or unpinned, or trailers read.
+  $effect(() =>
+    onBackend('trailers:rows', (p) => {
+      if (p !== path) return
+      cache.invalidate()
+      schedule()
+    }),
+  )
 
   /** Shows the notes of the commit whose mark the pointer is on, and hides them otherwise. */
   function updateNoteCard() {
@@ -1467,6 +1506,7 @@
     const th = theme()
     const now = Date.now() / 1000
     labelSpans.clear()
+    chipSpans.clear()
     const still = reducedMotion()
     let arrivals = 0
     for (let i = first; i < last; i++) {
@@ -1501,7 +1541,12 @@
       const isNoted = noted.has(row.id)
       const isArrived = arrived.has(row.id)
       const follows = isFollower(i)
-      const extra = isNoted || isArrived || follows || sparse ? { ...place?.extra, noted: isNoted, arrived: isArrived, follower: follows, sparse } : place?.extra
+      const spans: ChipSpan[] | undefined = row.chips?.length ? [] : undefined
+      const extra =
+        isNoted || isArrived || follows || sparse || spans
+          ? { ...place?.extra, noted: isNoted, arrived: isArrived, follower: follows, sparse, chips: row.chips, chipPicked, chipHover: hoveredChip, chipSpans: spans }
+          : place?.extra
+      if (spans) chipSpans.set(i, spans)
       const span = drawRow(ctx, row, cache.refsFor(row.id), y, lay, th, sel, hov, dim, now, sealOf(sigs.get(row.id)), { prev: cache.get(i - 1), prev2: cache.get(i - 2), next: cache.get(i + 1) }, extra)
       if (arriving) ctx.restore()
       if (span) labelSpans.set(i, span)
@@ -2094,10 +2139,14 @@
           if (fold) toggleFold(fold)
           return
         }
+        // A click on a pinned key's chip filters by its value, and selects nothing: the
+        // commit may be about to leave the graph.
+        const rect = scroller.getBoundingClientRect()
+        const chip = chipAt(i, e.clientX - rect.left, e.clientY - rect.top)
+        if (chip) return onFilterPick?.(chip.key, chip.value)
         select(i)
         // A click on the note mark also asks for the note itself.
         const row = cache.get(i)
-        const rect = scroller.getBoundingClientRect()
         if (row && onNoteMark(i, e.clientX - rect.left)) onNote?.(row)
         // And one on the author, for the card about them.
         else if (row && onAuthorText(i, e.clientX - rect.left, e.clientY - rect.top)) askAuthor(i)
@@ -2125,11 +2174,15 @@
         const rect = scroller.getBoundingClientRect()
         const over = foldAtY(e.clientY - rect.top)?.key ?? ''
         const author = i >= 0 && !drag?.active && onAuthorText(i, e.clientX - rect.left, e.clientY - rect.top)
-        if (over !== hoveredFold || author !== hoveredAuthor) {
+        const onChip = i >= 0 && !drag?.active ? chipAt(i, e.clientX - rect.left, e.clientY - rect.top) : undefined
+        const chip = onChip ? chipId(onChip) : ''
+        if (over !== hoveredFold || author !== hoveredAuthor || chip !== hoveredChip) {
           hoveredFold = over
           hoveredAuthor = author
-          // A fold's line and an author both take a click.
-          scroller.style.cursor = over || author ? 'pointer' : ''
+          hoveredChip = chip
+          // A fold's line, an author and a chip all take a click.
+          scroller.style.cursor = over || author || chip ? 'pointer' : ''
+          scroller.title = onChip ? `Filter the graph to ${onChip.keyLabel}: ${chipValue(onChip)}` : ''
           schedule()
         }
         updateExpanded()
@@ -2221,6 +2274,17 @@
             schedule()
           }}
         >
+          <!-- The row's chips are drawn on the canvas, where a pointer reaches them. These are
+               the same chips for the keyboard and a screen reader: buttons, seen only while
+               one has the focus. -->
+          {#if onFilterPick}
+            {#each cache.get(i)?.chips ?? [] as chip (chipId(chip))}
+              <button class="chip-key" aria-pressed={chipPicked(chip)} aria-label={chipName(chip)} onclick={() => onFilterPick(chip.key, chip.value)}>
+                <span class="key">{chip.keyLabel}</span>
+                {chipValue(chip)}
+              </button>
+            {/each}
+          {/if}
           {#if labelCount > 1}
             <button
               class="btn sm quiet icon"
@@ -2702,6 +2766,47 @@
 
   .go-head:hover {
     background: var(--paper-warm);
+  }
+
+  /* A row's chip as a button, for the keyboard: out of sight until it has the focus, then an
+     outline on paper in mono, as the canvas draws it, with the usual rose ring. */
+  .chip-key {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 22px;
+    padding: 0 7px;
+    border: 1px solid var(--paper-edge);
+    border-radius: 5px;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .chip-key .key {
+    color: var(--ink-mute);
+  }
+
+  .chip-key:not(:focus-visible) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .chip-key:focus-visible {
+    outline: 2px solid var(--link);
+    outline-offset: 2px;
+  }
+
+  .chip-key[aria-pressed='true'] {
+    background: var(--selected);
   }
 
   /* The checked-out commit isn't in the graph: it says so where the way back would be, and

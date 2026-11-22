@@ -149,6 +149,7 @@ func (a *App) gitConfig() (*gitConfigs, error) {
 			}
 			// The global config can hold smart links and a mailmap file of the user's own.
 			a.trailerReadings.touch("")
+			a.trailerPins.touch("")
 			a.emit("gitconfig:changed", ConfigChange{Path: path})
 		})
 		if global, alt, err := c.runner.GlobalConfigPath(context.Background()); err == nil {

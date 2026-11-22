@@ -96,6 +96,7 @@ func (a *App) sessions() (*session.Manager, error) {
 		a.sess.OnWatchFailed(func(path string, err error) { a.notice(path, watchFailedMessage(err)) })
 		a.sess.OnShown(func(path string, late bool) {
 			a.trailerReadings.touch(path)
+			a.trailerPins.touch(path)
 			// The repository's own settings live in its config, which nothing was watching.
 			a.syncRepoConfigSoon(path)
 			// The active tab's view opens after its repository is watched, and reads
@@ -111,6 +112,7 @@ func (a *App) sessions() (*session.Manager, error) {
 			a.trailerReadings.touch(path)
 			// The repository's own settings live in its config.
 			if k&watch.Config != 0 {
+				a.trailerPins.touch(path)
 				a.syncRepoConfigSoon(path)
 			}
 			a.emit("repo:changed", RepoChange{Path: path, Kinds: k.Names()})
@@ -231,6 +233,7 @@ func (a *App) CloseRepo(path string) error {
 	a.undo.forget(path)
 	// A smart filter lasts until its tab closes.
 	a.trailerFilters.set(path, nil)
+	a.trailerPins.touch(path)
 	return m.Close(path)
 }
 

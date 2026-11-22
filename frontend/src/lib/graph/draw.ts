@@ -1,7 +1,7 @@
 import { kindInfo, type KindInfo } from '../branchKinds'
 import { PATHS, type IconName } from '../ui/icons'
 import { eachPass } from './pass'
-import type { Ref, Row, Seg } from './rowCache'
+import type { Ref, Row, RowChip, Seg } from './rowCache'
 
 /** Row density: the two-line timeline, or single-line rows that fit twice as many commits. */
 export type Density = 'comfortable' | 'compact'
@@ -415,6 +415,8 @@ export interface Theme {
   teal: string
   /** The sepia of a note's mark. */
   note: string
+  /** The plum of a label, as a pinned trailer's chip says one. */
+  plum: string
   /** The hairline under a day line that has stuck to the top. */
   edge: string
 }
@@ -771,6 +773,146 @@ export interface RowExtra {
   /** The graph is filtered to some of its commits: the rows aren't neighbours any more, so
    * the lane between them is dashed. */
   sparse?: boolean
+  /** The commit's values for the trailer keys pinned to rows: chips after the subject. */
+  chips?: RowChip[]
+  /** Whether a chip is in the smart filter, which fills it. */
+  chipPicked?: (chip: RowChip) => boolean
+  /** The chip the pointer is on, as chipId names it. */
+  chipHover?: string
+  /** Filled in by drawRow: where each chip was drawn, for whoever takes clicks. */
+  chipSpans?: ChipSpan[]
+}
+
+/** A chip as a row shows it: sized, and either one value or a count of the ones not shown. */
+export interface FitChip {
+  chip?: RowChip
+  more?: number
+  key: string
+  value: string
+  width: number
+}
+
+/** Where a chip was drawn in the view. */
+export interface ChipSpan {
+  x0: number
+  x1: number
+  y0: number
+  y1: number
+  chip?: RowChip
+  more?: number
+}
+
+/** How tall a chip is, and how much of a row's height it takes a click over. */
+export const CHIP_H = 20
+const CHIP_PAD = 7
+const CHIP_GAP = 6
+const CHIP_KEY_GAP = 5
+/** How far the first chip sits from the end of the subject. */
+const CHIP_LEAD = 12
+/** How many values a row shows before it counts the rest. */
+export const CHIPS_SHOWN = 2
+const CHIP_VALUE_MAX = 150
+/** The least of a value worth showing: shorter than this and the chip gives way to a count. */
+const CHIP_VALUE_MIN = 36
+/** How much of the room for a subject its chips may take. */
+const CHIP_SHARE = 0.5
+const CHIP_FONT = `12px ${MONO}`
+
+/** Names a chip, to tell which one the pointer is on. */
+export function chipId(chip: RowChip): string {
+  return `${chip.key}\n${chip.value}`
+}
+
+/** What a chip says for its value: a person by name, anything else as it is. */
+export function chipValue(chip: RowChip): string {
+  if (chip.kind !== 'person') return chip.label
+  const open = chip.label.lastIndexOf(' <')
+  return open > 0 && chip.label.endsWith('>') ? chip.label.slice(0, open) : chip.label
+}
+
+/** How a chip is said aloud, as a button: "Changelog: fixed, filter". */
+export function chipName(chip: RowChip): string {
+  return `${chip.keyLabel}: ${chipValue(chip)}, filter`
+}
+
+/**
+ * The chips a row has room for: two of them and a count of the rest. When the room is short
+ * the longest value is cut shorter; when that isn't enough a chip gives way to the count; and
+ * there are none when even the count doesn't fit. `measure` says how wide text is in the
+ * chips' font and `cut` shortens text to a width.
+ */
+export function fitChips(chips: RowChip[], room: number, measure: (text: string) => number, cut: (text: string, width: number) => string): FitChip[] {
+  if (!chips.length) return []
+  const sized = (chip: RowChip, value = cut(chipValue(chip), CHIP_VALUE_MAX)): FitChip => ({
+    chip,
+    key: chip.keyLabel,
+    value,
+    width: CHIP_PAD * 2 + measure(chip.keyLabel) + CHIP_KEY_GAP + measure(value),
+  })
+  const count = (n: number): FitChip => ({ more: n, key: '', value: `+${n}`, width: CHIP_PAD * 2 + measure(`+${n}`) })
+  for (let shown = Math.min(CHIPS_SHOWN, chips.length); shown >= 0; shown--) {
+    const out = chips.slice(0, shown).map((c) => sized(c))
+    if (shown < chips.length) out.push(count(chips.length - shown))
+    const over = chipsWidth(out) - room
+    if (over <= 0) return out
+    // A little short: the longest value gives up what's missing, if enough of it is left to read.
+    const longest = out.reduce((at, c, i) => (c.chip && measure(c.value) > measure(out[at].value) ? i : at), 0)
+    const left = out[longest].chip ? measure(out[longest].value) - over : 0
+    if (left >= CHIP_VALUE_MIN) {
+      out[longest] = sized(out[longest].chip!, cut(out[longest].value, left))
+      if (chipsWidth(out) <= room) return out
+    }
+  }
+  return []
+}
+
+/** How wide some chips are side by side. */
+export function chipsWidth(fit: FitChip[]): number {
+  return fit.reduce((w, c) => w + c.width, 0) + CHIP_GAP * Math.max(0, fit.length - 1)
+}
+
+/** The ink a chip's value is written in. Kinds differ in more than hue: a ticket starts with
+ * its mark, a person is a name, a commit is an id, and each sits under its own key. */
+function chipInk(kind: string, theme: Theme): string {
+  if (kind === 'ticket') return theme.link
+  if (kind === 'person') return theme.teal
+  if (kind === 'commit') return theme.note
+  if (kind === 'identifier') return theme.muted
+  return theme.plum
+}
+
+/** Draws chips from x along a line, and says where each went. They're quieter than a branch's
+ * label: an outline on paper, in mono, the key muted and the value in its kind's ink. */
+function drawChips(ctx: CanvasRenderingContext2D, fit: FitChip[], x: number, mid: number, theme: Theme, extra: RowExtra) {
+  ctx.save()
+  setFont(ctx, CHIP_FONT)
+  ctx.textBaseline = 'middle'
+  ctx.textAlign = 'left'
+  ctx.lineWidth = 1
+  for (const c of fit) {
+    const ink = c.chip ? chipInk(c.chip.kind, theme) : theme.muted
+    const picked = !!c.chip && !!extra.chipPicked?.(c.chip)
+    const hover = !!c.chip && extra.chipHover === chipId(c.chip)
+    ctx.beginPath()
+    ctx.roundRect(Math.round(x) + 0.5, Math.round(mid - CHIP_H / 2) + 0.5, Math.round(c.width) - 1, CHIP_H - 1, 5)
+    if (picked || hover) {
+      ctx.fillStyle = picked ? theme.selected : theme.hover
+      ctx.fill()
+    }
+    ctx.strokeStyle = picked || hover ? ink : theme.edge
+    ctx.stroke()
+    let at = x + CHIP_PAD
+    if (c.key) {
+      ctx.fillStyle = theme.muted
+      ctx.fillText(c.key, at, mid + 0.5)
+      at += ctx.measureText(c.key).width + CHIP_KEY_GAP
+    }
+    ctx.fillStyle = ink
+    ctx.fillText(c.value, at, mid + 0.5)
+    extra.chipSpans?.push({ x0: x, x1: x + c.width, y0: mid - CHIP_H / 2, y1: mid + CHIP_H / 2, chip: c.chip, more: c.more })
+    x += c.width + CHIP_GAP
+  }
+  ctx.restore()
 }
 
 /** How strong the wash is on a row still in question during a bisect. */
@@ -1133,9 +1275,26 @@ export function drawRow(
     left = drawLabels(ctx, refs, left, line1, Math.min(subjectRight - left, (subjectRight - left) * 0.6), color, theme, comfortable, lay.remote)
     labelSpan = [lay.textX, left - LABEL_TRAIL]
   }
+  // A pinned key's values follow the subject, in the timeline: the subject gives up some of
+  // its room for them, never more than half.
+  let fit: FitChip[] = []
   setFont(ctx, `${comfortable ? 14 : 13}px ${SERIF}`)
+  if (comfortable && extra.chips?.length) {
+    // They have whatever the subject doesn't need, and at least their share when it's long.
+    const room = Math.max((subjectRight - left) * CHIP_SHARE, subjectRight - left - ctx.measureText(row.subject).width) - CHIP_LEAD
+    setFont(ctx, CHIP_FONT)
+    fit = fitChips(
+      extra.chips,
+      room,
+      (t) => ctx.measureText(t).width,
+      (t, w) => clip(ctx, t, w),
+    )
+    setFont(ctx, `${comfortable ? 14 : 13}px ${SERIF}`)
+  }
   ctx.fillStyle = docs ? theme.muted : theme.fg
-  ctx.fillText(clip(ctx, row.subject, subjectRight - left), left, line1)
+  const subject = clip(ctx, row.subject, subjectRight - left - (fit.length ? chipsWidth(fit) + CHIP_LEAD : 0))
+  ctx.fillText(subject, left, line1)
+  if (fit.length) drawChips(ctx, fit, left + ctx.measureText(subject).width + CHIP_LEAD, line1, theme, extra)
 
   if (tall) {
     setFont(ctx, `12px ${MONO}`, '0.08em')

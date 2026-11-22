@@ -710,6 +710,10 @@ export function SetTrailerFilter(arg1, arg2, arg3) {
   return window['go']['app']['App']['SetTrailerFilter'](arg1, arg2, arg3);
 }
 
+export function SetTrailerPin(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SetTrailerPin'](arg1, arg2, arg3);
+}
+
 export function SetUpdateChecks(arg1) {
   return window['go']['app']['App']['SetUpdateChecks'](arg1);
 }
@@ -804,6 +808,10 @@ export function TrailerMore(arg1, arg2, arg3, arg4) {
 
 export function TrailerPanel(arg1, arg2, arg3) {
   return window['go']['app']['App']['TrailerPanel'](arg1, arg2, arg3);
+}
+
+export function TrailerPins(arg1) {
+  return window['go']['app']['App']['TrailerPins'](arg1);
 }
 
 export function TrailerStatus(arg1) {
