@@ -468,6 +468,14 @@ const mounts = {
     mount(Dialog, { target: host, props: { spec: spec('Below'), onClose: record('close-below') } })
     mount(Dialog, { target: host, props: { spec: spec('Above'), onClose: record('close-above') } })
   },
+  // The whole shell, for what happens between its tabs. It restores its session from the stub.
+  async app() {
+    host.style.cssText = 'display:block;height:100vh'
+    const { default: App } = await import('../src/App.svelte')
+    const { session } = await import('../src/lib/session.svelte')
+    mount(App, { target: host })
+    Object.assign(win, { __select: (id: string) => session.select(id), __active: () => session.active })
+  },
 }
 
 switch (new URLSearchParams(location.search).get('mount')) {
@@ -563,6 +571,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'stackedDialogs':
     await mounts.stackedDialogs()
+    break
+  case 'app':
+    await mounts.app()
     break
   default:
     throw new Error('Unknown component to mount.')

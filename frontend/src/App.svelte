@@ -35,6 +35,8 @@
 
   let version = $state('')
   let env = $state<app.Environment | null>(null)
+  /** The repository whose tab is on screen, as a list of one path or none. See the markup. */
+  let onScreen = $derived(session.activeTab ? [session.activeTab.path] : [])
 
   provideCommands(() => {
     const list: Command[] = [
@@ -248,27 +250,31 @@
         <button class="btn sm quiet" onclick={() => update.dismiss()}>Dismiss</button>
       </div>
     {/if}
-    {#if session.activeTab}
-      {#key session.activeTab.path}
-        <OperationBanner path={session.activeTab.path} />
-      {/key}
-    {/if}
+    <!-- A keyed each over the one repository on screen, where an if and a key would read more
+         plainly, for what it hands a view: the path it was made for, which it can still read
+         once its tab is no longer the one on screen. A view that's being taken down may be
+         waiting on the backend, and reads its path again when the answer comes. Handed
+         session.activeTab.path itself, that read throws as soon as the tab on screen isn't a
+         repository (#849). -->
+    {#each onScreen as path (path)}
+      <OperationBanner {path} />
+    {/each}
     <main>
-      {#if session.activeTab}
-        {#key session.activeTab.path}
-          <RepoView path={session.activeTab.path} />
-        {/key}
-      {:else if session.active === session.configTabId && gitConfig.open}
-        <Lazy load={() => import('./lib/gitconfig/GitConfigView.svelte')} />
-      {:else if session.active === session.insightsTabId && insights.open}
-        <Lazy load={() => import('./lib/insights/InsightsView.svelte')} />
-      {:else if session.active === session.ignoreTabId && ignoreRules.open}
-        <Lazy load={() => import('./lib/ignorerules/IgnoreRulesView.svelte')} />
-      {:else if session.active === session.peopleTabId && peopleTab.open}
-        <Lazy load={() => import('./lib/people/PeopleView.svelte')} />
+      {#each onScreen as path (path)}
+        <RepoView {path} />
       {:else}
-        <StartPage />
-      {/if}
+        {#if session.active === session.configTabId && gitConfig.open}
+          <Lazy load={() => import('./lib/gitconfig/GitConfigView.svelte')} />
+        {:else if session.active === session.insightsTabId && insights.open}
+          <Lazy load={() => import('./lib/insights/InsightsView.svelte')} />
+        {:else if session.active === session.ignoreTabId && ignoreRules.open}
+          <Lazy load={() => import('./lib/ignorerules/IgnoreRulesView.svelte')} />
+        {:else if session.active === session.peopleTabId && peopleTab.open}
+          <Lazy load={() => import('./lib/people/PeopleView.svelte')} />
+        {:else}
+          <StartPage />
+        {/if}
+      {/each}
     </main>
     <footer class="status">
       <span class="meta">git {env.gitVersion}</span>
