@@ -372,6 +372,17 @@ func (c Config) Whole(place string) func(text string) []Match {
 	}
 }
 
+// ForShipped returns the config with only the rules that count for Insights › Shipped.
+func (c Config) ForShipped() Config {
+	shipped := Config{Web: c.Web}
+	for _, r := range c.Active() {
+		if r.Shipped {
+			shipped.Rules = append(shipped.Rules, r)
+		}
+	}
+	return shipped
+}
+
 // References returns the matches of rules that count for Insights › Shipped, found in a
 // message's subject (for rules that look in messages) and its reference trailers (for
 // rules that look in trailers). It returns nil when no rule counts for Shipped, so the

@@ -265,6 +265,9 @@ var (
 	// The address of an issue, a pull or merge request, or a bug, on the hosts and trackers
 	// in common use.
 	ticketAddress = regexp.MustCompile(`^https?://\S+?(?:/issues/\d+|/pull/\d+|/pulls/\d+|/merge_requests/\d+|/show_bug\.cgi\?id=\d+|/browse/[A-Z][A-Z0-9_]*-\d+)(?:[/?#]\S*)?$`)
+	// A ticket by its tracker's key: "TIDE-12", "PROJ_X-7". Capitals, a hyphen and a number,
+	// and nothing else, so "UTF-8 text" and "CVE-2021-4155" aren't one.
+	ticketKey = regexp.MustCompile(`^[A-Z][A-Z0-9_]*-\d+$`)
 	// What may be a commit's id at the start of a value: "656c296", "656c296 (\"subject\")".
 	commitStart = regexp.MustCompile(`^[0-9a-fA-F]{7,64}(?:$|[\s(:,.;])`)
 )
@@ -279,7 +282,7 @@ func ticketsIn(value string, rules Rules) []Ticket {
 	}
 	one := func(s string) (Ticket, bool) {
 		switch {
-		case ticketNumber.MatchString(s):
+		case ticketNumber.MatchString(s), ticketKey.MatchString(s):
 			return Ticket{Text: s}, true
 		case strings.HasPrefix(s, "http") && ticketAddress.MatchString(s):
 			return Ticket{Text: s, Href: s}, true

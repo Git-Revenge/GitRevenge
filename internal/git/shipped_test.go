@@ -6,24 +6,36 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
-func TestReferences(t *testing.T) {
+// The subject's references are what Shipped finds when nobody says otherwise. Trailers are
+// the trailer reader's to read (trailerindex.References), and none is looked at here.
+func TestSubjectReferences(t *testing.T) {
 	t.Parallel()
-	for msg, want := range map[string][]string{
-		"Cache readings offline (TIDE-88)":                        {"TIDE-88"},
-		"Paginate readings (#41)\n\nBody mentions OTHER-1.":       {"#41"},
-		"Fix rounding\n\nDetails.\n\nRefs: TIDE-9, TIDE-10":       {"TIDE-9", "TIDE-10"},
-		"TIDE-3 and TIDE-3 again\n\nCloses: TIDE-3\nSee: HARB-14": {"TIDE-3", "HARB-14"},
-		"Plain subject\n\nSigned-off-by: Someone <s@example.com>": {},
-		"lowercase-12 is not a reference":                         {},
+	for subject, want := range map[string][]string{
+		"Cache readings offline (TIDE-88)": {"TIDE-88"},
+		"Paginate readings (#41)":          {"#41"},
+		"TIDE-3 and TIDE-3 again, and #4":  {"TIDE-3", "#4"},
+		"Plain subject":                    {},
+		"lowercase-12 is not a reference":  {},
 	} {
-		if got := References(msg); !slices.Equal(got, want) {
-			t.Errorf("References(%q) = %v, want %v", msg, got, want)
+		if got := SubjectReferences(subject); !slices.Equal(got, want) {
+			t.Errorf("SubjectReferences(%q) = %v, want %v", subject, got, want)
 		}
+	}
+	// With nobody to read trailers, a whole message gives its subject's references only.
+	q := ShippedQuery{}
+	if got := q.references("Fix rounding (#7)\n\nBody mentions OTHER-1.\n\nRefs: TIDE-9"); !slices.Equal(got, []string{"#7"}) {
+		t.Errorf("a whole message, by default = %v, want the subject's", got)
+	}
+	// Whoever is given the message decides, and nothing is an empty list, not nil.
+	q.References = func(string) []string { return nil }
+	if got := q.references("Fix rounding (#7)"); got == nil || len(got) != 0 {
+		t.Errorf("a reader that finds nothing = %v", got)
 	}
 }
 
@@ -62,7 +74,16 @@ func TestShipped(t *testing.T) {
 		t.Fatalf("tip = %+v, %v", tip, err)
 	}
 
-	all, err := repo.Shipped(ctx, ShippedQuery{Target: target, Since: 0, Until: tip.Time})
+	// A stand-in for the trailer reader: the subject's references, and what "Refs:" names.
+	refs := func(message string) []string {
+		subject, body, _ := strings.Cut(message, "\n")
+		found := SubjectReferences(subject)
+		if _, after, ok := strings.Cut(body, "Refs: "); ok {
+			found = append(found, strings.TrimSpace(after))
+		}
+		return found
+	}
+	all, err := repo.Shipped(ctx, ShippedQuery{Target: target, Since: 0, Until: tip.Time, References: refs})
 	if err != nil {
 		t.Fatal(err)
 	}

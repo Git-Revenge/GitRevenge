@@ -10,6 +10,9 @@ import (
 
 	"github.com/git-revenge/gitrevenge/internal/branchkind"
 	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/links"
+	"github.com/git-revenge/gitrevenge/internal/trailerindex"
+	"github.com/git-revenge/gitrevenge/internal/trailerrules"
 )
 
 // InsightsInputs are the choices an insights result depends on, besides the repository
@@ -192,7 +195,7 @@ func (a *App) InsightsShipped(path string, in InsightsInputs) (ShippedResult, er
 		}
 		q := w.query()
 		lc := a.linkConfig(ctx, g)
-		q.Match = lc.References()
+		q.References = shippedReferences(ctx, g, lc)
 		w.References = lc.Patterns()
 		items, err := g.Shipped(ctx, q)
 		if err != nil {
@@ -265,4 +268,35 @@ func (a *App) InsightsTags(path string) ([]git.TagInfo, error) {
 		return nil, err
 	}
 	return g.Tags(ctx)
+}
+
+// shippedReferences returns what finds a commit's ticket references for Shipped: in its
+// subject by the smart links that count for Shipped, or PROJ-123 and #123 with none; and in
+// its trailers as the Smart filters reading rules read them, with the repository's own rules
+// for its trailer keys. One reader, so a ticket the Smart filters panel counts is the same
+// ticket here. It reads each message for itself: Shipped doesn't wait for the trailer index.
+func shippedReferences(ctx context.Context, g *git.Repo, lc links.Config) func(message string) []string {
+	var rules trailerindex.Rules
+	if said, err := trailerrules.Load(ctx, g, true); err == nil {
+		trailerrules.Apply(said, &rules)
+	}
+	// Only the links that count for Shipped find tickets here, as in the subject.
+	if whole := lc.ForShipped().Whole(links.InTrailers); whole != nil {
+		rules.Tickets = func(value string) []trailerindex.Ticket {
+			found := whole(value)
+			if found == nil {
+				return nil
+			}
+			out := make([]trailerindex.Ticket, len(found))
+			for i, m := range found {
+				out[i] = trailerindex.Ticket{Text: m.Text, Href: m.Href}
+			}
+			return out
+		}
+	}
+	subject := git.SubjectReferences
+	if match := lc.References(); match != nil {
+		subject = func(text string) []string { return match(text, links.InMessage) }
+	}
+	return func(message string) []string { return trailerindex.References(message, rules, subject) }
 }
