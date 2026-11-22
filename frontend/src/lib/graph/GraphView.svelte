@@ -1720,6 +1720,10 @@
     }
   }
 
+  /** What CommitRow answers for a commit that isn't in the graph because the graph holds
+   * only what a smart filter keeps. Any other answer below 0 means it isn't in the history. */
+  const FILTERED_OUT = -2
+
   /** The commit selected before a reload, so the selection follows it to its new row. */
   let selectedId = ''
   /** The commit that was selected when a smart filter took its row away, or "". */
@@ -1740,9 +1744,12 @@
     // The selection moved while that was being asked, to HEAD or by the person: it stands.
     if ((hiddenId || selectedId) !== id) return false
     if (row < 0 && moving) return true
-    if (row < 0 && sparse && id) {
+    if (row === FILTERED_OUT && id) {
       // A filter took the selected commit out of the graph. It's still the one the panel
       // beside the graph shows: no row is marked, and it's selected again when it's back.
+      // The backend says so of the graph it looked in. Which mode the filter is in doesn't:
+      // just after a switch to Highlight, the rows are still the ones Only these left, and
+      // the commit would be taken for one that's gone, and its old place selected (#881).
       hiddenId = id
       selected = -1
       autoSelect = 'done'
@@ -1754,7 +1761,7 @@
     if (row < 0) hiddenId = ''
     // If the commit is gone (e.g. amended), stay on the same position but refresh details.
     // One a filter took out isn't followed: the view stays where the filter put it.
-    selectWhenLoaded(row >= 0 ? row : selected, moving || (row < 0 && sparse), row >= 0 ? id : '', () => {
+    selectWhenLoaded(row >= 0 ? row : selected, moving, row >= 0 ? id : '', () => {
       if (asks > 0) void followSelection(moving, asks - 1)
     })
     return row < 0

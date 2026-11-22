@@ -188,3 +188,60 @@ func TestAFilterDoesNotMakeItsKeyLookLikeItIsOnEveryCommit(t *testing.T) {
 		t.Fatalf("the filter afterwards = %+v, %v, want 55 of 70", state, err)
 	}
 }
+
+// Where a commit is in the graph, and why it isn't there when it isn't: kept out by a filter
+// that narrows the graph, or not in the history at all. The graph's view keeps a selection
+// the filter hid, and gives up one that's gone (#881).
+func TestCommitRowSaysWhenAFilterKeepsTheCommitOut(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "a.txt", "One", "Changelog: fixed")
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "b.txt", "Two", "Changelog: added")
+	added := fx.Head()
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "c.txt", "Three", "Changelog: fixed")
+	fixed := fx.Head()
+	path := openForMap(t, a, fx)
+	trailersRead(t, a, path)
+	graphRows(t, a, path, 3)
+	nowhere := "0123456789abcdef0123456789abcdef01234567"
+	row := func(id string) int {
+		t.Helper()
+		got, err := a.CommitRow(path, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+
+	if got := row(added); got != 1 {
+		t.Fatalf("with no filter, the commit is at row %d, want 1", got)
+	}
+	if got := row(nowhere); got != rowAbsent {
+		t.Fatalf("with no filter, a commit that isn't in the history = %d, want %d", got, rowAbsent)
+	}
+
+	pick := []trailerindex.Pick{{Key: "changelog", Value: "text:fixed"}}
+	if _, err := a.SetTrailerFilter(path, pick, true); err != nil {
+		t.Fatal(err)
+	}
+	graphRows(t, a, path, 2)
+	if got := row(fixed); got != 0 {
+		t.Fatalf("under Only these, a commit the filter keeps is at row %d, want 0", got)
+	}
+	if got := row(added); got != rowFilteredOut {
+		t.Fatalf("under Only these, a commit the filter keeps out = %d, want %d", got, rowFilteredOut)
+	}
+
+	// Highlight takes nothing out: every commit has its row again.
+	if _, err := a.SetTrailerFilter(path, pick, false); err != nil {
+		t.Fatal(err)
+	}
+	graphRows(t, a, path, 3)
+	if got := row(added); got != 1 {
+		t.Fatalf("under Highlight, the commit is at row %d, want 1", got)
+	}
+	if got := row(nowhere); got != rowAbsent {
+		t.Fatalf("under Highlight, a commit that isn't in the history = %d, want %d", got, rowAbsent)
+	}
+}

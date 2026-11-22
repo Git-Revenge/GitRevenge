@@ -100,18 +100,35 @@ func (a *App) Refs(path string) ([]git.Ref, error) {
 	return refs, nil
 }
 
+// What CommitRow answers for a commit that has no row.
+const (
+	// rowAbsent: the commit isn't in the history the graph shows.
+	rowAbsent = -1
+	// rowFilteredOut: it isn't in the graph, and the graph holds only what a smart filter
+	// keeps, so it may well be in the history. The graph's view reads this as "hidden by the
+	// filter" where rowAbsent is "gone": it can't tell them apart by which mode the filter is
+	// in, since the rows it has may be from before the mode changed.
+	rowFilteredOut = -2
+)
+
 // CommitRow returns the graph row of a commit, reading on through the history until it
-// loads, or -1 if the commit isn't in the history. Progress events report the reading.
+// loads. For a commit with no row it returns rowAbsent, or rowFilteredOut when the graph it
+// looked in was narrowed by a smart filter. Progress events report the reading.
 func (a *App) CommitRow(path, id string) (int, error) {
 	r, err := a.openRepo(path)
 	if err != nil {
-		return -1, err
+		return rowAbsent, err
 	}
-	row, ok, err := r.FindRow(context.Background(), id)
-	if err != nil || !ok {
-		return -1, err
+	row, ok, narrowed, err := r.LocateRow(context.Background(), id)
+	switch {
+	case err != nil:
+		return rowAbsent, err
+	case ok:
+		return row, nil
+	case narrowed:
+		return rowFilteredOut, nil
 	}
-	return row, nil
+	return rowAbsent, nil
 }
 
 // openRepo returns the open repository at path.

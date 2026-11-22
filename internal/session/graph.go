@@ -77,8 +77,11 @@ type graphLoader struct {
 	// looked through, sorted: what a day held before the filter took commits out of it.
 	times []int64
 	// total is how many commits the history being loaded has, filter aside; 0 until counted.
-	total    int
-	current  *graph.Graph
+	total   int
+	current *graph.Graph
+	// narrowed says current was loaded under a filter: it holds only what the filter keeps.
+	// filter is what the next load will be under, which isn't always what's shown.
+	narrowed bool
 	refs     *RefIndex
 	loading  bool
 	paused   bool
@@ -443,6 +446,13 @@ func (l *graphLoader) Demand(row int) {
 // the displayed graph or the history ends, and returns that graph. A background reload
 // keeps the old graph displayed, so found may be satisfied by it.
 func (l *graphLoader) LoadUntil(ctx context.Context, found func(*graph.Graph) bool) (*graph.Graph, error) {
+	g, _, err := l.loadUntil(ctx, found)
+	return g, err
+}
+
+// loadUntil is LoadUntil, and says as well whether the graph it returns was loaded under a
+// filter, as of the moment it was the one being shown.
+func (l *graphLoader) loadUntil(ctx context.Context, found func(*graph.Graph) bool) (*graph.Graph, bool, error) {
 	l.start()
 	l.mu.Lock()
 	l.unbounded++
@@ -455,14 +465,15 @@ func (l *graphLoader) LoadUntil(ctx context.Context, found func(*graph.Graph) bo
 	for {
 		g, loading, changed := l.current, l.loading, l.changed
 		if g != nil && (!loading || found(g)) {
+			narrowed := l.narrowed
 			l.mu.Unlock()
-			return g, nil
+			return g, narrowed, nil
 		}
 		l.mu.Unlock()
 		select {
 		case <-changed:
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, false, ctx.Err()
 		}
 		l.mu.Lock()
 	}
@@ -511,6 +522,7 @@ func (l *graphLoader) reload() {
 	g := graph.New()
 	if l.current == nil {
 		l.current = g
+		l.narrowed = l.filter != nil
 	}
 	l.loading = true
 	l.started = true
@@ -666,6 +678,7 @@ func (l *graphLoader) reload() {
 		// swapLocked shows g in place of the graph it is reloading. The caller holds l.mu.
 		swapLocked := func(r refResult) {
 			l.current = g
+			l.narrowed = filter != nil
 			l.refs = r.idx
 			l.estimate = int(counted.Load())
 			l.notifyLocked()
@@ -755,6 +768,7 @@ func (l *graphLoader) reload() {
 		}
 		l.mu.Lock()
 		l.current = g
+		l.narrowed = filter != nil
 		l.refs = r.idx
 		l.loading = false
 		l.paused = false
