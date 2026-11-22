@@ -104,11 +104,14 @@ test.describe('the pin in the Smart filters panel', () => {
   const scenario = (over: object = {}) => ({ responses: { Refs: [], ShowingHidden: false, Worktrees: [], TrailerPanel: panel }, ...over })
   const show = async (page: Page, s: object = scenario()) => {
     await open(page, 'sidebar', s)
-    // The sidebar remembers its panel: the second time it's already showing.
+    // The sidebar remembers its panel: the second time it's already showing, and a click on
+    // its button would fold the sidebar away. So the panel is given a moment to show first.
     const tree = page.getByRole('tree', { name: 'Smart filters' })
-    if (!(await tree.isVisible().catch(() => false))) {
-      await page.getByRole('navigation', { name: 'Sidebar panels' }).getByRole('button', { name: /^Smart filters/ }).click()
-    }
+    const showing = await tree
+      .waitFor({ state: 'visible', timeout: 1500 })
+      .then(() => true)
+      .catch(() => false)
+    if (!showing) await page.getByRole('navigation', { name: 'Sidebar panels' }).getByRole('button', { name: /^Smart filters/ }).click()
     await expect(tree).toBeVisible()
   }
   const offer = (page: Page) => page.getByRole('group', { name: 'Show a trailer on the graph' })
