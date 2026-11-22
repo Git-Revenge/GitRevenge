@@ -18,6 +18,11 @@ import (
 // the index's ids as they were at a moment it held at least n commits, size bytes each. The
 // slice returned is shared and never changed.
 func (x *Index) orderOf(ids []byte, size, n int) []uint32 {
+	// An index that hasn't loaded its file yet has no table of commits at all, which counts
+	// as -1, and is asked all the same (a pinned key's chips, as a tab opens).
+	if n <= 0 || size == 0 {
+		return nil
+	}
 	x.orderMu.Lock()
 	defer x.orderMu.Unlock()
 	have := x.order

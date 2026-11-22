@@ -92,3 +92,22 @@ func TestTheIndexKeepsItsCommitsInIDOrder(t *testing.T) {
 		t.Error("found a commit by an id of another size")
 	}
 }
+
+// An index that hasn't loaded its file yet is asked about all the same, as a tab opens with a
+// key pinned, and holds nothing: it used to make a slice of -1 commits and panic.
+func TestAnIndexNotYetLoadedIsAskedAboutAllTheSame(t *testing.T) {
+	t.Parallel()
+	x := Open(t.TempDir(), t.TempDir())
+	defer x.Close()
+	id := hex.EncodeToString(make([]byte, 20))
+	r := x.Reading(Rules{})
+	if chips := r.Chips(id, []string{"key"}); chips != nil {
+		t.Errorf("Chips = %+v", chips)
+	}
+	if _, ok := r.Picked(id, []Pick{{Key: "key", Value: "text:value"}}); ok {
+		t.Error("Picked found a commit")
+	}
+	if _, ok := x.Trailers(id); ok {
+		t.Error("Trailers found a commit")
+	}
+}
