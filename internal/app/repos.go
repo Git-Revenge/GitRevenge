@@ -235,6 +235,9 @@ func (a *App) CloseRepo(path string) error {
 	a.trailerFilters.set(path, nil)
 	a.trailerPins.touch(path)
 	a.trailerCares.forget(path)
+	// And what was read of it, which on a long history is hundreds of MB.
+	a.trailerReadings.forget(path)
+	a.people.forget(path)
 	return m.Close(path)
 }
 
