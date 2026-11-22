@@ -12,7 +12,7 @@ Git Revenge is a desktop git client made by Ris Adams and its contributors ("we"
 
 **What it doesn't do.** It keeps no usage statistics, sends no crash reports, and has no analytics, advertising or tracking. Rendered previews fetch nothing from the network: images from the web are shown as links, HTML runs in a sandbox with no network, and GeoJSON is drawn without map tiles. The Map and Insights are worked out from the repository alone.
 
-**What it keeps on your machine.** Settings, project groups, recent repositories and open tabs, in one `settings.json` file; backups of git config files you save from the app; and a repository's own settings in its git config. The [install guide](guide/install.md#where-your-data-lives) says where they are. They never leave your machine. To remove them, delete that folder after uninstalling. Passwords and passphrases are passed from the prompt straight to `git` and are never written down by the app.
+**What it keeps on your machine.** Settings, project groups, recent repositories and open tabs, in one `settings.json` file; backups of git config files you save from the app; a repository's own settings in its git config; and a cache of the trailers on the commits of repositories you've opened (commit IDs and trailer text), so a history is read once. The [install guide](guide/install.md#where-your-data-lives) says where they are. They never leave your machine. To remove them, delete those folders after uninstalling. Passwords and passphrases are passed from the prompt straight to `git` and are never written down by the app.
 
 ## The website
 

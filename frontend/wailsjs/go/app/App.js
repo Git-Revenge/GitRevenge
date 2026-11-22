@@ -774,6 +774,10 @@ export function TrailerHints(arg1) {
   return window['go']['app']['App']['TrailerHints'](arg1);
 }
 
+export function TrailerStatus(arg1) {
+  return window['go']['app']['App']['TrailerStatus'](arg1);
+}
+
 export function TrustRepo(arg1) {
   return window['go']['app']['App']['TrustRepo'](arg1);
 }
