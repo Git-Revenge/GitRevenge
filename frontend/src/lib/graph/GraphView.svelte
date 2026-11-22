@@ -44,6 +44,7 @@
     trailersUnread = 0,
     filterPicks = [],
     onFilterPick,
+    pins = [],
     onFilterAdd,
     onFilterDrop,
     lead,
@@ -89,6 +90,9 @@
     /** Puts a trailer value in the smart filter, or takes it out if it's there: a click on a
      * pinned key's chip. Without it the chips are only read. */
     onFilterPick?: (key: string, value: string) => void
+    /** The trailer keys pinned to rows, in order: Compact gives each a column, headed by its
+     * name, while the message can spare the room. */
+    pins?: { key: string; label: string }[]
     /** Adds a trailer value to the smart filter. With it, the search box suggests the keys
      * and values that what's typed could mean. */
     onFilterAdd?: (key: string, value: string) => void
@@ -1314,6 +1318,15 @@
   /** The chip the pointer is on, as chipId names it, or "". */
   let hoveredChip = ''
   const chipPicked = (chip: { key: string; value: string }) => filterPicks.some((p) => p.key === chip.key && p.value === chip.value)
+  /** The pinned keys by ID, in the order of Compact's columns. */
+  let pinKeys = $derived(pins.map((p) => p.key))
+  // A key pinned or unpinned moves the columns.
+  $effect(() => {
+    void pins
+    untrack(schedule)
+  })
+  /** The selected commit's value for a pinned key, which its column's heading filters to. */
+  const selectedChip = (key: string) => cache.get(selected)?.chips?.find((c) => c.key === key)
   /** The chip of commit i at a point in the view, if it's one that takes a click. */
   function chipAt(i: number, x: number, y: number) {
     if (!onFilterPick) return undefined
@@ -1499,7 +1512,7 @@
       onSelectedRefs?.(refLabels(selectedRefs, remote))
     }
     const firstLane = minCol === Infinity ? 0 : laneWindow(minCol, maxCol, sel && selected >= first && selected < last ? sel.col : null, laneCapacity(graphW, m))
-    const lay = layoutColumns(w, graphW, density, firstLane, remote, labelW)
+    const lay = layoutColumns(w, graphW, density, firstLane, remote, labelW, pins.length)
     if (!columns || columns.width !== lay.width || columns.graphW !== lay.graphW || columns.density !== lay.density || columns.refW !== lay.refW) {
       columns = lay
     }
@@ -1544,7 +1557,7 @@
       const spans: ChipSpan[] | undefined = row.chips?.length ? [] : undefined
       const extra =
         isNoted || isArrived || follows || sparse || spans
-          ? { ...place?.extra, noted: isNoted, arrived: isArrived, follower: follows, sparse, chips: row.chips, chipPicked, chipHover: hoveredChip, chipSpans: spans }
+          ? { ...place?.extra, noted: isNoted, arrived: isArrived, follower: follows, sparse, chips: row.chips, pinKeys, chipPicked, chipHover: hoveredChip, chipSpans: spans }
           : place?.extra
       if (spans) chipSpans.set(i, spans)
       const span = drawRow(ctx, row, cache.refsFor(row.id), y, lay, th, sel, hov, dim, now, sealOf(sigs.get(row.id)), { prev: cache.get(i - 1), prev2: cache.get(i - 2), next: cache.get(i + 1) }, extra)
@@ -2088,6 +2101,23 @@
       <span style:left="12px">Branch / tag</span>
       {#if columns.graphW >= 56}<span style:left="{columns.refW + columns.m.pad}px">Graph</span>{/if}
       <span style:left="{columns.textX}px">Message</span>
+      {#each columns.pinX as x, i (pins[i]?.key ?? i)}
+        {#if pins[i]}
+          {@const chip = selectedChip(pins[i].key)}
+          <span class="pin-head" style:left="{x}px" style:width="{columns.pinW - 8}px">
+            <span class="pin-name" title="{pins[i].label}, pinned to rows">{pins[i].label}</span>
+            {#if onFilterPick}
+              <button
+                class="btn sm quiet icon"
+                onclick={() => chip && onFilterPick(chip.key, chip.value)}
+                disabled={!chip}
+                aria-label="Filter to the selected commit's {pins[i].label}"
+                title={chip ? `Filter to ${pins[i].label}: ${chipValue(chip)}` : `The selected commit has no ${pins[i].label}`}><Icon name="filter" size={13} /></button
+              >
+            {/if}
+          </span>
+        {/if}
+      {/each}
       {#if columns.authorW}
         <span style:left="{columns.authorX}px">
           Author
@@ -2603,6 +2633,13 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--ink-mute);
+  }
+
+  /* A pinned key's heading keeps to its column: a long name is cut, not run into the next. */
+  .columns .pin-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .columns > span {

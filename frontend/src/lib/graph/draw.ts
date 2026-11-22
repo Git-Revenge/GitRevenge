@@ -275,7 +275,7 @@ export function drawFoldLine(ctx: CanvasRenderingContext2D, fold: FoldLine, y: n
   ctx.stroke()
   ctx.textBaseline = 'middle'
   // When, at the end of the line, where a run's time is.
-  const right = (lay.authorW ? lay.authorX - 22 : lay.dateW ? lay.dateX - 22 : lay.shaX - MARKS_W) - 4
+  const right = messageRight(lay) - 4
   const time = `last ${timeLabel(fold.last).toLowerCase()}`
   setFont(ctx, `13px ${SERIF}`)
   ctx.fillStyle = theme.faint
@@ -552,6 +552,11 @@ export interface Layout {
   authorX: number
   dateX: number
   shaX: number
+  /** Compact's columns for the trailer keys pinned to rows, left of the author: where each
+   * starts, and how wide each is. There are none when nothing's pinned, in the timeline (where
+   * a pinned key's values follow the subject), or when the message can't spare the room. */
+  pinX: number[]
+  pinW: number
   /** The repository's main remote (see mainRemote). */
   remote: string
 }
@@ -594,7 +599,14 @@ export function noteMarkSpan(lay: Pick<Layout, 'shaX'>): [start: number, end: nu
   return [lay.shaX - NOTE_OFFSET - NOTE_REACH, lay.shaX - NOTE_OFFSET + NOTE_REACH]
 }
 
-export function layoutColumns(width: number, graphW: number, density: Density, firstLane = 0, remote = 'origin', labelW = LABEL_COLUMN.default): Layout {
+/** A pinned key's column in Compact: how wide, how many at most, and how much of the message
+ * must be left to read before a column is given up. */
+export const PIN_COLUMN = 140
+export const PIN_COLUMNS = 2
+const PIN_MESSAGE_MIN = 360
+
+/** The columns of a row. `pins` is how many trailer keys are pinned to rows. */
+export function layoutColumns(width: number, graphW: number, density: Density, firstLane = 0, remote = 'origin', labelW = LABEL_COLUMN.default, pins = 0): Layout {
   const compact = density === 'compact'
   const refW = refColumnWidth(width, labelW)
   const shaW = 76
@@ -602,6 +614,12 @@ export function layoutColumns(width: number, graphW: number, density: Density, f
   const authorW = compact && width >= 800 ? 150 : 0
   const shaX = width - shaW
   const dateX = shaX - dateW
+  const authorX = dateX - authorW
+  const textX = refW + graphW + (compact ? 8 : 6)
+  // A pinned key takes its column from the message, as many as it can spare: the author,
+  // date and SHA stay where they are, and without the room the column goes.
+  const messageEnd = authorW ? authorX : dateW ? dateX : shaX
+  const fit = compact && pins > 0 ? Math.max(0, Math.min(pins, PIN_COLUMNS, Math.floor((messageEnd - textX - PIN_MESSAGE_MIN) / PIN_COLUMN))) : 0
   return {
     width,
     graphW,
@@ -609,15 +627,24 @@ export function layoutColumns(width: number, graphW: number, density: Density, f
     density,
     m: METRICS[density],
     refW,
-    textX: refW + graphW + (compact ? 8 : 6),
+    textX,
     authorW,
     dateW,
     shaW,
-    authorX: dateX - authorW,
+    authorX,
     dateX,
     shaX,
+    pinX: Array.from({ length: fit }, (_, i) => messageEnd - (fit - i) * PIN_COLUMN),
+    pinW: PIN_COLUMN,
     remote,
   }
+}
+
+/** Where the message column ends: short of the next column, or of the marks when the SHA is
+ * next. */
+function messageRight(lay: Layout): number {
+  if (lay.pinX.length) return lay.pinX[0] - 22
+  return lay.authorW ? lay.authorX - 22 : lay.dateW ? lay.dateX - 22 : lay.shaX - MARKS_W
 }
 
 const SERIF = '"Fraunces Variable", Georgia, serif'
@@ -773,8 +800,11 @@ export interface RowExtra {
   /** The graph is filtered to some of its commits: the rows aren't neighbours any more, so
    * the lane between them is dashed. */
   sparse?: boolean
-  /** The commit's values for the trailer keys pinned to rows: chips after the subject. */
+  /** The commit's values for the trailer keys pinned to rows: chips after the subject in the
+   * timeline, and a column for each key in Compact. */
   chips?: RowChip[]
+  /** The pinned keys by ID, in the order of Compact's columns for them. */
+  pinKeys?: string[]
   /** Whether a chip is in the smart filter, which fills it. */
   chipPicked?: (chip: RowChip) => boolean
   /** The chip the pointer is on, as chipId names it. */
@@ -1258,9 +1288,33 @@ export function drawRow(
     if (ditto) ctx.globalAlpha /= 0.6
   }
 
+  // A pinned key's column, in Compact: the commit's value for it, in its kind's ink, with a
+  // count when it has more than one. The key is said once, in the column's heading.
+  if (lay.pinX.length && extra.pinKeys) {
+    setFont(ctx, CHIP_FONT)
+    lay.pinX.forEach((x, i) => {
+      const mine = (extra.chips ?? []).filter((c) => c.key === extra.pinKeys![i])
+      if (!mine.length) return
+      const more = mine.length > 1 ? ` +${mine.length - 1}` : ''
+      const text = clip(ctx, chipValue(mine[0]), lay.pinW - 16 - ctx.measureText(more).width)
+      const width = ctx.measureText(text).width
+      const ink = chipInk(mine[0].kind, theme)
+      ctx.fillStyle = ink
+      ctx.fillText(text, x, line1)
+      if (more) {
+        ctx.fillStyle = theme.muted
+        ctx.fillText(more, x + width, line1)
+      }
+      // In the filter, or under the pointer: underlined, as a link is.
+      if (extra.chipPicked?.(mine[0]) || extra.chipHover === chipId(mine[0])) {
+        ctx.fillRect(x, Math.round(line1 + 8), width, 1)
+      }
+      extra.chipSpans?.push({ x0: x, x1: x + Math.max(14, width), y0: line1 - 10, y1: line1 + 10, chip: mine[0] })
+    })
+  }
+
   let left = lay.textX
-  // The subject stops short of the next column, or of the marks when the SHA is next.
-  let subjectRight = lay.authorW ? lay.authorX - 22 : lay.dateW ? lay.dateX - 22 : lay.shaX - MARKS_W
+  let subjectRight = messageRight(lay)
   if (comfortable && extra.follower) {
     // A row that carries on a run says only when, quietly, at the end of its one line.
     const time = timeLabel(row.authorTime).toLowerCase()

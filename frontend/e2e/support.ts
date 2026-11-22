@@ -31,6 +31,8 @@ export interface Scenario {
   highlight?: number[]
   /** The trailer keys pinned to the graph's rows, by ID, as the sidebar is told. */
   pinnedKeys?: string[]
+  /** The trailer keys pinned to rows, in order, as the graph is told: Compact's columns. */
+  pins?: { key: string; label: string }[]
   /** The chips of pinned keys on the graph's rows, by commit id. With them the graph is
    * given a filter to pick into. */
   graphChips?: Record<string, { key: string; keyLabel: string; value: string; label: string; kind: string }[]>
