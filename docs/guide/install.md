@@ -28,7 +28,7 @@ Installing Git Revenge also gives you a `gitrevenge` command, which opens the ap
 gitrevenge
 ```
 
-- **Windows:** the installer adds `C:\Program Files\Git Revenge\bin` to the system `PATH`, and uninstalling takes it off again. That folder holds only the command, which works in cmd, PowerShell and Git Bash. A terminal that was already open doesn't see the change: open a new one.
+- **Windows:** the installer adds `C:\Program Files\Git Revenge\bin` to your own `PATH`, the one for the account that installs, and uninstalling takes it off again. That folder holds only the command, which works in cmd, PowerShell and Git Bash. The machine's `PATH` isn't changed, so other accounts on the computer don't get the command; they start Git Revenge from the Start menu. A terminal that was already open doesn't see the change: open a new one.
 - **macOS:** Homebrew links the command when it installs the app. If you installed from the disk image, open the command palette and choose **Install the gitrevenge command**. It writes a short script to `/usr/local/bin/gitrevenge`, and macOS asks for an administrator's password first, because that folder belongs to the system. If you move the app, install the command again.
 - **Linux:** the packages install the app as `/usr/bin/gitrevenge`.
 

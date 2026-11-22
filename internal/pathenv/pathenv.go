@@ -1,4 +1,5 @@
-// Package pathenv puts a folder on the Windows PATH, or takes it off, for the installer.
+// Package pathenv puts a folder on the current user's Windows PATH, or takes it off, for the
+// installer.
 //
 // The installer can't do it itself. NSIS reads a registry string into a 1024-character
 // buffer, so a longer PATH comes back empty and would be written back that way. Here the

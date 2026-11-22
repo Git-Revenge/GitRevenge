@@ -13,8 +13,14 @@ import (
 // Flag is the first argument that makes the app edit the PATH and exit instead of starting.
 // The installer and uninstaller run it as:
 //
-//	gitrevenge.exe --installer-path add|remove machine|user <folder>
+//	gitrevenge.exe --installer-path add|remove <folder>
+//
+// It edits the current user's PATH and no other. The machine's PATH reaches every account on
+// the machine, the system's too, and the folder may be one that others can write to (#895).
 const Flag = "--installer-path"
+
+// userEnvironment is where Windows keeps the current user's own environment variables.
+const userEnvironment = "Environment"
 
 // Run does what the installer asked for, when args start with Flag. It returns the process's
 // exit code, and false when args are an ordinary start of the app.
@@ -30,8 +36,8 @@ func Run(args []string, stderr io.Writer) (code int, handled bool) {
 }
 
 func run(args []string) error {
-	if len(args) != 3 {
-		return errors.New("usage: " + Flag + " add|remove machine|user <folder>")
+	if len(args) != 2 {
+		return errors.New("usage: " + Flag + " add|remove <folder>")
 	}
 	var change func(path, dir string) (string, bool)
 	switch args[0] {
@@ -42,22 +48,12 @@ func run(args []string) error {
 	default:
 		return fmt.Errorf("unknown action %q", args[0])
 	}
-	var root registry.Key
-	var name string
-	switch args[1] {
-	case "machine":
-		root, name = registry.LOCAL_MACHINE, `SYSTEM\CurrentControlSet\Control\Session Manager\Environment`
-	case "user":
-		root, name = registry.CURRENT_USER, "Environment"
-	default:
-		return fmt.Errorf("unknown scope %q", args[1])
-	}
-	dir := filepath.Clean(args[2])
+	dir := filepath.Clean(args[1])
 	// PATH separates its entries with semicolons, so it can't hold a folder with one in its name.
 	if !filepath.IsAbs(dir) || strings.Contains(dir, ";") {
-		return fmt.Errorf("%q can't be a PATH entry", args[2])
+		return fmt.Errorf("%q can't be a PATH entry", args[1])
 	}
-	key, err := registry.OpenKey(root, name, registry.QUERY_VALUE|registry.SET_VALUE)
+	key, err := registry.OpenKey(registry.CURRENT_USER, userEnvironment, registry.QUERY_VALUE|registry.SET_VALUE)
 	if err != nil {
 		return fmt.Errorf("opening the environment: %w", err)
 	}
@@ -66,7 +62,9 @@ func run(args []string) error {
 }
 
 // edit rewrites key's Path value with change, as the type of value it already is. It writes
-// nothing when change leaves the path alone, and refuses a value that isn't a string.
+// nothing when change leaves the path alone, and refuses a value that isn't a string. A path
+// that change empties is taken away: a user's PATH is often only what an installer added, and
+// an empty value and none are the same to Windows, so an uninstall leaves things as they were.
 func edit(key registry.Key, change func(path string) (string, bool)) error {
 	path, kind, err := key.GetStringValue("Path")
 	if errors.Is(err, registry.ErrNotExist) {
@@ -80,9 +78,12 @@ func edit(key registry.Key, change func(path string) (string, bool)) error {
 	if !changed {
 		return nil
 	}
-	if kind == registry.SZ {
+	switch {
+	case updated == "":
+		err = key.DeleteValue("Path")
+	case kind == registry.SZ:
 		err = key.SetStringValue("Path", updated)
-	} else {
+	default:
 		err = key.SetExpandStringValue("Path", updated)
 	}
 	if err != nil {

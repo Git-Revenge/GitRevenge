@@ -95,21 +95,20 @@ Function .onInit
    !insertmacro wails.checkArchitecture
 FunctionEnd
 
-# Whose PATH the launchers' folder goes on: everyone's for the usual install, which runs as
-# an administrator, and the current user's for one built to run without.
-!if "${REQUEST_EXECUTION_LEVEL}" == "user"
-  !define PATH_SCOPE "user"
-!else
-  !define PATH_SCOPE "machine"
-!endif
-
-# Puts $INSTDIR\bin on the PATH (ACTION "add") or takes it off ("remove"), then tells running
-# programs the environment changed, so the next terminal opened has it. The app makes the edit
-# (internal/pathenv), because NSIS can't safely: it reads a registry string into a
-# 1024-character buffer, so a longer PATH would come back empty and be written back that way.
+# Puts $INSTDIR\bin on the current user's PATH (ACTION "add") or takes it off ("remove"),
+# then tells running programs the environment changed, so the next terminal opened has it.
+#
+# Only the current user's, though the install runs as an administrator: the machine's PATH
+# reaches every account, the system's too, and $INSTDIR may be a folder others can write to
+# if that's where it was put (#895). The command is a convenience for whoever installs; another
+# account on the machine starts the app from the Start menu.
+#
+# The app makes the edit (internal/pathenv), because NSIS can't safely: it reads a registry
+# string into a 1024-character buffer, so a longer PATH would come back empty and be written
+# back that way.
 !macro gitrevenge.path ACTION
     ClearErrors
-    ExecWait '"$INSTDIR\${PRODUCT_EXECUTABLE}" --installer-path ${ACTION} ${PATH_SCOPE} "$INSTDIR\bin"' $0
+    ExecWait '"$INSTDIR\${PRODUCT_EXECUTABLE}" --installer-path ${ACTION} "$INSTDIR\bin"' $0
     ${If} ${Errors}
         DetailPrint "Couldn't ${ACTION} the PATH entry: ${PRODUCT_EXECUTABLE} didn't start"
     ${ElseIf} $0 != 0

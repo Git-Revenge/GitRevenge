@@ -98,6 +98,31 @@ func TestEditCreatesAMissingPathAsExpandable(t *testing.T) {
 	}
 }
 
+// A user's PATH is often only what an installer added. Taking the entry off takes the
+// value away, so an install and an uninstall leave the environment as they found it (#895).
+func TestEditTakesAwayAPathItEmpties(t *testing.T) {
+	key := scratchKey(t)
+	if err := edit(key, adding); err != nil {
+		t.Fatal(err)
+	}
+	if err := edit(key, removing); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := key.GetStringValue("Path"); !errors.Is(err, registry.ErrNotExist) {
+		t.Fatalf("an empty Path was left behind: %v", err)
+	}
+	// One that has something else in it stays.
+	if err := key.SetStringValue("Path", `C:\Tools;`+bin); err != nil {
+		t.Fatal(err)
+	}
+	if err := edit(key, removing); err != nil {
+		t.Fatal(err)
+	}
+	if got, kind := readPath(t, key); got != `C:\Tools` || kind != registry.SZ {
+		t.Fatalf("got type %d, %q", kind, got)
+	}
+}
+
 func TestEditLeavesAMissingPathMissingWhenNothingChanges(t *testing.T) {
 	key := scratchKey(t)
 	if err := edit(key, removing); err != nil {
@@ -122,24 +147,26 @@ func TestEditRefusesAPathThatIsNotAString(t *testing.T) {
 }
 
 func TestRunIgnoresAnOrdinaryStart(t *testing.T) {
-	for _, args := range [][]string{nil, {}, {`C:\some\repo`}, {"add", "machine", bin}, {"x", Flag, "add", "user", bin}} {
+	for _, args := range [][]string{nil, {}, {`C:\some\repo`}, {"add", bin}, {"x", Flag, "add", bin}} {
 		if _, handled := Run(args, &bytes.Buffer{}); handled {
 			t.Errorf("Run(%q) took an ordinary start as the installer's", args)
 		}
 	}
 }
 
-// Each of these fails before the registry is opened.
+// Each of these fails before the registry is opened. The machine's PATH can't be asked for
+// in any spelling (#895).
 func TestRunRefusesWhatItCannotDo(t *testing.T) {
 	tests := map[string][]string{
 		"no arguments":        {Flag},
-		"too few":             {Flag, "add", "user"},
-		"unknown action":      {Flag, "prepend", "user", bin},
-		"unknown scope":       {Flag, "add", "everyone", bin},
-		"relative folder":     {Flag, "add", "user", `Git Revenge\bin`},
-		"semicolon in folder": {Flag, "add", "user", `C:\Tools;More\bin`},
-		"empty folder":        {Flag, "add", "user", ""},
-		"extra argument":      {Flag, "add", "user", bin, "more"},
+		"too few":             {Flag, "add"},
+		"unknown action":      {Flag, "prepend", bin},
+		"the machine's PATH":  {Flag, "add", "machine", bin},
+		"a scope at all":      {Flag, "add", "user", bin},
+		"relative folder":     {Flag, "add", `Git Revenge\bin`},
+		"semicolon in folder": {Flag, "add", `C:\Tools;More\bin`},
+		"empty folder":        {Flag, "add", ""},
+		"extra argument":      {Flag, "add", bin, "more"},
 	}
 	for name, args := range tests {
 		t.Run(name, func(t *testing.T) {
