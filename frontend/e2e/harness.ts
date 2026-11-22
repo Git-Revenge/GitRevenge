@@ -249,7 +249,7 @@ const mounts = {
     // A test about the saved view has the app read it first, as the app does when it starts.
     if (scenario.responses?.GraphViews) await (await import('../src/lib/theme.svelte')).theme.load()
     const wip = scenario.wip ? { changes: scenario.wip.changes, active: false, open: record('wip') } : undefined
-    mount(GraphView, { target: host, props: { path: '/repo', wip, onSelect: record('select'), onNote: (row: { index: number }) => win.__events.push(['note', row.index]), onContext: (row: { index: number }) => win.__events.push(['context-row', row.index]), onDrop: record('drop'), ...(scenario.suggests ? { onFilterAdd: record('filter-add'), onFilterDrop: record('filter-drop') } : {}), sparse: scenario.sparse ?? false, highlight: scenario.highlight ?? null, filterPicks: scenario.filterPicks ?? [], ...(scenario.graphChips ? { onFilterPick: record('filter-pick') } : {}), trailersUnread: scenario.trailersUnread ?? 0 } })
+    mount(GraphView, { target: host, props: { path: '/repo', wip, onSelect: record('select'), onNote: (row: { index: number }) => win.__events.push(['note', row.index]), onContext: (row: { index: number }) => win.__events.push(['context-row', row.index]), onDrop: record('drop'), ...(scenario.suggests ? { onFilterAdd: record('filter-add'), onFilterDrop: record('filter-drop') } : {}), sparse: scenario.sparse ?? false, highlight: scenario.highlight ?? null, filterPicks: scenario.filterPicks ?? [], pins: scenario.pins ?? [], ...(scenario.graphChips ? { onFilterPick: record('filter-pick') } : {}), trailersUnread: scenario.trailersUnread ?? 0 } })
   },
   async commitMenu() {
     const { default: ContextMenu } = await import('../src/lib/ContextMenu.svelte')

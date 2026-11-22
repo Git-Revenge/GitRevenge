@@ -122,19 +122,20 @@
 
   // The trailer keys pinned to the graph's rows. They live in git config, the repository's
   // or the global one, so they're read again when either changes.
-  let pinnedKeys = $state<string[]>([])
+  let pins = $state<{ key: string; label: string }[]>([])
+  let pinnedKeys = $derived(pins.map((p) => p.key))
   $effect(() => {
     const repo = path
     void session.configRevision[repo]
     void TrailerPins(repo)
-      .then((pins) => {
-        if (repo === path) pinnedKeys = (pins ?? []).map((p) => p.key)
+      .then((got) => {
+        if (repo === path) pins = (got ?? []).map((p) => ({ key: p.key, label: p.label }))
       })
       .catch(() => {})
   })
   async function setPin(key: string, on: boolean) {
-    const pins = await session.run(() => SetTrailerPin(path, key, on))
-    if (pins) pinnedKeys = pins.map((p) => p.key)
+    const got = await session.run(() => SetTrailerPin(path, key, on))
+    if (got) pins = got.map((p) => ({ key: p.key, label: p.label }))
   }
 
   /** A value picked in the search box joins the filter; one that's there already stays. */
@@ -417,7 +418,7 @@
       <FilterStrip {filter} {only} {onlyOffered} onRemove={(p) => setFilter(togglePick(filter.picks, p.key, p.value))} onAdd={() => sidebar?.show('filters')} onMode={setMode} onClear={() => setFilter([])} />
     {/if}
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filter.picks.length > 0} {highlight} {trailersUnread} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFilterDrop={() => filter.picks.length && setFilter(filter.picks.slice(0, -1))} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filter.picks.length > 0} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFilterDrop={() => filter.picks.length && setFilter(filter.picks.slice(0, -1))} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           openMenu(commitMenuItems(row, refs, ctx), x, y)}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
