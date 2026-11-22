@@ -43,11 +43,15 @@ type TrailerProgress struct {
 
 func (a *App) emitTrailerProgress(path string, st trailerindex.Status) {
 	// A filter keeps more once more of the history is read, or a new commit's trailers are:
-	// when a read ends, what the filter shows is worked out again.
+	// when a read ends, what the filter shows is worked out again. Not from here, though:
+	// this is the reader's own goroutine, and closing a repository waits for its reader
+	// while holding the lock that looking the repository up needs.
 	if !st.Reading && a.trailerFilters.get(path) != nil {
-		if r, err := a.openRepo(path); err == nil {
-			a.applyTrailerFilter(r)
-		}
+		go func() {
+			if r, err := a.openRepo(path); err == nil {
+				a.applyTrailerFilter(r)
+			}
+		}()
 	}
 	a.emit("trailers:progress", TrailerProgress{Path: path, Status: st})
 }

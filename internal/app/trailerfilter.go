@@ -48,6 +48,10 @@ type TrailerFilterState struct {
 type trailerFilters struct {
 	mu sync.Mutex
 	by map[string]*repoFilter
+	// applying is held while a filter is read and given to the graph, so that two of those
+	// take turns: the end of a trailer read applies the filter while the window may be
+	// changing it, and whichever goes second must be the one that saw the latest.
+	applying sync.Mutex
 }
 
 type repoFilter struct {
@@ -119,6 +123,8 @@ func (a *App) TrailerFilter(path string) (TrailerFilterState, error) {
 // now, and has the graph show it: only those commits under Only these, everything under
 // Highlight or with no filter. Asking again with nothing changed reloads nothing.
 func (a *App) applyTrailerFilter(r *session.Repo) TrailerFilterState {
+	a.trailerFilters.applying.Lock()
+	defer a.trailerFilters.applying.Unlock()
 	state := TrailerFilterState{Picks: []FilterPick{}}
 	// How many commits there are with no filter: counted exactly once a load has finished,
 	// and git's quick count, which is a commit or two over where there are stashes, until then.

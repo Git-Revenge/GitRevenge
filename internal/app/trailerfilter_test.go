@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -100,5 +101,43 @@ func TestTrailerFilterNarrowsTheGraph(t *testing.T) {
 	graphRows(t, a, path, 5)
 	if rows, _ := a.TrailerFilterRows(path); rows.Total != 0 || rows.Rows == nil {
 		t.Fatalf("rows with no filter = %+v", rows)
+	}
+}
+
+// A repository closes while its filter is on and a read of its trailers is ending. The end
+// of a read works the filter out again, and it must not wait for what closing holds.
+func TestClosingWithAFilterOnDoesNotHang(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "a.txt", "One", "Changelog: fixed")
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "b.txt", "Two", "Changelog: added")
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "c.txt", "Three", "Changelog: fixed")
+	path := openForMap(t, a, fx)
+	trailersRead(t, a, path)
+	graphRows(t, a, path, 3)
+	fixed := []trailerindex.Pick{{Key: "changelog", Value: "text:fixed"}}
+	if _, err := a.SetTrailerFilter(path, fixed, true); err != nil {
+		t.Fatal(err)
+	}
+	graphRows(t, a, path, 2)
+	// Each change of mode loads the graph again, and each load has the trailers read again:
+	// the app shuts down with those reads on their way, some of them just ending.
+	for i := range 8 {
+		if _, err := a.SetTrailerFilter(path, fixed, i%2 == 1); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Duration(i) * 5 * time.Millisecond)
+	}
+	closed := make(chan struct{})
+	go func() {
+		a.Shutdown(context.Background())
+		close(closed)
+	}()
+	select {
+	case <-closed:
+	case <-time.After(30 * time.Second):
+		// The test's cleanup closes the app too and would hang behind this one: stop here.
+		panic("closing hung: the end of a trailer read is waiting for the lock that closing holds")
 	}
 }
