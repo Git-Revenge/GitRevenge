@@ -13,7 +13,7 @@ Marcus remembers the tide-prediction work closed issue 14, but not when it lande
 
    - the commit **message** (*tide height*),
    - the **author** (*Sarah*),
-   - the **SHA**, or the start of it (*6fd96d0*),
+   - the **SHA**, or the start of it (*7c810bf*),
    - a **trailer**, such as `Closes: #14` or `Co-authored-by: Sarah`.
 
    As you type, a list under the box offers the trailer keys and values that contain it. Type `closes:` and it lists the issues that `Closes` names, each with how many commits close it.

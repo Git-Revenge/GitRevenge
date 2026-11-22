@@ -130,6 +130,9 @@ A [trailer](smart-filters.md) is a line such as `Reviewed-by: Jessica Nguyen` or
 
 As you type, a list under the box offers the trailer keys and values that contain what you've typed, each with how many commits have it. The first row is the plain search, so <kbd>Enter</kbd> still goes to the next match. Press <kbd>↓</kbd> to a suggestion and <kbd>Enter</kbd> to filter the graph by it, or <kbd>Tab</kbd> to complete it in the box. <kbd>Backspace</kbd> in an empty box takes the last value out of the filter.
 
+![The search box with reviewed-by: typed, and the reviewers it offers, each with how many commits](../img/search-suggestions-light.webp#gh-light-mode-only)
+![The search box with reviewed-by: typed, and the reviewers it offers, each with how many commits](../img/search-suggestions-dark.webp#gh-dark-mode-only)
+
 ## Filtering by a trailer
 
 Search moves between matches. A **smart filter** changes what the graph shows: pick a value in the sidebar's **Smart filters** panel, or from the search box's suggestions, and the graph filters to the commits that have it.
@@ -138,6 +141,9 @@ A strip above the graph says how many commits the filter keeps, with a chip for 
 
 - **Only these**, the default, takes the other commits out. Those that stay are strung on one dashed line, and each day's line says how many it kept of how many the day had.
 - **Highlight** leaves everything, fades what doesn't match, and ticks each match on the [ruler](#the-ruler).
+
+![A filter on as Only these: the strip above the graph, and only the commits it keeps](../img/smart-filter-only-light.webp#gh-light-mode-only)
+![A filter on as Only these: the strip above the graph, and only the commits it keeps](../img/smart-filter-only-dark.webp#gh-dark-mode-only)
 
 A filter stacks with a [focus](#focusing-on-a-branch) and with hidden branches. [Smart filters](smart-filters.md) covers the panel, combining values, pinning a key so its values show on every row, and Trailer care.
 

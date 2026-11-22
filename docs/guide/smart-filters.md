@@ -19,6 +19,9 @@ It's read-only. Smart filters never writes a trailer, changes a commit, or asks 
 
 Open **Smart filters** in the sidebar's rail. It lists each key the history uses, most commits first, with what its values are (people, tickets, commits, labels) and how many commits have it. Under each key are its values, each with its count.
 
+![The Smart filters panel: each key with what its values are and how many commits have it, and its values under it](../img/smart-filters-panel-light.webp#gh-light-mode-only)
+![The Smart filters panel: each key with what its values are and how many commits have it, and its values under it](../img/smart-filters-panel-dark.webp#gh-dark-mode-only)
+
 - **People** are shown by name, as your [mailmap](people.md) reads them. Someone the mailmap joins is one person under every key, and bots come after everyone else.
 - **Tickets** are a reference by number (`#12`, `tide/api#12`), a tracker's key (`TIDE-12`), the address of an issue or pull request, or anything one of your [smart links](settings.md#links) matches.
 - **Labels** are a few values used over many commits, such as `Changelog: fixed`.
@@ -64,6 +67,12 @@ A filter has two modes, switched in the strip and remembered for each repository
 - **Only these**, the default. Commits that don't match leave the graph. Those that stay are strung on one dashed line, since they're no longer neighbours. Each day's line says how many it kept of how many the day had: "1 of 3 commits".
 - **Highlight.** Nothing leaves. The matches keep their ink and the rest fade, each match has a tick on the [ruler](graph.md#the-ruler), and a day's line adds how many of its commits match. A match inside a [folded lane](graph.md#folded-lanes) shows.
 
+![Only these: the graph holds the 171 commits that say Changelog: fixed, on one dashed line, and each day says how many it kept](../img/smart-filter-only-light.webp#gh-light-mode-only)
+![Only these: the graph holds the 171 commits that say Changelog: fixed, on one dashed line, and each day says how many it kept](../img/smart-filter-only-dark.webp#gh-dark-mode-only)
+
+![Highlight: every commit is there, the fixes keep their ink, and the ruler has a tick for each](../img/smart-filter-highlight-light.webp#gh-light-mode-only)
+![Highlight: every commit is there, the fixes keep their ink, and the ruler has a tick for each](../img/smart-filter-highlight-dark.webp#gh-dark-mode-only)
+
 The **Horizontal** view always highlights, since taking commits out would break its lanes.
 
 A filter stacks with [focus](graph.md#focusing-on-a-branch) and with [hidden branches](branch-care.md#hiding-branches): the graph shows what passes all of them. It lasts until you clear it or close the tab.
@@ -82,6 +91,9 @@ The [search box](graph.md#searching) knows trailers too. As you type, a list und
 - typing a word, such as `jess`, offers the values that contain it, under their keys;
 - typing a key and a colon, such as `reviewed-by:`, offers that key's values;
 - a key's own row writes the key in the box, to choose among its values.
+
+![The search box with reviewed-by: typed, and the reviewers it offers, each with how many commits](../img/search-suggestions-light.webp#gh-light-mode-only)
+![The search box with reviewed-by: typed, and the reviewers it offers, each with how many commits](../img/search-suggestions-dark.webp#gh-dark-mode-only)
 
 The first row is always the plain search, and it's where the keys start, so <kbd>Enter</kbd> goes to the next match as it always has. Press <kbd>↓</kbd> to reach a suggestion and <kbd>Enter</kbd> to add it to the filter. <kbd>Tab</kbd> completes it in the box. <kbd>Backspace</kbd> in an empty box takes the last value out of the filter. Counts in the list are within the filter that's already on.
 
@@ -108,6 +120,12 @@ Nothing is pinned until you pin it. The pin is beside each key in the panel, sho
 - **In the timeline**, a pinned key's values are chips after the subject: the key, then the value in its kind's colour. A row shows two and a count of the rest. Chips take the room the subject doesn't need, and never more than half.
 - **In Compact**, a pinned key has a column of its own, left of **Author**, with the key in the heading. Up to two keys get a column, while the message keeps room to be read; a narrower window gives the columns up.
 
+![The timeline with Changelog pinned: a chip after the subject of each commit that has the trailer](../img/smart-filter-pinned-light.webp#gh-light-mode-only)
+![The timeline with Changelog pinned: a chip after the subject of each commit that has the trailer](../img/smart-filter-pinned-dark.webp#gh-dark-mode-only)
+
+![Compact rows with Changelog pinned: a column of its own, left of Author](../img/smart-filter-compact-light.webp#gh-light-mode-only)
+![Compact rows with Changelog pinned: a column of its own, left of Author](../img/smart-filter-compact-dark.webp#gh-dark-mode-only)
+
 Click a chip, or a value in a column, to filter the graph to it. In Compact, the filter button in a column's heading filters to the selected commit's value. With the keyboard, select the row and press <kbd>Tab</kbd>: its chips are the first of the row's actions.
 
 The Horizontal view and the Map don't show pinned keys.
@@ -117,6 +135,9 @@ The Horizontal view and the Map don't show pinned keys.
 Some inconsistencies aren't the app's to settle. **Trailer care** is where you say how this repository's trailers should be read. Open it from **Settings › Smart filters**, from **Needs care** in the panel, which counts the questions waiting, or with **Trailer care** in the command palette.
 
 Nothing in Trailer care changes a commit. An answer is a rule, and a rule only says how to read what's already written. Every one can be undone.
+
+![Trailer care: a key one letter off Reviewed-by to answer, a person written two ways, and the table of keys](../img/trailer-care-light.webp#gh-light-mode-only)
+![Trailer care: a key one letter off Reviewed-by to answer, a person written two ways, and the table of keys](../img/trailer-care-dark.webp#gh-dark-mode-only)
 
 ### Needs care
 
