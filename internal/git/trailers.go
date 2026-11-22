@@ -30,7 +30,7 @@ var (
 // index keeps what MessageTrailers returned for every commit, on disk, so raise this
 // whenever SplitTrailers or MessageTrailers would answer differently for a message they
 // have already read: the index is then read again from the history.
-const TrailerParserVersion = 1
+const TrailerParserVersion = 2
 
 // MessageTrailers returns the trailers of a whole commit message: its subject, a blank
 // line, and a body. The subject is never a trailer, though "fix: the gauge" looks like one.
@@ -41,50 +41,156 @@ func MessageTrailers(message string) []Trailer {
 }
 
 // SplitTrailers separates a message body's trailers from the rest of it. As in git, the
-// trailers are the last paragraph when every line in it is a trailer or an indented
-// continuation of one. Closing references count as trailers too, and so does a paragraph
-// of them just before the trailers, as in "Closes #12", blank line, "Co-authored-by: …".
+// trailers are in the last paragraph: every line of it a trailer or an indented
+// continuation of one, or, where it has a line git itself writes (see gitWritten), at
+// least a quarter of them. The lines of such a paragraph that aren't trailers stay in the
+// message, and so does what git doesn't read at the very end (see ignoredTail). Closing
+// references count as trailers too, and so does a paragraph of them just before the
+// trailers, as in "Closes #12", blank line, "Co-authored-by: …".
 func SplitTrailers(body string) (rest string, trailers []Trailer) {
 	body = strings.TrimRight(strings.ReplaceAll(body, "\r\n", "\n"), " \t\n")
-	paras := paragraphs.Split(body, -1)
+	cut := ignoredTail(body)
+	tail := strings.TrimLeft(body[cut:], "\n")
+	paras := paragraphs.Split(strings.TrimRight(body[:cut], " \t\n"), -1)
 	keep := len(paras)
+	var notes []string
 	for keep > 0 {
-		t := parseTrailerParagraph(paras[keep-1])
+		// Only the message's last paragraph may have other lines among its trailers.
+		t, others := parseTrailerParagraph(paras[keep-1], keep == len(paras))
 		if t == nil {
 			break
 		}
 		trailers = append(t, trailers...)
 		keep--
+		if others != nil {
+			notes = others
+		}
 	}
 	if len(trailers) == 0 {
 		return body, nil
 	}
-	return strings.TrimSpace(strings.Join(paras[:keep], "\n\n")), trailers
+	left := slices.Clone(paras[:keep])
+	if notes != nil {
+		// A note written among the trailers is still part of the message, where it was.
+		left = append(left, strings.Join(notes, "\n"))
+	}
+	if tail != "" {
+		left = append(left, tail)
+	}
+	return strings.TrimSpace(strings.Join(left, "\n\n")), trailers
 }
 
-// parseTrailerParagraph returns a paragraph's trailers, or nil if any line isn't one.
-func parseTrailerParagraph(para string) []Trailer {
-	var out []Trailer
+// ignoredTail returns where the end of a message that git doesn't read for trailers
+// begins: a closing run of comment lines, blank lines and the "Conflicts:" list of files
+// that git once wrote into a merge's message, and that some maintainers still write under
+// their sign-off. It's len(body) when the message has no such end.
+func ignoredTail(body string) int {
+	start, conflicts := -1, false
+	for at := 0; at < len(body); {
+		line, next := body[at:], len(body)
+		if nl := strings.IndexByte(line, '\n'); nl >= 0 {
+			line, next = line[:nl], at+nl+1
+		}
+		switch {
+		case line == "" || line[0] == '#':
+			if start < 0 {
+				start = at
+			}
+		case line == "Conflicts:":
+			conflicts = true
+			if start < 0 {
+				start = at
+			}
+		case conflicts && line[0] == '\t':
+			// A file in the list.
+		default:
+			start, conflicts = -1, false
+		}
+		at = next
+	}
+	if start < 0 {
+		return len(body)
+	}
+	return start
+}
+
+// gitWritten are the starts of the lines git itself writes at the end of a message, in
+// lower case: a sign-off, and the note a cherry-pick -x leaves. A closing paragraph that has
+// one is trailers by git's own rule, though other lines sit among them: the Linux kernel
+// puts a bracketed note about who changed what between its sign-offs.
+var gitWritten = []string{"signed-off-by:", "(cherry picked from commit "}
+
+// parseTrailerParagraph returns a paragraph's trailers, or nil if it isn't a paragraph of
+// them. With mixed, it may hold other lines too, as git allows: comment lines, or, where it
+// has a line git itself writes, any lines so long as a quarter of them all are trailers.
+// Those other lines are returned as others, in order, each with its own continuation lines.
+func parseTrailerParagraph(para string, mixed bool) (out []Trailer, others []string) {
+	const none, trailer, other = 0, 1, 2
+	last := none
+	recognized := false
+	// Counted as git counts them: a line git writes is a trailer line though it has no
+	// key, and a note's continuation lines are lines that aren't.
+	trailerLines, otherLines := 0, 0
 	for line := range strings.SplitSeq(para, "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		if (line[0] == ' ' || line[0] == '\t') && len(out) > 0 {
-			out[len(out)-1].Value += " " + strings.TrimSpace(line)
+		// An indented line carries on whatever came before it.
+		if line[0] == ' ' || line[0] == '\t' {
+			switch last {
+			case trailer:
+				out[len(out)-1].Value += " " + strings.TrimSpace(line)
+				continue
+			case other:
+				others[len(others)-1] += "\n" + line
+				otherLines++
+				continue
+			}
+		}
+		// Git reads past a comment line among the trailers: it's neither one of them nor a
+		// line against them.
+		if line[0] == '#' {
+			others = append(others, line)
+			last = other
 			continue
 		}
+		lower := strings.ToLower(line)
+		written := false
+		for _, start := range gitWritten {
+			written = written || strings.HasPrefix(lower, start)
+		}
+		recognized = recognized || written
 		if m := closingLine.FindStringSubmatch(line); m != nil {
 			out = append(out, Trailer{Key: m[1], Value: m[2]})
+			last = trailer
+			trailerLines++
 			continue
 		}
 		m := trailerLine.FindStringSubmatch(line)
 		// "https://…" on a line of its own looks like a trailer keyed "https"; it isn't.
 		if m == nil || strings.HasPrefix(m[2], "//") {
-			return nil
+			others = append(others, line)
+			last = other
+			if written {
+				trailerLines++
+			} else {
+				otherLines++
+			}
+			continue
 		}
 		out = append(out, Trailer{Key: m[1], Value: m[2]})
+		last = trailer
+		trailerLines++
 	}
-	return out
+	switch {
+	case len(others) == 0:
+		return out, nil
+	case !mixed || len(out) == 0:
+		return nil, nil
+	case otherLines == 0, recognized && trailerLines*3 >= otherLines:
+		return out, others
+	}
+	return nil, nil
 }
 
 // TrailerQuery searches for commits with a trailer: Key, matched without regard to case,

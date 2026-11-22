@@ -49,6 +49,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 - A bare repository says it isn't supported, where with `safe.bareRepository=explicit` it showed git's own error. (#775)
 - Insights says when its fetch failed, where the error used to be cleared before it showed, and no longer shows one scope's releases or thresholds, or loses its results, when the scope is changed while it's still reading the last one. (#782)
 - The Ignore rules tab no longer shows a file from the repository it was on before, when that one was slow to read. (#782)
+- A commit's trailers are read when another line sits among them, as git reads them: a bracketed note between the sign-offs, as the Linux kernel writes, a `(cherry picked from commit …)` line, comment lines, or a `Conflicts:` list under them. Such a commit used to show no trailers at all, and wasn't found by a trailer search. The other lines stay in the message. (#860)
 
 ## [1.0.1] - 2026-11-18
 
