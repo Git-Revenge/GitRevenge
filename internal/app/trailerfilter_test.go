@@ -286,6 +286,62 @@ func TestTrailerFilterStepGoesThroughEveryMatch(t *testing.T) {
 	}
 }
 
+// Stepping works the filter's rows out once for a reading and a graph, and again when either
+// is another one: a new commit the filter keeps is stepped to (#899).
+func TestTrailerFilterStepKeepsItsRows(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "a.txt", "One", "Changelog: fixed")
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "b.txt", "Two", "Changelog: added")
+	path := openForMap(t, a, fx)
+	trailersRead(t, a, path)
+	graphRows(t, a, path, 2)
+	fixed := []trailerindex.Pick{{Key: "changelog", Value: "text:fixed"}}
+	if _, err := a.SetTrailerFilter(path, fixed, false); err != nil {
+		t.Fatal(err)
+	}
+	kept := func() []int {
+		f := a.trailerFilters.get(path)
+		a.trailerFilters.mu.Lock()
+		defer a.trailerFilters.mu.Unlock()
+		return f.rowsKept
+	}
+	if row, err := a.TrailerFilterStep(path, -1, 1); err != nil || row != 1 {
+		t.Fatalf("first step: row %d, %v; want 1", row, err)
+	}
+	first := kept()
+	if row, _ := a.TrailerFilterStep(path, 1, 1); row != 1 {
+		t.Fatalf("second step: row %d, want 1 again", row)
+	}
+	if again := kept(); len(first) != 1 || len(again) != 1 || &again[0] != &first[0] {
+		t.Fatalf("the rows were worked out again with nothing changed: %v then %v", first, again)
+	}
+	if res, err := a.TrailerFilterRows(path); err != nil || res.Total != 1 || len(res.Rows) != 1 || res.Rows[0] != 1 {
+		t.Fatalf("ruler rows = %+v, %v", res, err)
+	}
+
+	// A new commit the filter keeps: once it's read, the next step goes to it.
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "c.txt", "Three", "Changelog: fixed")
+	deadline := time.Now().Add(20 * time.Second)
+	for {
+		row, err := a.TrailerFilterStep(path, -1, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if row == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the new commit was never stepped to: row %d", row)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if row, _ := a.TrailerFilterStep(path, 0, 1); row != 2 {
+		t.Fatalf("after the new commit, the next match is row %d, want 2", row)
+	}
+}
+
 func TestStepRow(t *testing.T) {
 	t.Parallel()
 	if got := stepRow(nil, 3, 1); got != -1 {
