@@ -53,6 +53,8 @@ type App struct {
 	people peopleReads
 	// trailerReadings keeps each open repository's trailers as read through its rules.
 	trailerReadings trailerReadings
+	// trailerFilters holds each open repository's smart filter, for the session.
+	trailerFilters trailerFilters
 	// configBackupDir overrides where config backups are kept; tests use it.
 	configBackupDir string
 	// repoConfigMu orders reads of a repository's settings from git config with writes to

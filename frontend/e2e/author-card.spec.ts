@@ -28,7 +28,7 @@ const peopleTab = (page: Page) => page.evaluate(() => (window as unknown as Win)
 test.describe("an author's card", () => {
   test('opens from the name in the commit panel, and says who and how much', async ({ page }) => {
     // The count reads the whole history the first time, so it arrives after the rest.
-    await open(page, 'repoView', scenario({}, { delays: { PersonCard: 400 } }))
+    await open(page, 'repoView', scenario({}, { delays: { PersonCard: 2000 } }))
     await selectCommit(page)
     const name = panel(page).getByRole('button', { name: 'Ana Cruz' })
     await expect(name).toHaveAttribute('aria-haspopup', 'dialog')

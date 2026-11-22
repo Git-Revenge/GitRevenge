@@ -355,6 +355,63 @@ func TestContainsFold(t *testing.T) {
 	}
 }
 
+// Picks of one key are either-or, and picks of different keys must all hold.
+func TestReadingFilter(t *testing.T) {
+	t.Parallel()
+	x, ids := indexOf(
+		"Changelog: fixed\nReviewed-by: Sam Ortiz <sam@tidewater.example>",
+		"Changelog: added\nReviewed-by: Sam Ortiz <sam@tidewater.example>",
+		"Changelog: fixed\nReviewed-by: Sarah Lind <sarah@tidewater.example>",
+		"Changelog: changed",
+	)
+	r := x.Reading(Rules{})
+	kept := func(picks ...Pick) []string {
+		var out []string
+		for id := range r.Filter(picks) {
+			out = append(out, id)
+		}
+		slices.Sort(out)
+		return out
+	}
+	want := func(n ...int) []string {
+		var out []string
+		for _, i := range n {
+			out = append(out, ids[i])
+		}
+		slices.Sort(out)
+		return out
+	}
+	fixed, added := Pick{"changelog", "text:fixed"}, Pick{"Changelog", "text:added"}
+	sam := Pick{"reviewed-by", "person:Sam Ortiz <sam@tidewater.example>"}
+
+	if got := kept(fixed); !slices.Equal(got, want(0, 2)) {
+		t.Fatalf("fixed = %v", got)
+	}
+	// Two values of one key: either.
+	if got := kept(fixed, added); !slices.Equal(got, want(0, 1, 2)) {
+		t.Fatalf("fixed or added = %v", got)
+	}
+	// Another key as well: both.
+	if got := kept(fixed, sam); !slices.Equal(got, want(0)) {
+		t.Fatalf("fixed, reviewed by Sam = %v", got)
+	}
+	if got := kept(fixed, added, sam); !slices.Equal(got, want(0, 1)) {
+		t.Fatalf("fixed or added, reviewed by Sam = %v", got)
+	}
+	if got := kept(Pick{"changelog", "text:nothing"}, sam); len(got) != 0 {
+		t.Fatalf("a value nobody has = %v", got)
+	}
+	if got := kept(); len(got) != 0 {
+		t.Fatalf("no picks = %v, want nothing kept", got)
+	}
+	if v, ok := r.Value("Changelog", "text:fixed"); !ok || v.Label != "fixed" || v.Commits != 2 {
+		t.Fatalf("the value by its id = %+v, %v", v, ok)
+	}
+	if _, ok := r.Value("changelog", "text:nothing"); ok {
+		t.Fatal("a value nobody has was found")
+	}
+}
+
 func TestReadingHoldsWhileTheIndexStaysAsItIs(t *testing.T) {
 	t.Parallel()
 	x, _ := indexOf("Closes: #12")

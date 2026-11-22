@@ -31,12 +31,15 @@
     onMenu,
     onManageWorktrees,
     openDialog,
-    search = '',
+    filterPicks = [],
+    onFilterPick,
     onSearch,
   }: {
     path: string
-    /** What the graph is searching for, and how to search it: a smart filter is a search. */
-    search?: string
+    /** The values the graph is filtered by, and how to add one or take it out. */
+    filterPicks?: { key: string; value: string }[]
+    onFilterPick?: (key: string, value: string) => void
+    /** Searches the graph for text. */
     onSearch?: (query: string) => void
     /** The commit selected in the graph; refs pointing at it show as selected. */
     selectedCommit?: string
@@ -218,6 +221,12 @@
     }
     if (key === 'repo') return { count: repoAttention, text: repoAttention === 1 ? '1 submodule needs updating' : `${repoAttention} submodules need updating`, dot: true }
     return { count: 0, text: '' }
+  }
+
+  /** Shows a panel, opening the sidebar if it's folded: "+ Filter" above the graph asks. */
+  export function show(key: SidebarPanel) {
+    ui.panel = key
+    ui.collapsed = false
   }
 
   function pickTab(key: SidebarPanel) {
@@ -443,7 +452,7 @@
 
     {#if filtersWanted}
       <div class="scroll" hidden={ui.panel !== 'filters'}>
-        <Lazy load={() => import('./filters/SmartFiltersPanel.svelte')} {path} {filter} query={search} open={ui.open} onPick={(q: string) => onSearch?.(q)} onStatus={(s: { matches: number }) => (filterMatches = s.matches)} />
+        <Lazy load={() => import('./filters/SmartFiltersPanel.svelte')} {path} {filter} picks={filterPicks} open={ui.open} onPick={(key: string, value: string) => onFilterPick?.(key, value)} onSearch={(q: string) => onSearch?.(q)} onStatus={(s: { matches: number }) => (filterMatches = s.matches)} />
       </div>
     {/if}
 

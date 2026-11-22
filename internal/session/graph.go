@@ -68,7 +68,13 @@ type graphLoader struct {
 	// showHidden puts hidden branches back in the graph, for this session only.
 	showHidden bool
 	// focus narrows the graph to one branch or stack, for this session only.
-	focus    Focus
+	focus Focus
+	// filter narrows it to the commits a smart filter keeps, for this session only, and
+	// looked is how many commits the load under it has looked through.
+	filter *Filter
+	looked int
+	// total is how many commits the history being loaded has, filter aside; 0 until counted.
+	total    int
 	current  *graph.Graph
 	refs     *RefIndex
 	loading  bool
@@ -179,6 +185,48 @@ func (l *graphLoader) Focus() Focus {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.focus
+}
+
+// Filter narrows the graph to some of its commits: the ones a smart filter keeps.
+//
+// The commits that stay are no longer neighbours, so the graph doesn't pretend they are:
+// they're strung on one lane, newest first, each shown as the child of the next. Everything
+// else that narrows the graph still does: a filter shows what passes it and the focus and
+// the hidden branches too.
+type Filter struct {
+	// Keep holds the ids of the commits that stay.
+	Keep map[string]struct{}
+	// Sig tells one filter from another, so setting the same one again reloads nothing.
+	Sig string
+}
+
+// SetFilter narrows the graph to what filter keeps, or with nil shows everything again, and
+// reloads it if that's a change.
+func (l *graphLoader) SetFilter(filter *Filter) {
+	l.mu.Lock()
+	was, now := "", ""
+	if l.filter != nil {
+		was = l.filter.Sig
+	}
+	if filter != nil {
+		now = filter.Sig
+	}
+	changed := was != now || (l.filter == nil) != (filter == nil)
+	l.filter = filter
+	started := l.started
+	l.mu.Unlock()
+	if changed && started {
+		l.reload()
+	}
+}
+
+// Filtered reports whether a filter is narrowing the graph, how many commits the load
+// under it has looked through so far, kept or passed over, and how many the history has
+// in all (0 until that's counted).
+func (l *graphLoader) Filtered() (on bool, looked, total int) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.filter != nil, l.looked, l.total
 }
 
 // focusedRefs returns the full names of the refs focus covers, which is none once its branch
@@ -447,6 +495,8 @@ func (l *graphLoader) reload() {
 	l.sigReady = sigReady
 	show := l.showHidden
 	focus := l.focus
+	filter := l.filter
+	l.looked = 0
 	// Counted before the lock is let go, so that stop, which takes it to say nothing more
 	// loads, never starts waiting with a load about to be added.
 	l.wg.Add(1)
@@ -540,9 +590,12 @@ func (l *graphLoader) reload() {
 			stashes[id] = true
 		}
 		hidden := map[string]bool{}
-		pins, kinds := KindTips(ctx, l.repo, rules, remotes, show)
-		g.Pin(pins)
-		g.SetTipKinds(kinds)
+		// Under a filter there's one lane and nothing to pin to it.
+		if filter == nil {
+			pins, kinds := KindTips(ctx, l.repo, rules, remotes, show)
+			g.Pin(pins)
+			g.SetTipKinds(kinds)
+		}
 		opts := git.LogOptions{Extra: stashIDs}
 		if len(focused) > 0 {
 			// Only what the focus reaches: not HEAD, tags or stashes.
@@ -562,6 +615,15 @@ func (l *graphLoader) reload() {
 			n, err := l.repo.CountCommits(ctx, opts)
 			if err != nil || ctx.Err() != nil {
 				return
+			}
+			l.mu.Lock()
+			if ctx.Err() == nil {
+				l.total = n
+			}
+			l.mu.Unlock()
+			// A filter keeps at most what it holds, however long the history is.
+			if filter != nil {
+				n = min(n, len(filter.Keep))
 			}
 			counted.Store(int64(n))
 			l.mu.Lock()
@@ -586,6 +648,10 @@ func (l *graphLoader) reload() {
 
 		const every = 100 * time.Millisecond
 		last := time.Now()
+		// Under a filter a kept commit is added once the next one is known, as its child:
+		// held is the one waiting.
+		var held *git.LogCommit
+		looked := 0
 		err := l.repo.Log(ctx, opts, func(c git.LogCommit) error {
 			if hidden[c.ID] {
 				return nil
@@ -595,6 +661,30 @@ func (l *graphLoader) reload() {
 					hidden[p] = true
 				}
 				c.Parents = c.Parents[:1]
+			}
+			if filter != nil {
+				looked++
+				if looked%1024 == 0 {
+					l.mu.Lock()
+					l.looked = looked
+					l.mu.Unlock()
+				}
+				if _, keep := filter.Keep[c.ID]; !keep {
+					// Passed over. The reader still stops for breath, or a filter that keeps
+					// little would read a long history to its end before showing anything.
+					if err := ctx.Err(); err != nil {
+						return err
+					}
+					return nil
+				}
+				kept := c
+				before := held
+				held = &kept
+				if before == nil {
+					return nil // the newest kept commit: it waits for the one after it
+				}
+				before.Parents = []string{kept.ID}
+				c = *before
 			}
 			if err := g.Add(c); err != nil {
 				return err
@@ -615,6 +705,18 @@ func (l *graphLoader) reload() {
 			}
 			return l.pauseIfAhead(ctx, g, n, awaitRefs, swapLocked)
 		})
+		// The last commit kept has nothing after it.
+		if err == nil && held != nil {
+			held.Parents = nil
+			err = g.Add(*held)
+		}
+		if filter != nil {
+			l.mu.Lock()
+			if ctx.Err() == nil {
+				l.looked = looked
+			}
+			l.mu.Unlock()
+		}
 		r := awaitRefs()
 		if ctx.Err() != nil {
 			return // superseded or closed; the newer load reports

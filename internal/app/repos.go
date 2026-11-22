@@ -229,6 +229,8 @@ func (a *App) CloseRepo(path string) error {
 		return err
 	}
 	a.undo.forget(path)
+	// A smart filter lasts until its tab closes.
+	a.trailerFilters.set(path, nil)
 	return m.Close(path)
 }
 

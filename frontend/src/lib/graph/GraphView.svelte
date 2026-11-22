@@ -37,7 +37,8 @@
     onSelectedRefs,
     onNote,
     onAuthor,
-    onQuery,
+    sparse = false,
+    highlight = null,
     lead,
     wip,
     toolsHost,
@@ -67,9 +68,11 @@
     onDrop?: (source: Row, sourceRefs: Ref[], target: Row, targetRefs: Ref[], x: number, y: number) => void
     /** A click on a commit's note mark, after the commit is selected. */
     onNote?: (row: Row) => void
-    /** What the search box holds, whenever it changes: a smart filter picked in the sidebar is
-     * a search, and the sidebar shows which one is on. */
-    onQuery?: (query: string) => void
+    /** A smart filter is showing only its commits: they aren't neighbours, so their lane is
+     * dashed. */
+    sparse?: boolean
+    /** A smart filter is highlighting its commits: these are their rows, and the rest fade. */
+    highlight?: number[] | null
     /** A click on a row's author, or Enter on the selected row: asks for the author's card.
      * x and y are where in the window to put it, under the row, and above is the row's top. */
     onAuthor?: (row: Row, x: number, y: number, above: number) => void
@@ -250,9 +253,9 @@
     }
     ctx.globalAlpha = 1
     const head = headRow >= 0 ? slotOf(headRow) : -1
-    if (!ticksFor || ticksFor.count !== count || ticksFor.height !== h || ticksFor.head !== head || ticksFor.matches !== matches || ticksFor.marks !== marks) {
-      ticks = placeTicks({ head, tips: marks.tips.map(slotOf), tags: marks.tags.map(slotOf), notes: marks.notes.map(slotOf), matches: matches.map(slotOf) }, count, h)
-      ticksFor = { count, height: h, head, matches, marks }
+    if (!ticksFor || ticksFor.count !== count || ticksFor.height !== h || ticksFor.head !== head || ticksFor.matches !== rulerMatches || ticksFor.marks !== marks) {
+      ticks = placeTicks({ head, tips: marks.tips.map(slotOf), tags: marks.tags.map(slotOf), notes: marks.notes.map(slotOf), matches: rulerMatches.map(slotOf) }, count, h)
+      ticksFor = { count, height: h, head, matches: rulerMatches, marks }
     }
     // Each kind is a different length and place as well as a colour.
     for (const t of ticks) {
@@ -552,7 +555,8 @@
   }
   /** Whether commit i is folded out of sight. The selected commit and search matches always
    * show, so nothing is ever landed on that can't be seen. */
-  const isHidden = (i: number) => foldedAway(foldOf(i), openFolds, i === selected, matchRows.has(i))
+  // A commit in a folded lane shows when a search or a highlighting filter matches it.
+  const isHidden = (i: number) => foldedAway(foldOf(i), openFolds, i === selected, matchRows.has(i) || !!highlightSet?.has(i))
   /** The folding, as the Horizontal view asks about it: a fold there is a column, not a line. */
   const horizontalFolds = {
     of: (i: number) => {
@@ -1028,10 +1032,18 @@
   // Search state. matchSet is only used for dimming when every match fits in the result.
   let searchInput: HTMLInputElement
   let query = $state('')
-  $effect(() => onQuery?.(query))
   let matches = $state<number[]>([])
   let matchTotal = $state(0)
   let matchSet: Set<number> | null = null
+  // A filter that highlights fades every row but its own, as a search does, and marks them
+  // on the ruler while nothing is being searched for.
+  let highlightSet = $derived(highlight ? new Set(highlight) : null)
+  let rulerMatches = $derived(matches.length || !highlight ? matches : highlight)
+  $effect(() => {
+    void highlightSet
+    void sparse
+    schedule()
+  })
   /** The matches that came back, which always show even when their lane is folded. */
    
   let matchRows = new Set<number>()
@@ -1350,11 +1362,11 @@
       const hov = washes.value(`h${i}`, i === hovered ? 1 : 0, frameAt)
       // During a bisect a commit wears its answer, and fades once it's out of the running.
       const place = bisectView ? bisectRow(row.id, bisectView, { bad: th.bad }) : null
-      const dim = washes.value(`d${i}`, (matchSet && !matchSet.has(i)) || place?.faded ? 1 : 0, frameAt)
+      const dim = washes.value(`d${i}`, (matchSet && !matchSet.has(i)) || (highlightSet && !highlightSet.has(i)) || place?.faded ? 1 : 0, frameAt)
       const isNoted = noted.has(row.id)
       const isArrived = arrived.has(row.id)
       const follows = isFollower(i)
-      const extra = isNoted || isArrived || follows ? { ...place?.extra, noted: isNoted, arrived: isArrived, follower: follows } : place?.extra
+      const extra = isNoted || isArrived || follows || sparse ? { ...place?.extra, noted: isNoted, arrived: isArrived, follower: follows, sparse } : place?.extra
       const span = drawRow(ctx, row, cache.refsFor(row.id), y, lay, th, sel, hov, dim, now, sealOf(sigs.get(row.id)), { prev: cache.get(i - 1), prev2: cache.get(i - 2), next: cache.get(i + 1) }, extra)
       if (arriving) ctx.restore()
       if (span) labelSpans.set(i, span)
@@ -1446,6 +1458,13 @@
   }
 
   /** The refs on a commit, for its menu. */
+  /** Shows the newest commits: a filter that changes which commits there are starts from the top,
+   * as a focus does. */
+  export function top() {
+    toStart()
+    schedule()
+  }
+
   export function refsOf(id: string): Ref[] {
     return cache.refsFor(id)
   }
@@ -1523,7 +1542,8 @@
     if (selectedId !== id) return false
     if (row < 0 && moving) return true
     // If the commit is gone (e.g. amended), stay on the same position but refresh details.
-    selectWhenLoaded(row >= 0 ? row : selected, moving)
+    // One a filter took out isn't followed: the view stays where the filter put it.
+    selectWhenLoaded(row >= 0 ? row : selected, moving || (row < 0 && sparse))
     return row < 0
   }
 
@@ -2152,8 +2172,8 @@
       {selected}
       headRow={() => headRow}
       remote={() => remote}
-      dimmed={(i: number) => !!matchSet && !matchSet.has(i)}
-      ruler={() => ({ ...marks, matches })}
+      dimmed={(i: number) => (!!matchSet && !matchSet.has(i)) || (!!highlightSet && !highlightSet.has(i))}
+      ruler={() => ({ ...marks, matches: rulerMatches })}
       {wip}
       folds={horizontalFolds}
       onSelect={(i: number) => select(i)}

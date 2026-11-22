@@ -825,6 +825,26 @@ export namespace app {
 	        this.error = source["error"];
 	    }
 	}
+	export class FilterPick {
+	    key: string;
+	    value: string;
+	    keyLabel: string;
+	    valueLabel: string;
+	    kind: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FilterPick(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.value = source["value"];
+	        this.keyLabel = source["keyLabel"];
+	        this.valueLabel = source["valueLabel"];
+	        this.kind = source["kind"];
+	    }
+	}
 	export class ForecastCommit {
 	    id: string;
 	    subject: string;
@@ -2205,6 +2225,42 @@ export namespace app {
 		}
 	}
 	
+	export class TrailerFilterState {
+	    picks: FilterPick[];
+	    only: boolean;
+	    kept: number;
+	    total: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TrailerFilterState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.picks = this.convertValues(source["picks"], FilterPick);
+	        this.only = source["only"];
+	        this.kept = source["kept"];
+	        this.total = source["total"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class TrailerKeys {
 	    keys: trailerindex.Key[];
 	    status: trailerindex.Status;
@@ -3961,6 +4017,20 @@ export namespace trailerindex {
 		    }
 		    return a;
 		}
+	}
+	export class Pick {
+	    key: string;
+	    value: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Pick(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.value = source["value"];
+	    }
 	}
 	
 	export class Status {
