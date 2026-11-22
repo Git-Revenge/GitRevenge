@@ -4,7 +4,7 @@
   import { errorText } from '../errors'
   import { onMount, tick, untrack, type Snippet } from 'svelte'
   import { ALONE_STEPS, searchPlaceholder, SQUEEZE, squeezeFor } from '../barSqueeze'
-  import { ArrivedCommits, CommitNotes, CommitRow, CommitSignatures, GraphFocus, HeadCommit, OwnMoveAge, GraphRows, NotedCommits, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView } from '../../../wailsjs/go/app/App.js'
+  import { ArrivedCommits, CommitNotes, CommitRow, CommitSignatures, GraphFocus, HeadCommit, OwnMoveAge, GraphRows, NotedCommits, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView, TrailerSuggest } from '../../../wailsjs/go/app/App.js'
   import { session } from '../session.svelte'
   import { ClipboardSetText } from '../../../wailsjs/runtime/runtime.js'
   import { onBackend } from '../events'
@@ -19,6 +19,8 @@
   import ViewMenu from './ViewMenu.svelte'
   import { isRows, menuViews } from './views'
   import RefChip from './RefChip.svelte'
+  import SearchSuggest from './SearchSuggest.svelte'
+  import { completion, isKey, stepRow, type Suggestion, type Suggestions } from './suggest'
   import { bisectRow, DAY_H, dayCountLabel, dayLineLabel, dayLineSpoken, drawDayLine, drawFoldLine, drawRow, authorSpan, FOLD_H, FOLLOWER_H, gapLabel, sameDay, sealOf, startsRun, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { branchMove, headAway, headLabel, isOwnMove, LANDING, moveAnnouncement, tipsOf, type Tips } from './follow'
   import { loadLabelWidth, nextLabelWidth, REFIT_AFTER_MS, saveLabelWidth } from './labelColumn'
@@ -39,6 +41,8 @@
     onAuthor,
     sparse = false,
     highlight = null,
+    onFilterAdd,
+    onFilterDrop,
     lead,
     wip,
     toolsHost,
@@ -73,6 +77,11 @@
     sparse?: boolean
     /** A smart filter is highlighting its commits: these are their rows, and the rest fade. */
     highlight?: number[] | null
+    /** Adds a trailer value to the smart filter. With it, the search box suggests the keys
+     * and values that what's typed could mean. */
+    onFilterAdd?: (key: string, value: string) => void
+    /** Takes the last value out of the smart filter: Backspace in an empty search box. */
+    onFilterDrop?: () => void
     /** A click on a row's author, or Enter on the selected row: asks for the author's card.
      * x and y are where in the window to put it, under the row, and above is the row's top. */
     onAuthor?: (row: Row, x: number, y: number, above: number) => void
@@ -448,8 +457,66 @@
   function closeSearch() {
     query = ''
     void runSearch()
+    hideSuggestions()
     searchOpen = false
     scroller.focus()
+  }
+
+  // What the search box offers under what's typed: trailer keys and values, which filter the
+  // graph when picked. Row 0 is always the text search, and it's where the keys start, so
+  // Enter keeps moving between matches until an arrow key says otherwise.
+  const suggestId = `suggest-${Math.random().toString(36).slice(2, 8)}`
+  let suggested = $state<Suggestions | null>(null)
+  let suggestAt = $state(0)
+  let suggestedFor = ''
+  let keepSuggestions = false
+  let suggestTimer: ReturnType<typeof setTimeout> | undefined
+  let suggestSeq = 0
+
+  function hideSuggestions() {
+    clearTimeout(suggestTimer)
+    suggestSeq++
+    suggested = null
+    suggestedFor = ''
+    suggestAt = 0
+  }
+
+  function suggestSoon() {
+    clearTimeout(suggestTimer)
+    if (!onFilterAdd) return
+    if (!query.trim()) return hideSuggestions()
+    suggestTimer = setTimeout(() => void suggest(), 120)
+  }
+
+  async function suggest() {
+    const seq = ++suggestSeq
+    const q = query
+    const got = await TrailerSuggest(path, q, 0).catch(() => null)
+    if (seq !== suggestSeq || q !== query) return
+    // The same text asked about again, as when the box gets the focus back, keeps the row
+    // the keys are on.
+    suggestAt = q === suggestedFor ? Math.min(suggestAt, got?.items.length ?? 0) : 0
+    suggestedFor = q
+    suggested = got
+  }
+
+  /** A value joins the filter and the box empties for the next one; a key is written in the
+   * box, where its values are offered. */
+  function pickSuggestion(item: Suggestion) {
+    if (isKey(item)) return completeWith(item)
+    onFilterAdd?.(item.key, item.value)
+    query = ''
+    hideSuggestions()
+    void runSearch()
+    searchInput.focus()
+  }
+
+  function completeWith(item: Suggestion) {
+    query = completion(item)
+    suggestAt = 0
+    searchSoon()
+    suggestSoon()
+    searchInput.focus()
   }
   /** Moves the header into the caller's host while there is one, and back out with the graph.
    * Svelte keeps updating the node wherever it lives; it only needs taking away by hand, since
@@ -1032,6 +1099,7 @@
   // Search state. matchSet is only used for dimming when every match fits in the result.
   let searchInput: HTMLInputElement
   let query = $state('')
+  let suggestShown = $derived(!!suggested?.items.length && !!query.trim())
   let matches = $state<number[]>([])
   let matchTotal = $state(0)
   let matchSet: Set<number> | null = null
@@ -1652,19 +1720,39 @@
       dir === 1
         ? (matches.find((m) => m > selected) ?? matches[0])
         : (matches.findLast((m) => m < selected) ?? matches[matches.length - 1])
+    // Showing the match takes the focus to the graph and straight back: the list of
+    // suggestions stays up through that.
+    keepSuggestions = true
     reveal(next)
-    void focusSearch()
+    void focusSearch().finally(() => (keepSuggestions = false))
   }
 
   function onSearchKey(e: KeyboardEvent) {
+    const items = suggestShown ? (suggested?.items ?? []) : []
     if (e.key === 'Enter') {
       e.preventDefault()
+      // On a suggestion, Enter picks it.
+      if (suggestAt > 0 && items[suggestAt - 1]) return pickSuggestion(items[suggestAt - 1])
       const dir = e.shiftKey ? -1 : 1
       // Enter right after typing waits for that search rather than using the last one.
       if (searchPending) void runSearch().then(() => jump(dir))
       else jump(dir)
     } else if (e.key === 'Escape') {
-      closeSearch()
+      // The first Escape leaves the list, the next the search.
+      if (suggestAt > 0) {
+        e.preventDefault()
+        suggestAt = 0
+      } else closeSearch()
+    } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && items.length) {
+      e.preventDefault()
+      suggestAt = stepRow(suggestAt, e.key === 'ArrowDown' ? 1 : -1, items.length + 1)
+    } else if (e.key === 'Tab' && !e.shiftKey && items.length) {
+      // Tab completes with the row the keys are on, or the first one offered.
+      e.preventDefault()
+      completeWith(items[Math.max(0, suggestAt - 1)])
+    } else if (e.key === 'Backspace' && !query && onFilterDrop) {
+      e.preventDefault()
+      onFilterDrop()
     }
   }
 
@@ -1824,19 +1912,29 @@
       <button class="btn sm quiet icon search-open" aria-label="Search commits" title="Search commits" aria-expanded="false" onclick={focusSearch}><Icon name="search" size={14} /></button>
     {/if}
     <!-- The map has no commits to search: the field keeps its place, out of sight and out of reach. -->
-    <span class="search" class:closed={searchIconOnly && !searchOpen && !query.trim()} class:over={searchIconOnly} class:away={mapView} inert={mapView}>
+    <span class="search" class:closed={searchIconOnly && !searchOpen && !query.trim()} class:over={searchIconOnly} class:suggesting={suggestShown} class:away={mapView} inert={mapView}>
       <Icon name="search" size={14} />
       <input
         bind:this={searchInput}
         bind:value={query}
-        oninput={searchSoon}
+        oninput={() => {
+          searchSoon()
+          suggestSoon()
+        }}
         onkeydown={onSearchKey}
+        onfocus={suggestSoon}
         onblur={() => {
+          if (!keepSuggestions) hideSuggestions()
           if (!query.trim()) searchOpen = false
         }}
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={suggestShown}
+        aria-controls={suggestShown ? suggestId : undefined}
+        aria-activedescendant={suggestShown ? `${suggestId}-${suggestAt}` : undefined}
         type="search"
         placeholder={searchPlaceholder(level, total, loading)}
-        title="Search subjects, authors and SHAs, a trailer such as Co-authored-by: name or Closes: #12, or has:note for commits with a note"
+        title="Search subjects, authors and SHAs, or a trailer such as Co-authored-by: name or Closes: #12. has:reviewed-by finds any value of a trailer, a leading - finds the commits that don’t match, and has:note finds commits with a note."
         aria-label="Search commits"
       />
       {#if query.trim()}
@@ -1850,6 +1948,9 @@
       {/if}
       {#if searchIconOnly}
         <button class="btn sm quiet icon" onclick={closeSearch} aria-label="Close search" title="Close search (Escape)"><Icon name="close" size={13} /></button>
+      {/if}
+      {#if suggestShown && suggested}
+        <SearchSuggest id={suggestId} {query} items={suggested.items} match={suggested.match} active={suggestAt} soFar={!suggested.status.done} onPick={pickSuggestion} onSearch={() => jump(1)} />
       {/if}
     </span>
   </div>
@@ -2261,7 +2362,14 @@
     max-width: none;
   }
 
+  /* Over the bar the search is a layer of its own, under the graph's ruler: its list of
+     suggestions lifts it above, where a menu in the bar would be. */
+  .search.over.suggesting {
+    z-index: 20;
+  }
+
   .search {
+    position: relative;
     flex: 1 1 150px;
     display: flex;
     align-items: center;

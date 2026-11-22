@@ -194,15 +194,28 @@ var wholeNumber = regexp.MustCompile(`^#\d+$`)
 // Values are matched as they're shown, so a person is found under the name the mailmap
 // gives them, whichever name the commit used.
 func (a *App) trailerSearch(ctx context.Context, r *session.Repo, g *graph.Graph, query string) (graph.SearchResult, bool) {
-	key, value, ok := git.SplitTrailerQuery(query)
+	// A leading "-" asks for the commits that don't match.
+	q := strings.TrimSpace(query)
+	not := strings.HasPrefix(q, "-")
+	key, value, ok := git.SplitTrailerQuery(strings.TrimPrefix(q, "-"))
 	if !ok || !r.Trailers().Status().Done {
 		return graph.SearchResult{}, false
 	}
+	// "has:reviewed-by" asks for any value of a key.
+	has := strings.EqualFold(key, "has") && value != ""
+	if has {
+		key, value = value, ""
+	}
 	reading := a.trailerReading(ctx, r)
 	k, found := reading.Key(key)
-	if !found || !slices.ContainsFunc(k.Spellings, func(s trailerindex.Spelling) bool { return strings.EqualFold(s.Text, key) }) {
+	if !found {
 		return graph.SearchResult{}, false
 	}
+	// "closed: #14" finds Closes and Close too, since endings are one key. But a key typed in
+	// a spelling no commit uses may not be meant as one: "fix: crash" is the start of a
+	// subject, even where commits write Fixes. Said outright, with has: or a "-", it is one.
+	written := slices.ContainsFunc(k.Spellings, func(s trailerindex.Spelling) bool { return strings.EqualFold(s.Text, key) })
+	sure := has || not || (written && k.Held != trailerindex.HeldRare)
 	var match func(trailerindex.Value) bool
 	switch {
 	case value == "":
@@ -213,8 +226,12 @@ func (a *App) trailerSearch(ctx context.Context, r *session.Repo, g *graph.Graph
 		lower := strings.ToLower(value)
 		match = func(v trailerindex.Value) bool { return trailerindex.ContainsFold(v.Label, lower) }
 	}
-	res := rowsOf(g, reading.CommitsWhere(k.ID, match), maxSearchRows)
-	if k.Held != trailerindex.HeldRare {
+	ids := reading.CommitsWhere(k.ID, match)
+	if not {
+		return rowsBut(g, ids, maxSearchRows), true
+	}
+	res := rowsOf(g, ids, maxSearchRows)
+	if sure {
 		return res, true
 	}
 	// A key on a commit or two is likely a sentence with a colon in, and the search may be

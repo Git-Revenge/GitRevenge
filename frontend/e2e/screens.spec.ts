@@ -235,7 +235,7 @@ test.describe('commit graph', () => {
     test('the search count stays inside the column', async ({ page }) => {
       await page.setViewportSize({ width: 640, height: 600 })
       await open(page, 'graph', { ...narrow, responses: { ...narrow.responses, SearchGraph: { rows: [], total: 0 } } })
-      await page.getByRole('searchbox', { name: 'Search commits' }).fill('nothing like this')
+      await page.getByRole('combobox', { name: 'Search commits' }).fill('nothing like this')
       const count = page.getByText('No matches')
       await expect(count).toBeVisible()
       const box = (await count.boundingBox())!
@@ -249,7 +249,7 @@ test.describe('commit graph', () => {
     test('the count moves into the search placeholder when there is no room for both', async ({ page }) => {
       await page.setViewportSize({ width: 420, height: 600 })
       await open(page, 'graph', narrow)
-      const search = page.getByRole('searchbox', { name: 'Search commits' })
+      const search = page.getByRole('combobox', { name: 'Search commits' })
       await expect(search).toHaveAttribute('placeholder', 'Search 32 commits')
       await expect(page.locator('.status .meta')).toHaveCount(0)
       const status = page.locator('.status')
@@ -262,7 +262,7 @@ test.describe('commit graph', () => {
       await open(page, 'graph', { ...narrow, responses: { ...narrow.responses, SearchGraph: { rows: [1], total: 1 } } })
       const status = page.locator('.status')
       const opener = page.getByRole('button', { name: 'Search commits' })
-      const search = page.getByRole('searchbox', { name: 'Search commits' })
+      const search = page.getByRole('combobox', { name: 'Search commits' })
       await expect(opener).toBeVisible()
       await expect(search).toBeHidden()
       expect((await status.boundingBox())!.height).toBeLessThan(50)
@@ -421,7 +421,7 @@ test.describe('commit graph', () => {
       await open(page, 'graph', scenario)
       await pickView(page, 'Compact')
       await page.getByRole('button', { name: "Search for the selected commit's author" }).click()
-      await expect(page.getByRole('searchbox', { name: 'Search commits' })).toHaveValue('Ana Cruz')
+      await expect(page.getByRole('combobox', { name: 'Search commits' })).toHaveValue('Ana Cruz')
       await expect.poll(() => calls(page, 'SearchGraph')).toContainEqual(['/repo', 'Ana Cruz'])
     })
 
@@ -553,7 +553,7 @@ test.describe('commit graph', () => {
 
     test('search matches are marked on it', async ({ page }) => {
       await ready(page, 1000, { SearchGraph: { rows: [650, 651], total: 2 } })
-      await page.getByRole('searchbox', { name: 'Search commits' }).fill('something')
+      await page.getByRole('combobox', { name: 'Search commits' }).fill('something')
       await expect.poll(() => calls(page, 'SearchGraph')).toHaveLength(1)
       const r = (await ruler(page).boundingBox())!
       await page.mouse.move(r.x + r.width / 2, r.y + (650 / 1000) * r.height + 1)
@@ -677,7 +677,7 @@ test.describe('commit graph', () => {
 
     test('a search match in a fold shows, so the search never lands on something hidden', async ({ page }) => {
       await ready(page, { SearchGraph: { rows: [5], total: 1 } })
-      await page.getByRole('searchbox', { name: 'Search commits' }).fill('gh-pages 5')
+      await page.getByRole('combobox', { name: 'Search commits' }).fill('gh-pages 5')
       await expect.poll(() => calls(page, 'SearchGraph')).toHaveLength(1)
       await page.waitForTimeout(300)
       await page.locator('.scroller').focus()
@@ -1186,7 +1186,7 @@ test.describe('commit graph', () => {
 
     test('has:note is sent to the search as typed', async ({ page }) => {
       await ready(page)
-      await page.getByRole('searchbox', { name: 'Search commits' }).fill('has:note')
+      await page.getByRole('combobox', { name: 'Search commits' }).fill('has:note')
       await expect.poll(() => calls(page, 'SearchGraph')).toContainEqual(['/repo', 'has:note'])
       await expect(page.getByText('1 of 1').or(page.getByText(/^1$/))).toBeVisible()
     })
@@ -2178,7 +2178,7 @@ test.describe('before the first load has answered', () => {
       await page.setViewportSize({ width: 1800, height: 800 })
       await open(page, 'repoView', dirty([one]))
       const fetch = page.getByRole('button', { name: 'Fetch' })
-      const search = page.getByRole('searchbox', { name: 'Search commits' })
+      const search = page.getByRole('combobox', { name: 'Search commits' })
       await expect(search).toBeVisible()
       const a = (await fetch.boundingBox())!
       const b = (await search.boundingBox())!
@@ -2247,7 +2247,7 @@ test.describe('before the first load has answered', () => {
       test('with room, everything is spelled out', async ({ page }) => {
         await at(page, 1160)
         await expect(page.getByText('411 commits')).toBeVisible()
-        await expect(page.getByRole('searchbox', { name: 'Search commits' })).toHaveAttribute('placeholder', 'Search message, author or SHA')
+        await expect(page.getByRole('combobox', { name: 'Search commits' })).toHaveAttribute('placeholder', 'Search message, author or SHA')
         for (const name of ['Undo', 'Redo', 'Fetch', 'Pull', 'Push']) expect(await worded(page, name)).toBe(true)
         await oneLine(page)
       })
@@ -2255,7 +2255,7 @@ test.describe('before the first load has answered', () => {
       test('first the count moves into the search placeholder', async ({ page }) => {
         await at(page, 1000)
         await expect(page.locator('.status .meta')).toHaveCount(0)
-        await expect(page.getByRole('searchbox', { name: 'Search commits' })).toHaveAttribute('placeholder', 'Search 411 commits')
+        await expect(page.getByRole('combobox', { name: 'Search commits' })).toHaveAttribute('placeholder', 'Search 411 commits')
         expect(await worded(page, 'Undo')).toBe(true)
         await oneLine(page)
       })
@@ -2263,7 +2263,7 @@ test.describe('before the first load has answered', () => {
       test('then the search becomes an icon', async ({ page }) => {
         await at(page, 880)
         await expect(page.getByRole('button', { name: 'Search commits' })).toBeVisible()
-        await expect(page.getByRole('searchbox', { name: 'Search commits' })).toBeHidden()
+        await expect(page.getByRole('combobox', { name: 'Search commits' })).toBeHidden()
         expect(await worded(page, 'Undo')).toBe(true)
         await oneLine(page)
         // Opened, it covers the bar, toolbar included, and Escape gives the bar back.
@@ -2271,7 +2271,7 @@ test.describe('before the first load has answered', () => {
         const field = (await page.locator('.search').boundingBox())!
         const box = (await theBar(page).boundingBox())!
         expect(field.width).toBeGreaterThanOrEqual(box.width - 1)
-        await expect(page.getByRole('searchbox', { name: 'Search commits' })).toBeFocused()
+        await expect(page.getByRole('combobox', { name: 'Search commits' })).toBeFocused()
         await page.keyboard.press('Escape')
         await expect(page.getByRole('button', { name: 'Search commits' })).toBeVisible()
         await oneLine(page)

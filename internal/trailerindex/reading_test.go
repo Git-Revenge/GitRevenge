@@ -412,6 +412,45 @@ func TestReadingFilter(t *testing.T) {
 	}
 }
 
+// A value's count within a filter is how many of the filter's commits have it.
+func TestReadingCountWithin(t *testing.T) {
+	t.Parallel()
+	x, _ := indexOf(
+		"Changelog: fixed\nReviewed-by: Sam Ortiz <sam@tidewater.example>",
+		"Changelog: added\nReviewed-by: Sam Ortiz <sam@tidewater.example>",
+		"Changelog: fixed\nReviewed-by: Sarah Lind <sarah@tidewater.example>",
+		"Changelog: changed\nCloses: #12, #14",
+		"Changelog: fixed\nCloses: #14",
+	)
+	r := x.Reading(Rules{})
+	sam, sarah := "person:Sam Ortiz <sam@tidewater.example>", "person:Sarah Lind <sarah@tidewater.example>"
+	fixed := r.Filter([]Pick{{"changelog", "text:fixed"}})
+	if got := r.CountWithin("Reviewed-by", []string{sam, sarah, "person:nobody"}, fixed); !slices.Equal(got, []int{1, 1, 0}) {
+		t.Fatalf("reviewers of fixed commits = %v, want 1, 1, 0", got)
+	}
+	// A line that names two tickets counts for each.
+	tickets := r.Values("closes")
+	if len(tickets) != 2 {
+		t.Fatalf("tickets = %+v", tickets)
+	}
+	ids := []string{tickets[0].ID, tickets[1].ID}
+	all := r.Filter([]Pick{{"changelog", "text:fixed"}, {"changelog", "text:changed"}})
+	got := r.CountWithin("closes", ids, all)
+	if got[0]+got[1] != 3 {
+		t.Fatalf("tickets within fixed or changed = %v, want 2 and 1", got)
+	}
+	if got := r.CountWithin("closes", ids, fixed); got[0]+got[1] != 1 {
+		t.Fatalf("tickets within fixed = %v, want one commit", got)
+	}
+	// No such key, no values, nothing kept: zeroes.
+	if got := r.CountWithin("nothing", []string{sam}, fixed); !slices.Equal(got, []int{0}) {
+		t.Fatalf("an unknown key = %v", got)
+	}
+	if got := r.CountWithin("reviewed-by", []string{sam}, nil); !slices.Equal(got, []int{0}) {
+		t.Fatalf("within nothing = %v", got)
+	}
+}
+
 func TestReadingHoldsWhileTheIndexStaysAsItIs(t *testing.T) {
 	t.Parallel()
 	x, _ := indexOf("Closes: #12")

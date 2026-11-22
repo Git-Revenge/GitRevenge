@@ -802,6 +802,10 @@ export function TrailerStatus(arg1) {
   return window['go']['app']['App']['TrailerStatus'](arg1);
 }
 
+export function TrailerSuggest(arg1, arg2, arg3) {
+  return window['go']['app']['App']['TrailerSuggest'](arg1, arg2, arg3);
+}
+
 export function TrailerValues(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['app']['App']['TrailerValues'](arg1, arg2, arg3, arg4, arg5);
 }
