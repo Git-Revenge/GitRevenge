@@ -1,6 +1,9 @@
 package git
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // This file reads mailmap text the way git does (mailmap.c), without asking git. The
 // People view needs that to show what an edit would do before it's saved, and to say
@@ -237,6 +240,30 @@ func (m *Mailmap) Resolve(id Identity) (Identity, []MailmapRef) {
 		}
 	}
 	return out, by
+}
+
+// mappedTo returns the commit emails, in lower case and in order, that some line maps to
+// one of emails (lower case too) and that aren't among them: the other addresses a person
+// with those emails may be written under. A nil Mailmap maps nothing.
+func (m *Mailmap) mappedTo(emails map[string]bool) []string {
+	if m == nil {
+		return nil
+	}
+	var out []string
+	for old, item := range m.byEmail {
+		if old == "" || emails[old] {
+			continue
+		}
+		maps := item.simple.hasEmail && emails[foldASCII(item.simple.email)]
+		for _, t := range item.byName {
+			maps = maps || t.hasEmail && emails[foldASCII(t.email)]
+		}
+		if maps {
+			out = append(out, old)
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 // live returns the lines that still decide something: a line every part of which a later

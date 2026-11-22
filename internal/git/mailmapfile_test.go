@@ -2,6 +2,8 @@ package git
 
 import (
 	"context"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/git-revenge/gitrevenge/internal/gittest"
@@ -206,5 +208,28 @@ func TestMailmapNotes(t *testing.T) {
 	}
 	if notes[3].Why == "" {
 		t.Error("a skipped line should say why")
+	}
+}
+
+func TestMailmapMappedTo(t *testing.T) {
+	t.Parallel()
+	m := NewMailmap()
+	m.Add(MailmapWorkTree, strings.Join([]string{
+		"Jane Doe <jane@example.com> <JDoe@old.example.com>",
+		"Jane Doe <jane@example.com> jdoe <team@example.com>",
+		"Robin <robin@example.com> <robin@old.example.com>",
+		"Jane D. <jane@example.com>",
+		"<jane@work.example.com> <jane@example.com>",
+	}, "\n"))
+	hers := map[string]bool{"jane@example.com": true}
+	if got, want := m.mappedTo(hers), []string{"jdoe@old.example.com", "team@example.com"}; !slices.Equal(got, want) {
+		t.Errorf("mappedTo = %q, want %q", got, want)
+	}
+	if got := m.mappedTo(map[string]bool{"nobody@example.com": true}); len(got) != 0 {
+		t.Errorf("mappedTo for someone no line names = %q", got)
+	}
+	var none *Mailmap
+	if got := none.mappedTo(hers); got != nil {
+		t.Errorf("no mailmap maps %q", got)
 	}
 }

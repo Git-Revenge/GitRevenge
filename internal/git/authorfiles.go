@@ -16,12 +16,16 @@ type person struct {
 	// mentions them, each as fixed strings without regard to case. Both match more than is
 	// theirs (any author line or message holding the text), so every hit is checked with is.
 	authorArgs, grepArgs []string
+	// mailmap reads a co-author trailer's identity as git would an author's. Git maps the
+	// author line itself, and leaves a trailer as it was written.
+	mailmap *Mailmap
 }
 
 // personOf gathers ids into one person. An identity is known by its email, or by its name
-// when it has no email.
-func personOf(ids []Identity) person {
-	p := person{emails: map[string]bool{}, names: map[string]bool{}}
+// when it has no email. ids are as the mailmap shows them; with mailmap, a trailer that
+// names the person under an address the mailmap maps to one of theirs credits them too.
+func personOf(ids []Identity, mailmap *Mailmap) person {
+	p := person{emails: map[string]bool{}, names: map[string]bool{}, mailmap: mailmap}
 	for _, id := range ids {
 		switch {
 		case id.Email != "":
@@ -38,6 +42,11 @@ func personOf(ids []Identity) person {
 			}
 		}
 	}
+	// The addresses the mailmap maps to theirs: a message that credits them may hold one of
+	// these and none of their own.
+	for _, old := range mailmap.mappedTo(p.emails) {
+		p.grepArgs = append(p.grepArgs, "--grep=<"+old+">")
+	}
 	return p
 }
 
@@ -53,7 +62,16 @@ func (p person) is(id Identity) bool {
 // names the person.
 func (p person) credits(coAuthors string) bool {
 	for value := range strings.SplitSeq(coAuthors, "\x1d") {
-		if value != "" && p.is(ParseIdentity(value)) {
+		if value == "" {
+			continue
+		}
+		id := ParseIdentity(value)
+		// Read as the mailmap shows it, both ways: a name it maps to them is theirs, and a
+		// name at their address that it maps to somebody else isn't.
+		if p.mailmap != nil {
+			id, _ = p.mailmap.Resolve(id)
+		}
+		if p.is(id) {
 			return true
 		}
 	}
@@ -78,11 +96,11 @@ type AuthorFilesCommit struct {
 //
 // Only that person's commits are compared with their parents, which is what keeps this quick
 // on a long history: the files of everyone's commits would take minutes to read.
-func (r *Repo) AuthorFiles(ctx context.Context, since int64, revs []string, ids []Identity, each func(AuthorFilesCommit)) error {
+func (r *Repo) AuthorFiles(ctx context.Context, since int64, revs []string, ids []Identity, mailmap *Mailmap, each func(AuthorFilesCommit)) error {
 	if err := CheckRevs(revs...); err != nil {
 		return err
 	}
-	who := personOf(ids)
+	who := personOf(ids, mailmap)
 	if len(who.authorArgs) == 0 {
 		return nil
 	}
