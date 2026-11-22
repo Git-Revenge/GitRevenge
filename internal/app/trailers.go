@@ -84,6 +84,8 @@ type keptReading struct {
 	// so a look is good for a moment, unless the repository is known to have changed.
 	checked time.Time
 	gen     uint64
+	// history is how many commits the history had when that was last known.
+	history int
 }
 
 // rulesGoodFor is how long a look at a repository's mailmap, bot patterns and smart links
@@ -144,7 +146,19 @@ func (a *App) trailerReading(ctx context.Context, r *session.Repo) *trailerindex
 	defer func() { k.checked = time.Now() }()
 	bots := a.branchRules(r.Path)
 	linked := a.linkConfig(ctx, r.Git)
+	// How long the history is, for telling a key that's on nearly all of it. Under a smart
+	// filter the graph holds only what the filter keeps, so its size isn't the history's:
+	// the key a filter is on would be on every commit there is, and be held back. The
+	// graph counts the history without its filter, and until it has, it's as long as it was.
 	_, total := r.GraphStatus()
+	if on, _, whole := r.Filtered(); on {
+		if total = whole; total == 0 {
+			total = k.history
+		}
+	}
+	if total > 0 {
+		k.history = total
+	}
 	// What the repository's own rules say about its keys, in its git config.
 	said := a.trailerRules(ctx, r)
 	sig, _ := json.Marshal([]any{index.Gen(), r.Git.MailmapState(ctx).Key(), bots.BotAuthorPatterns(), linked.Active(), total, said})
