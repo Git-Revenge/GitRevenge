@@ -86,6 +86,50 @@ type keptReading struct {
 	gen     uint64
 	// history is how many commits the history had when that was last known.
 	history int
+	// ids are the abbreviated commit ids readings have asked about, each with the full id of
+	// the commit it names, or "" for one that names none. Placing them is most of a reading's
+	// time on a long history (4.5 of 6.6 seconds on the Linux kernel), and an id that named a
+	// commit still does, so each is asked once. One that named none is asked again once the
+	// index has read new commits (idsGen), since the commit may have come with them (#897).
+	ids    map[string]string
+	idsGen uint64
+}
+
+// commitIDs answers what ask (git.CommitIDs) would, asking it only about ids it hasn't been
+// asked about before, as of the index at gen. It runs while the reading is worked out, with
+// making held.
+func (k *keptReading) commitIDs(gen uint64, ids []string, ask func([]string) (map[string]string, error)) map[string]string {
+	if k.ids == nil || k.idsGen != gen {
+		kept := make(map[string]string, len(k.ids))
+		for id, full := range k.ids {
+			if full != "" {
+				kept[id] = full
+			}
+		}
+		k.ids, k.idsGen = kept, gen
+	}
+	var fresh []string
+	for _, id := range ids {
+		if _, asked := k.ids[id]; !asked {
+			fresh = append(fresh, id)
+		}
+	}
+	if len(fresh) > 0 {
+		// A question git couldn't answer is asked again next time, and its ids read as text
+		// meanwhile, as they did before anything was kept.
+		if full, err := ask(fresh); err == nil {
+			for _, id := range fresh {
+				k.ids[id] = full[id]
+			}
+		}
+	}
+	out := make(map[string]string, len(ids))
+	for _, id := range ids {
+		if full := k.ids[id]; full != "" {
+			out[id] = full
+		}
+	}
+	return out
 }
 
 // rulesGoodFor is how long a look at a repository's mailmap, bot patterns and smart links
@@ -166,15 +210,11 @@ func (a *App) trailerReading(ctx context.Context, r *session.Repo) *trailerindex
 		return k.reading
 	}
 
+	gen := index.Gen()
+	ask := func(ids []string) (map[string]string, error) { return r.Git.CommitIDs(ctx, ids) }
 	rules := trailerindex.Rules{
-		Total: total,
-		Commits: func(ids []string) map[string]string {
-			full, err := r.Git.CommitIDs(ctx, ids)
-			if err != nil {
-				return nil
-			}
-			return full
-		},
+		Total:   total,
+		Commits: func(ids []string) map[string]string { return k.commitIDs(gen, ids, ask) },
 	}
 	trailerrules.Apply(said, &rules)
 	// Who a trailer names is who the graph would show: the mailmap git reads.
