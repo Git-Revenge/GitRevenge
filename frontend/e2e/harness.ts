@@ -328,7 +328,7 @@ const mounts = {
     const s: NonNullable<Scenario['filterStrip']> = scenario.filterStrip ?? { filter: null }
     mount(FilterStrip, {
       target: host,
-      props: { filter: s.filter as never, only: s.only ?? true, onlyOffered: s.onlyOffered ?? true, onRemove: record('remove'), onAdd: record('add'), onMode: record('mode'), onClear: record('clear') },
+      props: { filter: s.filter as never, only: s.only ?? true, onlyOffered: s.onlyOffered ?? true, onRemove: record('remove'), onAdd: record('add'), onMode: record('mode'), onClear: record('clear'), onStep: record('step') },
     })
   },
   // The status bar's line about reading trailers, for the repository on screen.

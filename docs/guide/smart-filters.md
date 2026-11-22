@@ -65,7 +65,7 @@ While a filter is on, a **strip** above the graph says how many commits it keeps
 A filter has two modes, switched in the strip and remembered for each repository:
 
 - **Only these**, the default. Commits that don't match leave the graph. Those that stay are strung on one dashed line, since they're no longer neighbours. Each day's line says how many it kept of how many the day had: "1 of 3 commits".
-- **Highlight.** Nothing leaves. The matches keep their ink and the rest fade, each match has a tick on the [ruler](graph.md#the-ruler), and a day's line adds how many of its commits match. A match inside a [folded lane](graph.md#folded-lanes) shows.
+- **Highlight.** Nothing leaves. The matches keep their ink and the rest fade, each match has a tick on the [ruler](graph.md#the-ruler), and a day's line adds how many of its commits match. A match inside a [folded lane](graph.md#folded-lanes) shows. The arrows in the strip go to the next and the previous match.
 
 ![Only these: the graph holds the 171 commits that say Changelog: fixed, on one dashed line, and each day says how many it kept](../img/smart-filter-only-light.webp#gh-light-mode-only)
 ![Only these: the graph holds the 171 commits that say Changelog: fixed, on one dashed line, and each day says how many it kept](../img/smart-filter-only-dark.webp#gh-dark-mode-only)

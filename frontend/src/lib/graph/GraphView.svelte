@@ -1672,6 +1672,11 @@
     jump(1)
   }
 
+  /** The selected row, or -1 when no row is: as when a filter hides the selected commit. */
+  export function selectedRow(): number {
+    return selected
+  }
+
   /** Scrolls to and selects row i (e.g. when a branch is picked in the sidebar). */
   export function reveal(i: number) {
     if (i < 0) return

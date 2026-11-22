@@ -16,6 +16,7 @@
     onAdd,
     onMode,
     onClear,
+    onStep,
   }: {
     filter: app.TrailerFilterState
     /** Whether only the kept commits show: the mode in force, which may not be the one asked
@@ -28,6 +29,9 @@
     onAdd: () => void
     onMode: (only: boolean) => void
     onClear: () => void
+    /** Under Highlight, goes to the next commit the filter keeps, or with -1 the one before.
+     * Enter on the graph stays the author's card, so stepping has its own buttons (#866). */
+    onStep?: (dir: 1 | -1) => void
   } = $props()
 </script>
 
@@ -45,6 +49,14 @@
     <button aria-pressed={only} disabled={!onlyOffered} title={onlyOffered ? 'Commits that don’t match leave the graph' : 'Not in the Horizontal view: taking commits out would break its lanes'} onclick={() => onMode(true)}>Only these</button>
     <button aria-pressed={!only} title="Nothing leaves: the matches keep their ink and the rest fade" onclick={() => onMode(false)}>Highlight</button>
   </div>
+  {#if !only && onStep}
+    <div class="steps">
+      <button class="btn sm quiet icon step up" disabled={!filter.kept} aria-label="Previous match" title="The commit before this one that the filter keeps" onclick={() => onStep(-1)}
+        ><Icon name="chevron" size={13} /></button
+      >
+      <button class="btn sm quiet icon step" disabled={!filter.kept} aria-label="Next match" title="The next commit the filter keeps" onclick={() => onStep(1)}><Icon name="chevron" size={13} /></button>
+    </div>
+  {/if}
   <button class="btn sm text" onclick={onClear}>Clear</button>
 </div>
 
@@ -64,6 +76,20 @@
   .count {
     flex: none;
     font-variant-numeric: tabular-nums;
+  }
+
+  .steps {
+    flex: none;
+    display: inline-flex;
+    gap: 2px;
+  }
+
+  .step.up {
+    transform: rotate(180deg);
+  }
+
+  .step.up:hover:not(:disabled) {
+    transform: rotate(180deg) translateY(1px);
   }
 
   /* A picked value: the key in small mono, the value in ink, washed in rose as it is in the
