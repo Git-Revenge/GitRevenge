@@ -125,6 +125,17 @@
     if (!hasPick(filter.picks, key, value)) void setFilter([...filter.picks, { key, value }])
   }
 
+  // How far the trailers are read: under a filter, the ruler's foot is hatched for the rest.
+  let trailersRead = $state<{ reading: boolean; read: number; total: number } | null>(null)
+  $effect(() =>
+    onBackend('trailers:progress', (p) => {
+      if (p.path === path) trailersRead = p
+    }),
+  )
+  let trailersUnread = $derived(filter.picks.length && trailersRead?.reading && trailersRead.total > 0 ? Math.max(0, 1 - trailersRead.read / trailersRead.total) : 0)
+  /** Names the filter that's on, for whoever shows what it picked. */
+  let filterSig = $derived(filter.picks.map((p) => `${p.key}=${p.value}`).join('|'))
+
   function setMode(next: boolean) {
     filterOnly = next
     saveOnly(path, next, localStorage)
@@ -387,7 +398,7 @@
       <FilterStrip {filter} {only} {onlyOffered} onRemove={(p) => setFilter(togglePick(filter.picks, p.key, p.value))} onAdd={() => sidebar?.show('filters')} onMode={setMode} onClear={() => setFilter([])} />
     {/if}
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filter.picks.length > 0} {highlight} onFilterAdd={addPick} onFilterDrop={() => filter.picks.length && setFilter(filter.picks.slice(0, -1))} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filter.picks.length > 0} {highlight} {trailersUnread} onFilterAdd={addPick} onFilterDrop={() => filter.picks.length && setFilter(filter.picks.slice(0, -1))} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           openMenu(commitMenuItems(row, refs, ctx), x, y)}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
@@ -487,7 +498,7 @@
       onRevert={revertFound}
     />
   {:else if selected}
-    <CommitPanel {path} onMenu={openMenu} showNotes={noteAsk} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} onAuthor={(sha, name, from) => {
+    <CommitPanel {path} onMenu={openMenu} showNotes={noteAsk} {filterSig} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} onAuthor={(sha, name, from) => {
         const at = from.getBoundingClientRect()
         authorCard = { sha, name, x: at.left, y: at.bottom + 4, above: at.top, opener: from }
       }} onReveal={revealCommit} onActions={(x, y) => selected && openMenu(commitMenuItems(selected, graph.refsOf(selected.id), ctx), x, y)} />

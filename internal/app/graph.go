@@ -63,6 +63,12 @@ func (a *App) GraphRows(path string, start, count int) (GraphPage, error) {
 	}
 	paused, estimate := r.GraphStatus()
 	rows := g.Page(start, count)
+	// Under a filter that highlights, each row says whether it's one of the filter's.
+	if keep := a.trailerFilters.highlighted(r.Path); keep != nil {
+		for i := range rows {
+			_, rows[i].Match = keep[rows[i].ID]
+		}
+	}
 	idx := r.Refs()
 	refs := map[string][]git.Ref{}
 	for _, row := range rows {

@@ -25,6 +25,12 @@ export interface Scenario {
   /** Which preview the preview dialog shows; a merge unless said. */
   previewKind?: 'merge' | 'rebase'
   theme?: 'light' | 'dark'
+  /** The graph is under a smart filter that takes commits out. */
+  sparse?: boolean
+  /** The graph is under a smart filter that highlights: the rows to tick on its ruler. */
+  highlight?: number[]
+  /** The share of the history whose trailers aren't read yet, as the graph is told. */
+  trailersUnread?: number
   /** The graph is given a smart filter to add to, so its search box suggests. */
   suggests?: boolean
   /** The values the graph is filtered by, as the sidebar is told. */

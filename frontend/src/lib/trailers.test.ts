@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeLinker } from './links/links'
-import { appendTrailer, groupTrailers, trailerKeyChoices, asPerson, valueParts } from './trailers'
+import { appendTrailer, groupTrailers, lineKey, trailerKeyChoices, asPerson, valueParts } from './trailers'
 
 describe('appendTrailer', () => {
   it('starts an empty description', () => {
@@ -117,5 +117,14 @@ describe('valueParts', () => {
 
   it('returns plain text as one part', () => {
     expect(valueParts('no links here', numbered)).toEqual([{ text: 'no links here' }])
+  })
+})
+
+describe('lineKey', () => {
+  it('tells one trailer line from another, whatever the case of the key', () => {
+    expect(lineKey('Reviewed-by', 'Sam Ortiz <sam@tidewater.example>')).toBe(lineKey('reviewed-BY', 'Sam Ortiz <sam@tidewater.example>'))
+    expect(lineKey('Reviewed-by', 'Sam Ortiz')).not.toBe(lineKey('Reviewed-by', 'sam ortiz'))
+    // A key that ends as a value begins isn't the same line.
+    expect(lineKey('Closes', '#12')).not.toBe(lineKey('Close', 's#12'))
   })
 })

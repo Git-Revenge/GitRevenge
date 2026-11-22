@@ -3830,6 +3830,7 @@ export namespace graph {
 	    passKind?: string[];
 	    width: number;
 	    kind?: string;
+	    match?: boolean;
 	    id: string;
 	    parents: number;
 	    author: string;
@@ -3851,6 +3852,7 @@ export namespace graph {
 	        this.passKind = source["passKind"];
 	        this.width = source["width"];
 	        this.kind = source["kind"];
+	        this.match = source["match"];
 	        this.id = source["id"];
 	        this.parents = source["parents"];
 	        this.author = source["author"];

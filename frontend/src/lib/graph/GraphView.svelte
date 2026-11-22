@@ -4,7 +4,7 @@
   import { errorText } from '../errors'
   import { onMount, tick, untrack, type Snippet } from 'svelte'
   import { ALONE_STEPS, searchPlaceholder, SQUEEZE, squeezeFor } from '../barSqueeze'
-  import { ArrivedCommits, CommitNotes, CommitRow, CommitSignatures, GraphFocus, HeadCommit, OwnMoveAge, GraphRows, NotedCommits, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView, TrailerSuggest } from '../../../wailsjs/go/app/App.js'
+  import { ArrivedCommits, CommitNotes, CommitRow, CommitSignatures, GraphFocus, HeadCommit, OwnMoveAge, GraphRows, NotedCommits, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView, TrailerFilterDays, TrailerSuggest } from '../../../wailsjs/go/app/App.js'
   import { session } from '../session.svelte'
   import { ClipboardSetText } from '../../../wailsjs/runtime/runtime.js'
   import { onBackend } from '../events'
@@ -21,7 +21,7 @@
   import RefChip from './RefChip.svelte'
   import SearchSuggest from './SearchSuggest.svelte'
   import { completion, isKey, stepRow, type Suggestion, type Suggestions } from './suggest'
-  import { bisectRow, DAY_H, dayCountLabel, dayLineLabel, dayLineSpoken, drawDayLine, drawFoldLine, drawRow, authorSpan, FOLD_H, FOLLOWER_H, gapLabel, sameDay, sealOf, startsRun, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
+  import { bisectRow, DAY_H, dayBounds, dayCountLabel, dayLineLabel, dayLineSpoken, drawDayLine, drawFoldLine, drawRow, authorSpan, FOLD_H, FOLLOWER_H, gapLabel, sameDay, sealOf, startsRun, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { branchMove, headAway, headLabel, isOwnMove, LANDING, moveAnnouncement, tipsOf, type Tips } from './follow'
   import { loadLabelWidth, nextLabelWidth, REFIT_AFTER_MS, saveLabelWidth } from './labelColumn'
   import { RowCache, type Page, type Ref, type Row } from './rowCache'
@@ -41,6 +41,7 @@
     onAuthor,
     sparse = false,
     highlight = null,
+    trailersUnread = 0,
     onFilterAdd,
     onFilterDrop,
     lead,
@@ -75,8 +76,12 @@
     /** A smart filter is showing only its commits: they aren't neighbours, so their lane is
      * dashed. */
     sparse?: boolean
-    /** A smart filter is highlighting its commits: these are their rows, and the rest fade. */
+    /** A smart filter is highlighting its commits: each row says whether it's one, and the
+     * rest fade. These are rows to tick on the ruler. */
     highlight?: number[] | null
+    /** While a smart filter is on, the share of the history whose trailers aren't read yet:
+     * the ruler's foot is hatched for it. */
+    trailersUnread?: number
     /** Adds a trailer value to the smart filter. With it, the search box suggests the keys
      * and values that what's typed could mean. */
     onFilterAdd?: (key: string, value: string) => void
@@ -138,7 +143,9 @@
    * from a move the view followed, or on its upstream after a fetch. */
   let unseen = 0
   /** The button that goes to the checked-out commit, while that commit is out of view. */
-  let goHead = $state<{ dir: 'up' | 'down'; label: string; count: number } | null>(null)
+  let goHead = $state<{ dir: 'up' | 'down' | 'out'; label: string; count: number } | null>(null)
+  /** Whether the checked-out commit's row has been looked for since the graph last loaded. */
+  let headLooked = false
 
   // The ruler: the scrollbar, with the history marked on it (see ruler.ts).
   /** The rows' id, which the ruler says it scrolls. One per graph: several can be open in tabs. */
@@ -236,7 +243,11 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, RULER_W, h)
     // The rows not read yet: a hatched stretch at the foot. Going there reads them.
-    const unread = unreadFrom(slotOf(total), count, h)
+    const unreadRows = unreadFrom(slotOf(total), count, h)
+    // Under a filter the trailers not read yet are hatched too: its matches there aren't known.
+    // Where the filter took commits out the ruler spans the matches, so the foot is a token one.
+    const unreadTrailers = trailersUnread > 0 && (sparse || highlight) ? (sparse ? h - 12 : Math.round(h * (1 - trailersUnread))) : null
+    const unread = unreadRows === null ? unreadTrailers : unreadTrailers === null ? unreadRows : Math.min(unreadRows, unreadTrailers)
     if (unread !== null) {
       ctx.save()
       ctx.beginPath()
@@ -301,6 +312,7 @@
     const [refs, head] = await Promise.all([loadKinds(), HeadCommit(path).catch(() => null)])
     const next = tipsOf(refs, { branch: head?.branch ?? '', commit: head?.commit ?? '' })
     headRow = next.headCommit ? await CommitRow(path, next.headCommit).catch(() => -1) : -1
+    headLooked = true
     schedule()
     return next
   }
@@ -334,6 +346,7 @@
 
   /** Takes the view to the checked-out commit, without selecting it. */
   function goToHead() {
+    if (headRow < 0 && sparse && tips?.headCommit) announce = `${headLabel(tips.head, tips.headCommit)} isn’t in this filter`
     if (headRow < 0) return
     glideTo(headRow, LANDING)
     scroller.focus()
@@ -579,7 +592,7 @@
     followers: new Map<number, boolean>(),
     days: new Map<number, boolean>(),
     dayStarts: new Map<number, number>(),
-    dayInfo: new Map<number, { commits: number; people: number; complete: boolean; arrived: number }>(),
+    dayInfo: new Map<number, { commits: number; people: number; complete: boolean; arrived: number; matches: number }>(),
     folding: null as Set<string> | null,
     /** Each day's folds by commit, by the day's first commit. */
     folds: new Map<number, Map<number, Fold>>(),
@@ -623,7 +636,7 @@
   /** Whether commit i is folded out of sight. The selected commit and search matches always
    * show, so nothing is ever landed on that can't be seen. */
   // A commit in a folded lane shows when a search or a highlighting filter matches it.
-  const isHidden = (i: number) => foldedAway(foldOf(i), openFolds, i === selected, matchRows.has(i) || !!highlightSet?.has(i))
+  const isHidden = (i: number) => foldedAway(foldOf(i), openFolds, i === selected, matchRows.has(i) || !!(highlight && cache.get(i)?.match))
   /** The folding, as the Horizontal view asks about it: a fold there is a column, not a line. */
   const horizontalFolds = {
     of: (i: number) => {
@@ -726,6 +739,7 @@
     const people = new Set<string>()
     let commits = 0
     let came = 0
+    let matches = 0
     let complete = true
     for (let k = i; first && k < span; k++) {
       const row = cache.get(k)
@@ -739,8 +753,9 @@
       commits++
       people.add(row.author)
       if (arrived.has(row.id)) came++
+      if (row.match) matches++
     }
-    info = { commits, people: people.size, complete, arrived: came }
+    info = { commits, people: people.size, complete, arrived: came, matches }
     dayInfo.set(i, info)
     return info
   }
@@ -753,10 +768,53 @@
     const info = dayInfoOf(i)
     return {
       label: dayLineLabel(row.authorTime, now) + (gap ? ` · ${gap}` : ''),
-      count: dayCountLabel(info.commits, info.people, info.complete),
+      count: dayCountLabel(info.commits, info.people, info.complete, dayFilter(row.authorTime, info.matches)),
       news: info.arrived ? `${info.arrived.toLocaleString()} new just now` : undefined,
       stuck,
     }
+  }
+  // What a smart filter adds to a day's count. Only these: how many commits the day had before
+  // the filter, asked of the backend a few days at a time as their lines come into view.
+  // Highlight: how many of the day's commits match.
+  // These aren't drawn from by Svelte: the canvas reads them when it paints.
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  let dayTotals = new Map<number, number>()
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  let dayAsked = new Set<number>()
+  let dayWanted: number[] = []
+  let dayTimer: ReturnType<typeof setTimeout> | undefined
+  function dayFilter(time: number, matches: number): { of?: number; matches?: number } {
+    if (highlight) return { matches }
+    if (!sparse) return {}
+    const [from, to] = dayBounds(time)
+    const of = dayTotals.get(from)
+    if (of === undefined && !dayAsked.has(from)) {
+      dayAsked.add(from)
+      dayWanted.push(from, to)
+      clearTimeout(dayTimer)
+      dayTimer = setTimeout(() => void askDays(), 60)
+    }
+    return { of }
+  }
+  async function askDays() {
+    const spans = dayWanted
+    dayWanted = []
+    const totals = dayTotals
+    const counts = (await TrailerFilterDays(path, spans).catch(() => null)) ?? []
+    if (totals !== dayTotals) return // the graph was loaded again since
+    if (counts.length * 2 !== spans.length) {
+      // The history is still being looked through: asked again when the load ends.
+      for (let i = 0; i < spans.length; i += 2) dayAsked.delete(spans[i])
+      return
+    }
+    for (let i = 0; i < counts.length; i++) dayTotals.set(spans[i * 2], counts[i])
+    schedule()
+  }
+  function forgetDays() {
+    clearTimeout(dayTimer)
+    dayTotals = new Map()
+    dayAsked = new Set()
+    dayWanted = []
   }
   /** How much of the view's top the stuck day line covers, as last painted. */
   let stuckH = 0
@@ -1105,12 +1163,21 @@
   let matchSet: Set<number> | null = null
   // A filter that highlights fades every row but its own, as a search does, and marks them
   // on the ruler while nothing is being searched for.
-  let highlightSet = $derived(highlight ? new Set(highlight) : null)
   let rulerMatches = $derived(matches.length || !highlight ? matches : highlight)
+  // The ruler's hatched foot follows the read of the trailers.
   $effect(() => {
-    void highlightSet
+    void trailersUnread
+    untrack(schedule)
+  })
+  $effect(() => {
+    void highlight
     void sparse
-    schedule()
+    untrack(() => {
+      // Which rows match comes with the rows: they're asked for again.
+      cache.invalidate()
+      forgetDays()
+      schedule()
+    })
   })
   /** The matches that came back, which always show even when their lane is folded. */
    
@@ -1430,7 +1497,7 @@
       const hov = washes.value(`h${i}`, i === hovered ? 1 : 0, frameAt)
       // During a bisect a commit wears its answer, and fades once it's out of the running.
       const place = bisectView ? bisectRow(row.id, bisectView, { bad: th.bad }) : null
-      const dim = washes.value(`d${i}`, (matchSet && !matchSet.has(i)) || (highlightSet && !highlightSet.has(i)) || place?.faded ? 1 : 0, frameAt)
+      const dim = washes.value(`d${i}`, (matchSet && !matchSet.has(i)) || (highlight && !cache.get(i)?.match) || place?.faded ? 1 : 0, frameAt)
       const isNoted = noted.has(row.id)
       const isArrived = arrived.has(row.id)
       const follows = isFollower(i)
@@ -1503,7 +1570,9 @@
     updateActions()
     // The way back to the checked-out commit shows while that commit is out of view, once the
     // graph has held still, so it doesn't flicker past during a drag.
-    const away = headRow >= 0 && tips ? headAway(relY(headRow), heightOf(headRow), 0, h) : null
+    // Under a filter the checked-out commit may not be in the graph at all: the way back says so.
+    const out = sparse && headLooked && headRow < 0 && !!tips?.headCommit && !loading
+    const away = out ? ('out' as const) : headRow >= 0 && tips ? headAway(relY(headRow), heightOf(headRow), 0, h) : null
     if (!away) unseen = 0
     const wanted = away && (settled || goHead) ? { dir: away, label: headLabel(tips!.head, tips!.headCommit), count: unseen } : null
     if (wanted?.dir !== goHead?.dir || wanted?.label !== goHead?.label || wanted?.count !== goHead?.count) goHead = wanted
@@ -1595,6 +1664,8 @@
 
   /** The commit selected before a reload, so the selection follows it to its new row. */
   let selectedId = ''
+  /** The commit that was selected when a smart filter took its row away, or "". */
+  let hiddenId = ''
 
   /** Keeps the selection on its commit after a reload. A new focus starts from its top. With
    * `moving`, the view is on its way to a branch that moved, so the selection is kept without
@@ -1603,12 +1674,22 @@
   async function followSelection(moving = false): Promise<boolean> {
     const refocused = await loadFocus()
     if (refocused) toStart()
-    if (selected < 0) return false
-    const id = selectedId
+    if (selected < 0 && !hiddenId) return false
+    const id = hiddenId || selectedId
     const row = refocused ? 0 : id ? await CommitRow(path, id).catch(() => -1) : -1
     // The selection moved while that was being asked, to HEAD or by the person: it stands.
-    if (selectedId !== id) return false
+    if ((hiddenId || selectedId) !== id) return false
     if (row < 0 && moving) return true
+    if (row < 0 && sparse && id) {
+      // A filter took the selected commit out of the graph. It's still the one the panel
+      // beside the graph shows: no row is marked, and it's selected again when it's back.
+      hiddenId = id
+      selected = -1
+      autoSelect = 'done'
+      schedule()
+      return true
+    }
+    hiddenId = ''
     // If the commit is gone (e.g. amended), stay on the same position but refresh details.
     // One a filter took out isn't followed: the view stays where the filter put it.
     selectWhenLoaded(row >= 0 ? row : selected, moving || (row < 0 && sparse))
@@ -1643,6 +1724,7 @@
       if (arrived.size) arrived = new Set()
     }
     selected = Math.max(0, Math.min(span - 1, i))
+    hiddenId = ''
     // Keep the selection in view, unless a glide is already on its way there.
     const y = relY(selected)
     // The first selection can land before the first draw has measured the view.
@@ -1663,7 +1745,7 @@
       const start = dayStartOf(selected)
       const info = start >= 0 ? dayInfoOf(start) : null
       const now = Date.now() / 1000
-      announce = dayLineSpoken(row.authorTime, now) + (info ? `, ${dayCountLabel(info.commits, info.people, info.complete)}` : '')
+      announce = dayLineSpoken(row.authorTime, now) + (info ? `, ${dayCountLabel(info.commits, info.people, info.complete, dayFilter(row.authorTime, info.matches))}` : '')
     }
     if (row) selectedTime = row.authorTime
     selectedId = row?.id ?? ''
@@ -1854,6 +1936,7 @@
       }
       if (p.done) {
         // A reload swaps in a new graph; anything cached may be stale.
+        forgetDays()
         cache.invalidate()
         error = p.error
         void afterReload()
@@ -2162,7 +2245,11 @@
          keyboard and screen readers, and the row underneath keeps working. -->
     <!-- The way back to where you are: shown while the checked-out commit is out of view. It goes
          there without selecting anything. Tab reaches it after the row's actions. -->
-    {#if goHead}
+    {#if goHead?.dir === 'out'}
+      <p class="go-head out" in:fadeUp out:menuOut role="note" title="The checked-out commit doesn’t match the filter. Clear the filter, or switch it to Highlight, to see it.">
+        <span class="name">{goHead.label}</span> isn’t in this filter
+      </p>
+    {:else if goHead}
       <button
         class="go-head"
         in:fadeUp
@@ -2273,7 +2360,7 @@
       {selected}
       headRow={() => headRow}
       remote={() => remote}
-      dimmed={(i: number) => (!!matchSet && !matchSet.has(i)) || (!!highlightSet && !highlightSet.has(i))}
+      dimmed={(i: number) => (!!matchSet && !matchSet.has(i)) || (!!highlight && !cache.get(i)?.match)}
       ruler={() => ({ ...marks, matches: rulerMatches })}
       {wip}
       folds={horizontalFolds}
@@ -2615,6 +2702,25 @@
 
   .go-head:hover {
     background: var(--paper-warm);
+  }
+
+  /* The checked-out commit isn't in the graph: it says so where the way back would be, and
+     goes nowhere. */
+  .go-head.out {
+    margin: 0;
+    padding: 0 12px;
+    font-weight: 400;
+    color: var(--ink-soft);
+    cursor: default;
+  }
+
+  .go-head.out:hover {
+    background: var(--paper);
+  }
+
+  .go-head.out .name {
+    font-weight: 600;
+    color: var(--ink);
   }
 
   .go-head:focus-visible {

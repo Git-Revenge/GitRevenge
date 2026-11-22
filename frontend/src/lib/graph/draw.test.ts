@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { authorSpan, clip, DATE_COLUMN, noteMarkSpan, middleCut, fitLabelColumn, LABEL_COLUMN, labelColumnNeed, moreLabels, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine, bisectRow, startsRun, RUN_PAUSE, dayLineLabel, dayLineSpoken, gapLabel, dayCountLabel, strongAbove, strongBelow, selectionWash, thinned } from './draw'
+import { authorSpan, clip, dayBounds, DATE_COLUMN, noteMarkSpan, middleCut, fitLabelColumn, LABEL_COLUMN, labelColumnNeed, moreLabels, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine, bisectRow, startsRun, RUN_PAUSE, dayLineLabel, dayLineSpoken, gapLabel, dayCountLabel, strongAbove, strongBelow, selectionWash, thinned } from './draw'
 import type { Ref, Row } from './rowCache'
 
 describe('graph geometry', () => {
@@ -547,6 +547,32 @@ describe('the day line', () => {
     expect(dayCountLabel(41, 1, false)).toBe('41+ commits')
     expect(dayCountLabel(1, 1, false)).toBe('1+ commits')
     expect(dayCountLabel(200, 3, false)).toBe('200+ commits · 3 people')
+  })
+
+  it('says how many the day had, under a filter that takes commits out', () => {
+    expect(dayCountLabel(1, 1, true, { of: 3 })).toBe('1 of 3 commits')
+    expect(dayCountLabel(2, 2, true, { of: 31 })).toBe('2 of 31 commits · 2 people')
+    expect(dayCountLabel(1, 1, true, { of: 1 })).toBe('1 of 1 commit')
+    // Until the day's count is known, and when it can't be right, it's the plain count.
+    expect(dayCountLabel(1, 1, true, {})).toBe('1 commit')
+    expect(dayCountLabel(4, 1, true, { of: 3 })).toBe('4 commits')
+    expect(dayCountLabel(41, 1, false, { of: 90 })).toBe('41+ commits')
+  })
+
+  it('says how many match, under a filter that highlights', () => {
+    expect(dayCountLabel(3, 1, true, { matches: 1 })).toBe('3 commits · 1 match')
+    expect(dayCountLabel(31, 6, true, { matches: 12 })).toBe('31 commits · 6 people · 12 matches')
+    expect(dayCountLabel(3, 1, true, { matches: 0 })).toBe('3 commits')
+  })
+
+  it('finds the day a time falls in, here', () => {
+    const noon = new Date(2026, 10, 10, 12, 30).getTime() / 1000
+    const [from, to] = dayBounds(noon)
+    expect(new Date(from * 1000)).toEqual(new Date(2026, 10, 10))
+    expect(new Date(to * 1000)).toEqual(new Date(2026, 10, 11))
+    // The day's first second is in it, and the next day's isn't.
+    expect(dayBounds(from)).toEqual([from, to])
+    expect(dayBounds(to)[0]).toBe(to)
   })
 })
 
