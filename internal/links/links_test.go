@@ -172,6 +172,34 @@ func TestFind(t *testing.T) {
 	}
 }
 
+// A trailer's value is tickets when it's nothing but matches, with commas or spaces between.
+func TestWhole(t *testing.T) {
+	num := Rule{Name: "Num", Pattern: `#(\d+)\b`, URL: "https://t.example/i/{1}", In: []string{InTrailers}, Enabled: true}
+	keys := Rule{Name: "Keys", Pattern: `\b[A-Z]+-\d+\b`, URL: "https://k.example/{0}", In: AllPlaces, Enabled: true}
+	whole := Config{Rules: []Rule{num, keys}}.Whole(InTrailers)
+
+	if got := whole("#4"); len(got) != 1 || got[0] != (Match{Text: "#4", Href: "https://t.example/i/4", Rule: "Num"}) {
+		t.Fatalf("one match = %+v", got)
+	}
+	if got := whole("TIDE-7, TIDE-9 #4"); len(got) != 3 || got[1].Text != "TIDE-9" || got[2].Rule != "Num" {
+		t.Fatalf("several = %+v", got)
+	}
+	for _, text := range []string{"#4 and the rest", "see TIDE-7", "nothing here", ""} {
+		if got := whole(text); got != nil {
+			t.Errorf("%q has more than matches in it, and gave %+v", text, got)
+		}
+	}
+	// No rule looks in the place: there's nothing to ask.
+	if (Config{Rules: []Rule{num}}).Whole(InMessage) != nil {
+		t.Fatal("a function was returned with no rule for the place")
+	}
+	off := num
+	off.Enabled = false
+	if (Config{Rules: []Rule{off}}).Whole(InTrailers) != nil {
+		t.Fatal("a rule that's switched off was used")
+	}
+}
+
 func TestReferencesAndPatterns(t *testing.T) {
 	c := Config{Rules: []Rule{jira}}
 	refs := c.References()

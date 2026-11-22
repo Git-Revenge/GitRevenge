@@ -22,6 +22,8 @@ const (
 	targetTrailerKeys = 2 * time.Second
 	// Opening a repository whose trailers are already read: load the file, find nothing new.
 	targetTrailerReopen = 15 * time.Second
+	// Reading the whole index through the rules, done once and kept until either changes.
+	targetTrailerReading = 20 * time.Second
 )
 
 // countingMessages says how many commits a read asked git for.
@@ -113,6 +115,49 @@ func TestTrailerIndex(t *testing.T) {
 	}
 	if len(commits) != values[0].Commits {
 		t.Errorf("%d commits found, and the value is counted on %d", len(commits), values[0].Commits)
+	}
+	// The reading: keys joined, values told apart by kind, commit ids checked with git.
+	asked := 0
+	start = time.Now()
+	reading := x.Reading(trailerindex.Rules{
+		Total: first.read,
+		Commits: func(ids []string) map[string]string {
+			asked = len(ids)
+			full, err := r.CommitIDs(ctx, ids)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return full
+		},
+	})
+	took = time.Since(start)
+	rkeys := reading.Keys()
+	held := map[string]int{}
+	for _, k := range rkeys {
+		held[k.Held]++
+	}
+	t.Logf("reading: %d keys (%d offered, %d rare, %d identifiers, %d everywhere), %d ids asked of git, in %s", len(rkeys), held[""], held[trailerindex.HeldRare], held[trailerindex.HeldIdentifier], held[trailerindex.HeldEverywhere], asked, took.Round(time.Millisecond))
+	if took > targetTrailerReading {
+		t.Errorf("reading the index took %s, target %s", took, targetTrailerReading)
+	}
+	for i, k := range rkeys {
+		if i < 14 {
+			t.Logf("  %-18s %-10s %8d commits %7d values  held: %q", k.Label, k.Kind, k.Commits, k.Values, k.Held)
+		}
+	}
+	start = time.Now()
+	fixed := reading.Values("Fixes")
+	took = time.Since(start)
+	if len(fixed) > 0 {
+		start = time.Now()
+		n := len(reading.Commits("Fixes", fixed[0].ID))
+		t.Logf("values of Fixes: %d in %s; commits that fix %q: %d in %s", len(fixed), took, fixed[0].Label, n, time.Since(start))
+		if n != fixed[0].Commits {
+			t.Errorf("%d commits found, and the value is counted on %d", n, fixed[0].Commits)
+		}
+		if d := time.Since(start); d > targetTrailerQuery {
+			t.Errorf("finding the commits with a value took %s, target %s", d, targetTrailerQuery)
+		}
 	}
 	x.Close()
 

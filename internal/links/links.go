@@ -301,6 +301,77 @@ func (c Config) Find(text, place string) []Match {
 	return out
 }
 
+// Whole returns a function that reads a text as nothing but matches of the active rules
+// that look in a place: one match, or several with commas or spaces between, as in
+// "TIDE-7, TIDE-9". It gives nil for a text with anything else in it. The patterns are
+// compiled once, for asking about a great many texts, and the function is nil when no rule
+// looks in the place.
+func (c Config) Whole(place string) func(text string) []Match {
+	type rule struct {
+		re        *regexp.Regexp
+		url, name string
+	}
+	var rules []rule
+	for _, r := range c.Active() {
+		if !slices.Contains(r.In, place) {
+			continue
+		}
+		if re, err := regexp.Compile(r.Pattern); err == nil {
+			rules = append(rules, rule{re, r.URL, r.Name})
+		}
+	}
+	if len(rules) == 0 {
+		return nil
+	}
+	type hit struct {
+		start, end, rule int
+		groups           []string
+	}
+	return func(text string) []Match {
+		var hits []hit
+		for i, r := range rules {
+			for _, loc := range r.re.FindAllStringSubmatchIndex(text, -1) {
+				if loc[1] == loc[0] {
+					continue
+				}
+				g := make([]string, len(loc)/2)
+				for k := range g {
+					if loc[2*k] >= 0 {
+						g[k] = text[loc[2*k]:loc[2*k+1]]
+					}
+				}
+				hits = append(hits, hit{loc[0], loc[1], i, g})
+			}
+		}
+		if len(hits) == 0 {
+			return nil
+		}
+		slices.SortStableFunc(hits, func(a, b hit) int {
+			if a.start != b.start {
+				return a.start - b.start
+			}
+			return a.rule - b.rule
+		})
+		between := func(s string) bool { return strings.Trim(s, " \t,") == "" }
+		var out []Match
+		end := 0
+		for _, h := range hits {
+			if h.start < end {
+				continue
+			}
+			if !between(text[end:h.start]) {
+				return nil
+			}
+			end = h.end
+			out = append(out, Match{Text: h.groups[0], Href: Expand(rules[h.rule].url, h.groups), Rule: rules[h.rule].name})
+		}
+		if !between(text[end:]) {
+			return nil
+		}
+		return out
+	}
+}
+
 // References returns the matches of rules that count for Insights › Shipped, found in a
 // message's subject (for rules that look in messages) and its reference trailers (for
 // rules that look in trailers). It returns nil when no rule counts for Shipped, so the
