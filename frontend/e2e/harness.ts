@@ -474,6 +474,17 @@ const mounts = {
     mount(Dialog, { target: host, props: { spec: spec('Below'), onClose: record('close-below') } })
     mount(Dialog, { target: host, props: { spec: spec('Above'), onClose: record('close-above') } })
   },
+  // The Insights tab, opened the way a repository's tab menu and the command palette open it.
+  async insights() {
+    host.style.cssText = 'display:block;height:100vh'
+    const { default: InsightsView } = await import('../src/lib/insights/InsightsView.svelte')
+    const { insights } = await import('../src/lib/insights/insights.svelte')
+    const { session } = await import('../src/lib/session.svelte')
+    session.tabs = [{ path: '/r', name: 'tidewater', head: 'main' } as never]
+    session.active = '/r'
+    mount(InsightsView, { target: host })
+    await insights.show()
+  },
   // The whole shell, for what happens between its tabs. It restores its session from the stub.
   async app() {
     host.style.cssText = 'display:block;height:100vh'
@@ -580,6 +591,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'app':
     await mounts.app()
+    break
+  case 'insights':
+    await mounts.insights()
     break
   default:
     throw new Error('Unknown component to mount.')
