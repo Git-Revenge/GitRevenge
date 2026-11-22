@@ -41,6 +41,23 @@ In git config the setting is `gitrevenge.botAuthor`, once for each pattern.
 
 The settings under **This repository** are kept in the repository's git config, under `gitrevenge` keys, where the [Git Config tab](git-config.md) shows them with the rest; set them in your global config to make them your defaults everywhere. The app's own settings are saved to `settings.json`; see [where your data lives](install.md#where-your-data-lives). Git's own settings, such as your name, email and aliases, are edited in the [Git Config tab](git-config.md): choose **Edit git config…** under Git.
 
+## Smart filters
+
+**Settings › Smart filters** has one button, **Trailer care…**, which opens for the repository whose tab is active. Trailer care is where a repository says how its [trailers](smart-filters.md) are read: a misspelled key read as the right one, two keys read as one, what a key's values are, and whether the Smart filters panel offers it. Nothing there changes a commit.
+
+It's also behind **Needs care** in the sidebar's Smart filters panel, and **Trailer care** in the command palette. [Smart filters](smart-filters.md#trailer-care) covers what it asks and what its table shows.
+
+What you decide there is kept in git config as `gitrevenge-trailer` rules, in the repository's own `.git/config`:
+
+```ini
+[gitrevenge-trailer "Reviewed-by"]
+	also = Reviewd-by
+	kind = people
+	show = panel
+```
+
+Written by hand in your global config, a rule applies to every repository, and a repository's rule for a key replaces the global one. [Where rules are kept](smart-filters.md#where-rules-are-kept) lists what each line means.
+
 ## Links
 
 Smart links turn ticket keys and web addresses into links, wherever they turn up in commit messages, trailers and branch names. A link opens in your browser. Git Revenge only builds the address and never contacts the site.

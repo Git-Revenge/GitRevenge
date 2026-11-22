@@ -129,6 +129,11 @@ const features = [
     to: '/docs/guide/ignoring',
   },
   {
+    title: 'Filters from what’s already written',
+    body: 'The trailers your history has, such as Reviewed-by, Closes and Changelog, become filters for the graph. Show only the fixes that closed an issue, or pin a key and read it down the history. Nothing is written to a commit.',
+    to: '/docs/guide/smart-filters',
+  },
+  {
     title: 'Insights for sprint reviews',
     body: 'What shipped in a window, which branches are stuck or would conflict, and where the hotspots are. It’s worked out from the repository alone, so anyone gets the same numbers.',
     to: '/docs/guide/insights',
