@@ -121,7 +121,7 @@ func (a *App) SetTrailerFilter(path string, picks []trailerindex.Pick, only bool
 	var known []trailerindex.Pick
 	for _, p := range picks {
 		if _, ok := reading.Value(p.Key, p.Value); ok {
-			known = append(known, trailerindex.Pick{Key: trailerindex.KeyID(p.Key), Value: p.Value})
+			known = append(known, trailerindex.Pick{Key: reading.KeyID(p.Key), Value: p.Value})
 		}
 	}
 	if len(known) == 0 {

@@ -18,6 +18,10 @@ export function AnswerPrompt(arg1, arg2, arg3) {
   return window['go']['app']['App']['AnswerPrompt'](arg1, arg2, arg3);
 }
 
+export function AnswerTrailerQuestion(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['AnswerTrailerQuestion'](arg1, arg2, arg3, arg4);
+}
+
 export function ArrivedCommits(arg1, arg2, arg3) {
   return window['go']['app']['App']['ArrivedCommits'](arg1, arg2, arg3);
 }
@@ -710,8 +714,16 @@ export function SetTrailerFilter(arg1, arg2, arg3) {
   return window['go']['app']['App']['SetTrailerFilter'](arg1, arg2, arg3);
 }
 
+export function SetTrailerKind(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SetTrailerKind'](arg1, arg2, arg3);
+}
+
 export function SetTrailerPin(arg1, arg2, arg3) {
   return window['go']['app']['App']['SetTrailerPin'](arg1, arg2, arg3);
+}
+
+export function SetTrailerPlace(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SetTrailerPlace'](arg1, arg2, arg3);
 }
 
 export function SetUpdateChecks(arg1) {
@@ -776,6 +788,10 @@ export function TakeTrustQuestion() {
 
 export function Theme() {
   return window['go']['app']['App']['Theme']();
+}
+
+export function TrailerCare(arg1) {
+  return window['go']['app']['App']['TrailerCare'](arg1);
 }
 
 export function TrailerFilter(arg1) {
@@ -848,6 +864,10 @@ export function UndoIgnore(arg1, arg2) {
 
 export function UndoState(arg1) {
   return window['go']['app']['App']['UndoState'](arg1);
+}
+
+export function UndoTrailerJoin(arg1, arg2, arg3) {
+  return window['go']['app']['App']['UndoTrailerJoin'](arg1, arg2, arg3);
 }
 
 export function UnsetGitConfig(arg1, arg2, arg3) {

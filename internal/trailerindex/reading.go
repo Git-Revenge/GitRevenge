@@ -55,6 +55,8 @@ const (
 	HeldEverywhere = "everywhere"
 	// HeldRare: so few commits have it that it's likely a sentence shaped like a trailer.
 	HeldRare = "rare"
+	// HeldRule: the repository's own rule holds it back.
+	HeldRule = "rule"
 )
 
 // The thresholds, set against three histories: this project's own (570 commits), the
@@ -104,7 +106,29 @@ type Rules struct {
 	// Total is how many commits the history has, for telling a key that's on nearly all of
 	// them. 0 leaves that unjudged.
 	Total int
+
+	// What the repository has said about its keys, each by key ID. Nothing here changes a
+	// commit: a rule only says how to read what's written.
+
+	// Join reads one key as another: "Rviewed-by" as "Reviewed-by", or "Fixes" as "Closes".
+	// It maps the ID of a key to the ID of the key it's read as.
+	Join map[string]string
+	// Labels says how a key is written when a rule names it, which is how it's shown: a
+	// joined key reads as the rule says, whichever of its spellings is the most used.
+	Labels map[string]string
+	// Kinds says what a key's values are, where the repository has said. Without it the
+	// kind is a guess from the values.
+	Kinds map[string]Kind
+	// Show says where a key is offered: ShowPanel offers it whatever the guess, and
+	// ShowHeld holds it back.
+	Show map[string]string
 }
+
+// Where a rule can say a key is offered.
+const (
+	ShowPanel = "panel"
+	ShowHeld  = "held"
+)
 
 // Spelling is one way a key is written, and how many commits write it so.
 type Spelling struct {
@@ -167,9 +191,14 @@ type Reading struct {
 	several map[uint32][]int32
 	// vals are the values, across keys: a person is the same one under every key.
 	vals []canon
+	// join is the repository's own joins of keys, by ID (see Rules.Join).
+	join map[string]string
 	// byID is the commits sorted by id, made the first time one is asked for by its id.
 	sortOnce sync.Once
 	byID     []uint32
+	// peopleAt is where each person is among the values, by ID, made on first use.
+	peopleOnce sync.Once
+	peopleAt   map[string]int32
 }
 
 // canon is one value, however it was spelled.
@@ -206,6 +235,26 @@ func KeyID(spelling string) string {
 	id := strings.ToLower(strings.TrimSpace(spelling))
 	if joined, ok := endings[id]; ok {
 		return joined
+	}
+	return id
+}
+
+// KeyID returns the ID of the key a spelling belongs to in this reading: as KeyID does,
+// and then by the repository's own joins.
+func (r *Reading) KeyID(spelling string) string {
+	return joinedID(KeyID(spelling), r.join)
+}
+
+// joinedID follows a key's joins to the key it's read as. A rule that joins a key to one
+// that's joined elsewhere is followed too, a few steps and no further, so rules that go
+// round in a circle end somewhere.
+func joinedID(id string, join map[string]string) string {
+	for hop := 0; hop < 4; hop++ {
+		to, ok := join[id]
+		if !ok || to == id {
+			break
+		}
+		id = to
 	}
 	return id
 }
@@ -284,7 +333,7 @@ func (x *Index) Reading(rules Rules) *Reading {
 	// What's held only grows, and what's there is never changed, so the read works on the
 	// index as it was at this moment without holding anyone up.
 	x.mu.RLock()
-	r := &Reading{gen: x.gen, idSize: x.idSize, ids: x.ids, first: x.first, pairs: x.pairs, keyAt: map[string]int{}}
+	r := &Reading{gen: x.gen, idSize: x.idSize, ids: x.ids, first: x.first, pairs: x.pairs, keyAt: map[string]int{}, join: rules.Join}
 	strs := x.strs
 	x.mu.RUnlock()
 	commits := len(r.first) - 1
@@ -303,7 +352,7 @@ func (x *Index) Reading(rules Rules) *Reading {
 		if !isKey[n] {
 			continue
 		}
-		id := KeyID(s)
+		id := joinedID(KeyID(s), rules.Join)
 		at, ok := r.keyAt[id]
 		if !ok {
 			at = len(r.keys)
@@ -449,7 +498,19 @@ func (x *Index) Reading(rules Rules) *Reading {
 		slices.SortFunc(key.Spellings, func(a, b Spelling) int {
 			return cmp.Or(cmp.Compare(b.Commits, a.Commits), cmp.Compare(a.Text, b.Text))
 		})
+		// A key is shown as it's most written, among the spellings that are its own: one
+		// joined to it by a rule doesn't rename it, however much it's used. A rule that
+		// names the key says how it's written.
 		key.Label = key.Spellings[0].Text
+		for _, sp := range key.Spellings {
+			if KeyID(sp.Text) == key.ID {
+				key.Label = sp.Text
+				break
+			}
+		}
+		if said := rules.Labels[key.ID]; said != "" {
+			key.Label = said
+		}
 
 		// Plain values are labels when a few of them cover many commits, identifiers when
 		// nearly every commit has its own, and text otherwise.
@@ -466,6 +527,11 @@ func (x *Index) Reading(rules Rules) *Reading {
 			plainKind = KindIdentifier
 		case plainUses >= labelFrom && float64(plain) <= labelShare*float64(plainUses):
 			plainKind = KindLabel
+		}
+		// What the repository says its values are isn't a guess: its plain values are that.
+		said := rules.Kinds[key.ID]
+		if said != "" {
+			plainKind = said
 		}
 		r.plain[k] = plainKind
 		uses := map[Kind]int{}
@@ -492,8 +558,16 @@ func (x *Index) Reading(rules Rules) *Reading {
 			}
 		}
 
+		if said != "" {
+			key.Kind = said
+		}
+
 		plainly := key.Kind == KindPerson || key.Kind == KindTicket || key.Kind == KindCommit
 		switch {
+		case rules.Show[key.ID] == ShowHeld:
+			key.Held = HeldRule
+		case rules.Show[key.ID] != "":
+			// Offered because the repository says so, whatever the guess would be.
 		case key.Commits < rareUnder && !key.Known && !plainly:
 			key.Held = HeldRare
 		case key.Kind == KindIdentifier:
@@ -547,7 +621,7 @@ func (r *Reading) Keys() []Key { return slices.Clone(r.keys) }
 
 // Key returns one key by its ID or by any spelling of it.
 func (r *Reading) Key(id string) (Key, bool) {
-	at, ok := r.keyAt[KeyID(id)]
+	at, ok := r.keyAt[r.KeyID(id)]
 	if !ok {
 		return Key{}, false
 	}
@@ -557,7 +631,7 @@ func (r *Reading) Key(id string) (Key, bool) {
 // Values returns a key's values, most commits first. The key is named by its ID or by any
 // spelling of it.
 func (r *Reading) Values(key string) []Value {
-	at, ok := r.keyAt[KeyID(key)]
+	at, ok := r.keyAt[r.KeyID(key)]
 	if !ok {
 		return []Value{}
 	}
@@ -570,7 +644,7 @@ func (r *Reading) Values(key string) []Value {
 // The key is named by its ID or by any spelling of it.
 func (r *Reading) Top(key string, n int, match func(Value) bool) (top []Value, matching int) {
 	top = []Value{}
-	at, ok := r.keyAt[KeyID(key)]
+	at, ok := r.keyAt[r.KeyID(key)]
 	if !ok {
 		return top, 0
 	}
@@ -624,7 +698,7 @@ func ContainsFold(s, lowerSub string) bool {
 // spelling of it. A nil match takes every commit with the key.
 func (r *Reading) CommitsWhere(key string, match func(Value) bool) []string {
 	out := []string{}
-	k, ok := r.keyAt[KeyID(key)]
+	k, ok := r.keyAt[r.KeyID(key)]
 	if !ok {
 		return out
 	}
@@ -675,7 +749,7 @@ func (r *Reading) CommitsWhere(key string, match func(Value) bool) []string {
 // empty value asks for every commit with the key.
 func (r *Reading) Commits(key, value string) []string {
 	out := []string{}
-	k, ok := r.keyAt[KeyID(key)]
+	k, ok := r.keyAt[r.KeyID(key)]
 	if !ok {
 		return out
 	}
@@ -716,7 +790,7 @@ type Pick struct {
 
 // Value returns one value of a key by its ID. The key is named by its ID or any spelling.
 func (r *Reading) Value(key, value string) (Value, bool) {
-	at, ok := r.keyAt[KeyID(key)]
+	at, ok := r.keyAt[r.KeyID(key)]
 	if !ok {
 		return Value{}, false
 	}
@@ -735,7 +809,7 @@ func (r *Reading) Filter(picks []Pick) map[string]struct{} {
 	byKey := map[string]map[string]bool{}
 	var order []string
 	for _, p := range picks {
-		id := KeyID(p.Key)
+		id := r.KeyID(p.Key)
 		if byKey[id] == nil {
 			byKey[id] = map[string]bool{}
 			order = append(order, id)
@@ -770,7 +844,7 @@ func (r *Reading) Filter(picks []Pick) map[string]struct{} {
 // by any spelling of it, the values by ID. It's one pass, however many values.
 func (r *Reading) CountWithin(key string, values []string, kept map[string]struct{}) []int {
 	counts := make([]int, len(values))
-	k, ok := r.keyAt[KeyID(key)]
+	k, ok := r.keyAt[r.KeyID(key)]
 	if !ok || len(values) == 0 || len(kept) == 0 {
 		return counts
 	}
@@ -830,7 +904,7 @@ func (r *Reading) Picked(id string, picks []Pick) (hits []bool, ok bool) {
 	}
 	want := map[int32]map[string]bool{}
 	for _, p := range picks {
-		k, known := r.keyAt[KeyID(p.Key)]
+		k, known := r.keyAt[r.KeyID(p.Key)]
 		if !known {
 			continue
 		}
@@ -916,7 +990,7 @@ func (r *Reading) Chips(id string, keys []string) []Chip {
 	}
 	want := make(map[int32]bool, len(keys))
 	for _, key := range keys {
-		if k, known := r.keyAt[KeyID(key)]; known {
+		if k, known := r.keyAt[r.KeyID(key)]; known {
 			want[int32(k)] = true
 		}
 	}

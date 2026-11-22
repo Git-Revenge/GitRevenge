@@ -17,6 +17,7 @@ import (
 	"github.com/git-revenge/gitrevenge/internal/links"
 	"github.com/git-revenge/gitrevenge/internal/session"
 	"github.com/git-revenge/gitrevenge/internal/trailerindex"
+	"github.com/git-revenge/gitrevenge/internal/trailerrules"
 )
 
 // Every commit's trailers are read once, in the background, and kept in a file of the
@@ -144,7 +145,9 @@ func (a *App) trailerReading(ctx context.Context, r *session.Repo) *trailerindex
 	bots := a.branchRules(r.Path)
 	linked := a.linkConfig(ctx, r.Git)
 	_, total := r.GraphStatus()
-	sig, _ := json.Marshal([]any{index.Gen(), r.Git.MailmapState(ctx).Key(), bots.BotAuthorPatterns(), linked.Active(), total})
+	// What the repository's own rules say about its keys, in its git config.
+	said := a.trailerRules(ctx, r)
+	sig, _ := json.Marshal([]any{index.Gen(), r.Git.MailmapState(ctx).Key(), bots.BotAuthorPatterns(), linked.Active(), total, said})
 	if k.reading != nil && k.key == string(sig) {
 		return k.reading
 	}
@@ -159,6 +162,7 @@ func (a *App) trailerReading(ctx context.Context, r *session.Repo) *trailerindex
 			return full
 		},
 	}
+	trailerrules.Apply(said, &rules)
 	// Who a trailer names is who the graph would show: the mailmap git reads.
 	if m, err := r.Git.ReadMailmap(ctx, "", false); err == nil {
 		rules.Person = func(name, email string) (string, string, bool) {
@@ -300,6 +304,9 @@ type TrailerPanel struct {
 	// Status says how far reading the history has got: until it's done, counts are of
 	// what's read so far.
 	Status trailerindex.Status `json:"status"`
+	// Care is how many questions about the repository's trailers are open, for the pill
+	// that leads to Trailer care.
+	Care int `json:"care"`
 }
 
 const (
@@ -322,6 +329,7 @@ func (a *App) TrailerPanel(path, query string, perKey int) (TrailerPanel, error)
 	}
 	reading := a.trailerReading(context.Background(), r)
 	out.Status = r.Trailers().Status()
+	_, out.Care = a.careOf(context.Background(), r, reading)
 	if perKey <= 0 {
 		perKey = trailerPanelValues
 	}

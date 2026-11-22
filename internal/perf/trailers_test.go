@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,6 +25,8 @@ const (
 	targetTrailerReopen = 15 * time.Second
 	// Reading the whole index through the rules, done once and kept until either changes.
 	targetTrailerReading = 20 * time.Second
+	// Finding the questions Trailer care asks, done once for a reading and kept with it.
+	targetTrailerCare = 5 * time.Second
 )
 
 // countingMessages says how many commits a read asked git for.
@@ -158,6 +161,55 @@ func TestTrailerIndex(t *testing.T) {
 		if d := time.Since(start); d > targetTrailerQuery {
 			t.Errorf("finding the commits with a value took %s, target %s", d, targetTrailerQuery)
 		}
+	}
+
+	// The questions Trailer care asks: every pair of keys is looked at, and a long history
+	// must not raise hundreds.
+	start = time.Now()
+	questions, open := reading.Care(nil, 30)
+	byKind := map[string]int{}
+	all, _ := reading.Care(nil, 0)
+	for _, q := range all {
+		byKind[q.Kind]++
+	}
+	people, peopleOpen := reading.People(5)
+	took = time.Since(start)
+	t.Logf("care: %d questions (%d spelling, %d same things), %d listed; %d people written two ways, %d listed; in %s", open, byKind[trailerindex.CareSpelling], byKind[trailerindex.CareSame], len(questions), peopleOpen, len(people), took.Round(time.Millisecond))
+	for i, q := range questions {
+		if i < 14 {
+			t.Logf("  %-9s %-22s (%d) as %-22s (%d)  shared %d  %v", q.Kind, q.OtherLabel, q.OtherCommits, q.KeyLabel, q.Commits, q.Shared, q.Examples)
+		}
+	}
+	if took > targetTrailerCare {
+		t.Errorf("finding the questions took %s, target %s", took, targetTrailerCare)
+	}
+
+	// A page of graph rows asks for each commit's chips: the first asking sorts the commits
+	// by id, once, and after that a page is answered while the user scrolls.
+	ids, err := r.ReadString(ctx, "rev-list", "--max-count=400", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := strings.Fields(ids)
+	// Whichever two keys the repository offers and uses most, as someone would pin.
+	var pinned []string
+	for _, k := range rkeys {
+		if k.Held == "" && len(pinned) < 2 {
+			pinned = append(pinned, k.Label)
+		}
+	}
+	start = time.Now()
+	reading.Chips(page[0], pinned)
+	first400 := time.Since(start)
+	start = time.Now()
+	chips := 0
+	for _, id := range page {
+		chips += len(reading.Chips(id, pinned))
+	}
+	took = time.Since(start)
+	t.Logf("chips for %v: the first lookup (which sorts the commits) in %s; a page of %d rows, %d chips, in %s", pinned, first400.Round(time.Millisecond), len(page), chips, took)
+	if took > targetTrailerQuery {
+		t.Errorf("a page of chips took %s, target %s", took, targetTrailerQuery)
 	}
 	x.Close()
 

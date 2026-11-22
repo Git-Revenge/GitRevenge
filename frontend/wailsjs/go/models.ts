@@ -614,6 +614,46 @@ export namespace app {
 	        this.wails = source["wails"];
 	    }
 	}
+	export class CareKey {
+	    key: trailerindex.Key;
+	    where: string;
+	    kindSaid: boolean;
+	    whereSaid: boolean;
+	    also: string[];
+	    scope: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CareKey(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = this.convertValues(source["key"], trailerindex.Key);
+	        this.where = source["where"];
+	        this.kindSaid = source["kindSaid"];
+	        this.whereSaid = source["whereSaid"];
+	        this.also = source["also"];
+	        this.scope = source["scope"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class CommitInfo {
 	    commit: git.CommitDetail;
 	    files: git.FileChange[];
@@ -2227,6 +2267,48 @@ export namespace app {
 		}
 	}
 	
+	export class TrailerCare {
+	    questions: trailerindex.Question[];
+	    open: number;
+	    people: trailerindex.Question[];
+	    peopleOpen: number;
+	    joined: trailerindex.Joined;
+	    keys: CareKey[];
+	    status: trailerindex.Status;
+	
+	    static createFrom(source: any = {}) {
+	        return new TrailerCare(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.questions = this.convertValues(source["questions"], trailerindex.Question);
+	        this.open = source["open"];
+	        this.people = this.convertValues(source["people"], trailerindex.Question);
+	        this.peopleOpen = source["peopleOpen"];
+	        this.joined = this.convertValues(source["joined"], trailerindex.Joined);
+	        this.keys = this.convertValues(source["keys"], CareKey);
+	        this.status = this.convertValues(source["status"], trailerindex.Status);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class TrailerFilterState {
 	    picks: FilterPick[];
 	    only: boolean;
@@ -2335,6 +2417,7 @@ export namespace app {
 	    held: trailerindex.Key[];
 	    matches: number;
 	    status: trailerindex.Status;
+	    care: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new TrailerPanel(source);
@@ -2347,6 +2430,7 @@ export namespace app {
 	        this.held = this.convertValues(source["held"], trailerindex.Key);
 	        this.matches = source["matches"];
 	        this.status = this.convertValues(source["status"], trailerindex.Status);
+	        this.care = source["care"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -4116,6 +4200,41 @@ export namespace trailerindex {
 		    return a;
 		}
 	}
+	export class Joined {
+	    spellings: Key[];
+	    several: number;
+	    bots: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Joined(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.spellings = this.convertValues(source["spellings"], Key);
+	        this.several = source["several"];
+	        this.bots = source["bots"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class Pick {
 	    key: string;
 	    value: string;
@@ -4128,6 +4247,34 @@ export namespace trailerindex {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key = source["key"];
 	        this.value = source["value"];
+	    }
+	}
+	export class Question {
+	    kind: string;
+	    key: string;
+	    keyLabel: string;
+	    commits: number;
+	    other: string;
+	    otherLabel: string;
+	    otherCommits: number;
+	    shared: number;
+	    examples: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Question(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.key = source["key"];
+	        this.keyLabel = source["keyLabel"];
+	        this.commits = source["commits"];
+	        this.other = source["other"];
+	        this.otherLabel = source["otherLabel"];
+	        this.otherCommits = source["otherCommits"];
+	        this.shared = source["shared"];
+	        this.examples = source["examples"];
 	    }
 	}
 	
