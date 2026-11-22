@@ -351,7 +351,7 @@
     if (move.to === now.headCommit) unseen = got?.total ?? 0
     glideTo(row, LANDING)
     // The tip is selected only when the person hadn't chosen a commit, or theirs is gone.
-    if (!chosen || gone) selectWhenLoaded(row, true)
+    if (!chosen || gone) selectWhenLoaded(row, true, move.to)
     announce = moveAnnouncement(move, got?.total ?? 0)
   }
 
@@ -1728,8 +1728,10 @@
   /** Keeps the selection on its commit after a reload. A new focus starts from its top. With
    * `moving`, the view is on its way to a branch that moved, so the selection is kept without
    * scrolling to it. Returns whether the selected commit is gone (amended or rebased away); when
-   * moving, that's left for the caller, who selects the branch's new tip instead. */
-  async function followSelection(moving = false): Promise<boolean> {
+   * moving, that's left for the caller, who selects the branch's new tip instead. `asks` is
+   * how many more times it may ask where the commit is, when what arrives at that row turns
+   * out to be another commit. */
+  async function followSelection(moving = false, asks = 3): Promise<boolean> {
     const refocused = await loadFocus()
     if (refocused) toStart()
     if (selected < 0 && !hiddenId) return false
@@ -1747,22 +1749,35 @@
       schedule()
       return true
     }
-    hiddenId = ''
+    // A commit a filter hid is remembered until its row is selected: what arrives there may
+    // yet be another commit.
+    if (row < 0) hiddenId = ''
     // If the commit is gone (e.g. amended), stay on the same position but refresh details.
     // One a filter took out isn't followed: the view stays where the filter put it.
-    selectWhenLoaded(row >= 0 ? row : selected, moving || (row < 0 && sparse))
+    selectWhenLoaded(row >= 0 ? row : selected, moving || (row < 0 && sparse), row >= 0 ? id : '', () => {
+      if (asks > 0) void followSelection(moving, asks - 1)
+    })
     return row < 0
   }
 
   /** Selects a row once it has loaded, giving up after ~5s (e.g. the graph got shorter) or as
-   * soon as the selection changes some other way. */
-  function selectWhenLoaded(target: number, keepView: boolean) {
+   * soon as the selection changes some other way. `want` is the commit that was said to be at
+   * that row. Where a commit is and the row that's there are asked for one after the other,
+   * and a reload can swap the graph for another in between: the row that arrives is then
+   * some other commit's. It isn't selected, and `mistaken` is told a moment later, when the
+   * rows may have caught up. */
+  function selectWhenLoaded(target: number, keepView: boolean, want = '', mistaken?: () => void) {
     const id = selectedId
     cache.ensure(target, target + 1)
     let frames = 300
     const wait = () => {
       if (selectedId !== id) return
-      if (cache.get(target)) select(target, true, keepView)
+      const row = cache.get(target)
+      if (row && want && row.id !== want) {
+        setTimeout(() => {
+          if (selectedId === id) mistaken?.()
+        }, 200)
+      } else if (row) select(target, true, keepView)
       else if (frames-- > 0) requestAnimationFrame(wait)
     }
     wait()
