@@ -392,6 +392,8 @@ func (a *App) SaveMailmap(path, base, text string, create bool) error {
 		return userError("The .mailmap changed on disk since you started editing, so it wasn't saved. Reload it to see the change, then make your edits again.")
 	case errors.Is(err, git.ErrNoMailmap):
 		return userError("This repository has no .mailmap, and one is only created when you say so. Nothing was written.")
+	case errors.Is(err, git.ErrSymlink):
+		return userError("This repository's .mailmap is a symbolic link. Git doesn't read a mailmap through a link, so the app won't write through one either: it could change a file outside the repository. Nothing was written. Replace the link with a file of its own to keep a mailmap here.")
 	}
 	return err
 }

@@ -5,8 +5,10 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
@@ -152,5 +154,94 @@ func TestLinkedGitignoreIsNotWrittenThrough(t *testing.T) {
 	}
 	if got := mustRead(t, secret); got != "outside\n" {
 		t.Errorf("the file outside the repository now holds %q", got)
+	}
+}
+
+// git doesn't read a .mailmap that is a link (#892): the app reads names as git does, as if
+// there were no mailmap, and an edit isn't written to the file the link points at.
+func TestLinkedMailmapIsNeitherReadNorWrittenThrough(t *testing.T) {
+	t.Parallel()
+	fx := gittest.New(t)
+	fx.CommitFile("a.txt", "a\n", "base")
+	const outside = "Real Name <real@example.com> <old@example.com>\n"
+	_, secret := outsideFile(t, outside)
+	link(t, secret, fx.Path(".mailmap"))
+	repo := OpenRepo(newTestRunner(t), fx.Dir)
+	ctx := context.Background()
+
+	// What git makes of it, which is what the app must agree with.
+	if got := strings.TrimSpace(fx.Git("check-mailmap", "<old@example.com>")); got != "<old@example.com>" {
+		t.Fatalf("git check-mailmap = %q: this git reads a linked .mailmap", got)
+	}
+
+	sources, err := repo.MailmapSources(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := sources[0]; s.Source != MailmapWorkTree || s.Exists || s.Lines != 0 {
+		t.Errorf("work tree source = %+v, want one that doesn't exist", s)
+	}
+	if text, err := repo.ReadMailmapSource(ctx, MailmapWorkTree); err != nil || text != "" {
+		t.Errorf("ReadMailmapSource = %q, %v; want nothing", text, err)
+	}
+	m, err := repo.ReadMailmap(ctx, "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := m.Resolve(Identity{Email: "old@example.com"}); got.Name != "" || got.Email != "old@example.com" {
+		t.Errorf("Resolve = %+v; the linked file was read as the mailmap", got)
+	}
+
+	for _, create := range []bool{false, true} {
+		err := repo.WriteMailmap(ctx, "", "Other <o@example.com> <o2@example.com>\n", create)
+		if !errors.Is(err, ErrSymlink) {
+			t.Errorf("WriteMailmap(create %v) err = %v, want ErrSymlink", create, err)
+		}
+		if err := repo.WriteMailmap(ctx, outside, outside+"Other <o@example.com> <o2@example.com>\n", create); !errors.Is(err, ErrSymlink) {
+			t.Errorf("WriteMailmap(create %v) with the linked file's text as base err = %v, want ErrSymlink", create, err)
+		}
+	}
+	if got := mustRead(t, secret); got != outside {
+		t.Errorf("the file outside the repository now holds %q", got)
+	}
+	if !isLink(fx.Path(".mailmap")) {
+		t.Error("the link was replaced")
+	}
+}
+
+// A .mailmap linked to a device, or a mailmap.file that names one, is read as no mailmap:
+// /dev/zero would otherwise be read until the app ran out of memory (#892).
+func TestMailmapFromADeviceIsNotRead(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no /dev/zero")
+	}
+	t.Parallel()
+	fx := gittest.New(t)
+	fx.CommitFile("a.txt", "a\n", "base")
+	link(t, "/dev/zero", fx.Path(".mailmap"))
+	fx.Git("config", "mailmap.file", "/dev/zero")
+	repo := OpenRepo(newTestRunner(t), fx.Dir)
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := repo.ReadMailmap(context.Background(), "", false)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("ReadMailmap: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		panic("ReadMailmap is still reading /dev/zero after 10 seconds")
+	}
+	sources, err := repo.MailmapSources(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range sources {
+		if s.Exists {
+			t.Errorf("%s (%s) read as a mailmap", s.Source, s.Path)
+		}
 	}
 }
