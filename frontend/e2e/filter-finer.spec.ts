@@ -11,6 +11,9 @@ const emit = (page: Page, rows: number) =>
   page.evaluate((n) => (window as unknown as { __emit: (name: string, d: object) => void }).__emit('graph:progress', { path: '/repo', rows: n, done: true, paused: false, estimate: n }), rows)
 const respond = (page: Page, r: object) => page.evaluate((x) => (window as unknown as { __respond: (r: object) => void }).__respond(x), r)
 const selects = async (page: Page) => (await events(page, 'select')).map((e) => (e[0] as { id?: string } | undefined)?.id)
+/** Swaps the graph for one of these commits, in this order, as a filter that changes does. */
+const graphOf = (page: Page, commits: number[]) => page.evaluate((c) => (window as unknown as { __graph: (c: number[]) => void }).__graph(c), commits)
+const upTo = (n: number) => Array.from({ length: n }, (_, i) => i)
 
 test.describe('under a filter that takes commits out', () => {
   const head = (commit: string) => ({ Refs: [{ ...branch('main', { head: true, branchKind: 'trunk' }), commit }], HeadCommit: { branch: 'main', commit }, CommitSignatures: [] })
@@ -46,18 +49,54 @@ test.describe('under a filter that takes commits out', () => {
     const before = (await selects(page)).length
 
     // The filter changes and commit 2 isn't in the graph any more.
+    await graphOf(page, upTo(30).filter((n) => n % 3 === 0))
     await respond(page, { CommitRow: -1 })
-    await emit(page, 12)
+    await emit(page, 10)
     await expect.poll(async () => (await calls(page, 'CommitRow')).some((c) => c[1] === id(2))).toBe(true)
     await page.waitForTimeout(500)
     // Nothing else was selected in its place: whoever shows the commit still shows it.
     expect((await selects(page)).length).toBe(before)
 
     // It's back, at another row: it's selected there.
+    await graphOf(page, [9, 8, 7, 6, 5, 2, ...upTo(30).filter((n) => n > 9)])
     await respond(page, { CommitRow: 5 })
-    await emit(page, 30)
+    await emit(page, 26)
     await expect.poll(async () => (await selects(page)).length).toBeGreaterThan(before)
-    expect((await events(page, 'select')).at(-1)?.[0]).toMatchObject({ index: 5 })
+    expect((await events(page, 'select')).at(-1)?.[0]).toMatchObject({ index: 5, id: id(2) })
+  })
+
+  // Where a commit is, and the row that's there, are asked for one after the other, and a
+  // reload can swap the graph for another in between. The row at that place is then some
+  // other commit's (#881).
+  test('a commit that comes back is never taken for whatever else is at its row', async ({ page }) => {
+    await open(page, 'graph', { graphRows: 30, sparse: true, responses: head(id(0)) })
+    const grid = page.getByRole('grid', { name: 'Commit history' })
+    await grid.focus()
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('ArrowDown')
+    await expect.poll(async () => (await selects(page)).at(-1)).toBe(id(2))
+
+    // The filter hides commit 2.
+    await graphOf(page, upTo(30).filter((n) => n % 3 === 0))
+    await respond(page, { CommitRow: -1 })
+    await emit(page, 10)
+    await expect.poll(async () => (await calls(page, 'CommitRow')).some((c) => c[1] === id(2))).toBe(true)
+    await page.waitForTimeout(400)
+    const before = (await selects(page)).length
+
+    // The filter goes, and the answer about where commit 2 is comes from the whole history
+    // while the rows are still the filter's: row 2 of those is commit 6.
+    await respond(page, { CommitRow: 2 })
+    await emit(page, 10)
+    await page.waitForTimeout(700)
+    expect(await selects(page)).not.toContain(id(6))
+    expect((await selects(page)).length).toBe(before)
+
+    // The whole history arrives, and commit 2 is selected where it is.
+    await graphOf(page, upTo(30))
+    await emit(page, 30)
+    await expect.poll(async () => (await selects(page)).at(-1)).toBe(id(2))
+    expect(await selects(page)).not.toContain(id(6))
   })
 
   test('without a filter, a commit that is gone gives its place to the next, as before', async ({ page }) => {

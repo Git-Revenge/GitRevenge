@@ -17,6 +17,8 @@ type Harness = Window &
     __emit: (name: string, data: unknown) => void
     /** Changes what the stubbed backend answers from now on. */
     __respond: (responses: Record<string, unknown>) => void
+    /** Swaps the graph for another, as a reload does: the numbered commits, in this order. */
+    __graph: (commits: number[]) => void
     /** Tells the app the repository changed on disk, as the watcher would. */
     __changed: (path: string) => void
     go: unknown
@@ -73,6 +75,10 @@ const graphRow = (i: number) => ({
   authorTime: 1793500000 - i * 60,
   subject: `Commit ${i}`,
 })
+
+win.__graph = (commits) => {
+  scenario.graphData = commits.map((n, index) => ({ ...graphRow(n), index }))
+}
 
 type Group = { name: string; paths: string[] }
 
