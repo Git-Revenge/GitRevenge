@@ -62,6 +62,53 @@ type repoFilter struct {
 	// keep is what the picks keep while the filter highlights, for marking rows as they're
 	// handed out; nil under Only these, where every row of the graph is one of them.
 	keep map[string]struct{}
+
+	// What the picks keep as one reading reads them, and the graph rows those commits are on
+	// in one graph, sorted. Each is worked out once and kept here (a filter's picks never
+	// change: another filter is another repoFilter), since the strip's Previous and Next ask
+	// on every click, and on a long history working them out takes a fifth of a second (#899).
+	keptBy   *trailerindex.Reading
+	kept     map[string]struct{}
+	rowsBy   *trailerindex.Reading
+	rowsIn   *graph.Graph
+	rowsLen  int
+	rowsKept []int
+}
+
+// keeps returns what f's picks keep as reading reads them.
+func (fs *trailerFilters) keeps(f *repoFilter, reading *trailerindex.Reading) map[string]struct{} {
+	fs.mu.Lock()
+	if f.keptBy == reading && f.kept != nil {
+		defer fs.mu.Unlock()
+		return f.kept
+	}
+	fs.mu.Unlock()
+	keep := reading.Filter(f.picks)
+	fs.mu.Lock()
+	f.keptBy, f.kept = reading, keep
+	fs.mu.Unlock()
+	return keep
+}
+
+// rows returns the rows of g that f's picks keep as reading reads them, in order. The slice
+// is shared: it mustn't be changed.
+func (fs *trailerFilters) rows(f *repoFilter, reading *trailerindex.Reading, g *graph.Graph) []int {
+	fs.mu.Lock()
+	if f.rowsBy == reading && f.rowsIn == g && f.rowsLen == g.Len() && f.rowsKept != nil {
+		defer fs.mu.Unlock()
+		return f.rowsKept
+	}
+	fs.mu.Unlock()
+	keep := fs.keeps(f, reading)
+	ids := make([]string, 0, len(keep))
+	for id := range keep {
+		ids = append(ids, id)
+	}
+	rows := rowsOf(g, ids, len(ids)).Rows
+	fs.mu.Lock()
+	f.rowsBy, f.rowsIn, f.rowsLen, f.rowsKept = reading, g, g.Len(), rows
+	fs.mu.Unlock()
+	return rows
 }
 
 // highlighted returns the commits a repository's filter keeps while it highlights, or nil
@@ -172,7 +219,7 @@ func (a *App) applyTrailerFilter(r *session.Repo) TrailerFilterState {
 		state.Picks = append(state.Picks, FilterPick{Key: p.Key, Value: p.Value, KeyLabel: k.Label, ValueLabel: v.Label, Kind: string(v.Kind)})
 	}
 	state.Only = f.only
-	keep := reading.Filter(f.picks)
+	keep := a.trailerFilters.keeps(f, reading)
 	state.Kept = len(keep)
 	if !f.only {
 		a.trailerFilters.setHighlighted(f, keep)
@@ -209,24 +256,18 @@ func (a *App) TrailerFilterRows(path string) (graph.SearchResult, error) {
 	if err != nil || g == nil {
 		return none, err
 	}
-	keep := a.trailerReading(context.Background(), r).Filter(f.picks)
-	ids := make([]string, 0, len(keep))
-	for id := range keep {
-		ids = append(ids, id)
-	}
-	all := rowsOf(g, ids, len(ids))
+	rows := a.trailerFilters.rows(f, a.trailerReading(context.Background(), r), g)
 	stretch := max(1, g.Len()/rulerTicks)
 	if stretch == 1 {
-		return all, nil
+		return graph.SearchResult{Rows: rows, Total: len(rows)}, nil
 	}
 	ticks := make([]int, 0, rulerTicks)
-	for _, row := range all.Rows {
+	for _, row := range rows {
 		if n := len(ticks); n == 0 || row/stretch != ticks[n-1]/stretch {
 			ticks = append(ticks, row)
 		}
 	}
-	all.Rows = ticks
-	return all, nil
+	return graph.SearchResult{Rows: ticks, Total: len(rows)}, nil
 }
 
 // TrailerFilterStep returns the row of the next commit the repository's filter keeps after
@@ -247,12 +288,7 @@ func (a *App) TrailerFilterStep(path string, from, dir int) (int, error) {
 	if err != nil || g == nil {
 		return -1, err
 	}
-	keep := a.trailerReading(context.Background(), r).Filter(f.picks)
-	ids := make([]string, 0, len(keep))
-	for id := range keep {
-		ids = append(ids, id)
-	}
-	rows := rowsOf(g, ids, len(ids)).Rows
+	rows := a.trailerFilters.rows(f, a.trailerReading(context.Background(), r), g)
 	return stepRow(rows, from, dir), nil
 }
 
