@@ -26,8 +26,10 @@ type Index struct {
 	// parser is the trailer parser's version the file must have been written with.
 	parser uint16
 
-	// reading lets one read of the history run at a time.
+	// reading lets one read of the history run at a time, and splits says when a long walk
+	// is read in slices side by side (see read.go): the defaults, unless a test says otherwise.
 	reading sync.Mutex
+	splits  splitting
 
 	mu sync.RWMutex
 	// loaded is set once the file has been read.

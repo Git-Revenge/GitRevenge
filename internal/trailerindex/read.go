@@ -5,6 +5,9 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
+	"fmt"
+	"runtime"
 	"time"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
@@ -130,6 +133,12 @@ func (x *Index) Read(ctx context.Context, src Source, progress func(Status)) err
 
 // run walks one pass, from where it stopped if it's one being carried on, and marks it
 // complete when the walk ends. With again set, commits already held are left out.
+//
+// A long walk is read in slices side by side (see split), but taken in walk order: this
+// reader takes the first slice as it reads it, and each of the others is taken once the ones
+// before it are in. So what's held, and what's in the file, is always the walk from its start
+// up to the pass's place, as it is when one reader reads it all, and a read that's cut short
+// carries on from there.
 func (x *Index) run(ctx context.Context, src Source, p *pass, again bool, progress func(Status)) error {
 	m := git.MessageRange{Tips: hexIDs(p.tips), Not: hexIDs(p.not), Skip: p.done}
 	x.mu.Lock()
@@ -155,10 +164,22 @@ func (x *Index) run(ctx context.Context, src Source, p *pass, again bool, progre
 		counted <- n
 	}()
 
+	// The slices others read, and where this reader stops once they have the rest (-1 while
+	// it reads to the end). They all stop when the pass does, however it ends.
+	sctx, stop := context.WithCancel(ctx)
+	var later []*slice
+	end := -1
+	defer func() {
+		stop()
+		for _, s := range later {
+			<-s.done
+		}
+	}()
+
 	begun := p.done > 0 // a pass being carried on has its begin frame in the file
 	var b passBatch
 	local := map[string]uint32{}
-	walked, lastFlush := 0, time.Now()
+	walked, lastFlush, total := 0, time.Now(), -1
 	number := func(s string) uint32 {
 		n, ok := local[s]
 		if !ok {
@@ -169,6 +190,15 @@ func (x *Index) run(ctx context.Context, src Source, p *pass, again bool, progre
 		return n
 	}
 	flush := func() {
+		if total < 0 {
+			select {
+			case n := <-counted:
+				// The walk's length is known: the rest of it can be shared out.
+				total = n
+				later, end = x.split(sctx, src, m, p.nonce, p.done+walked, n)
+			default:
+			}
+		}
 		if walked == 0 && begun {
 			return
 		}
@@ -185,11 +215,7 @@ func (x *Index) run(ctx context.Context, src Source, p *pass, again bool, progre
 		x.addLocked(b, seen)
 		x.status.Read = p.done
 		x.status.Commits = x.commitsLocked()
-		select {
-		case n := <-counted:
-			x.status.Total = n
-		default:
-		}
+		x.status.Total = max(total, 0)
 		st := x.status
 		x.mu.Unlock()
 		// A file that can't be written leaves the index working from memory.
@@ -199,21 +225,26 @@ func (x *Index) run(ctx context.Context, src Source, p *pass, again bool, progre
 		lastFlush = time.Now()
 		progress(st)
 	}
+	if x.splits.waitCount {
+		select {
+		case total = <-counted:
+			later, end = x.split(sctx, src, m, p.nonce, p.done, total)
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 
 	err := src.CommitMessages(ctx, m, func(id, message string) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		raw, err := hex.DecodeString(id)
+		if end >= 0 && p.done+walked >= end {
+			return errSliceRead // the rest is being read by others
+		}
+		raw, size, err := x.idOf(id)
 		if err != nil {
 			return err
 		}
-		x.mu.Lock()
-		if x.idSize == 0 {
-			x.idSize = len(raw)
-		}
-		size := x.idSize
-		x.mu.Unlock()
 		walked++
 		if trailers := git.MessageTrailers(message); len(trailers) > 0 && len(raw) == size {
 			c := batchCommit{id: raw, pairs: make([]uint32, 0, len(trailers)*2)}
@@ -227,10 +258,28 @@ func (x *Index) run(ctx context.Context, src Source, p *pass, again bool, progre
 		}
 		return nil
 	})
+	if errors.Is(err, errSliceRead) {
+		err = nil
+	}
 	// What was walked before the read stopped is kept either way, with its place.
 	flush()
 	if err != nil {
 		return err
+	}
+	// The slices the others read, in order, each once the one before it is in.
+	for _, s := range later {
+		select {
+		case <-s.done:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		if s.err != nil {
+			return s.err
+		}
+		if s.from != p.done {
+			return fmt.Errorf("reading trailers lost its place: a slice of the walk starts at %d, and the walk is at %d", s.from, p.done)
+		}
+		x.take(s, p, seen, progress)
 	}
 	x.mu.Lock()
 	x.complete = appendTips(x.complete, p.tips)
@@ -239,6 +288,161 @@ func (x *Index) run(ctx context.Context, src Source, p *pass, again bool, progre
 	x.mu.Unlock()
 	_ = x.write(encodeComplete(p.nonce))
 	return nil
+}
+
+// A long walk is read in slices side by side. Git spends a first read unpacking commits,
+// one at a time on one core: on the Linux kernel, one `git log` of every message takes 29
+// seconds, and four over a quarter of the walk each take 11 (#900).
+const (
+	// splitFrom is how many commits a walk must still have to be shared out: a shorter one
+	// is read in a few seconds by one reader.
+	splitFrom = 100000
+	// mostReaders is how many read a walk at once, at most. A few more would be a little
+	// quicker still, but the app has other work, and so may the machine.
+	mostReaders = 4
+)
+
+// errSliceRead stops a reader at the end of its slice of a walk.
+var errSliceRead = errors.New("the rest of the walk is being read by others")
+
+// splitting says, for tests, when a walk is shared out and among how many readers. Zero
+// values take splitFrom and as many readers as half the machine's cores, up to mostReaders.
+// waitCount has the pass's own reader wait for the walk's length before it reads, so a
+// test's short walk is shared out for certain; otherwise it's shared out at the first batch
+// after the length is known.
+type splitting struct {
+	from, readers int
+	waitCount     bool
+}
+
+// slice is part of a walk, read by a reader of its own.
+type slice struct {
+	// from is where it starts in the walk, and max how many commits it reads, or 0 for the
+	// rest of the walk. end is where it ended.
+	from, max, end int
+	// frames are its batches, encoded as they're kept in the file, waiting to be taken.
+	frames [][]byte
+	err    error
+	done   chan struct{}
+}
+
+// split shares out the rest of a walk that's at at, total commits long, when it's long: the
+// reader that called keeps reading the first part, and stops where split returns; others
+// read the rest, a part each, side by side. A short walk is left to one reader, and split
+// returns no slices and -1.
+func (x *Index) split(ctx context.Context, src Source, m git.MessageRange, nonce uint64, at, total int) ([]*slice, int) {
+	readers := x.splits.readers
+	if readers == 0 {
+		readers = min(mostReaders, runtime.NumCPU()/2)
+	}
+	from := x.splits.from
+	if from == 0 {
+		from = splitFrom
+	}
+	rest := total - at
+	if readers < 2 || rest < max(from, readers) {
+		return nil, -1
+	}
+	part := (rest + readers - 1) / readers
+	var out []*slice
+	for i := 1; i < readers; i++ {
+		s := &slice{from: at + i*part, done: make(chan struct{})}
+		if i < readers-1 {
+			s.max = part
+		}
+		out = append(out, s)
+		go x.readSlice(ctx, src, m, nonce, s)
+	}
+	return out, at + part
+}
+
+// readSlice reads one slice of a pass's walk into frames, to be taken in turn.
+func (x *Index) readSlice(ctx context.Context, src Source, m git.MessageRange, nonce uint64, s *slice) {
+	defer close(s.done)
+	var b passBatch
+	local := map[string]uint32{}
+	number := func(v string) uint32 {
+		n, ok := local[v]
+		if !ok {
+			n = uint32(len(b.strs))
+			b.strs = append(b.strs, v)
+			local[v] = n
+		}
+		return n
+	}
+	at, framed := s.from, s.from
+	frame := func() {
+		if at == framed {
+			return
+		}
+		b.nonce, b.done = nonce, at
+		s.frames = append(s.frames, encodeBatch(b))
+		b = passBatch{}
+		clear(local)
+		framed = at
+	}
+	m.Skip, m.Max = s.from, s.max
+	s.err = src.CommitMessages(ctx, m, func(id, message string) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		raw, size, err := x.idOf(id)
+		if err != nil {
+			return err
+		}
+		at++
+		if trailers := git.MessageTrailers(message); len(trailers) > 0 && len(raw) == size {
+			c := batchCommit{id: raw, pairs: make([]uint32, 0, len(trailers)*2)}
+			for _, t := range trailers {
+				c.pairs = append(c.pairs, number(t.Key), number(t.Value))
+			}
+			b.commits = append(b.commits, c)
+		}
+		if at-framed >= batchCommits {
+			frame()
+		}
+		return nil
+	})
+	frame()
+	s.end = at
+}
+
+// take puts a slice another reader read into the index and its file, as if the pass's own
+// reader had read it: the pass's place moves to where the slice ended.
+func (x *Index) take(s *slice, p *pass, seen map[[32]byte]struct{}, progress func(Status)) {
+	x.mu.Lock()
+	for _, f := range s.frames {
+		if b, ok := decodeBatch(f[frameHeaderSize:], x.idSize); ok {
+			x.addLocked(b, seen)
+		}
+	}
+	p.done = s.end
+	x.status.Read = p.done
+	x.status.Commits = x.commitsLocked()
+	st := x.status
+	x.mu.Unlock()
+	for _, f := range s.frames {
+		// A file that can't be written leaves the index working from memory.
+		_ = x.write(f)
+	}
+	s.frames = nil
+	progress(st)
+}
+
+// idOf reads a commit's id, and says the size the index keeps ids at, which the first id
+// read sets.
+func (x *Index) idOf(id string) ([]byte, int, error) {
+	raw, err := hex.DecodeString(id)
+	if err != nil {
+		return nil, 0, err
+	}
+	x.mu.Lock()
+	if x.idSize == 0 {
+		x.idSize = len(raw)
+	}
+	size := x.idSize
+	x.mu.Unlock()
+	return raw, size, nil
 }
 
 func newNonce() uint64 {
