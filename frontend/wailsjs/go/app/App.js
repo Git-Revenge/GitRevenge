@@ -22,6 +22,10 @@ export function AnswerTrailerQuestion(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['AnswerTrailerQuestion'](arg1, arg2, arg3, arg4);
 }
 
+export function AnswerTrailerSlips(arg1, arg2, arg3) {
+  return window['go']['app']['App']['AnswerTrailerSlips'](arg1, arg2, arg3);
+}
+
 export function ArrivedCommits(arg1, arg2, arg3) {
   return window['go']['app']['App']['ArrivedCommits'](arg1, arg2, arg3);
 }

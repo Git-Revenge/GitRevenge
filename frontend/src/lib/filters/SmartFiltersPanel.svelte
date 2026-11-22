@@ -27,6 +27,7 @@
     onPick,
     onPin,
     onMenu,
+    onCare,
     onSearch,
     onStatus,
   }: {
@@ -43,6 +44,8 @@
     onPin?: (key: string, on: boolean) => void
     /** Opens a menu at a point: a key's, from a right click or the menu key. */
     onMenu?: (items: MenuItem[], x: number, y: number) => void
+    /** Opens Trailer care, where the questions about this repository's keys are answered. */
+    onCare?: () => void
     /** Adds a value to the graph's filter, or takes it out if it's there. */
     onPick: (key: string, value: string) => void
     /** Searches the graph for text: a key held back from the list can still be searched for. */
@@ -230,6 +233,11 @@
 {/if}
 {#if note}
   <p class="note meta" role="status">{note}</p>
+{/if}
+{#if panel && panel.care > 0 && onCare}
+  <button class="care" onclick={onCare} title="Questions about this repository’s trailer keys that only you can answer">
+    Needs care <span class="pill">{panel.care.toLocaleString()}</span>
+  </button>
 {/if}
 
 {#if offer}
@@ -477,6 +485,38 @@
     margin: 6px 12px;
     color: var(--ink-mute);
     white-space: normal;
+  }
+
+  /* The way to Trailer care, with how many questions wait there. */
+  .care {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 12px 6px;
+    padding: 2px 4px 2px 10px;
+    border: 1px solid var(--paper-edge);
+    border-radius: 999px;
+    background: var(--paper);
+    color: var(--ink-soft);
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .care:hover,
+  .care:focus-visible {
+    color: var(--ink);
+    border-color: var(--link);
+  }
+
+  .care .pill {
+    min-width: 18px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--selected);
+    color: var(--ink);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
   }
 
   /* The pin on a key: seen while the key is pinned, or the pointer is on its row. */

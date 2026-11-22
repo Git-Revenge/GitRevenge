@@ -148,6 +148,49 @@ func TestTrailerCareAsksAndRemembersTheAnswer(t *testing.T) {
 	}
 }
 
+// Several slips of one key are answered together, and written as a line each.
+func TestTrailerCareAnswersSeveralSlipsTogether(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	sam := "Sam Ortiz <sam@tidewater.example>"
+	for i := range 12 {
+		commitAs(fx, "Sam Ortiz", "sam@tidewater.example", fmt.Sprintf("f%d.txt", i), fmt.Sprintf("Commit %d", i), "Reviewed-by: "+sam)
+	}
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "s1.txt", "A slip", "Rviewed-by: "+sam)
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "s2.txt", "Another", "Reviewed-bt: "+sam)
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "s3.txt", "A third", "Reviewed-byy: "+sam)
+	path := openForMap(t, a, fx)
+	trailersRead(t, a, path)
+	graphRows(t, a, path, 15)
+	if care, _ := a.TrailerCare(path); care.Open != 3 {
+		t.Fatalf("%d questions to begin with: %v", care.Open, careAsks(care))
+	}
+
+	care, err := a.AnswerTrailerSlips(path, "reviewed-by", []string{"rviewed-by", "reviewed-bt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if asks := careAsks(care); len(asks) != 1 || asks[0] != "spelling:Reviewed-byy as Reviewed-by" {
+		t.Fatalf("questions after answering two together = %v, want the third", asks)
+	}
+	k, _ := careKey(care, "reviewed-by")
+	if k.Key.Commits != 14 || len(k.Also) != 2 {
+		t.Fatalf("Reviewed-by after = %+v, want 14 commits and two joins to undo", k)
+	}
+	text, _ := os.ReadFile(filepath.Join(fx.Dir, ".git", "config"))
+	if strings.Count(string(text), "also = ") != 2 || strings.Count(string(text), "[gitrevenge-trailer") != 1 {
+		t.Fatalf("the config:\n%s", text)
+	}
+	// One that can't be joined stops there and says so, and what was written stands.
+	if _, err = a.AnswerTrailerSlips(path, "reviewed-by", []string{"reviewed-byy", "reviewed-by"}); err == nil {
+		t.Fatal("a key was joined to itself")
+	}
+	if care, _ = a.TrailerCare(path); care.Open != 0 {
+		t.Fatalf("the one before the bad one wasn't written: %v", careAsks(care))
+	}
+}
+
 // What a key's values are, and where it shows, are guesses until a rule says.
 func TestTrailerCareSetsKindAndPlace(t *testing.T) {
 	t.Parallel()

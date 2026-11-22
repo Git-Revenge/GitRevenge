@@ -187,6 +187,30 @@ func (a *App) AnswerTrailerQuestion(path, key, other string, join bool) (Trailer
 	return a.trailerCare(ctx, r), nil
 }
 
+// AnswerTrailerSlips reads several keys as one in the repository at path, all at once:
+// every slip of a key, answered together. Each is its own line in the rule, and the history
+// is read through the new rule once, not once for each, which on a long history is the
+// difference between a moment and a minute.
+func (a *App) AnswerTrailerSlips(path, key string, others []string) (TrailerCare, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return TrailerCare{}, err
+	}
+	ctx := context.Background()
+	reading := a.trailerReading(ctx, r)
+	name := keyAsWritten(reading, key)
+	for _, other := range others {
+		if err = trailerrules.Join(ctx, r.Git, trailerrules.Local, name, keyAsWritten(reading, other)); err != nil {
+			break
+		}
+	}
+	a.ruleChanged(r)
+	if err != nil {
+		return a.trailerCare(ctx, r), userError("That couldn’t be written to the repository’s git config: " + err.Error())
+	}
+	return a.trailerCare(ctx, r), nil
+}
+
 // UndoTrailerJoin takes back a join in the repository at path: other is read as itself
 // again, and the question about the two may be asked again.
 func (a *App) UndoTrailerJoin(path, key, other string) (TrailerCare, error) {

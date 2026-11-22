@@ -19,6 +19,8 @@ export function AnswerPrompt(arg1:string,arg2:string,arg3:boolean):Promise<void>
 
 export function AnswerTrailerQuestion(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<app.TrailerCare>;
 
+export function AnswerTrailerSlips(arg1:string,arg2:string,arg3:Array<string>):Promise<app.TrailerCare>;
+
 export function ArrivedCommits(arg1:string,arg2:string,arg3:string):Promise<app.Arrived>;
 
 export function AuthorCard(arg1:string,arg2:string):Promise<app.AuthorCard>;

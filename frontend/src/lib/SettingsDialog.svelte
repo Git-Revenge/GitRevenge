@@ -16,6 +16,7 @@
   import { update } from './update.svelte'
   import Loading from './ui/Loading.svelte'
   import LinksSettings from './links/LinksSettings.svelte'
+  import { trailerCare } from './filters/careDialog.svelte'
 
   let { onClose }: { onClose: () => void } = $props()
 
@@ -224,6 +225,26 @@
               onClose()
               void gitConfig.show(session.activeTab?.path ?? '')
             }}><Icon name="gear" size={14} />Edit git config…</button
+          >
+        </span>
+      </fieldset>
+
+      <fieldset>
+        <legend class="meta">Smart filters</legend>
+        <p class="hint">
+          Smart filters read the trailers a history already has, such as Reviewed-by and Closes. Trailer care is where a repository says how they should be read: a misspelled key read as the right one, two keys read as
+          one, what a key’s values are, and where it shows. Nothing there changes a commit.
+        </p>
+        <span>
+          <button
+            type="button"
+            class="btn quiet"
+            disabled={!repoPath}
+            title={repoPath ? `How ${repoName} reads its trailers` : 'Open a repository to care for its trailers'}
+            onclick={() => {
+              onClose()
+              trailerCare.show(repoPath)
+            }}><Icon name="filter" size={14} />Trailer care…</button
           >
         </span>
       </fieldset>
