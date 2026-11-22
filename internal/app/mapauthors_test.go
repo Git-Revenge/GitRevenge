@@ -161,12 +161,11 @@ func TestMapAuthorsFollowASavedMailmap(t *testing.T) {
 			t.Fatalf("jdoe is still on the map after the mailmap: %+v", who)
 		}
 	}
-	// Her card finds the commit she wrote under the old name. The one that credits her
-	// under it in a trailer isn't found: the card searches messages for the names it's
-	// given, and the old one isn't among them (#843).
+	// Her card finds the commit she wrote under the old name, and the one that credits her
+	// under it in a trailer, which git leaves as it was written (#843).
 	h, err := a.MapAuthorHistory(path, []AuthorIdentity{{Name: "Jane Doe", Email: "jane@example.com"}})
-	if err != nil || h.Authored != 1 {
-		t.Fatalf("her card = %+v, %v, want the one commit she wrote", h, err)
+	if err != nil || h.Authored != 1 || h.CoAuthored != 1 {
+		t.Fatalf("her card = %+v, %v, want the commit she wrote and the one that credits her", h, err)
 	}
 
 	// Taking the file away puts jdoe back.
@@ -335,6 +334,56 @@ func TestMapAuthorsOfAnEmptyRepository(t *testing.T) {
 	}
 	if m.Trunk.Name != "" || m.Authors == nil || len(m.Authors) != 0 {
 		t.Fatalf("map = %+v, want no trunk and an empty list", m)
+	}
+}
+
+// A trailer keeps the name it was written with, so an author's card reads it through the
+// mailmap as the map does: by the line that applies to that name and address, and no other.
+func TestMapAuthorHistoryCountsCreditsUnderAMappedName(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.Linear(1)
+	// Two people shared an address once. Only "jdoe" at it is Jane.
+	fx.WriteFile(".mailmap", "Jane Doe <jane@example.com> jdoe <team@example.com>\nJane Doe <jane@example.com> <jdoe@old.example.com>\n")
+	fx.Git("add", "--", ".mailmap")
+	fx.Git("commit", "-q", "-m", "Add a mailmap")
+	commitAs(fx, "Sam", "sam@example.com", "s1.txt", "one", "Co-authored-by: jdoe <team@example.com>")
+	commitAs(fx, "Sam", "sam@example.com", "s2.txt", "two", "Co-authored-by: JDoe <TEAM@example.com>")
+	commitAs(fx, "Sam", "sam@example.com", "s3.txt", "three", "Co-developed-by: Jay <jdoe@old.example.com>")
+	commitAs(fx, "Sam", "sam@example.com", "s4.txt", "four", "Co-authored-by: Jane Doe <jane@example.com>")
+	// Not hers: the other person at the shared address, and a message that only mentions her
+	// old address.
+	commitAs(fx, "Sam", "sam@example.com", "s5.txt", "five", "Co-authored-by: Robin <team@example.com>")
+	commitAs(fx, "Sam", "sam@example.com", "s6.txt", "Thanks to <jdoe@old.example.com> for the idea")
+	// Hers to have written, not to be credited on, though it names her too.
+	commitAs(fx, "jdoe", "jdoe@old.example.com", "j1.txt", "seven", "Co-authored-by: jdoe <team@example.com>")
+	path := openForMap(t, a, fx)
+
+	jane := []AuthorIdentity{{Name: "Jane Doe", Email: "jane@example.com"}}
+	h, err := a.MapAuthorHistory(path, jane)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h.Authored != 1 || h.CoAuthored != 4 {
+		t.Fatalf("history = %+v, want 1 written and 4 credited: three under names the mailmap maps to her, one under her own", h)
+	}
+	// The map counts her the same way.
+	m, err := a.mapAuthorsSince(path, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if on := mapAuthor(t, m, "Jane Doe"); on.Authored != h.Authored || on.CoAuthored != h.CoAuthored {
+		t.Errorf("the map says %d written and %d credited, her card %d and %d", on.Authored, on.CoAuthored, h.Authored, h.CoAuthored)
+	}
+
+	// Robin, at the shared address, is credited once, and not with what's Jane's.
+	robin, err := a.MapAuthorHistory(path, []AuthorIdentity{{Name: "Robin", Email: "team@example.com"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if robin.Authored != 0 || robin.CoAuthored != 1 {
+		t.Errorf("Robin's history = %+v, want only the commit that credits Robin", robin)
 	}
 }
 

@@ -114,7 +114,7 @@ func (a *App) mapAuthorAreasSince(repoPath string, identities []AuthorIdentity, 
 			revs = append(revs, b.Name)
 		}
 		tree = newAreaTree()
-		if err := r.Git.AuthorFiles(ctx, since, revs, ids, tree.add); err != nil {
+		if err := r.Git.AuthorFiles(ctx, since, revs, ids, a.savedMailmap(ctx, r), tree.add); err != nil {
 			return empty, err
 		}
 		tree.index()

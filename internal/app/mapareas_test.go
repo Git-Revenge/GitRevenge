@@ -177,6 +177,29 @@ func TestMapAuthorAreasFollowTheWholePersonAndTheWindow(t *testing.T) {
 	}
 }
 
+// Where someone has worked counts a commit that credits them under a name the mailmap maps
+// to them, as the map and their card do (#843).
+func TestMapAuthorAreasCountCreditsUnderAMappedName(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.Linear(1)
+	fx.WriteFile(".mailmap", "Jane Doe <jane@example.com> <jdoe@old.example.com>\n")
+	commitFiles(fx, "Jane Doe", "jane@example.com", "hers", []string{"api/a.go"})
+	commitFiles(fx, "Sam", "sam@example.com", "theirs together", []string{"docs/guide.md"}, "Co-authored-by: jdoe <jdoe@old.example.com>")
+	commitFiles(fx, "Sam", "sam@example.com", "sam alone", []string{"web/app.ts"})
+	got, err := a.MapAuthorAreas(openForMap(t, a, fx), []AuthorIdentity{{Name: "Jane Doe", Email: "jane@example.com"}}, 0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if docs := area(t, got, "docs/"); docs.Commits != 1 {
+		t.Errorf("docs/ = %+v, want the commit that credits her under her old address", docs)
+	}
+	if len(got.Areas) != 2 {
+		t.Errorf("areas = %+v, want api/ and docs/ and nothing of Sam's alone", got.Areas)
+	}
+}
+
 func TestMapAuthorAreasShowTheMostWorkedInAndCountTheRest(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)

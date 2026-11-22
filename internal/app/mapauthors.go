@@ -11,6 +11,7 @@ import (
 
 	"github.com/git-revenge/gitrevenge/internal/branchkind"
 	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/session"
 )
 
 // The Map's Authors mode (#816): a node for each person who wrote commits inside a window of
@@ -212,7 +213,19 @@ func (a *App) MapAuthorHistory(path string, identities []AuthorIdentity) (git.Au
 	for i, id := range identities {
 		ids[i] = git.Identity{Name: id.Name, Email: id.Email}
 	}
-	return r.Git.AuthorHistory(context.Background(), revs, ids)
+	ctx := context.Background()
+	return r.Git.AuthorHistory(ctx, revs, ids, a.savedMailmap(ctx, r))
+}
+
+// savedMailmap is the repository's mailmap as it's saved, for reading a co-author trailer
+// as the Map's own count does. A mailmap that can't be read counts as none: what a person
+// wrote, and what credits them under their own names, is still counted.
+func (a *App) savedMailmap(ctx context.Context, r *session.Repo) *git.Mailmap {
+	m, err := r.Git.ReadMailmap(ctx, "", false)
+	if err != nil {
+		return nil
+	}
+	return m
 }
 
 // authorTally counts commits by who took part in them, without keeping the commits: a long

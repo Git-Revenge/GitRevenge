@@ -116,13 +116,15 @@ type AuthorHistory struct {
 
 // AuthorHistory counts every commit reachable from revs that the person behind ids wrote or
 // is credited on. ids are the names and emails that are all one person; an identity is
-// matched by its email, or by its name when it has no email.
-func (r *Repo) AuthorHistory(ctx context.Context, revs []string, ids []Identity) (AuthorHistory, error) {
+// matched by its email, or by its name when it has no email. ids are as the mailmap shows
+// them. With mailmap, a trailer that credits the person under a name the mailmap maps to
+// them counts as well: git maps a commit's author, and leaves its trailers as written.
+func (r *Repo) AuthorHistory(ctx context.Context, revs []string, ids []Identity, mailmap *Mailmap) (AuthorHistory, error) {
 	var out AuthorHistory
 	if err := CheckRevs(revs...); err != nil {
 		return out, err
 	}
-	who := personOf(ids)
+	who := personOf(ids, mailmap)
 	if len(who.authorArgs) == 0 {
 		return out, nil
 	}
@@ -174,11 +176,8 @@ func (r *Repo) AuthorHistory(ctx context.Context, revs []string, ids []Identity)
 			if theirs(Identity{Name: f[0], Email: f[1]}) {
 				return
 			}
-			for value := range strings.SplitSeq(f[3], "\x1d") {
-				if value != "" && theirs(ParseIdentity(value)) {
-					count(&credited, f[2])
-					return
-				}
+			if who.credits(f[3]) {
+				count(&credited, f[2])
 			}
 		})
 	}()
