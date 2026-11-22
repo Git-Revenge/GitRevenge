@@ -15,14 +15,18 @@
   import { matchParts } from '../sidebarTree'
   import Empty from '../ui/Empty.svelte'
   import Icon from '../ui/Icon.svelte'
-  import { commitsText, folderKey, hasPick, heldText, heldWhy, isOpen, kindWord, moreText, queryFor, soFar, valueName } from './filters'
+  import { answerPinOffer, commitsText, folderKey, hasPick, heldText, heldWhy, isOpen, kindWord, moreText, pinLabel, pinOffer, queryFor, soFar, valueName } from './filters'
+  import type { MenuItem } from '../ContextMenu.svelte'
 
   let {
     path,
     filter,
     picks,
+    pins = [],
     open,
     onPick,
+    onPin,
+    onMenu,
     onSearch,
     onStatus,
   }: {
@@ -33,6 +37,12 @@
     picks: { key: string; value: string }[]
     /** The sidebar's open folders, by key: this panel's are kept with the branch folders'. */
     open: Record<string, boolean>
+    /** The keys pinned to the graph's rows, by ID. */
+    pins?: string[]
+    /** Pins a key to the graph's rows, or unpins it. Without it, nothing here pins. */
+    onPin?: (key: string, on: boolean) => void
+    /** Opens a menu at a point: a key's, from a right click or the menu key. */
+    onMenu?: (items: MenuItem[], x: number, y: number) => void
     /** Adds a value to the graph's filter, or takes it out if it's there. */
     onPick: (key: string, value: string) => void
     /** Searches the graph for text: a key held back from the list can still be searched for. */
@@ -146,11 +156,44 @@
     else onPick(row.k.key.id, row.v.id)
   }
 
+  // A key's menu: the pin. The tree is one Tab stop, so the menu key is how the keyboard
+  // reaches what the pin button does for a pointer.
+  function menuFor(k: app.TrailerPanelKey, x: number, y: number) {
+    if (!onPin || !onMenu) return
+    const pinned = pins.includes(k.key.id)
+    onMenu([{ label: pinLabel(k.key.label, pinned), icon: 'pin', run: () => onPin(k.key.id, !pinned) }], x, y)
+  }
+
+  // The offer to pin, made once for a repository: its most used label, while nothing is pinned.
+  let offerAnswered = $state(0)
+  let offer = $derived.by(() => {
+    void offerAnswered
+    if (!onPin || !panel || filtering) return undefined
+    return pinOffer(
+      panel.keys.map((k) => k.key),
+      pins,
+      path,
+      localStorage,
+    )
+  })
+  function answerOffer(pin: boolean) {
+    const key = offer
+    answerPinOffer(path, localStorage)
+    offerAnswered++
+    if (pin && key) onPin?.(key.id, true)
+  }
+
   let typed = ''
   let typedTimer: ReturnType<typeof setTimeout> | undefined
   function onKey(e: KeyboardEvent) {
     const row = rows[active]
     if (!row) return
+    if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
+      e.preventDefault()
+      const box = document.getElementById(rowId(active))?.getBoundingClientRect()
+      menuFor(row.k, (box?.left ?? 0) + 32, box?.bottom ?? 0)
+      return
+    }
     const typing = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key !== ' ' || typed !== '')
     if (typing) {
       e.preventDefault()
@@ -189,6 +232,16 @@
   <p class="note meta" role="status">{note}</p>
 {/if}
 
+{#if offer}
+  <div class="offer" role="group" aria-label="Show a trailer on the graph">
+    <p>Show <strong>{offer.label}</strong> on the graph’s rows? You’d read it down the history without opening each commit.</p>
+    <div class="offer-actions">
+      <button class="btn sm" onclick={() => answerOffer(true)}><Icon name="pin" size={12} />Pin it</button>
+      <button class="btn sm text" onclick={() => answerOffer(false)}>Not now</button>
+    </div>
+  </div>
+{/if}
+
 {#if panel && rows.length}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <ul
@@ -205,6 +258,7 @@
       {#if row.type === 'key'}
         {@const key = row.k.key}
         {@const parts = matchParts(key.label, filter)}
+        {@const pinned = pins.includes(key.id)}
         <li
           id={rowId(i)}
           role="treeitem"
@@ -216,9 +270,29 @@
           class:group={i > 0}
           title={key.spellings.length > 1 ? `Written as ${key.spellings.map((s) => s.text).join(', ')}` : `${key.label} on ${commitsText(key.commits)}`}
           onclick={() => act(row)}
+          oncontextmenu={(e) => {
+            if (!onPin || !onMenu) return
+            e.preventDefault()
+            menuFor(row.k, e.clientX, e.clientY)
+          }}
         >
           <span class="caret" class:open={row.open}><Icon name="right" size={10} /></span>
-          <span class="name">{parts.pre}{#if parts.hit}<mark>{parts.hit}</mark>{/if}{parts.post}</span>
+          <span class="name">{parts.pre}{#if parts.hit}<mark>{parts.hit}</mark>{/if}{parts.post}{#if pinned}<span class="visually-hidden">, pinned to the graph’s rows</span>{/if}</span>
+          {#if onPin}
+            <!-- For a pointer. The keyboard has the row's menu: the tree is one Tab stop. -->
+            <button
+              class="pin"
+              class:on={pinned}
+              tabindex="-1"
+              aria-pressed={pinned}
+              aria-label={pinLabel(key.label, pinned)}
+              title={pinLabel(key.label, pinned)}
+              onclick={(e) => {
+                e.stopPropagation()
+                onPin(key.id, !pinned)
+              }}><Icon name="pin" size={12} /></button
+            >
+          {/if}
           <span class="meta kind">{kindWord(key.kind)}</span>
           <span class="meta count" aria-label={commitsText(key.commits)}>{key.commits.toLocaleString()}</span>
         </li>
@@ -403,6 +477,61 @@
     margin: 6px 12px;
     color: var(--ink-mute);
     white-space: normal;
+  }
+
+  /* The pin on a key: seen while the key is pinned, or the pointer is on its row. */
+  .pin {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    color: var(--ink-mute);
+    cursor: pointer;
+  }
+
+  /* It takes no room from the key's name until it's wanted. */
+  .pin:not(.on) {
+    display: none;
+  }
+
+  .row:hover .pin,
+  .row.active .pin {
+    display: grid;
+  }
+
+  .pin.on {
+    color: var(--link);
+  }
+
+  .pin:hover {
+    background: var(--paper);
+    color: var(--ink);
+  }
+
+  /* The offer to pin a label, made once: a note on paper, not a banner. */
+  .offer {
+    margin: 8px 12px;
+    padding: 8px 10px;
+    border: 1px dashed var(--paper-edge);
+    border-radius: var(--r-md);
+    font-size: 13px;
+    white-space: normal;
+  }
+
+  .offer p {
+    margin: 0 0 6px;
+    color: var(--ink-soft);
+  }
+
+  .offer-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
   .failed {

@@ -33,12 +33,17 @@
     openDialog,
     filterPicks = [],
     onFilterPick,
+    pinnedKeys = [],
+    onPin,
     onSearch,
   }: {
     path: string
     /** The values the graph is filtered by, and how to add one or take it out. */
     filterPicks?: { key: string; value: string }[]
     onFilterPick?: (key: string, value: string) => void
+    /** The trailer keys pinned to the graph's rows, by ID, and how to pin or unpin one. */
+    pinnedKeys?: string[]
+    onPin?: (key: string, on: boolean) => void
     /** Searches the graph for text. */
     onSearch?: (query: string) => void
     /** The commit selected in the graph; refs pointing at it show as selected. */
@@ -452,7 +457,7 @@
 
     {#if filtersWanted}
       <div class="scroll" hidden={ui.panel !== 'filters'}>
-        <Lazy load={() => import('./filters/SmartFiltersPanel.svelte')} {path} {filter} picks={filterPicks} open={ui.open} onPick={(key: string, value: string) => onFilterPick?.(key, value)} onSearch={(q: string) => onSearch?.(q)} onStatus={(s: { matches: number }) => (filterMatches = s.matches)} />
+        <Lazy load={() => import('./filters/SmartFiltersPanel.svelte')} {path} {filter} picks={filterPicks} pins={pinnedKeys} {onPin} {onMenu} open={ui.open} onPick={(key: string, value: string) => onFilterPick?.(key, value)} onSearch={(q: string) => onSearch?.(q)} onStatus={(s: { matches: number }) => (filterMatches = s.matches)} />
       </div>
     {/if}
 

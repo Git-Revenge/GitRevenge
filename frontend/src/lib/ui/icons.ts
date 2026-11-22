@@ -88,6 +88,8 @@ export const ICONS = {
   refresh: ['M21 12a9 9 0 1 1-2.6-6.4', 'M21 3v6h-6'],
   search: [c(11, 11, 7), 'm20 20-3.5-3.5'],
   filter: ['M4 5h16l-6 7.5V19l-4-2v-4.5z'],
+  // A pushpin: what's pinned stays in view.
+  pin: ['M9 4h6', 'M10 4v5l-3 4.5h10L14 9V4', 'M12 13.5V20'],
   lock: [rr(5, 11, 14, 9, 2), 'M8 11V8a4 4 0 0 1 8 0v3'],
   unlock: [rr(5, 11, 14, 9, 2), 'M8 11V8a4 4 0 0 1 7.5-2'],
   external: ['M14 4h6v6', 'M20 4l-9 9', 'M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4'],

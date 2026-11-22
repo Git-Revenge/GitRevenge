@@ -29,6 +29,11 @@ export interface Scenario {
   sparse?: boolean
   /** The graph is under a smart filter that highlights: the rows to tick on its ruler. */
   highlight?: number[]
+  /** The trailer keys pinned to the graph's rows, by ID, as the sidebar is told. */
+  pinnedKeys?: string[]
+  /** The chips of pinned keys on the graph's rows, by commit id. With them the graph is
+   * given a filter to pick into. */
+  graphChips?: Record<string, { key: string; keyLabel: string; value: string; label: string; kind: string }[]>
   /** The share of the history whose trailers aren't read yet, as the graph is told. */
   trailersUnread?: number
   /** The graph is given a smart filter to add to, so its search box suggests. */

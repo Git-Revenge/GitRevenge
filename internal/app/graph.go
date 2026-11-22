@@ -9,6 +9,7 @@ import (
 	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/graph"
 	"github.com/git-revenge/gitrevenge/internal/session"
+	"github.com/git-revenge/gitrevenge/internal/trailerindex"
 )
 
 // maxGraphPage caps one GraphRows request so a bad caller can't ask for a million rows.
@@ -26,6 +27,9 @@ type GraphPage struct {
 	Paused bool `json:"paused"`
 	// Estimate is about how many rows the whole history has, or 0 until known.
 	Estimate int `json:"estimate"`
+	// Chips maps commit IDs in Rows to their values for the pinned trailer keys. A commit
+	// with none isn't in it, and with nothing pinned there's no map.
+	Chips map[string][]trailerindex.Chip `json:"chips,omitempty"`
 }
 
 // GraphProgress is the payload of the "graph:progress" event.
@@ -76,7 +80,11 @@ func (a *App) GraphRows(path string, start, count int) (GraphPage, error) {
 			refs[row.ID] = rs
 		}
 	}
-	return GraphPage{Rows: rows, Refs: refs, Total: g.Len(), Loading: loading, Paused: paused, Estimate: estimate}, nil
+	ids := make([]string, len(rows))
+	for i, row := range rows {
+		ids[i] = row.ID
+	}
+	return GraphPage{Rows: rows, Refs: refs, Total: g.Len(), Loading: loading, Paused: paused, Estimate: estimate, Chips: a.rowChips(r, ids)}, nil
 }
 
 // Refs lists the branches, remote branches, tags and stashes shown in the graph.

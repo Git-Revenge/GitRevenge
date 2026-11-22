@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import { CommitRow, SetTrailerFilter, TrailerFilter, TrailerFilterRows } from '../../wailsjs/go/app/App.js'
+  import { CommitRow, SetTrailerFilter, SetTrailerPin, TrailerFilter, TrailerFilterRows, TrailerPins } from '../../wailsjs/go/app/App.js'
   import type { app } from '../../wailsjs/go/models'
   import { onBackend } from './events'
   import FilterStrip from './filters/FilterStrip.svelte'
@@ -118,6 +118,23 @@
     }
     const rows = await session.run(() => TrailerFilterRows(path))
     if (n === filterAsk) highlight = rows?.rows ?? []
+  }
+
+  // The trailer keys pinned to the graph's rows. They live in git config, the repository's
+  // or the global one, so they're read again when either changes.
+  let pinnedKeys = $state<string[]>([])
+  $effect(() => {
+    const repo = path
+    void session.configRevision[repo]
+    void TrailerPins(repo)
+      .then((pins) => {
+        if (repo === path) pinnedKeys = (pins ?? []).map((p) => p.key)
+      })
+      .catch(() => {})
+  })
+  async function setPin(key: string, on: boolean) {
+    const pins = await session.run(() => SetTrailerPin(path, key, on))
+    if (pins) pinnedKeys = pins.map((p) => p.key)
   }
 
   /** A value picked in the search box joins the filter; one that's there already stays. */
@@ -372,6 +389,8 @@
     {path}
     filterPicks={filter.picks}
     onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))}
+    {pinnedKeys}
+    onPin={setPin}
     onSearch={(q) => graph?.search(q)}
     selectedCommit={selected?.id}
     onPick={pick}
@@ -398,7 +417,7 @@
       <FilterStrip {filter} {only} {onlyOffered} onRemove={(p) => setFilter(togglePick(filter.picks, p.key, p.value))} onAdd={() => sidebar?.show('filters')} onMode={setMode} onClear={() => setFilter([])} />
     {/if}
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filter.picks.length > 0} {highlight} {trailersUnread} onFilterAdd={addPick} onFilterDrop={() => filter.picks.length && setFilter(filter.picks.slice(0, -1))} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filter.picks.length > 0} {highlight} {trailersUnread} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFilterDrop={() => filter.picks.length && setFilter(filter.picks.slice(0, -1))} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           openMenu(commitMenuItems(row, refs, ctx), x, y)}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
@@ -498,7 +517,7 @@
       onRevert={revertFound}
     />
   {:else if selected}
-    <CommitPanel {path} onMenu={openMenu} showNotes={noteAsk} {filterSig} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} onAuthor={(sha, name, from) => {
+    <CommitPanel {path} onMenu={openMenu} showNotes={noteAsk} {filterSig} {pinnedKeys} onPin={setPin} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} onAuthor={(sha, name, from) => {
         const at = from.getBoundingClientRect()
         authorCard = { sha, name, x: at.left, y: at.bottom + 4, above: at.top, opener: from }
       }} onReveal={revealCommit} onActions={(x, y) => selected && openMenu(commitMenuItems(selected, graph.refsOf(selected.id), ctx), x, y)} />

@@ -472,3 +472,66 @@ func TestReadingHoldsWhileTheIndexStaysAsItIs(t *testing.T) {
 		t.Fatalf("a new reading = %+v", k)
 	}
 }
+
+// The values a commit has for some keys, as a graph row shows them.
+func TestReadingChips(t *testing.T) {
+	t.Parallel()
+	x, ids := indexOf(
+		"Changelog: fixed\nReviewed-by: Sam Ortiz <sam@tidewater.example>\nCloses: #12, #14",
+		"Changelog: added\nChangelog: added\nReviewed-by: Sam Ortiz <sam@tidewater.example>",
+		"Reviewed-by: Sarah Lind <sarah@tidewater.example>",
+		"",
+		"Changelog: fixed",
+		"Changelog: changed",
+	)
+	r := x.Reading(Rules{})
+	labels := func(chips []Chip) []string {
+		var out []string
+		for _, c := range chips {
+			out = append(out, c.KeyLabel+"="+c.Label)
+		}
+		return out
+	}
+	// Only the keys asked for, by any spelling, in the commit's own order.
+	got := r.Chips(ids[0], []string{"CHANGELOG", "closed"})
+	if want := []string{"Changelog=fixed", "Closes=#12", "Closes=#14"}; !slices.Equal(labels(got), want) {
+		t.Fatalf("chips = %v, want %v", labels(got), want)
+	}
+	if got[0].Key != "changelog" || got[0].Value != "text:fixed" || got[0].Kind != KindText {
+		t.Fatalf("a label's chip = %+v", got[0])
+	}
+	if got[1].Key != "closes" || got[1].Kind != KindTicket {
+		t.Fatalf("a ticket's chip = %+v", got[1])
+	}
+	// A value said twice shows once.
+	if got = r.Chips(ids[1], []string{"changelog"}); len(got) != 1 || got[0].Label != "added" {
+		t.Fatalf("a value written twice = %v", labels(got))
+	}
+	// A person is a person, by the name they're shown under.
+	if got = r.Chips(ids[2], []string{"reviewed-by"}); len(got) != 1 || got[0].Kind != KindPerson || got[0].Value != "person:Sarah Lind <sarah@tidewater.example>" {
+		t.Fatalf("a person's chip = %+v", got)
+	}
+	// Nothing for a commit without the key, without trailers, or that isn't held; nor for no keys.
+	for _, c := range [][]Chip{
+		r.Chips(ids[2], []string{"changelog"}),
+		r.Chips(ids[3], []string{"changelog"}),
+		r.Chips("0000000000000000000000000000000000000000", []string{"changelog"}),
+		r.Chips("not an id", []string{"changelog"}),
+		r.Chips(ids[0], nil),
+		r.Chips(ids[0], []string{"no-such-key"}),
+	} {
+		if len(c) != 0 {
+			t.Fatalf("chips where there should be none: %v", labels(c))
+		}
+	}
+	// Every commit is found by its id, in whatever order they're asked for.
+	for i := len(ids) - 1; i >= 0; i-- {
+		want := 1
+		if i == 2 || i == 3 {
+			want = 0
+		}
+		if got = r.Chips(ids[i], []string{"changelog"}); len(got) != want {
+			t.Fatalf("commit %d has %d Changelog chips, want %d", i, len(got), want)
+		}
+	}
+}

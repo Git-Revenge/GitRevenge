@@ -101,7 +101,7 @@ const behaviours: Record<string, (...args: never[]) => unknown> = {
   },
   GraphRows: (_path: string, start: number, count: number) => {
     const total = scenario.graphData?.length ?? scenario.graphRows ?? 0
-    return { rows: Array.from({ length: Math.max(0, Math.min(count, total - start)) }, (_, k) => scenario.graphData?.[start + k] ?? graphRow(start + k)), refs: scenario.graphRefs ?? {}, total, loading: false, paused: false, estimate: total }
+    return { rows: Array.from({ length: Math.max(0, Math.min(count, total - start)) }, (_, k) => scenario.graphData?.[start + k] ?? graphRow(start + k)), refs: scenario.graphRefs ?? {}, chips: scenario.graphChips, total, loading: false, paused: false, estimate: total }
   },
   // A lane is started by the first commit that wears its colour; the refs on that commit name it.
   LaneNames: (_path: string, colors: number[]) => {
@@ -232,6 +232,8 @@ const mounts = {
         openDialog: record('dialog'),
         filterPicks: scenario.filterPicks ?? [],
         onFilterPick: record('filter'),
+        pinnedKeys: scenario.pinnedKeys ?? [],
+        onPin: record('pin'),
         onSearch: record('search'),
       },
     })
@@ -247,7 +249,7 @@ const mounts = {
     // A test about the saved view has the app read it first, as the app does when it starts.
     if (scenario.responses?.GraphViews) await (await import('../src/lib/theme.svelte')).theme.load()
     const wip = scenario.wip ? { changes: scenario.wip.changes, active: false, open: record('wip') } : undefined
-    mount(GraphView, { target: host, props: { path: '/repo', wip, onSelect: record('select'), onNote: (row: { index: number }) => win.__events.push(['note', row.index]), onContext: (row: { index: number }) => win.__events.push(['context-row', row.index]), onDrop: record('drop'), ...(scenario.suggests ? { onFilterAdd: record('filter-add'), onFilterDrop: record('filter-drop') } : {}), sparse: scenario.sparse ?? false, highlight: scenario.highlight ?? null, trailersUnread: scenario.trailersUnread ?? 0 } })
+    mount(GraphView, { target: host, props: { path: '/repo', wip, onSelect: record('select'), onNote: (row: { index: number }) => win.__events.push(['note', row.index]), onContext: (row: { index: number }) => win.__events.push(['context-row', row.index]), onDrop: record('drop'), ...(scenario.suggests ? { onFilterAdd: record('filter-add'), onFilterDrop: record('filter-drop') } : {}), sparse: scenario.sparse ?? false, highlight: scenario.highlight ?? null, filterPicks: scenario.filterPicks ?? [], ...(scenario.graphChips ? { onFilterPick: record('filter-pick') } : {}), trailersUnread: scenario.trailersUnread ?? 0 } })
   },
   async commitMenu() {
     const { default: ContextMenu } = await import('../src/lib/ContextMenu.svelte')

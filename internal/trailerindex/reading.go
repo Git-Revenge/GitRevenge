@@ -1,11 +1,13 @@
 package trailerindex
 
 import (
+	"bytes"
 	"cmp"
 	"encoding/hex"
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
 )
@@ -150,6 +152,8 @@ type Reading struct {
 	keys   []Key
 	keyAt  map[string]int
 	values [][]Value
+	// plain is what each key's plain values are: labels, identifiers or just text.
+	plain []Kind
 
 	// What Commits scans: the index as it was, and what each of its strings is here.
 	idSize int
@@ -163,6 +167,9 @@ type Reading struct {
 	several map[uint32][]int32
 	// vals are the values, across keys: a person is the same one under every key.
 	vals []canon
+	// byID is the commits sorted by id, made the first time one is asked for by its id.
+	sortOnce sync.Once
+	byID     []uint32
 }
 
 // canon is one value, however it was spelled.
@@ -432,6 +439,7 @@ func (x *Index) Reading(rules Rules) *Reading {
 	// Each key: its spellings, its values, what kind most of them are, and whether it's
 	// worth offering.
 	r.values = make([][]Value, len(r.keys))
+	r.plain = make([]Kind, len(r.keys))
 	for k := range r.keys {
 		key, t := &r.keys[k], &tallies[k]
 		key.Commits, key.Lines, key.Values = t.commits, t.lines, len(t.by)
@@ -459,6 +467,7 @@ func (x *Index) Reading(rules Rules) *Reading {
 		case plainUses >= labelFrom && float64(plain) <= labelShare*float64(plainUses):
 			plainKind = KindLabel
 		}
+		r.plain[k] = plainKind
 		uses := map[Kind]int{}
 		vals := make([]Value, 0, len(t.by))
 		for v, n := range t.by {
@@ -854,4 +863,91 @@ func (r *Reading) Picked(id string, picks []Pick) (hits []bool, ok bool) {
 		return hits, true
 	}
 	return nil, false
+}
+
+// Chip is one value of a key on one commit, as a graph row shows it.
+type Chip struct {
+	// Key and Value are IDs, as picks name them. KeyLabel and Label are how to show them.
+	Key      string `json:"key"`
+	KeyLabel string `json:"keyLabel"`
+	Value    string `json:"value"`
+	Label    string `json:"label"`
+	Kind     Kind   `json:"kind"`
+}
+
+// at returns where a commit is in the reading, by its id in hex. The first question sorts
+// the commits by id, once: a graph asks about a page of rows at a time, and a long history
+// has too many commits to look through for each.
+func (r *Reading) at(id string) (int, bool) {
+	raw, err := hex.DecodeString(id)
+	if err != nil || len(raw) != r.idSize || r.idSize == 0 {
+		return 0, false
+	}
+	r.sortOnce.Do(func() {
+		n := len(r.first) - 1
+		r.byID = make([]uint32, max(n, 0))
+		for i := range r.byID {
+			r.byID[i] = uint32(i)
+		}
+		slices.SortFunc(r.byID, func(a, b uint32) int {
+			return bytes.Compare(r.ids[int(a)*r.idSize:(int(a)+1)*r.idSize], r.ids[int(b)*r.idSize:(int(b)+1)*r.idSize])
+		})
+	})
+	i, found := slices.BinarySearchFunc(r.byID, raw, func(c uint32, want []byte) int {
+		return bytes.Compare(r.ids[int(c)*r.idSize:(int(c)+1)*r.idSize], want)
+	})
+	if !found {
+		return 0, false
+	}
+	return int(r.byID[i]), true
+}
+
+// Chips returns the values one commit has for some keys, in the order the commit has them,
+// each once. The keys are named by ID or by any spelling. A commit the reading doesn't
+// hold, or one with none of the keys, has none.
+func (r *Reading) Chips(id string, keys []string) []Chip {
+	c, ok := r.at(id)
+	if !ok || len(keys) == 0 {
+		return nil
+	}
+	mine := r.pairs[r.first[c]:r.first[c+1]]
+	if len(mine) == 0 {
+		return nil
+	}
+	want := make(map[int32]bool, len(keys))
+	for _, key := range keys {
+		if k, known := r.keyAt[KeyID(key)]; known {
+			want[int32(k)] = true
+		}
+	}
+	var out []Chip
+	seen := map[[2]int32]bool{}
+	add := func(k, v int32) {
+		if v < 0 || seen[[2]int32{k, v}] {
+			return
+		}
+		seen[[2]int32{k, v}] = true
+		key, val := r.keys[k], r.vals[v]
+		kind := val.kind
+		// Plain text is a label or an identifier, which is the key's to say; so is an
+		// address with no name, under a key that has a new one on nearly every commit.
+		if kind == KindText || (val.bare && r.plain[k] == KindIdentifier) {
+			kind = r.plain[k]
+		}
+		out = append(out, Chip{Key: key.ID, KeyLabel: key.Label, Value: val.id, Label: val.label, Kind: kind})
+	}
+	for j := 0; j < len(mine); j += 2 {
+		k := r.keyOf[mine[j]]
+		if !want[k] {
+			continue
+		}
+		if several := r.several[mine[j+1]]; several != nil {
+			for _, v := range several {
+				add(k, v)
+			}
+		} else {
+			add(k, r.valueOf[mine[j+1]])
+		}
+	}
+	return out
 }

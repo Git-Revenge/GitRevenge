@@ -55,6 +55,8 @@ type App struct {
 	trailerReadings trailerReadings
 	// trailerFilters holds each open repository's smart filter, for the session.
 	trailerFilters trailerFilters
+	// trailerPins keeps what each open repository's config says about its trailer keys.
+	trailerPins trailerPins
 	// configBackupDir overrides where config backups are kept; tests use it.
 	configBackupDir string
 	// repoConfigMu orders reads of a repository's settings from git config with writes to

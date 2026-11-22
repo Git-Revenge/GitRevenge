@@ -18,6 +18,7 @@
   import { session } from './session.svelte'
   import { reflow } from './text'
   import { asPerson, groupTrailers, lineKey, valueParts } from './trailers'
+  import { keyId, pinLabel } from './filters/filters'
   import { shownAs, writtenAs } from './people'
   import Markdown from './Markdown.svelte'
   import Icon, { type IconName } from './ui/Icon.svelte'
@@ -36,6 +37,8 @@
     onMenu,
     showNotes = 0,
     filterSig = '',
+    pinnedKeys = [],
+    onPin,
   }: {
     /** Goes up each time the graph's note mark is clicked: the notes come into view. */
     showNotes?: number
@@ -46,6 +49,10 @@
     /** Names the smart filter that's on, or "" with none: the trailers it picks on this commit
      * are marked, and looked up again whenever this changes. */
     filterSig?: string
+    /** The trailer keys pinned to the graph's rows, by ID, and how to pin or unpin one: a
+     * pin beside each key in the Trailers tab. Without onPin there's none. */
+    pinnedKeys?: string[]
+    onPin?: (key: string, on: boolean) => void
     /** Labels for the branches and tags on the commit. */
     refs?: RefLabel[]
     openFile: (t: DiffTarget) => void
@@ -89,6 +96,9 @@
     }
   })
   const isPicked = (key: string, value: string) => pickedLines.includes(lineKey(key, value))
+  /** A trailer key as this commit writes it: the grouped view shows keys its own way, and a
+   * pin is named, and kept, by the key itself. */
+  const keyAsWritten = (key: string) => info?.commit.trailers.find((t) => keyId(t.key) === keyId(key))?.key ?? key
   const PICKED = 'The smart filter picked this'
 
   let info = $state<app.CommitInfo | null>(null)
@@ -357,12 +367,21 @@
   {/if}
 {/snippet}
 
+<!-- The pin beside a key: its values show on the graph's rows while it's pinned. -->
+{#snippet pinFor(key: string)}
+  {#if onPin}
+    {@const pinned = pinnedKeys.includes(keyId(key))}
+    {@const written = keyAsWritten(key)}
+    <button class="pin" class:on={pinned} aria-pressed={pinned} aria-label={pinLabel(written, pinned)} title={pinLabel(written, pinned)} onclick={() => onPin(written, !pinned)}><Icon name="pin" size={12} /></button>
+  {/if}
+{/snippet}
+
 {#snippet trailerSection(title: string, rows: { key: string; label: string; values: string[] }[])}
   <section class="trailer-section">
     <h3>{title}</h3>
     <dl class="trailers">
       {#each rows as row (row.key)}
-        <dt class="meta">{row.label}</dt>
+        <dt class="meta">{row.label}{@render pinFor(row.key)}</dt>
         <dd class="trailer-values">
           {#each row.values as v, i (i)}<span class="trailer" class:picked={isPicked(row.key, v)} title={isPicked(row.key, v) ? PICKED : undefined}>{@render trailerValue(row.key, v)}</span>{/each}
         </dd>
@@ -505,13 +524,13 @@
                 <h3>People</h3>
                 <dl class="trailers">
                   {#each g.people as row (row.key)}
-                    <dt class="meta">{row.label}</dt>
+                    <dt class="meta">{row.label}{@render pinFor(row.key)}</dt>
                     <dd class="trailer-values">
                       {#each row.values as v, i (i)}<span class="trailer" class:picked={isPicked(row.key, v)} title={isPicked(row.key, v) ? PICKED : undefined}>{@render trailerValue(row.key, v)}</span>{/each}
                     </dd>
                   {/each}
                   {#if g.cc.length}
-                    <dt class="meta">Cc</dt>
+                    <dt class="meta">Cc{@render pinFor('Cc')}</dt>
                     <dd class="trailer-values">
                       {#each ccOpen ? g.cc : g.cc.slice(0, CC_SHOWN) as v, i (i)}<span class="trailer" class:picked={isPicked('Cc', v)} title={isPicked('Cc', v) ? PICKED : undefined}>{@render trailerValue('Cc', v)}</span>{/each}
                       {#if g.cc.length > CC_SHOWN}
@@ -780,6 +799,33 @@
     font-size: 14px;
     font-weight: 500;
     color: var(--ink-soft);
+  }
+
+  /* The pin beside a trailer's key: quiet until its row is pointed at, or it's on. */
+  .pin {
+    display: inline-grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    margin-left: 4px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    color: var(--ink-mute);
+    vertical-align: -3px;
+    opacity: 0.35;
+    cursor: pointer;
+  }
+
+  .pin:hover,
+  .pin:focus-visible,
+  .pin.on {
+    opacity: 1;
+  }
+
+  .pin.on {
+    color: var(--link);
   }
 
   /* A trailer the smart filter picked: washed as the filter's chip is. */
