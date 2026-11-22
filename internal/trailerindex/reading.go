@@ -1,7 +1,6 @@
 package trailerindex
 
 import (
-	"bytes"
 	"cmp"
 	"encoding/hex"
 	"regexp"
@@ -193,9 +192,9 @@ type Reading struct {
 	vals []canon
 	// join is the repository's own joins of keys, by ID (see Rules.Join).
 	join map[string]string
-	// byID is the commits sorted by id, made the first time one is asked for by its id.
-	sortOnce sync.Once
-	byID     []uint32
+	// byID is the commits' numbers in the order of their ids, shared with the index (see
+	// Index.orderOf), for finding a commit by its id.
+	byID []uint32
 	// peopleAt is where each person is among the values, by ID, made on first use.
 	peopleOnce sync.Once
 	peopleAt   map[string]int32
@@ -340,6 +339,9 @@ func (x *Index) Reading(rules Rules) *Reading {
 	strs := x.strs
 	x.mu.RUnlock()
 	commits := len(r.first) - 1
+	// For finding a commit by its id: kept by the index, so only what it has read since the
+	// last reading is sorted.
+	r.byID = x.orderOf(r.ids, r.idSize, commits)
 
 	// Which strings are keys and which are values: most are one or the other.
 	isKey, isValue := make([]bool, len(strs)), make([]bool, len(strs))
@@ -901,8 +903,8 @@ func (r *Reading) CountWithin(key string, values []string, kept map[string]struc
 // trailers, in the order the commit has them, whether its key is picked with that value. ok
 // is false for a commit the reading doesn't hold.
 func (r *Reading) Picked(id string, picks []Pick) (hits []bool, ok bool) {
-	raw, err := hex.DecodeString(id)
-	if err != nil || len(raw) != r.idSize {
+	c, held := r.at(id)
+	if !held {
 		return nil, false
 	}
 	want := map[int32]map[string]bool{}
@@ -916,30 +918,24 @@ func (r *Reading) Picked(id string, picks []Pick) (hits []bool, ok bool) {
 		}
 		want[int32(k)][p.Value] = true
 	}
-	for c := 0; c < len(r.first)-1; c++ {
-		if string(r.ids[c*r.idSize:(c+1)*r.idSize]) != string(raw) {
+	mine := r.pairs[r.first[c]:r.first[c+1]]
+	hits = make([]bool, len(mine)/2)
+	for j := 0; j < len(mine); j += 2 {
+		values := want[r.keyOf[mine[j]]]
+		if values == nil {
 			continue
 		}
-		mine := r.pairs[r.first[c]:r.first[c+1]]
-		hits = make([]bool, len(mine)/2)
-		for j := 0; j < len(mine); j += 2 {
-			values := want[r.keyOf[mine[j]]]
-			if values == nil {
-				continue
-			}
-			if several := r.several[mine[j+1]]; several != nil {
-				for _, v := range several {
-					if values[r.vals[v].id] {
-						hits[j/2] = true
-					}
+		if several := r.several[mine[j+1]]; several != nil {
+			for _, v := range several {
+				if values[r.vals[v].id] {
+					hits[j/2] = true
 				}
-			} else if v := r.valueOf[mine[j+1]]; v >= 0 && values[r.vals[v].id] {
-				hits[j/2] = true
 			}
+		} else if v := r.valueOf[mine[j+1]]; v >= 0 && values[r.vals[v].id] {
+			hits[j/2] = true
 		}
-		return hits, true
 	}
-	return nil, false
+	return hits, true
 }
 
 // Chip is one value of a key on one commit, as a graph row shows it.
@@ -952,31 +948,14 @@ type Chip struct {
 	Kind     Kind   `json:"kind"`
 }
 
-// at returns where a commit is in the reading, by its id in hex. The first question sorts
-// the commits by id, once: a graph asks about a page of rows at a time, and a long history
-// has too many commits to look through for each.
+// at returns where a commit is in the reading, by its id in hex: a graph asks about a page
+// of rows at a time, and a long history has too many commits to look through for each.
 func (r *Reading) at(id string) (int, bool) {
 	raw, err := hex.DecodeString(id)
-	if err != nil || len(raw) != r.idSize || r.idSize == 0 {
+	if err != nil {
 		return 0, false
 	}
-	r.sortOnce.Do(func() {
-		n := len(r.first) - 1
-		r.byID = make([]uint32, max(n, 0))
-		for i := range r.byID {
-			r.byID[i] = uint32(i)
-		}
-		slices.SortFunc(r.byID, func(a, b uint32) int {
-			return bytes.Compare(r.ids[int(a)*r.idSize:(int(a)+1)*r.idSize], r.ids[int(b)*r.idSize:(int(b)+1)*r.idSize])
-		})
-	})
-	i, found := slices.BinarySearchFunc(r.byID, raw, func(c uint32, want []byte) int {
-		return bytes.Compare(r.ids[int(c)*r.idSize:(int(c)+1)*r.idSize], want)
-	})
-	if !found {
-		return 0, false
-	}
-	return int(r.byID[i]), true
+	return find(r.ids, r.idSize, r.byID, raw)
 }
 
 // Chips returns the values one commit has for some keys, in the order the commit has them,
