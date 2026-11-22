@@ -118,9 +118,10 @@ type ShippedQuery struct {
 	Target       string
 	Since, Until int64
 	Range        string
-	// Match finds ticket references in a subject (place "message") or a reference trailer's
-	// value (place "trailers"). Nil uses the built-in PROJ-123 and #123.
-	Match func(text, place string) []string
+	// References finds the ticket references of a whole commit message, in the order written
+	// and each once. Which trailers name tickets is for whoever reads trailers to say, so
+	// that's not decided here: nil finds the ones in the subject, PROJ-123 and #123.
+	References func(message string) []string
 }
 
 // ShippedItem is one first-parent commit on the target branch.
@@ -224,7 +225,7 @@ func parseShipped(head, numstat string, q ShippedQuery) (item *ShippedItem, pare
 	title, _, _ := strings.Cut(body, "\n")
 	it := &ShippedItem{
 		SHA: f[0], Title: title, Author: f[2], Email: f[3], Committed: at,
-		Merge: len(parents) > 1, Refs: ReferencesWith(body, q.Match),
+		Merge: len(parents) > 1, Refs: q.references(body),
 		Revert: strings.HasPrefix(title, "Revert \""),
 		Fixup:  strings.HasPrefix(title, "fixup! ") || strings.HasPrefix(title, "squash! ") || strings.HasPrefix(title, "amend! "),
 	}
@@ -268,37 +269,29 @@ func (r *Repo) cycle(ctx context.Context, target string, mergedAt int64, parents
 	return mergedAt - first
 }
 
-// referenceTrailers are the trailer keys whose values name tickets.
-var referenceTrailers = []string{"refs", "references", "closes", "close", "closed", "fixes", "fix", "fixed", "resolves", "resolve", "resolved", "issue", "issues", "ticket", "see"}
-
 var referenceRE = regexp.MustCompile(`\b[A-Z][A-Z0-9_]*-[0-9]+\b|#[0-9]+\b`)
 
-// References finds ticket references (PROJ-123 or #123) in a message's subject and in its
-// reference trailers, in order of first appearance.
-func References(message string) []string { return ReferencesWith(message, nil) }
-
-// ReferencesWith is References with the matching given: match finds references in a subject
-// ("message") or a reference trailer's value ("trailers"). Nil means the built-in matching.
-func ReferencesWith(message string, match func(text, place string) []string) []string {
-	if match == nil {
-		match = func(text, _ string) []string { return referenceRE.FindAllString(text, -1) }
-	}
-	subject, body, _ := strings.Cut(strings.TrimSpace(message), "\n")
-	type text struct{ s, place string }
-	texts := []text{{subject, "message"}}
-	_, trailers := SplitTrailers(body)
-	for _, t := range trailers {
-		if slices.Contains(referenceTrailers, strings.ToLower(t.Key)) {
-			texts = append(texts, text{t.Value, "trailers"})
-		}
-	}
+// SubjectReferences finds ticket references (PROJ-123 or #123) in a commit's subject line,
+// in order of first appearance. It's what Shipped finds when nobody says otherwise, and it
+// looks at no trailer: which trailers name tickets is the trailer reader's to say.
+func SubjectReferences(subject string) []string {
 	refs := []string{}
-	for _, s := range texts {
-		for _, m := range match(s.s, s.place) {
-			if !slices.Contains(refs, m) {
-				refs = append(refs, m)
-			}
+	for _, m := range referenceRE.FindAllString(subject, -1) {
+		if !slices.Contains(refs, m) {
+			refs = append(refs, m)
 		}
 	}
 	return refs
+}
+
+// references finds the ticket references of a whole message, as the query says to.
+func (q ShippedQuery) references(message string) []string {
+	if q.References != nil {
+		if refs := q.References(message); refs != nil {
+			return refs
+		}
+		return []string{}
+	}
+	subject, _, _ := strings.Cut(strings.TrimSpace(message), "\n")
+	return SubjectReferences(subject)
 }

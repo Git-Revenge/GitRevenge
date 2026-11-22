@@ -11,9 +11,9 @@ func TestReadingFollowsTheRepositorysRules(t *testing.T) {
 	t.Parallel()
 	sam := "Sam Ortiz <sam@tidewater.example>"
 	x, ids := indexOf(
-		"Reviewed-by: "+sam+"\nFixes: #1\nTicket: TIDE-1\nChangelog: fixed",
-		"Rviewed-by: "+sam+"\nFixes: #2\nTicket: TIDE-2\nChangelog: fixed",
-		"Reviewed-by: "+sam+"\nFixes: #3\nTicket: TIDE-3\nChangelog: added",
+		"Reviewed-by: "+sam+"\nFixes: #1\nTicket: tide 1\nChangelog: fixed",
+		"Rviewed-by: "+sam+"\nFixes: #2\nTicket: tide 2\nChangelog: fixed",
+		"Reviewed-by: "+sam+"\nFixes: #3\nTicket: tide 3\nChangelog: added",
 		"Closes: #4\nNote: once only\nChangelog: added",
 	)
 
@@ -84,7 +84,7 @@ func TestReadingFollowsTheRepositorysRules(t *testing.T) {
 		}
 	}
 	if was, _ := plain.Key("ticket"); was.Kind == KindTicket {
-		t.Fatal("with no rules, TIDE-1 is not known to be a ticket")
+		t.Fatal("with no rules, \"tide 1\" is not known to be a ticket")
 	}
 
 	// Where it is offered: said, whatever the guess.

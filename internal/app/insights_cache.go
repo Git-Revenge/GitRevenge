@@ -12,6 +12,7 @@ import (
 
 	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/settings"
+	"github.com/git-revenge/gitrevenge/internal/trailerrules"
 )
 
 // Insights results are kept in memory for the session (ADR-0008: nothing is stored). Each
@@ -97,7 +98,13 @@ func cachedInsight[T any](ctx context.Context, a *App, g *git.Repo, root, view s
 	if err != nil {
 		return zero, err
 	}
-	key := view + "\x00" + root + "\x00" + string(inputs) + "\x00" + string(kinds) + "\x00" + string(links) + "\x00" + refs
+	// And the repository's rules for its trailer keys, which say which trailers name tickets.
+	said, _ := trailerrules.Load(ctx, g, true)
+	trailers, err := json.Marshal(said)
+	if err != nil {
+		return zero, err
+	}
+	key := view + "\x00" + root + "\x00" + string(inputs) + "\x00" + string(kinds) + "\x00" + string(links) + "\x00" + string(trailers) + "\x00" + refs
 	if v, ok := a.insights.get(key); ok {
 		if t, ok := v.(T); ok {
 			return t, nil
