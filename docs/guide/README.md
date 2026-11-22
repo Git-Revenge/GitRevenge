@@ -35,6 +35,7 @@ After that, the guide covers each part of the app in turn:
 | [Remotes, LFS and submodules](remotes.md) | Fetch, pull and push, signing in, and what to do when one fails. |
 | [Git config](git-config.md) | Editing git's own settings files. |
 | [People and the mailmap](people.md) | Who a history names, joining the names that are one person, and the `.mailmap`. |
+| [Smart filters](smart-filters.md) | Filtering the graph by the trailers a history already has, pinning a key to rows, and Trailer care. |
 | [Insights](insights.md) | What shipped and what's stuck, for sprint reviews. |
 | [Settings and shortcuts](settings.md) | The app's settings, smart links, and every keyboard shortcut. |
 

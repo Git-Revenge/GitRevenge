@@ -54,7 +54,7 @@ Jumping to a commit, from a branch in the sidebar, a parent link or a search mat
 
 ### Back to where you are
 
-Whenever the checked-out commit is out of view, a button at the foot of the graph goes back to it. It names the branch, or the short SHA when you aren't on a branch, and points the way. It selects nothing, so the commit you were reading stays in the panel on the right. After a fetch it also counts what's new on the upstream.
+Whenever the checked-out commit is out of view, a button at the foot of the graph goes back to it. It names the branch, or the short SHA when you aren't on a branch, and points the way. It selects nothing, so the commit you were reading stays in the panel on the right. After a fetch it also counts what's new on the upstream. Under a [smart filter](#filtering-by-a-trailer) that takes commits out, it says instead when the checked-out commit isn't one the filter keeps.
 
 The graph follows a branch you move. After a pull, checkout, merge, rebase, reset, cherry-pick or revert, the view goes to the branch's new tip. A commit you had selected stays selected. A fetch, or a change made outside the app, leaves the view where it was.
 
@@ -65,7 +65,7 @@ A ruler stands at the graph's right edge, where a scrollbar would be. Its box is
 ![The ruler at the graph's right edge, with ticks for branches, tags and the checked-out commit](../img/graph-ruler-light.webp#gh-light-mode-only)
 ![The ruler at the graph's right edge, with ticks for branches, tags and the checked-out commit](../img/graph-ruler-dark.webp#gh-dark-mode-only)
 
-Ticks mark the checked-out commit, branches, tags, commits with notes and search matches, and a faint line marks each month. Point at a tick to see what's there. On a very long history, a hatched foot is the part that hasn't been read yet.
+Ticks mark the checked-out commit, branches, tags, commits with notes and search matches, and a faint line marks each month. Under a [smart filter](#filtering-by-a-trailer) that highlights, they mark its matches too. Point at a tick to see what's there. On a very long history, a hatched foot is the part that hasn't been read yet, or, with a filter on, the part whose trailers haven't.
 
 ### The panel on the right
 
@@ -112,9 +112,34 @@ From the card you can:
 
 ## Searching
 
-Press <kbd>Ctrl</kbd>+<kbd>F</kbd> to search. You can search by commit message, author or SHA. An author is found under every name they've used: the one shown and the one each commit was written with. A search with an `@` in it is taken as an address. You can also search for a trailer, such as `Co-authored-by: Tyler` or `Closes: #12`, and `has:note` finds the commits that have a git note.
+Press <kbd>Ctrl</kbd>+<kbd>F</kbd> to search. You can search by commit message, author or SHA. An author is found under every name they've used: the one shown and the one each commit was written with. A search with an `@` in it is taken as an address. `has:note` finds the commits that have a git note.
 
 <kbd>Enter</kbd> goes to the next match and <kbd>Shift</kbd>+<kbd>Enter</kbd> to the previous one. Matches further back than what's loaded are found too; the graph loads up to them. Each match has a tick on the [ruler](#the-ruler). [Find a commit](../walkthroughs/find-a-commit.md) shows it in action.
+
+### Searching by a trailer
+
+A [trailer](smart-filters.md) is a line such as `Reviewed-by: Jessica Nguyen` or `Closes: #12` at the end of a commit message, and search finds commits by any trailer key the history uses:
+
+| Search | Finds |
+|---|---|
+| `Co-authored-by: Tyler` | Commits with that value. A person is found by any name the mailmap joins to them. |
+| `Closes: #12` | That ticket, whole: never `#120`. `closed: #12` finds it too, since a key's endings are one key. |
+| `Changelog:` or `has:changelog` | Every commit with the key. |
+| `-has:changelog` | Every commit without it. |
+| `-changelog: none` | Every commit but those with that value. |
+
+As you type, a list under the box offers the trailer keys and values that contain what you've typed, each with how many commits have it. The first row is the plain search, so <kbd>Enter</kbd> still goes to the next match. Press <kbd>↓</kbd> to a suggestion and <kbd>Enter</kbd> to filter the graph by it, or <kbd>Tab</kbd> to complete it in the box. <kbd>Backspace</kbd> in an empty box takes the last value out of the filter.
+
+## Filtering by a trailer
+
+Search moves between matches. A **smart filter** changes what the graph shows: pick a value in the sidebar's **Smart filters** panel, or from the search box's suggestions, and the graph filters to the commits that have it.
+
+A strip above the graph says how many commits the filter keeps, with a chip for each value, **+ Filter**, and **Clear**. It has two modes:
+
+- **Only these**, the default, takes the other commits out. Those that stay are strung on one dashed line, and each day's line says how many it kept of how many the day had.
+- **Highlight** leaves everything, fades what doesn't match, and ticks each match on the [ruler](#the-ruler).
+
+A filter stacks with a [focus](#focusing-on-a-branch) and with hidden branches. [Smart filters](smart-filters.md) covers the panel, combining values, pinning a key so its values show on every row, and Trailer care.
 
 ## Branches and tags
 
@@ -159,7 +184,7 @@ Only one focus exists at a time, and choosing another replaces it. The bar above
 
 ## Views
 
-The default **Timeline** view is the one described above: a line for each day, and a second line for a commit that starts a run. **Compact** fits one commit per line with no day lines, under column headings, so you see more history at once. In Compact with enough width, the filter button beside **Author** searches for the selected commit's author, an author carrying on from the row above shows as a ditto mark, and the **When** column holds how long ago each commit was made.
+The default **Timeline** view is the one described above: a line for each day, and a second line for a commit that starts a run. **Compact** fits one commit per line with no day lines, under column headings, so you see more history at once. In Compact with enough width, the filter button beside **Author** searches for the selected commit's author, an author carrying on from the row above shows as a ditto mark, and the **When** column holds how long ago each commit was made. A [trailer key pinned to rows](smart-filters.md#pinning-a-key-to-rows) has a column of its own in Compact, left of Author, while the window has room; in the timeline its values follow the subject as chips.
 
 Switch between them with the view menu in the bar above the graph. Its button shows the view in use; click it, or press <kbd>Enter</kbd> on it, and pick another. Settings and the command palette switch views too.
 

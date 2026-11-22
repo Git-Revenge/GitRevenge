@@ -39,9 +39,11 @@ Below the tiles are items shipped per day, the branches that most need attention
 
 An **item** is one commit on the target branch's main line (its first parents). A merge commit stands for the whole branch it brought in, and a squash merge is a single item, so merge, squash and rebase workflows all count one item per piece of work.
 
-Items are grouped **by reference**: ticket IDs like `TIDE-88` or `#41` found in the subject, or in trailers such as `Refs:`, `Closes:` or `Fixes:`. An item with several goes under its first. Items without one are grouped at the end.
+Items are grouped **by reference**: ticket IDs like `TIDE-88` or `#41` found in the subject, and the tickets its trailers name. An item with several goes under its first. Items without one are grouped at the end.
 
-If any of your [smart links](settings.md#links) is set to count for Shipped, the references are whatever those links find instead, and each one is a link to its ticket. Switch to **by date** to see them day by day.
+A trailer names a ticket when its whole value is one: `#41`, `TIDE-88`, the address of an issue or pull request, or several with commas between. It doesn't matter which key it's under, so `Closes: #41` and `Bug: #41` both count, and a number inside other words doesn't. These are the rules [Smart filters](smart-filters.md) reads trailers by, so a ticket counted in its panel is the same ticket here, and what you decide in [Trailer care](smart-filters.md#trailer-care) applies to both: a key you say holds tickets counts, and a key you hold back doesn't.
+
+If any of your [smart links](settings.md#links) is set to count for Shipped, the references in a subject are whatever those links find instead, and each one is a link to its ticket. Switch to **by date** to see them day by day.
 
 Each item shows its author, how many files and lines it changed, and its **cycle time**: from the merged branch's first commit to the merge. Only merge commits have one. Squash merges and direct commits don't keep the branch's history, so they say **single commit** rather than show a guess.
 
