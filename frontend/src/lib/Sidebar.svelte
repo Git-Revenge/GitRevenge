@@ -705,10 +705,11 @@
     padding-inline: 8px;
   }
 
+  /* Tight, so "Remotes" keeps its whole width beside "Remote ▾" at the default width. */
   .group {
     flex: none;
-    gap: 4px;
-    padding-inline: 8px;
+    gap: 2px;
+    padding-inline: 4px;
   }
 
   .filter {
