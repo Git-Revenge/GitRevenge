@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Settings › Links › Forges** names what a server of your own runs (GitLab, Gitea, Forgejo, GitHub Enterprise, Bitbucket Data Center or Azure DevOps Server), so its remotes can open on the web. It lists the hosts of the repository's remotes that have none, so picking one is a click. A forge is never guessed from a host's name. Remotes on GitHub, GitLab.com, Gitea.com, Codeberg, Bitbucket and Azure DevOps need nothing here. A rule is a line in git config, the repository's or the global one: `[gitrevenge-forge "git.example.com"]` with `type = gitlab`, and `web =` for a forge whose pages aren't at `https://` and the host, such as one reached through an SSH alias. (#918)
+
+### Changed
+
+- When you write a smart link, the suggested address for issues now covers Gitea, Forgejo and Codeberg as well as GitHub and GitLab. A self-hosted GitLab is suggested once its host is named under Forges, no longer because "gitlab" is in its name. (#918)
+
 ## [1.1.0] - 2026-11-22
 
 ### Added

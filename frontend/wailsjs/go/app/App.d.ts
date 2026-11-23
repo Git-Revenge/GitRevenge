@@ -39,6 +39,8 @@ export function BranchMapGroup(arg1:string,arg2:string):Promise<app.MapGroup>;
 
 export function BranchMergeState(arg1:string,arg2:string):Promise<git.BranchMerge>;
 
+export function BranchWebLinks(arg1:string,arg2:string,arg3:string):Promise<app.BranchWeb>;
+
 export function BuiltWith():Promise<app.BuiltWith>;
 
 export function CancelClone():Promise<void>;
@@ -273,7 +275,11 @@ export function RemoteAction(arg1:string,arg2:string,arg3:Array<string>):Promise
 
 export function RemoteSettings(arg1:string):Promise<git.RemoteSettings>;
 
+export function RemoteWebLinks(arg1:string):Promise<Array<app.RemoteWeb>>;
+
 export function Remotes(arg1:string):Promise<Array<git.Remote>>;
+
+export function RemoveForgeRule(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function RemoveGitConfigSection(arg1:string,arg2:string):Promise<app.ConfigDoc>;
 
@@ -316,6 +322,8 @@ export function RulerMarks(arg1:string):Promise<app.RulerMarks>;
 export function RunOperationAction(arg1:string,arg2:string):Promise<void>;
 
 export function SaveFile(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function SaveForgeRule(arg1:string,arg2:links.ForgeRule,arg3:string):Promise<void>;
 
 export function SaveGitConfig(arg1:string,arg2:boolean):Promise<app.ConfigSaveResult>;
 
@@ -448,6 +456,8 @@ export function UndoIgnore(arg1:string,arg2:app.IgnoreAdded):Promise<void>;
 export function UndoState(arg1:string):Promise<app.UndoInfo>;
 
 export function UndoTrailerJoin(arg1:string,arg2:string,arg3:string):Promise<app.TrailerCare>;
+
+export function UnknownHosts(arg1:string):Promise<Array<string>>;
 
 export function UnsetGitConfig(arg1:string,arg2:string,arg3:string):Promise<app.ConfigDoc>;
 

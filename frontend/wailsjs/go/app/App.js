@@ -62,6 +62,10 @@ export function BranchMergeState(arg1, arg2) {
   return window['go']['app']['App']['BranchMergeState'](arg1, arg2);
 }
 
+export function BranchWebLinks(arg1, arg2, arg3) {
+  return window['go']['app']['App']['BranchWebLinks'](arg1, arg2, arg3);
+}
+
 export function BuiltWith() {
   return window['go']['app']['App']['BuiltWith']();
 }
@@ -530,8 +534,16 @@ export function RemoteSettings(arg1) {
   return window['go']['app']['App']['RemoteSettings'](arg1);
 }
 
+export function RemoteWebLinks(arg1) {
+  return window['go']['app']['App']['RemoteWebLinks'](arg1);
+}
+
 export function Remotes(arg1) {
   return window['go']['app']['App']['Remotes'](arg1);
+}
+
+export function RemoveForgeRule(arg1, arg2, arg3) {
+  return window['go']['app']['App']['RemoveForgeRule'](arg1, arg2, arg3);
 }
 
 export function RemoveGitConfigSection(arg1, arg2) {
@@ -616,6 +628,10 @@ export function RunOperationAction(arg1, arg2) {
 
 export function SaveFile(arg1, arg2, arg3) {
   return window['go']['app']['App']['SaveFile'](arg1, arg2, arg3);
+}
+
+export function SaveForgeRule(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SaveForgeRule'](arg1, arg2, arg3);
 }
 
 export function SaveGitConfig(arg1, arg2) {
@@ -880,6 +896,10 @@ export function UndoState(arg1) {
 
 export function UndoTrailerJoin(arg1, arg2, arg3) {
   return window['go']['app']['App']['UndoTrailerJoin'](arg1, arg2, arg3);
+}
+
+export function UnknownHosts(arg1) {
+  return window['go']['app']['App']['UnknownHosts'](arg1);
 }
 
 export function UnsetGitConfig(arg1, arg2, arg3) {

@@ -390,24 +390,6 @@ func (r *Repo) PushBranches(ctx context.Context, remote string, refspecs []strin
 	return err
 }
 
-// IssueURL returns a pattern for links to a remote's issues, with "{n}" standing for the
-// issue number, for remotes on GitHub or GitLab (including self-hosted GitLab, recognised
-// by "gitlab" in the host name). It returns "" for anything else.
-func IssueURL(remoteURL string) string {
-	host, path := webLocation(remoteURL)
-	if host == "" || path == "" {
-		return ""
-	}
-	base := "https://" + host + "/" + path
-	switch {
-	case host == "github.com":
-		return base + "/issues/{n}"
-	case strings.Contains(host, "gitlab"):
-		return base + "/-/issues/{n}"
-	}
-	return ""
-}
-
 // RemoteHost returns the server a remote URL is on, in lower case and without a port, or ""
 // when the URL names none (a folder on this machine, say).
 func RemoteHost(remoteURL string) string {

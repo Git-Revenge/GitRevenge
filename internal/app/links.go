@@ -17,7 +17,7 @@ import (
 func (a *App) linkConfig(ctx context.Context, g *git.Repo) links.Config {
 	c, err := links.Load(ctx, g, true)
 	if err != nil {
-		return links.Config{Rules: []links.Rule{}, Web: true}
+		return links.Config{Rules: []links.Rule{}, Web: true, Forges: []links.ForgeRule{}}
 	}
 	return c
 }
