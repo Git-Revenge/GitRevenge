@@ -156,6 +156,7 @@ Two fixes from this run (#78): `git log` starts only from tags HEAD can't reach,
 10. **0.10.0 Linux:** Linux as a first-class platform, with `.deb` and `.rpm` packages.
 11. **0.11.0 Git tools:** ignore rules, smart links, bisect, merge and rebase previews, a rebuilt rebase editor and conflict tool, and a second pass on the graph.
 12. **1.0.0:** experimental Map and Horizontal views, more rendered previews, a signed Windows installer, winget, and the [version promise](#what-a-version-promises).
+13. **1.1.0 Smart filters and mailmap:** People and the mailmap, smart filters read from commit trailers (a panel, a graph filter, pinned keys, Trailer care), the Map's Authors mode, and a `gitrevenge` command.
 
 [CHANGELOG.md](../CHANGELOG.md) says what each release changed.
 
