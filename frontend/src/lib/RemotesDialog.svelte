@@ -1,7 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { RemoteAction, Remotes } from '../../wailsjs/go/app/App.js'
-  import type { git } from '../../wailsjs/go/models'
+  import { RemoteAction, RemoteFetchRules, RemotePlaces, Remotes, SetRemoteFetchRules } from '../../wailsjs/go/app/App.js'
+  import { git } from '../../wailsjs/go/models'
+  import FetchRulesEditor from './FetchRulesEditor.svelte'
+  import PlaceGlyph from './PlaceGlyph.svelte'
+  import { placeLook, type URLPlace } from './remoteHeader'
+  import { prefs } from './prefs.svelte'
   import { errorText } from './errors'
   import InkButton from './ui/InkButton.svelte'
   import Modal from './ui/Modal.svelte'
@@ -15,10 +19,15 @@
   let name = $state('')
   let url = $state('')
   let confirmRemove = $state<string | null>(null)
+  // The remote's fetch rules while it's edited, and what they were, so Save writes only a change.
+  let rules = $state<git.FetchRules | null>(null)
+  let rulesWere = ''
+  let places = $state<Record<string, URLPlace>>({})
 
   async function load() {
     try {
       remotes = (await Remotes(path)) ?? []
+      places = ((await RemotePlaces(path).catch(() => ({}))) ?? {}) as Record<string, URLPlace>
     } catch (e) {
       error = errorText(e)
     }
@@ -40,6 +49,15 @@
     name = r?.name ?? (remotes.length ? '' : 'origin')
     url = r?.fetchUrl ?? ''
     error = ''
+    rules = null
+    if (r) {
+      RemoteFetchRules(path, r.name)
+        .then((fr) => {
+          rules = fr
+          rulesWere = JSON.stringify(fr)
+        })
+        .catch((e) => (error = errorText(e)))
+    }
   }
 
   async function save(e: SubmitEvent) {
@@ -50,6 +68,15 @@
       const old = remotes.find((r) => r.name === editing)
       if (old && name !== old.name) ok = await act('rename', [old.name, name])
       if (ok && old && url !== old.fetchUrl) ok = await act('seturl', [name, url])
+      // Written last, under the remote's new name, and only when something changed.
+      if (ok && rules && JSON.stringify(rules) !== rulesWere) {
+        try {
+          await SetRemoteFetchRules(path, name, git.FetchRules.createFrom($state.snapshot(rules)))
+        } catch (err) {
+          error = errorText(err)
+          ok = false
+        }
+      }
     }
     if (ok) {
       editing = null
@@ -91,8 +118,13 @@
 
   {#if editing !== null}
     <form onsubmit={save}>
+      {#if editing}
+        {@const r = remotes.find((x) => x.name === editing)}
+        {#if r}<p class="where"><PlaceGlyph look={placeLook(places[r.fetchUrl])} brand={prefs.forgeColors} /><span class="url">{r.fetchUrl}</span></p>{/if}
+      {/if}
       <label class="form-field"><span>Name</span><input bind:value={name} placeholder="origin" /></label>
       <label class="form-field"><span>URL</span><input bind:value={url} placeholder="git@github.com:you/repo.git" /></label>
+      {#if rules}<FetchRulesEditor remote={editing || name} bind:rules />{/if}
       {#if error}<p class="form-error" role="alert">{error}</p>{/if}
       <div class="form-actions">
         <InkButton variant="secondary" onclick={() => (editing = null)}>Cancel</InkButton>
@@ -109,6 +141,14 @@
 </Modal>
 
 <style>
+  .where {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+    color: var(--ink-soft);
+  }
+
   ul {
     list-style: none;
     margin: 0;

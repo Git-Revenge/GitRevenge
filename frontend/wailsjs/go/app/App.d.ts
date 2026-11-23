@@ -279,6 +279,8 @@ export function RemoteAction(arg1:string,arg2:string,arg3:Array<string>):Promise
 
 export function RemoteBranchStatus(arg1:string,arg2:string,arg3:string):Promise<app.RemoteBranchStatus>;
 
+export function RemoteFetchRules(arg1:string,arg2:string):Promise<git.FetchRules>;
+
 export function RemotePlaces(arg1:string):Promise<Record<string, app.URLPlace>>;
 
 export function RemoteSettings(arg1:string):Promise<git.RemoteSettings>;
@@ -378,6 +380,8 @@ export function SetPreferences(arg1:app.Preferences):Promise<void>;
 export function SetPushDefault(arg1:string,arg2:string):Promise<void>;
 
 export function SetQuietDays(arg1:string,arg2:number):Promise<void>;
+
+export function SetRemoteFetchRules(arg1:string,arg2:string,arg3:git.FetchRules):Promise<void>;
 
 export function SetRepoPreferences(arg1:string,arg2:app.RepoPreferences):Promise<void>;
 

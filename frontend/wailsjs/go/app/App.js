@@ -542,6 +542,10 @@ export function RemoteBranchStatus(arg1, arg2, arg3) {
   return window['go']['app']['App']['RemoteBranchStatus'](arg1, arg2, arg3);
 }
 
+export function RemoteFetchRules(arg1, arg2) {
+  return window['go']['app']['App']['RemoteFetchRules'](arg1, arg2);
+}
+
 export function RemotePlaces(arg1) {
   return window['go']['app']['App']['RemotePlaces'](arg1);
 }
@@ -740,6 +744,10 @@ export function SetPushDefault(arg1, arg2) {
 
 export function SetQuietDays(arg1, arg2) {
   return window['go']['app']['App']['SetQuietDays'](arg1, arg2);
+}
+
+export function SetRemoteFetchRules(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SetRemoteFetchRules'](arg1, arg2, arg3);
 }
 
 export function SetRepoPreferences(arg1, arg2) {

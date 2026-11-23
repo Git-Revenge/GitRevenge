@@ -208,3 +208,34 @@ func (a *App) RemoteBranchStatus(path, remote, branch string) (RemoteBranchStatu
 	_, _ = fmt.Sscan(out, &st.Ahead, &st.Behind)
 	return st, nil
 }
+
+// RemoteFetchRules returns how a remote is fetched, for its rules in the Remotes dialog.
+func (a *App) RemoteFetchRules(path, remote string) (git.FetchRules, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return git.FetchRules{}, err
+	}
+	ctx := context.Background()
+	remotes, err := r.Git.RemoteDetails(ctx)
+	if err != nil {
+		return git.FetchRules{}, err
+	}
+	i := slices.IndexFunc(remotes, func(x git.Remote) bool { return x.Name == remote })
+	if i < 0 {
+		return git.FetchRules{}, userError("There's no remote called " + remote + ".")
+	}
+	return git.ReadFetchRules(remotes[i], r.Git.RemoteSettings(ctx).FetchPrune), nil
+}
+
+// SetRemoteFetchRules writes how a remote is fetched, all at once, on the dialog's Save.
+func (a *App) SetRemoteFetchRules(path, remote string, rules git.FetchRules) error {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return err
+	}
+	err = r.Git.SetFetchRules(context.Background(), remote, rules)
+	if errors.Is(err, git.ErrBadPattern) {
+		return userError(capitalize(err.Error()) + ". Use a branch name, or one with a single *, such as release/*.")
+	}
+	return writeErr(err)
+}
