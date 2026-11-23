@@ -27,7 +27,12 @@ function backend(total: number, available = total) {
   return { state, fetch }
 }
 
-const flush = () => new Promise((r) => setTimeout(r, 0))
+// After every pending promise, as setTimeout(0) would be, without its wait: on Windows a timer
+// waits for the system's tick (about 15ms), and a long scroll's hundreds of flushes ran past
+// the test's five seconds there while taking under a second on Linux.
+// The tests run in Node, which has setImmediate; the app's TypeScript config has no Node types.
+const { setImmediate } = globalThis as unknown as { setImmediate: (run: () => void) => void }
+const flush = () => new Promise<void>((r) => setImmediate(r))
 
 describe('a failed fetch', () => {
   it('reports the error without repainting, and clears it once a fetch works', async () => {
