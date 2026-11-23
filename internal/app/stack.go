@@ -315,6 +315,7 @@ func (a *App) UpdateStack(path string, names []string) ([]string, error) {
 			if err := r.Git.Fetch(ctx, remote, o); err != nil {
 				return err
 			}
+			a.noteFetched(ctx, r.Git, []string{remote})
 			onto, targets = upstream, []string{upstream, trunk}
 		}
 		states := r.Git.BranchStates(ctx, names, targets)

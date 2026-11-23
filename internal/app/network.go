@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/git-revenge/gitrevenge/internal/askpass"
+	"github.com/git-revenge/gitrevenge/internal/fetchlog"
 	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/session"
 )
@@ -199,7 +200,7 @@ func (a *App) cancelNetwork(key string) {
 func (a *App) Fetch(path, remote string) error {
 	return a.runNetwork(path, "fetch", func(ctx context.Context, r *session.Repo, o git.NetOptions) error {
 		a.upstreams.remember(ctx, r.Path, r.Git)
-		reached, err := fetchRemotes(ctx, r.Git, remote, o)
+		reached, err := a.fetchRemotes(ctx, r.Git, remote, o)
 		// Notes come from the remotes that answered, whether or not all of them did.
 		a.syncNotesIn(ctx, r, reached, o)
 		return err
@@ -214,7 +215,9 @@ func (a *App) Pull(path, mode string) error {
 			return err
 		}
 		a.cleanupAfterPull(ctx, r)
-		a.syncNotesIn(ctx, r, []string{pullRemote(ctx, r.Git)}, o)
+		pulled := []string{pullRemote(ctx, r.Git)}
+		a.noteFetched(ctx, r.Git, pulled)
+		a.syncNotesIn(ctx, r, pulled, o)
 		return nil
 	})
 }
@@ -386,20 +389,46 @@ func (a *App) PushRef(path, remote, kind, name string) error {
 	})
 }
 
-// Remotes lists the repository's remotes.
+// Remotes lists the repository's remotes, each with where it is, its fetch settings, where
+// pushes go and when it was last fetched: by the app (see fetchlog) or by anything else, as
+// far as FETCH_HEAD says, whichever is later.
 func (a *App) Remotes(path string) ([]git.Remote, error) {
 	r, err := a.openRepo(path)
 	if err != nil {
 		return nil, err
 	}
-	return r.Git.Remotes(context.Background())
+	remotes, err := r.Git.RemoteDetails(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	noted := fetchlog.Read(a.fetchDir(), r.CommonDir)
+	for i := range remotes {
+		if at, ok := noted[remotes[i].Name]; ok && at.Unix() > remotes[i].FetchedAt {
+			remotes[i].FetchedAt = at.Unix()
+		}
+	}
+	return remotes, nil
+}
+
+// RemoteSettings returns the repository's settings for where pushes go and whether fetches
+// prune, from every scope of git config.
+func (a *App) RemoteSettings(path string) (git.RemoteSettings, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return git.RemoteSettings{}, err
+	}
+	return r.Git.RemoteSettings(context.Background()), nil
 }
 
 // IssueURL returns a pattern for links to the repository's issues, with "{n}" for the
 // issue number, from origin (or the first remote). It's "" when the remote isn't on GitHub
 // or GitLab.
 func (a *App) IssueURL(path string) (string, error) {
-	remotes, err := a.Remotes(path)
+	r, err := a.openRepo(path)
+	if err != nil {
+		return "", err
+	}
+	remotes, err := r.Git.Remotes(context.Background())
 	if err != nil || len(remotes) == 0 {
 		return "", err
 	}
@@ -430,11 +459,15 @@ func (a *App) RemoteAction(path, action string, args []string) error {
 	case "add":
 		err = r.Git.AddRemote(ctx, arg(0), arg(1))
 	case "rename":
-		err = r.Git.RenameRemote(ctx, arg(0), arg(1))
+		if err = r.Git.RenameRemote(ctx, arg(0), arg(1)); err == nil {
+			fetchlog.Rename(a.fetchDir(), r.CommonDir, arg(0), arg(1))
+		}
 	case "seturl":
 		err = r.Git.SetRemoteURL(ctx, arg(0), arg(1))
 	case "remove":
-		err = r.Git.RemoveRemote(ctx, arg(0))
+		if err = r.Git.RemoveRemote(ctx, arg(0)); err == nil {
+			fetchlog.Forget(a.fetchDir(), r.CommonDir, arg(0))
+		}
 	default:
 		return userError("Unknown remote action " + action + ".")
 	}

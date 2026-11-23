@@ -526,6 +526,10 @@ export function RemoteAction(arg1, arg2, arg3) {
   return window['go']['app']['App']['RemoteAction'](arg1, arg2, arg3);
 }
 
+export function RemoteSettings(arg1) {
+  return window['go']['app']['App']['RemoteSettings'](arg1);
+}
+
 export function Remotes(arg1) {
   return window['go']['app']['App']['Remotes'](arg1);
 }

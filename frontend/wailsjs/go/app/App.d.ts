@@ -271,6 +271,8 @@ export function ReloadGitConfig(arg1:string):Promise<app.ConfigDoc>;
 
 export function RemoteAction(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
+export function RemoteSettings(arg1:string):Promise<git.RemoteSettings>;
+
 export function Remotes(arg1:string):Promise<Array<git.Remote>>;
 
 export function RemoveGitConfigSection(arg1:string,arg2:string):Promise<app.ConfigDoc>;
