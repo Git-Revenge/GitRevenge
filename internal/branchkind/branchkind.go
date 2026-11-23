@@ -119,7 +119,6 @@ func New(overrides map[Kind][]string, hide []string) Rules {
 	return r
 }
 
-// HidingKinds returns r with every branch of the given kinds hidden as well.
 // HidingRemotes returns the rules with every branch of these remotes hidden as well.
 func (r Rules) HidingRemotes(remotes []string) Rules {
 	if len(remotes) == 0 {
@@ -135,6 +134,7 @@ func (r Rules) HidingRemotes(remotes []string) Rules {
 // RemoteHidden reports whether every branch of a remote is hidden.
 func (r Rules) RemoteHidden(remote string) bool { return r.hideRemotes[remote] }
 
+// HidingKinds returns r with every branch of the given kinds hidden as well.
 func (r Rules) HidingKinds(kinds []Kind) Rules {
 	if len(kinds) == 0 {
 		return r

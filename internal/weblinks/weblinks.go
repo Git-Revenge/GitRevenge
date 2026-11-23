@@ -57,7 +57,8 @@ func For(remoteURL string, cfg links.Config) (Site, bool) {
 	}
 	forge := loc.Forge
 	rule, ruled := cfg.ForgeFor(loc.Host)
-	if ruled {
+	switch {
+	case ruled:
 		forge = rule.Forge
 		if rule.Web != "" {
 			base = rule.Web
@@ -74,9 +75,9 @@ func For(remoteURL string, cfg links.Config) (Site, bool) {
 				return Site{}, false
 			}
 		}
-	} else if loc.Forge == git.ForgeNone {
+	case loc.Forge == git.ForgeNone:
 		return Site{}, false
-	} else if loc.Place != git.PlaceWeb {
+	case loc.Place != git.PlaceWeb:
 		base = "https://" + loc.Host
 	}
 	s := Site{Forge: forge, Repo: base + "/" + escapePath(path), host: loc.Host, path: loc.Path, public: loc.Forge != git.ForgeNone && !ruled}
