@@ -97,6 +97,8 @@ export function Environment():Promise<app.Environment>;
 
 export function Fetch(arg1:string,arg2:string):Promise<void>;
 
+export function FetchBranch(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function FileContents(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:boolean):Promise<git.FileContents>;
 
 export function FileData(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
@@ -274,6 +276,8 @@ export function Refs(arg1:string):Promise<Array<git.Ref>>;
 export function ReloadGitConfig(arg1:string):Promise<app.ConfigDoc>;
 
 export function RemoteAction(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
+
+export function RemoteBranchStatus(arg1:string,arg2:string,arg3:string):Promise<app.RemoteBranchStatus>;
 
 export function RemotePlaces(arg1:string):Promise<Record<string, app.URLPlace>>;
 

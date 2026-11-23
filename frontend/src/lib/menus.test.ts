@@ -429,3 +429,59 @@ describe('newBranchDialog', () => {
     expect(BranchCaseTwin).not.toHaveBeenCalled()
   })
 })
+
+// #922
+describe("a remote branch's menu with what it reads as it opens", () => {
+  const web = {
+    branch: 'https://github.com/ris/tidewater/tree/fix/harbor',
+    bases: [
+      { remote: 'origin', branch: 'main', compare: 'https://github.com/ris/tidewater/compare/main...fix/harbor', request: '' },
+      { remote: 'upstream', branch: 'trunk', compare: 'https://github.com/tidewater/tidewater/compare/trunk...ris:fix/harbor', request: '' },
+      { remote: 'gl', branch: 'main', compare: '', request: '' },
+    ],
+  }
+  const extras = (over: object = {}) =>
+    ({ remote: 'origin', branch: 'fix/harbor', web, host: 'github.com', status: { base: 'main', ahead: 3, behind: 1 }, trackedBy: ['fix/harbor'], localExists: true, ...over }) as never
+
+  it('heads with how far it is and who tracks it, then its pages under the host', () => {
+    const items = refItems(ref('origin/fix/harbor', 'remote'), ctx('main'), extras())
+    expect(items[0]).toMatchObject({ label: 'origin/fix/harbor', heading: true, hint: '3 ahead, 1 behind origin/main · Tracked by fix/harbor' })
+    const l = labels(items)
+    expect(l.slice(1, 6)).toEqual([
+      'origin/fix/harbor on github.com',
+      'Open origin/fix/harbor',
+      'Compare origin/fix/harbor with origin/main',
+      'Compare origin/fix/harbor with upstream/trunk',
+      "Copy origin/fix/harbor's web link",
+    ])
+    // A base the forge can't compare with by address isn't offered, and nothing starts a request.
+    expect(l.join('\n')).not.toMatch(/gl\/main|pull request|merge request/i)
+    expect(l).toContain('Checkout fix/harbor')
+    expect(l).toContain('Fetch just fix/harbor')
+    expect(l).toContain('Focus on fix/harbor')
+  })
+
+  it('offers to check it out as a new local branch when there is none', () => {
+    const item = refItems(ref('origin/fix/harbor', 'remote'), ctx('main'), extras({ localExists: false, trackedBy: [] })).find((i) => i.label === 'Check out as a local branch')
+    expect(item?.hint).toBe('Makes fix/harbor, tracking origin/fix/harbor')
+  })
+
+  it('leaves the pages out, not greyed, without a web address', () => {
+    const items = refItems(ref('nas/fix', 'remote'), ctx('main'), extras({ remote: 'nas', branch: 'fix', web: undefined, host: '' }))
+    expect(labels(items).filter((l) => l.endsWith(' on ') || / on \S+\.\S+$/.test(l) || l.startsWith('Open') || l.startsWith('Compare') || l.includes('web link'))).toEqual([])
+  })
+
+  it("gives a local branch its upstream's pages", () => {
+    const local = { ...ref('fix/harbor', 'local'), upstream: 'origin/fix/harbor' }
+    const l = labels(refItems(local, ctx('main'), extras()))
+    expect(l).toContain('Open origin/fix/harbor')
+    expect(l).toContain('Compare origin/fix/harbor with upstream/trunk')
+  })
+
+  it('carries them into the commit menu, ref by ref', () => {
+    const r = ref('origin/fix/harbor', 'remote')
+    const items = commitMenuItems(row('a'.repeat(40)), [r], ctx('main'), new Map([[r.short, extras()]]))
+    const sub = items.find((i) => i.label === 'origin/fix/harbor')
+    expect(labels(sub?.items ?? [])).toContain('Open origin/fix/harbor')
+  })
+})

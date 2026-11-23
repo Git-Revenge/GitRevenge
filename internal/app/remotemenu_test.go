@@ -162,3 +162,40 @@ func TestRemoteFolder(t *testing.T) {
 		}
 	}
 }
+
+func TestFetchBranchAndStatus(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	local, remote := gittest.WithRemote(t, 2)
+	// Two branches appear on the remote after the clone: only the one asked for is fetched.
+	other := gittest.Clone(t, remote)
+	other.Git("switch", "-q", "-c", "feature")
+	other.Commit("feature one")
+	other.Commit("feature two")
+	other.Git("push", "-q", "origin", "feature")
+	other.Git("switch", "-q", "-c", "other")
+	other.Git("push", "-q", "origin", "other")
+	tab, err := a.OpenRepo(local.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.FetchBranch(tab.Path, "origin", "feature"); err != nil {
+		t.Fatal(err)
+	}
+	if out := local.Git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin/"); !strings.Contains(out, "origin/feature") || strings.Contains(out, "origin/other") {
+		t.Fatalf("remote branches after fetching one:\n%s", out)
+	}
+	st, err := a.RemoteBranchStatus(tab.Path, "origin", "feature")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st != (RemoteBranchStatus{Base: "main", Ahead: 2, Behind: 0}) {
+		t.Fatalf("status = %+v", st)
+	}
+	if st, _ := a.RemoteBranchStatus(tab.Path, "origin", "main"); st != (RemoteBranchStatus{Base: "main"}) {
+		t.Fatalf("main against itself = %+v", st)
+	}
+	if err := a.FetchBranch(tab.Path, "origin", "-x"); err == nil {
+		t.Fatal("fetched a branch named like an option")
+	}
+}
