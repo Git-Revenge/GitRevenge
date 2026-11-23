@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en" dir="ltr" class="docs-wrapper plugin-docs plugin-id-default docs-version-current docs-doc-page docs-doc-id-research/semantic-diff-merge" data-has-hydrated="false">
+<head>
+<meta charset="UTF-8">
+<meta name="generator" content="Docusaurus v3.10.2">
+<title data-rh="true">Semantic diff and merge: research | Git Revenge</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" name="twitter:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" property="og:url" content="https://gitrevenge.com/docs/research/semantic-diff-merge"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Semantic diff and merge: research | Git Revenge"><meta data-rh="true" name="description" content="- Date: 2026-11-23"><meta data-rh="true" property="og:description" content="- Date: 2026-11-23"><link data-rh="true" rel="icon" href="/img/favicon.svg"><link data-rh="true" rel="canonical" href="https://gitrevenge.com/docs/research/semantic-diff-merge"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/research/semantic-diff-merge" hreflang="en"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/research/semantic-diff-merge" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Semantic diff and merge","item":"https://gitrevenge.com/docs/research/semantic-diff-merge"}]}</script><link rel="apple-touch-icon" href="/img/apple-touch-icon.png"><link rel="stylesheet" href="/assets/css/styles.1bf894f5.css">
+<script src="/assets/js/runtime~main.3b29e539.js" defer="defer"></script>
+<script src="/assets/js/main.eaf17a52.js" defer="defer"></script>
+</head>
+<body>
+<svg style="display: none;"><defs>
+<symbol id="theme-svg-external-link" viewBox="0 0 24 24"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"/></symbol>
+</defs></svg>
+<script>!function(){var t=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();document.documentElement.setAttribute("data-theme",t||(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")),document.documentElement.setAttribute("data-theme-choice",t||"system")}(),function(){try{const c=new URLSearchParams(window.location.search).entries();for(var[t,e]of c)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script><div id="__docusaurus"><link rel="preload" as="image" href="/img/logo.svg"><div role="region" aria-label="Skip to main content"><a class="skipToContent_fXgn" href="#__docusaurus_skipToContent_fallback">Skip to main content</a></div><nav aria-label="Main" class="theme-layout-navbar navbar navbar--fixed-top"><div class="navbar__inner"><div class="theme-layout-navbar-left navbar__items"><button aria-label="Toggle navigation bar" aria-expanded="false" class="navbar__toggle clean-btn" type="button"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2" d="M4 7h22M4 15h22M4 23h22"></path></svg></button><a class="navbar__brand" href="/"><div class="navbar__logo"><img src="/img/logo.svg" alt="Git Revenge" class="themedComponent_mlkZ themedComponent--light_NVdE"><img src="/img/logo.svg" alt="Git Revenge" class="themedComponent_mlkZ themedComponent--dark_xIcU"></div><b class="navbar__title text--truncate">Git Revenge</b></a><a aria-current="page" class="navbar__item navbar__link navbar__link--active" href="/docs/guide">Docs</a><a href="https://github.com/Git-Revenge/GitRevenge/releases" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link">Releases<svg width="13.5" height="13.5" aria-label="(opens in new tab)" class="iconExternalLink_nPIU"><use href="#theme-svg-external-link"></use></svg></a></div><div class="theme-layout-navbar-right navbar__items navbar__items--right"><div class="navbar__item"><span class="navbar-version-badge">v1.1.0</span></div><a href="https://github.com/sponsors/risadams" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link header-sponsor-link">Sponsor<svg width="13.5" height="13.5" aria-label="(opens in new tab)" class="iconExternalLink_nPIU"><use href="#theme-svg-external-link"></use></svg></a><a href="https://github.com/Git-Revenge/GitRevenge" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link header-github-link" aria-label="GitHub repository"></a><div class="toggle_vylO colorModeToggle_DEke"><button class="clean-btn toggleButton_gllP toggleButtonDisabled_aARS" type="button" disabled="" title="system mode" aria-label="Switch between dark and light mode (currently system mode)"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP lightToggleIcon_pyhR"><path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP darkToggleIcon_wfgR"><path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP systemToggleIcon_QzmC"><path fill="currentColor" d="m12 21c4.971 0 9-4.029 9-9s-4.029-9-9-9-9 4.029-9 9 4.029 9 9 9zm4.95-13.95c1.313 1.313 2.05 3.093 2.05 4.95s-0.738 3.637-2.05 4.95c-1.313 1.313-3.093 2.05-4.95 2.05v-14c1.857 0 3.637 0.737 4.95 2.05z"></path></svg></button></div><div class="navbarSearchContainer_Bca1"></div></div></div><div role="presentation" class="navbar-sidebar__backdrop"></div></nav><div id="__docusaurus_skipToContent_fallback" class="theme-layout-main main-wrapper mainWrapper_z2l0"><div class="docsWrapper_hBAB"><button aria-label="Scroll back to top" class="clean-btn theme-back-to-top-button backToTopButton_sjWU" type="button"></button><div class="docRoot_UBD9"><aside class="theme-doc-sidebar-container docSidebarContainer_YfHR"><div class="sidebarViewport_aRkj"><div class="sidebar_njMd"><nav aria-label="Docs sidebar" class="menu thin-scrollbar menu_SIkG"><ul class="theme-doc-sidebar-menu menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/docs/guide"><span class="linkLabel_WmDU">Introduction</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/docs/guide/install"><span class="linkLabel_WmDU">Installing</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/docs/guide/tour"><span class="linkLabel_WmDU">A tour of the window</span></a></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist" href="/docs/walkthroughs"><span class="categoryLinkLabel_W154">Walkthroughs</span></a><button aria-label="Expand sidebar category &#x27;Walkthroughs&#x27;" aria-expanded="false" type="button" class="clean-btn menu__caret"></button></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/docs/guide/repositories"><span class="categoryLinkLabel_W154">User guide</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret menu__link--active" role="button" aria-expanded="true" href="/docs/PLAN"><span class="categoryLinkLabel_W154">The project</span></a></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/docs/PLAN"><span class="linkLabel_WmDU">Plan</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/docs/RELEASING"><span class="linkLabel_WmDU">Releasing</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/docs/privacy"><span class="linkLabel_WmDU">Privacy policy</span></a></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-2 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" tabindex="0" href="/docs/adr/wails-desktop-shell"><span class="categoryLinkLabel_W154">Design decisions</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-2 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret menu__link--active" role="button" aria-expanded="true" tabindex="0" href="/docs/research/semantic-diff-merge"><span class="categoryLinkLabel_W154">Research</span></a></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link menu__link--active" aria-current="page" tabindex="0" href="/docs/research/semantic-diff-merge"><span class="linkLabel_WmDU">Semantic diff and merge</span></a></li></ul></li></ul></li></ul></nav></div></div></aside><main class="docMainContainer_TBSr"><div class="container padding-top--md padding-bottom--lg"><div class="row"><div class="col docItemCol_VOVn"><div class="docItemContainer_Djhp"><article><nav class="theme-doc-breadcrumbs breadcrumbsContainer_Z_bl" aria-label="Breadcrumbs"><ul class="breadcrumbs"><li class="breadcrumbs__item"><a aria-label="Home page" class="breadcrumbs__link" href="/"><svg viewBox="0 0 24 24" class="breadcrumbHomeIcon_YNFT"><path d="M10 19v-5h4v5c0 .55.45 1 1 1h3c.55 0 1-.45 1-1v-7h1.7c.46 0 .68-.57.33-.87L12.67 3.6c-.38-.34-.96-.34-1.34 0l-8.36 7.53c-.34.3-.13.87.33.87H5v7c0 .55.45 1 1 1h3c.55 0 1-.45 1-1z" fill="currentColor"></path></svg></a></li><li class="breadcrumbs__item"><span class="breadcrumbs__link">The project</span></li><li class="breadcrumbs__item"><span class="breadcrumbs__link">Research</span></li><li class="breadcrumbs__item breadcrumbs__item--active"><span class="breadcrumbs__link">Semantic diff and merge</span></li></ul></nav><div class="tocCollapsible_ETCw theme-doc-toc-mobile tocMobile_ITEo"><button type="button" class="clean-btn tocCollapsibleButton_TO0P">On this page</button></div><div class="theme-doc-markdown markdown"><header><h1>Semantic diff and merge: research</h1></header>
+<ul>
+<li class="">Date: 2026-11-23</li>
+<li class="">Status: decided on 2026-11-23; see <a class="" href="/docs/adr/diffs-and-merges-read-the-code">ADR 0015</a>. The open questions near the end now carry their answers.</li>
+</ul>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="the-question">The question<a href="#the-question" class="hash-link" aria-label="Direct link to The question" title="Direct link to The question" translate="no">​</a></h2>
+<p>What are Git Revenge&#x27;s realistic options for building structure-aware (&quot;semantic&quot;) diffs, like <a href="https://semanticdiff.com/" target="_blank" rel="noopener noreferrer" class="">SemanticDiff</a>, and a three-way merge and conflict tool, like <a href="https://www.perforce.com/products/p4/p4-merge" target="_blank" rel="noopener noreferrer" class="">P4Merge</a>, into the app? The work has to cover plain diffs as well as conflicts from merges, rebases and cherry-picks. It should be fast, preferably native Go, aware of the syntax of most major languages, and drawn in the Ink and Agency design.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="short-answer">Short answer<a href="#short-answer" class="hash-link" aria-label="Direct link to Short answer" title="Direct link to Short answer" translate="no">​</a></h2>
+<ol>
+<li class=""><strong>Parse in Go with <a href="https://github.com/odvcencio/gotreesitter" target="_blank" rel="noopener noreferrer" class="">gotreesitter</a>.</strong> It is a pure-Go tree-sitter runtime: MIT licence, 206 grammars, no cgo. That keeps <a class="" href="/docs/adr/system-git-cli">ADR 0002</a>&#x27;s &quot;There is no cgo&quot; true, and our Windows builds have no C compiler (<code>.github/workflows/ci.yml</code>, the comment above <code>go test</code>). Every other way of parsing in Go either needs cgo, covers too few languages, or is pre-release (see the parsing table below).</li>
+<li class=""><strong>Diff syntax tokens, not whole trees.</strong> Turn each version into a sequence of leaf tokens and normalise them with per-language rules: whitespace isn&#x27;t a token, <code>0x10</code> equals <code>16</code>, and optional parentheses and trailing commas don&#x27;t count. Diff those sequences with a fast Go sequence diff (<a href="https://github.com/znkr/diff" target="_blank" rel="noopener noreferrer" class="">znkr.io/diff</a>, Apache-2.0). Detect moved blocks and group renames afterwards. The plain line diff stays as the fallback. Full tree matching (GumTree, difftastic) costs much more and can wait (see the diff table below).</li>
+<li class=""><strong>Draw with what the app already has.</strong> <code>@codemirror/merge</code> accepts an externally computed diff through <code>DiffConfig.override</code>, added in 6.12.0; we ship 6.12.3. The split view can therefore show the Go result unchanged, and the unified view reads the same result. The conflict tool (#597) already has the P4Merge-like layout of versions above and an editable result below. What it lacks is P4Merge&#x27;s colouring of where each change came from, and syntax-aware suggestions.</li>
+<li class=""><strong>Merging stays git&#x27;s line merge, with syntax-aware suggestions on top.</strong> For each conflicted place, run a three-way merge over syntax tokens of the base, ours and theirs the backend already reads. Where the two sides changed different tokens, offer the combined result as a suggestion the user accepts. A full structured merge in the style of mergiraf or Spork is a later, larger step. Mergiraf works with the app today if the user has set it up as a git merge driver. We can&#x27;t bundle it into an Apache-2.0 app without settling its GPLv3 licence first.</li>
+</ol>
+<p><strong>The main risk is the dependency.</strong> gotreesitter is pre-1.0 (v0.58.0, released 2026-11-20). Only 34 of its grammars are certified to produce the same trees as the C runtime. It also makes the app binary bigger: I measured about 10 MB stripped for the runtime and about 15 MB with 22 major grammars. A parse error or a timeout always falls back to the line diff, so a parser bug costs a nicer view, never a wrong one.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="what-the-app-does-today">What the app does today<a href="#what-the-app-does-today" class="hash-link" aria-label="Direct link to What the app does today" title="Direct link to What the app does today" translate="no">​</a></h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Piece</th><th>Where</th><th>What it does</th></tr></thead><tbody><tr><td>Line diff</td><td><code>frontend/src/lib/diff/lineDiff.ts</code></td><td>Myers O(ND) over lines in TypeScript. Above an edit distance of 4000 it shows everything replaced (<code>MAX_EDIT_DISTANCE</code>). It also builds hunks, and <code>applyChanges</code> rebuilds a file from a subset of changes for staging, unstaging and discarding lines.</td></tr><tr><td>Unified view</td><td><code>frontend/src/lib/diff/UnifiedDiff.svelte</code></td><td>Custom rendering from <code>lineDiff.ts</code>. No highlighting of changes within a line, and no whitespace option.</td></tr><tr><td>Split view</td><td><code>frontend/src/lib/diff/SplitDiff.svelte</code></td><td><code>@codemirror/merge</code> <code>MergeView</code>, read-only, <code>collapseUnchanged: { margin: 3, minSize: 6 }</code>, with CodeMirror&#x27;s own diff.</td></tr><tr><td>Highlighting</td><td><code>frontend/src/lib/diff/highlight.ts</code></td><td>Lezer grammars from <code>@codemirror/language-data</code>, skipped above 1 MiB (<code>MAX_HIGHLIGHT</code>).</td></tr><tr><td>Conflict data</td><td><code>internal/git/conflict.go</code></td><td><code>ConflictFile</code> carries <code>Base</code>, <code>Ours</code> and <code>Theirs</code> (index stages 1–3) and <code>Merged</code>. Conflicted places come from <code>git merge-file -p --diff3</code> (line 86), whatever <code>merge.conflictStyle</code> is set to.</td></tr><tr><td>Conflict tool</td><td><code>frontend/src/lib/diff/ConflictView.svelte</code>, <code>places.ts</code>, <code>placesDeco.ts</code></td><td>The result is the main editable view, never showing markers. Modes are Result only, Ours and theirs, and Three-way. Each place has a status: undecided, ours, theirs, both or edited. It can also hand off to the user&#x27;s mergetool (<code>internal/git/conflictctx.go</code>).</td></tr><tr><td>Rebases</td><td><code>docs/walkthroughs/resolve-a-conflict.md</code></td><td>A rebase can stop once per conflicting commit. Each stop goes through the same conflict tool.</td></tr></tbody></table>
+<p>Facts that shape the design:</p>
+<ul>
+<li class=""><strong>Lezer can&#x27;t be the structural layer.</strong> In <code>@codemirror/language-data</code>, C#, Kotlin, Scala, Ruby, Swift, Shell and TOML load <code>@codemirror/legacy-modes</code>. Those are CodeMirror 5-style stream parsers (<code>StreamLanguage</code>, <code>node_modules/@codemirror/language/dist/index.d.ts</code>) that give highlighting tokens but no real syntax tree. Most of the file&#x27;s 143 languages load legacy modes. Lezer stays the highlighter.</li>
+<li class=""><strong>The backend already has all three versions of a conflicted file.</strong> A structured merge never needs to rebuild the base from conflict markers. Mergiraf&#x27;s <code>solve</code> mode has to, which is why it breaks with <code>zdiff3</code> (see the merge section).</li>
+<li class=""><strong>Staging works on lines.</strong> <code>applyChanges</code> rebuilds files line by line. A diff that hides formatting changes must still let the user stage them, so whatever the semantic view hides must map back to lines (see the open questions).</li>
+</ul>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="features-worth-copying">Features worth copying<a href="#features-worth-copying" class="hash-link" aria-label="Direct link to Features worth copying" title="Direct link to Features worth copying" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="semanticdiff">SemanticDiff<a href="#semanticdiff" class="hash-link" aria-label="Direct link to SemanticDiff" title="Direct link to SemanticDiff" translate="no">​</a></h3>
+<p>SemanticDiff is closed source, a freemium product from Sysmagine GmbH, shipped as a VS Code extension that runs locally and as a GitHub app (<a href="https://semanticdiff.com/blog/semanticdiff-vs-difftastic" target="_blank" rel="noopener noreferrer" class="">blog comparison</a>). Nothing about how it is built is public. Its docs say only that it &quot;requires specific rules and logic for each supported programming language&quot; (<a href="https://semanticdiff.com/docs/what-is-semanticdiff/" target="_blank" rel="noopener noreferrer" class="">what is SemanticDiff</a>). Its fallback &quot;uses the same algorithms as all our other diffs&quot;, treating each line as one token (<a href="https://semanticdiff.com/docs/understand-diff/fallback-diff/" target="_blank" rel="noopener noreferrer" class="">fallback diff</a>). That suggests, but doesn&#x27;t prove, that its main diff is also a sequence diff over tokens.</p>
+<p>Behaviours to copy:</p>
+<ul>
+<li class=""><strong>Hide changes that don&#x27;t matter:</strong> whitespace and line breaks, optional commas, and unnecessary parentheses (<a href="https://semanticdiff.com/docs/what-is-semanticdiff/" target="_blank" rel="noopener noreferrer" class="">what is SemanticDiff</a>).</li>
+<li class=""><strong>Per-language equivalences</strong> (<a href="https://semanticdiff.com/docs/invariances/" target="_blank" rel="noopener noreferrer" class="">invariances</a>). For most languages: the base of an integer literal, string escapes, and redundant parentheses. More specific ones: Python keyword-argument order and split or joined strings; JS/TS object-key order and arrow versus anonymous functions; Go type-term order; HTML attribute and class order and whitespace collapsing; Rust <code>...</code> versus <code>..=</code>.</li>
+<li class=""><strong>Moved code</strong> (<a href="https://semanticdiff.com/docs/understand-diff/moved-code/" target="_blank" rel="noopener noreferrer" class="">moved code</a>). A move must cover at least one complete line. Each move gets its own border colour and a line linking the old and new places, and an unchanged move is labelled &quot;Moved without changes&quot;. &quot;Compare With Original&quot; shows what changed inside a moved block.</li>
+<li class=""><strong>Rename grouping</strong> (<a href="https://semanticdiff.com/docs/understand-diff/refactoring-grouping/" target="_blank" rel="noopener noreferrer" class="">refactoring grouping</a>). Every occurrence of the same rename shares a colour. The docs say this is &quot;currently limited to renames&quot;.</li>
+<li class=""><strong>Colour rules</strong> (<a href="https://semanticdiff.com/docs/understand-diff/colors/" target="_blank" rel="noopener noreferrer" class="">colors</a>). Whole added or removed lines get a strong fill. Partial changes highlight only the changed part, not the rest of the line. Moved targets get a lighter fill.</li>
+<li class=""><strong>Visible fallback.</strong> If a file doesn&#x27;t parse, it shows a plain text diff with a warning, or fails if fallback is off (<a href="https://semanticdiff.com/docs/limitations/" target="_blank" rel="noopener noreferrer" class="">limitations</a>). There is also an option to hide changes in comments (<a href="https://semanticdiff.com/docs/" target="_blank" rel="noopener noreferrer" class="">docs index</a>).</li>
+<li class=""><strong>Language list</strong> (<a href="https://semanticdiff.com/" target="_blank" rel="noopener noreferrer" class="">homepage</a>): Go, JavaScript, TypeScript, Python, C#, Java, CSS, SCSS, JSON, Rust, Vue, HTML, Lua and XML. The invariances page adds Swift, JSON5 and gettext <code>.po</code>.</li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="p4merge">P4Merge<a href="#p4merge" class="hash-link" aria-label="Direct link to P4Merge" title="Direct link to P4Merge" translate="no">​</a></h3>
+<p>From the <a href="https://help.perforce.com/helix-core/server-apps/p4merge/current/Content/P4Merge/diff-merge.p4merge.html" target="_blank" rel="noopener noreferrer" class="">P4Merge manual</a> and <a href="https://www.perforce.com/products/p4/p4-merge" target="_blank" rel="noopener noreferrer" class="">product page</a>:</p>
+<ul>
+<li class=""><strong>Three-way layout.</strong> The base sits in the middle of the top half with the two changed versions either side, and the merge result fills the bottom half. Our conflict tool already has versions above and the result below.</li>
+<li class=""><strong>Every chunk says where it came from.</strong> The legend has entries like &quot;Same in theirs and base.&quot;, &quot;Text added to your file. Not in theirs or base.&quot;, &quot;Text deleted from their file.&quot;, &quot;Same in yours and theirs, different from base.&quot; and &quot;Added to both yours and theirs.&quot;. Each source has its own colour: purple for theirs, green for yours, yellow for base.</li>
+<li class=""><strong>Toggle buttons per chunk</strong> (&quot;click once to select the corresponding text, click again to deselect it&quot;) and per whole file. The result stays directly editable, with hand edits shown in grey.</li>
+<li class=""><strong>Toolbar:</strong> next and previous diff, find, and go to line. The <a href="https://help.perforce.com/helix-core/server-apps/p4merge/current/Content/P4Merge/diff-merge.text_diff.html" target="_blank" rel="noopener noreferrer" class="">2-way diff page</a> offers side-by-side or a single pane, where deleted text is struck through.</li>
+<li class=""><strong>Also:</strong> image overlay diff, folder diff, ignoring line endings and whitespace, and syntax highlighting (<a href="https://www.perforce.com/products/p4/p4-merge" target="_blank" rel="noopener noreferrer" class="">product page</a>). It is free.</li>
+</ul>
+<p>Two of these are worth adding to what we have: colouring each conflicted place by where its text came from, and showing the base as its own column. We already have a Three-way mode. The other P4Merge features are already in the app.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="gits-own-building-blocks">Git&#x27;s own building blocks<a href="#gits-own-building-blocks" class="hash-link" aria-label="Direct link to Git&#x27;s own building blocks" title="Direct link to Git&#x27;s own building blocks" translate="no">​</a></h3>
+<p>These are worth exposing, since we drive the git CLI anyway (<a href="https://git-scm.com/docs/git-diff" target="_blank" rel="noopener noreferrer" class="">git diff</a>, <a href="https://git-scm.com/docs/git-config" target="_blank" rel="noopener noreferrer" class="">git config</a>):</p>
+<ul>
+<li class=""><code>--diff-algorithm=histogram|patience|minimal</code></li>
+<li class=""><code>--color-moved</code> with modes such as <code>zebra</code> and <code>dimmed-zebra</code>, and <code>--color-moved-ws=allow-indentation-change</code></li>
+<li class=""><code>--anchored=&lt;text&gt;</code></li>
+<li class=""><code>merge.conflictStyle=zdiff3</code>, which &quot;removes matching lines on the two sides from the conflict region&quot;</li>
+</ul>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="options-by-layer">Options by layer<a href="#options-by-layer" class="hash-link" aria-label="Direct link to Options by layer" title="Direct link to Options by layer" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="1-parsing">1. Parsing<a href="#1-parsing" class="hash-link" aria-label="Direct link to 1. Parsing" title="Direct link to 1. Parsing" translate="no">​</a></h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Option</th><th>How it runs</th><th>Windows build</th><th>Languages from our list</th><th>Licence</th><th>Speed (source)</th><th>Maturity</th><th>Verdict</th></tr></thead><tbody><tr><td><strong><a href="https://github.com/odvcencio/gotreesitter" target="_blank" rel="noopener noreferrer" class="">gotreesitter</a></strong></td><td>Pure Go. Runs upstream tree-sitter parse tables, with external scanners ported to Go (119 of 206 grammars have one)</td><td>No change</td><td>All 22 checked: Go, C, C++, C#, Java, JS, TS, TSX, Python, Rust, Ruby, PHP, Kotlin, Swift, Scala, JSON, YAML, TOML, CSS, HTML, Bash, Markdown (<a href="https://gotreesitter.m31labs.dev/docs/languages" target="_blank" rel="noopener noreferrer" class="">languages</a>). Also SQL.</td><td>MIT. Four copyleft grammars are excluded with <code>-tags gotreesitter_no_copyleft</code></td><td>Self-reported: certified grammars 0.3–0.8× C time on small inputs; a frozen 4-file Go run at 4.8× C; v1 target &quot;median at most 3x C&quot; (<a href="https://gotreesitter.m31labs.dev/docs/performance" target="_blank" rel="noopener noreferrer" class="">performance</a>)</td><td>v0.58.0, 2026-11-20, pre-1.0. 34 grammars &quot;C-faithful&quot; by default, the rest on an older engine (<a href="https://github.com/odvcencio/gotreesitter" target="_blank" rel="noopener noreferrer" class="">README</a>). 586 stars, 5k commits</td><td><strong>Recommended</strong></td></tr><tr><td><a href="https://github.com/tree-sitter/go-tree-sitter" target="_blank" rel="noopener noreferrer" class="">tree-sitter/go-tree-sitter</a> (official)</td><td>cgo over the C runtime. One Go module per grammar. Optional purego loading of shared libraries (Linux and macOS examples only)</td><td>Needs a C toolchain on Windows CI and release builds; goes against ADR 0002</td><td>Any upstream grammar</td><td>MIT</td><td>Native C</td><td>Official. You must call <code>Close</code> on every object because of &quot;bugs with runtime.SetFinalizer and CGO&quot;</td><td>Fallback if gotreesitter fails us</td></tr><tr><td><a href="https://github.com/smacker/go-tree-sitter" target="_blank" rel="noopener noreferrer" class="">smacker/go-tree-sitter</a></td><td>cgo, grammars bundled</td><td>Same as official</td><td>About 30 in the repo; no JSON</td><td>MIT</td><td>Native C</td><td>Not archived; no tagged releases</td><td>No: cgo, and the official bindings exist</td></tr><tr><td><a href="https://github.com/malivvan/tree-sitter" target="_blank" rel="noopener noreferrer" class="">malivvan/tree-sitter</a></td><td>tree-sitter compiled to WASM, run by wazero</td><td>No change</td><td>Grammars from smacker</td><td>MIT</td><td>No numbers</td><td>&quot;pre release software&quot;, 3 commits</td><td>No</td></tr><tr><td><a href="https://pkg.go.dev/github.com/msuozzo/bonsai" target="_blank" rel="noopener noreferrer" class="">bonsai</a></td><td>Grammars compiled to WASM, then to Go by wasm2go</td><td>No change</td><td>18 modules; no C#, C++, PHP, Swift, Scala, JSON, TOML, HTML or CSS</td><td>MIT</td><td>No speed numbers; &quot;+0.7 MB&quot; to &quot;+4.6 MB&quot; per grammar</td><td>v0.4.x</td><td>No: too few languages</td></tr><tr><td><a href="https://github.com/dcosson/treesitter-go" target="_blank" rel="noopener noreferrer" class="">dcosson/treesitter-go</a></td><td>Pure Go, generated tables</td><td>No change</td><td>15; no C#, PHP, Kotlin, Swift, Scala, YAML, TOML, Markdown or SQL</td><td>MIT</td><td>No numbers</td><td>0.1.0, 5 stars; passes all 1619 upstream corpus tests</td><td>No: too few languages</td></tr><tr><td><a href="https://github.com/tree-sitter/tree-sitter/tree/master/lib/binding_web" target="_blank" rel="noopener noreferrer" class="">web-tree-sitter</a> in the frontend</td><td>WASM in the webview</td><td>No change</td><td>Any grammar compiled to WASM</td><td>MIT</td><td>Native-ish</td><td>Official</td><td>No: keeps the work in JS, adds WASM to the frontend bundle (budget, #850), and the merge work wants Go</td></tr><tr><td>Lezer (already shipped)</td><td>JS in the webview</td><td>—</td><td>Real trees only where a Lezer grammar exists; C#, Kotlin, Scala, Ruby, Swift, Shell and TOML are stream modes with no tree (see above)</td><td>MIT</td><td>Fast</td><td>Shipped</td><td>Keep for highlighting only</td></tr></tbody></table>
+<p><strong>Measured on this machine</strong> (Go 1.27.4, windows/amd64, <code>CGO_ENABLED=0</code>, <code>-ldflags &quot;-s -w&quot;</code>):</p>
+<ul>
+<li class="">A hello-world binary is 1.66 MB.</li>
+<li class="">With gotreesitter and only the Go grammar (<code>-tags &#x27;grammar_subset grammar_subset_go&#x27;</code>, per <a href="https://github.com/odvcencio/gotreesitter/blob/main/docs/build-tags.md" target="_blank" rel="noopener noreferrer" class="">build tags</a>) it is 11.68 MB.</li>
+<li class="">With the 22 grammars above as a subset it is 16.36 MB.</li>
+<li class="">With the full 206-grammar catalog it is 31.79 MB.</li>
+</ul>
+<p>So the runtime costs about 10 MB and the major grammars about 5 MB more. For comparison, the v1.1.0 Windows installer is 11.6 MB and the macOS universal DMG is 20.4 MB (<code>gh release view v1.1.0</code>). Installers are compressed, so their growth will be smaller than the raw numbers, but I didn&#x27;t measure it. The <code>grammar_blobs_external</code> tag can load grammars from a folder at run time, which allows &quot;download languages on first use&quot; if size matters.</p>
+<p>I didn&#x27;t time parses locally: running the freshly built benchmark binary was blocked by this session&#x27;s permission checks. The speed column therefore rests on the project&#x27;s own figures. A parse benchmark on kernel files (<code>kernel/sched/core.c</code> is 302 KB) should be the first task of any spike.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="2-diff-algorithm">2. Diff algorithm<a href="#2-diff-algorithm" class="hash-link" aria-label="Direct link to 2. Diff algorithm" title="Direct link to 2. Diff algorithm" translate="no">​</a></h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Option</th><th>What it gives</th><th>Cost</th><th>Licence and form</th><th>Verdict</th></tr></thead><tbody><tr><td>Line diff (today, TS Myers)</td><td>Lines only</td><td>O(ND); falls back to replace-all at 4000 edits</td><td>Ours</td><td>Keep as the fallback; move to Go with the rest</td></tr><tr><td><strong><a href="https://github.com/znkr/diff" target="_blank" rel="noopener noreferrer" class="">znkr.io/diff</a></strong></td><td>Generic over any slice (<code>Edits</code>, <code>EditsFunc</code> with a custom equality, <code>Hunks</code>); <code>textdiff.Unified</code> with an indent heuristic</td><td>Default O(N^1.5 log N), <code>Minimal()</code> O(ND), <code>Fast()</code> O(N log N); README: usually under 1 ms on Go-repo commits, rare outliers around 100 ms</td><td>Apache-2.0, v1.1.x, stable API</td><td><strong>Recommended</strong> engine for both lines and tokens. No histogram or patience mode</td></tr><tr><td><strong>Token-sequence diff over syntax leaves</strong> (ours, on top of the two above)</td><td>Formatting-insensitive diffs, per-language equivalences through normalised tokens, changes aligned to syntax, moves and renames as extra passes</td><td>Linear tokenising plus a sequence diff; parsing dominates</td><td>Ours</td><td><strong>Recommended</strong> core</td></tr><tr><td><a href="https://github.com/GumTreeDiff/gumtree" target="_blank" rel="noopener noreferrer" class="">GumTree</a> tree matching</td><td>Insert, delete, update and move of tree nodes; a greedy top-down pass matching identical subtrees, a bottom-up pass using the dice similarity of descendants, then an optimal edit script on small subtrees (<a href="https://www.labri.fr/perso/xblanc/data/papers/ASE14.pdf" target="_blank" rel="noopener noreferrer" class="">Falleri et al., ASE 2014</a>, §3)</td><td>&quot;worst-case complexity of O(n²)&quot; (§3.3). Mean 20 ms on Jenkins and 74 ms on jQuery file pairs; median 18–30× a text diff, against about 10× for parsing alone (§4.2). The paper used <code>minHeight = 2</code>, <code>minDice = 0.2</code>, <code>maxSize = 100</code></td><td>Java, LGPL-3.0. No credible Go port (pkg.go.dev search)</td><td>Later: for moves and renames inside structure, written in Go from the paper</td></tr><tr><td><a href="https://difftastic.wilfred.me.uk/" target="_blank" rel="noopener noreferrer" class="">difftastic</a> as a process</td><td>Dijkstra route-finding over two syntax trees (<a href="https://difftastic.wilfred.me.uk/diffing.html" target="_blank" rel="noopener noreferrer" class="">diffing</a>); about 50 languages</td><td>&quot;scales relatively poorly on files with a large number of changes, and can use a lot of memory&quot; (<a href="https://github.com/Wilfred/difftastic" target="_blank" rel="noopener noreferrer" class="">README</a>). Line diff above 1 MB, above 2M graph vertices, or on any parse error (<a href="https://github.com/Wilfred/difftastic/blob/master/src/options.rs" target="_blank" rel="noopener noreferrer" class="">options.rs</a>)</td><td>MIT, but binary only (no <code>[lib]</code> in Cargo.toml). <code>--display json</code> with no stated stability; no moves; &quot;does not address&quot; merging</td><td>No: an extra binary to ship, an unstable output format, and slower</td></tr><tr><td>SemanticDiff</td><td>—</td><td>—</td><td>Closed</td><td>Not available</td></tr></tbody></table>
+<p><strong>Why tokens rather than trees first.</strong> A token sequence diff handles most of what people see in SemanticDiff:</p>
+<ul>
+<li class="">Whitespace never becomes a token.</li>
+<li class="">A literal like <code>0x539</code> normalises to <code>1337</code>.</li>
+<li class="">Optional parentheses and trailing commas can be marked ignorable by node kind.</li>
+<li class="">A token diff can&#x27;t produce the &quot;a line with one changed word looks entirely changed&quot; result that line diffs give.</li>
+</ul>
+<p>It runs at sequence-diff speed, and it uses the code we need for the fallback anyway. Moves can be found the way SemanticDiff&#x27;s rules imply: hash unmatched deleted and added runs of at least one full line, and match them. Renames are identifier tokens changed the same way throughout the file. Tree matching (GumTree) earns its cost on structural edits: a block wrapped in an <code>if</code>, or arguments reordered. That&#x27;s the phase after.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="3-merge">3. Merge<a href="#3-merge" class="hash-link" aria-label="Direct link to 3. Merge" title="Direct link to 3. Merge" translate="no">​</a></h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Option</th><th>What it does</th><th>Fit</th><th>Licence</th><th>Verdict</th></tr></thead><tbody><tr><td>git&#x27;s line merge (today)</td><td><code>git merge-file</code> and the merge machinery</td><td>Source of truth, per ADR 0002</td><td>— (we run git, as today)</td><td>Keep</td></tr><tr><td><strong>Token-level three-way merge inside each conflicted place</strong> (ours)</td><td>Diff3 over syntax tokens of base, ours and theirs for just that place. If the two sides changed different tokens, it gives a suggested result; if not, it shows exactly which tokens each side changed</td><td>Fits <code>ConflictView</code>: a place gains a &quot;suggested&quot; state and token-level marks. Works the same at every rebase stop</td><td>Ours</td><td><strong>Recommended first</strong></td></tr><tr><td>Structured merge, mergiraf or Spork style, in Go</td><td>Parse all three, match with GumTree (base–left, base–right, left–right), merge with parent–child–successor (PCS) triples; commutative parents such as import lists merge by set; on failure, line merge of that node (<a href="https://mergiraf.org/architecture.html" target="_blank" rel="noopener noreferrer" class="">mergiraf architecture</a>, following <a href="https://arxiv.org/abs/2202.05329" target="_blank" rel="noopener noreferrer" class="">Spork</a>)</td><td>Large: needs GumTree in Go first</td><td>Ours, if written from the papers</td><td>Later</td></tr><tr><td><a href="https://mergiraf.org/" target="_blank" rel="noopener noreferrer" class="">mergiraf</a> as the user&#x27;s own merge driver</td><td>git runs it through <code>.gitattributes</code> <code>merge=mergiraf</code> during merge, rebase, cherry-pick and revert; it tries a line merge first and only uses the structured merge on conflicts (<a href="https://mergiraf.org/usage.html" target="_blank" rel="noopener noreferrer" class="">usage</a>). About 30 programming languages plus data formats (<a href="https://mergiraf.org/languages.html" target="_blank" rel="noopener noreferrer" class="">languages</a>)</td><td>Already works with the app: git runs drivers, and our conflict tool shows whatever is left. The app could mention it in the conflict tool if it is installed</td><td>GPLv3, Rust (<a href="https://codeberg.org/mergiraf/mergiraf" target="_blank" rel="noopener noreferrer" class="">repo</a>)</td><td>Support, don&#x27;t bundle. Bundling a GPLv3 binary next to an Apache-2.0 app needs a licence decision; I couldn&#x27;t fetch the GNU GPL FAQ to quote it</td></tr><tr><td><code>mergiraf solve</code> on a file with markers</td><td>Rebuilds the three versions from diff3 markers; <code>zdiff3</code> &quot;can confuse Mergiraf&quot; (unbalanced braces)</td><td>We don&#x27;t need it, since we have the stages</td><td>GPLv3</td><td>No</td></tr><tr><td>rerere</td><td>Replays recorded resolutions (<a href="https://git-scm.com/docs/git-rerere" target="_blank" rel="noopener noreferrer" class="">git rerere</a>)</td><td>Separate feature, #938</td><td>—</td><td>Separate</td></tr></tbody></table>
+<p>Custom merge drivers in git (<a href="https://git-scm.com/docs/gitattributes" target="_blank" rel="noopener noreferrer" class="">gitattributes</a>) take <code>%O %A %B %L %P %S %X %Y</code> and exit 0 for clean or 1–128 for conflicts. Git Revenge could ship its own Go merge driver later, so syntax-aware merging also happens for merges started in a terminal. It isn&#x27;t needed for the first version.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="4-rendering">4. Rendering<a href="#4-rendering" class="hash-link" aria-label="Direct link to 4. Rendering" title="Direct link to 4. Rendering" translate="no">​</a></h3>
+<p><strong>What <code>@codemirror/merge</code> can do.</strong> The installed version is 6.12.3; see <code>node_modules/@codemirror/merge/dist/index.d.ts</code> and the <a href="https://codemirror.net/docs/ref/#merge" target="_blank" rel="noopener noreferrer" class="">reference</a>.</p>
+<ul>
+<li class=""><code>MergeView</code> is two editors, <code>a</code> and <code>b</code>, with <code>collapseUnchanged</code>, <code>revertControls</code>, <code>gutter</code> and <code>diffConfig</code>.</li>
+<li class=""><code>unifiedMergeView</code> is one editor against an <code>original</code> document, with accept and reject per chunk.</li>
+<li class=""><code>DiffConfig.override?: (a: string, b: string) =&gt; readonly Change[]</code> swaps out its diff (<a href="https://github.com/codemirror/merge/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer" class="">CHANGELOG 6.12.0</a>). Its own diff is Myers 1986, with <code>scanLimit</code> and <code>timeout</code> fallbacks.</li>
+<li class="">There is no three-way or N-pane mode.</li>
+</ul>
+<p><strong>Plan for the views:</strong></p>
+<ul>
+<li class=""><strong>Split view.</strong> Keep <code>MergeView</code>. Pass the Go result through <code>override</code>. The override is synchronous, so the frontend fetches the Go result first and then builds the view, which is what <code>SplitDiff.svelte</code> already does with <code>languageFor</code>. Draw moves, renames and hidden changes as decorations: <code>Decoration.mark</code> for tokens and <code>Decoration.line</code> for moved lines, the same way <code>placesDeco.ts</code> builds its decorations.</li>
+<li class=""><strong>Unified view.</strong> <code>UnifiedDiff.svelte</code> renders from the Go result instead of <code>lineDiff.ts</code>, adding marks within a line. Staging keeps using line operations.</li>
+<li class=""><strong>Conflict tool.</strong> Keep its own panes; MergeView can&#x27;t do three-way. Add origin colouring per place, P4Merge-style (&quot;only ours changed this&quot;, &quot;both changed it the same way&quot;, &quot;theirs deleted it&quot;), a token-level view of what each side changed against the base, and a &quot;suggested&quot; state with a one-click accept.</li>
+</ul>
+<p><strong>Tokens to reuse</strong> (<code>frontend/src/style.css</code>, plus the colours already used in the diff and conflict views):</p>
+<ul>
+<li class=""><strong>Added and removed:</strong> <code>--success-wash</code> and <code>--danger-wash</code> for whole lines, as in <code>UnifiedDiff.svelte</code>. For changed tokens, <code>color-mix(in srgb, var(--success|--danger) 35%, transparent)</code>, as <code>SplitDiff.svelte</code> does for <code>.cm-changedText</code>.</li>
+<li class=""><strong>Ours, theirs and base:</strong> <code>--code-string</code> (teal) for ours, <code>--code-function</code> (plum) for theirs, and an italic <code>--code-comment</code> for base, as in <code>ConflictView.svelte</code>. Use <code>--code-number</code> (ochre) for hand edits, which matches P4Merge&#x27;s &quot;edited&quot; marking. New &quot;suggested&quot; places could use <code>--warning-wash</code>, already in <code>ConflictView.svelte</code>, with a dashed border so they don&#x27;t read as decided.</li>
+<li class=""><strong>Moves:</strong> give each move a border rather than a fill, as SemanticDiff does, cycling <code>--accent-a</code>, <code>--accent-b</code>, <code>--accent-c</code> and <code>--ink-ochre</code>, so moves never use the red or green of add and delete. &quot;Moved without changes&quot; goes in the serif italic already used for collapsed lines (<code>--font-serif</code>, as in <code>SplitDiff.svelte</code>&#x27;s <code>.cm-collapsedLines</code>).</li>
+<li class=""><strong>Hidden formatting changes:</strong> don&#x27;t hide them silently. Show them in <code>--ink-faint</code> or with the gutter marker, with a toggle. Notes such as &quot;Shown as a line diff: the new version doesn&#x27;t parse&quot; use the existing banner style (<code>--warning-wash</code>).</li>
+<li class=""><strong>Code backgrounds:</strong> everything sits on <code>.code-ground</code> like the current diff, blame and conflict bodies, so both the light (Ink Paper) and dark (Ink Parchment) themes come for free.</li>
+</ul>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="recommended-architecture">Recommended architecture<a href="#recommended-architecture" class="hash-link" aria-label="Direct link to Recommended architecture" title="Direct link to Recommended architecture" translate="no">​</a></h2>
+<p>A new Go package, say <code>internal/semdiff</code>, reached through new bound methods on <code>App</code>. Note from earlier work: a bound method&#x27;s result must not implement <code>error</code>, or Wails rejects the call.</p>
+<ol>
+<li class=""><strong>Inputs</strong> are blob ids where they exist, read through the existing <code>cat-file --batch</code> process, plus the working-tree text. Cache results by <code>(old id, new id, language, engine version)</code> in an LRU. The working tree is keyed by a content hash.</li>
+<li class=""><strong>Language detection.</strong> Use <code>linguist-language</code> or a <code>diff=</code> driver from <code>git check-attr</code> first, then gotreesitter&#x27;s <code>grammars.DetectLanguage</code> by file name. Unknown files go straight to the line diff.</li>
+<li class=""><strong>Parsing.</strong> Parse the old and new versions in two goroutines, each with its own parser. I haven&#x27;t checked whether gotreesitter parsers are safe to share; <a href="https://pkg.go.dev/github.com/msuozzo/bonsai" target="_blank" rel="noopener noreferrer" class="">bonsai</a> warns its parsers are not. Stop if <code>context</code> is cancelled: the tab closed (the #778 lesson) or the budget ran out.</li>
+<li class=""><strong>Tokens.</strong> Walk the leaves into a slice of <code>{kind, text, normalised, span}</code>. Comments are their own tokens and can be ignored on request. Per-language normalisers start with the SemanticDiff list for our top languages.</li>
+<li class=""><strong>Diff.</strong> Use <code>znkr.io/diff.EditsFunc</code> over the token slices, comparing normalised text. Then:
+<ul>
+<li class="">align change edges to node boundaries;</li>
+<li class="">find moves by hashing runs of unmatched tokens that cover at least one full line;</li>
+<li class="">group identifier renames that happen the same way throughout the file.</li>
+</ul>
+</li>
+<li class=""><strong>Output.</strong> Byte ranges for each side: changed, moved (with an id), renamed (with an id) and hidden. Also a line map, which the unified view and <code>MergeView.override</code> both use. A field records which engine produced it (<code>structure</code> or <code>lines</code>) and why it fell back.</li>
+<li class=""><strong>Conflicts.</strong> For each place from <code>parsePlaces</code>, take the base, ours and theirs slices and tokenise them in the context of each whole-file parse. Run a three-way merge over the tokens (diff3 on tokens), and return a suggestion or per-side token changes.</li>
+</ol>
+<p><strong>Budget and fallbacks.</strong> These are proposed numbers; check them on the kernel bench.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Condition</th><th>Action</th><th>Precedent</th></tr></thead><tbody><tr><td>Either side over 1 MB</td><td>Line diff</td><td>difftastic <code>DEFAULT_BYTE_LIMIT = 1_000_000</code>; our <code>MAX_HIGHLIGHT</code> is 1 MiB</td></tr><tr><td>Any parse error in either version</td><td>Line diff, with a note saying why</td><td>difftastic <code>DEFAULT_PARSE_ERROR_LIMIT = 0</code>; SemanticDiff&#x27;s fallback warning</td></tr><tr><td>More than 200,000 tokens per side, or 150 ms wall time</td><td>Line diff, with a note</td><td>GumTree mean 20–74 ms per file pair; znkr usually under 1 ms</td></tr><tr><td>Line diff over 4000 edits</td><td>Replace-all, as today</td><td><code>MAX_EDIT_DISTANCE</code></td></tr><tr><td>Many files in a commit</td><td>Diff a file when it is opened, not the whole commit at once; prefetch the next file</td><td>—</td></tr></tbody></table>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="phased-plan">Phased plan<a href="#phased-plan" class="hash-link" aria-label="Direct link to Phased plan" title="Direct link to Phased plan" translate="no">​</a></h2>
+<ol>
+<li class=""><strong>Diff service in Go, lines and words</strong> (no parser yet). Move the diff to Go with <code>znkr.io/diff</code>. Add highlighting within a line from a generic word tokenizer, an &quot;ignore whitespace&quot; toggle, and moved-line detection. Feed both the unified and split views; the split view uses <code>override</code>. This gives the biggest visible change with the least risk. The unified view gets highlighting within lines for the first time, and caching and speed are fixed in one place.</li>
+<li class=""><strong>Structure for the top languages.</strong> Add gotreesitter behind a setting and normalise SemanticDiff&#x27;s equivalences. Start with Go, TypeScript, TSX, JavaScript, Python, Java, C#, Rust, C and C++, then JSON, YAML, CSS and HTML. Show a quiet note whenever a file falls back. Write parity tests on a fixed corpus, including kernel files, so a gotreesitter upgrade can&#x27;t silently change results.</li>
+<li class=""><strong>Conflict tool.</strong> Add P4Merge-style origin colouring and a base column. Add token-level marks for what each side changed. Add three-way token-merge suggestions, which also work at every rebase and cherry-pick stop. Mention mergiraf when it is configured.</li>
+<li class=""><strong>Moves and renames in full.</strong> Linked move borders and &quot;Compare with original&quot; for moved blocks; rename grouping with one colour per rename. Then GumTree in Go for structural moves, and commutative merges of import lists and members, Spork-style.</li>
+</ol>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="open-questions-answered-2026-11-23">Open questions, answered 2026-11-23<a href="#open-questions-answered-2026-11-23" class="hash-link" aria-label="Direct link to Open questions, answered 2026-11-23" title="Direct link to Open questions, answered 2026-11-23" translate="no">​</a></h2>
+<ol>
+<li class=""><strong>Binary size.</strong> Is about 15 MB more (uncompressed, 22 grammars) acceptable? Or should we ship a core set and download other grammars on first use (<code>grammar_blobs_external</code>)?
+<strong>Answer:</strong> the size is acceptable, as part of the feature. Grammars are built in.</li>
+<li class=""><strong>Dependency.</strong> Is it acceptable to depend on gotreesitter, which is pre-1.0 and comes from one main upstream? The alternative is the official cgo bindings, which need a C toolchain on Windows and change ADR 0002.
+<strong>Answer:</strong> yes.</li>
+<li class=""><strong>Default behaviour.</strong> Should formatting-only changes be hidden by default, as SemanticDiff does, or dimmed but visible? And should the structural diff be on by default?
+<strong>Answer:</strong> hiding formatting-only changes is an option the user turns on. ADR 0015 makes it off by default.</li>
+<li class=""><strong>Staging hidden changes.</strong> When the view hides a formatting change, should staging a nearby line take it along, or should hidden changes become visible whenever the user starts staging?
+<strong>Answer:</strong> staging always shows the end result. Nothing is hidden where changes are staged.</li>
+<li class=""><strong>Merge suggestions.</strong> Should token-level merge suggestions always wait for a click, or may a place with no overlap be pre-filled but marked as suggested?
+<strong>Answer:</strong> pre-filled, and marked as suggested.</li>
+<li class=""><strong>Languages.</strong> Which languages come first? Matching SemanticDiff&#x27;s list is the default proposal.
+<strong>Answer:</strong> SemanticDiff&#x27;s list, for a first pass. gotreesitter v0.58.0 has a grammar for every language on it except gettext <code>.po</code>.</li>
+<li class=""><strong>mergiraf.</strong> Should the app offer to set it up, or only notice it? Bundling needs a licence decision, since it is GPLv3.
+<strong>Answer:</strong> support it, don&#x27;t bundle it.</li>
+</ol>
+<p>None of the first-pass grammars is copyleft. gotreesitter&#x27;s copyleft grammars are caddy, disassembly and jq (GPL-3.0) and nim (MPL-2.0) (<code>docs/licensing.md</code> in the module). The <code>gotreesitter_no_copyleft</code> build tag leaves them out.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="not-verified">Not verified<a href="#not-verified" class="hash-link" aria-label="Direct link to Not verified" title="Direct link to Not verified" translate="no">​</a></h2>
+<ul>
+<li class=""><strong>Parse speed on our files.</strong> Running the benchmark binary was blocked, so speed figures are gotreesitter&#x27;s own.</li>
+<li class=""><strong>gotreesitter&#x27;s concurrency rules, and which grammars are certified.</strong> Only 12 of the 34 certified grammars are named in the README.</li>
+<li class=""><strong>P4Merge layout.</strong> The manual doesn&#x27;t say which side shows theirs and which shows yours. The 2-way page says both &quot;purple bands&quot; and &quot;blue and green&quot;.</li>
+<li class=""><strong>CodeMirror reference details</strong> beyond the installed <code>.d.ts</code>. The online reference was read as a summary.</li>
+<li class=""><strong>GPL FAQ.</strong> gnu.org returned HTTP 429 three times, so this note gives no quoted licence guidance on bundling mergiraf.</li>
+<li class=""><strong>GumTree&#x27;s later paper.</strong> The ICSE 2024 scalability paper (<a href="https://doi.org/10.1145/3597503.3639148" target="_blank" rel="noopener noreferrer" class="">DOI</a>) wasn&#x27;t read; it may change the cost picture for phase 4.</li>
+</ul>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="sources">Sources<a href="#sources" class="hash-link" aria-label="Direct link to Sources" title="Direct link to Sources" translate="no">​</a></h2>
+<ul>
+<li class="">SemanticDiff: <a href="https://semanticdiff.com/" target="_blank" rel="noopener noreferrer" class="">homepage</a>, <a href="https://semanticdiff.com/docs/what-is-semanticdiff/" target="_blank" rel="noopener noreferrer" class="">what is SemanticDiff</a>, <a href="https://semanticdiff.com/docs/invariances/" target="_blank" rel="noopener noreferrer" class="">invariances</a>, <a href="https://semanticdiff.com/docs/understand-diff/moved-code/" target="_blank" rel="noopener noreferrer" class="">moved code</a>, <a href="https://semanticdiff.com/docs/understand-diff/refactoring-grouping/" target="_blank" rel="noopener noreferrer" class="">refactoring grouping</a>, <a href="https://semanticdiff.com/docs/understand-diff/colors/" target="_blank" rel="noopener noreferrer" class="">colors</a>, <a href="https://semanticdiff.com/docs/understand-diff/fallback-diff/" target="_blank" rel="noopener noreferrer" class="">fallback diff</a>, <a href="https://semanticdiff.com/docs/limitations/" target="_blank" rel="noopener noreferrer" class="">limitations</a>, <a href="https://semanticdiff.com/blog/semanticdiff-vs-difftastic" target="_blank" rel="noopener noreferrer" class="">SemanticDiff vs difftastic</a></li>
+<li class="">P4Merge: <a href="https://www.perforce.com/products/p4/p4-merge" target="_blank" rel="noopener noreferrer" class="">product page</a>, <a href="https://help.perforce.com/helix-core/server-apps/p4merge/current/Content/P4Merge/diff-merge.p4merge.html" target="_blank" rel="noopener noreferrer" class="">Merging files</a>, <a href="https://help.perforce.com/helix-core/server-apps/p4merge/current/Content/P4Merge/diff-merge.text_diff.html" target="_blank" rel="noopener noreferrer" class="">Diffing text files</a></li>
+<li class="">Parsers: <a href="https://github.com/odvcencio/gotreesitter" target="_blank" rel="noopener noreferrer" class="">gotreesitter README</a>, <a href="https://gotreesitter.m31labs.dev/docs/languages" target="_blank" rel="noopener noreferrer" class="">languages</a>, <a href="https://gotreesitter.m31labs.dev/docs/performance" target="_blank" rel="noopener noreferrer" class="">performance</a>, <a href="https://github.com/odvcencio/gotreesitter/blob/main/docs/build-tags.md" target="_blank" rel="noopener noreferrer" class="">build tags</a>, <a href="https://pkg.go.dev/github.com/odvcencio/gotreesitter" target="_blank" rel="noopener noreferrer" class="">pkg.go.dev</a>; <a href="https://tree-sitter.github.io/tree-sitter/" target="_blank" rel="noopener noreferrer" class="">tree-sitter</a>; <a href="https://github.com/tree-sitter/go-tree-sitter" target="_blank" rel="noopener noreferrer" class="">go-tree-sitter</a>; <a href="https://github.com/smacker/go-tree-sitter" target="_blank" rel="noopener noreferrer" class="">smacker/go-tree-sitter</a>; <a href="https://github.com/malivvan/tree-sitter" target="_blank" rel="noopener noreferrer" class="">malivvan/tree-sitter</a>; <a href="https://pkg.go.dev/github.com/msuozzo/bonsai" target="_blank" rel="noopener noreferrer" class="">bonsai</a>; <a href="https://github.com/dcosson/treesitter-go" target="_blank" rel="noopener noreferrer" class="">dcosson/treesitter-go</a>; <a href="https://github.com/tree-sitter/tree-sitter/tree/master/lib/binding_web" target="_blank" rel="noopener noreferrer" class="">web binding</a></li>
+<li class="">Diff: <a href="https://github.com/znkr/diff" target="_blank" rel="noopener noreferrer" class="">znkr.io/diff</a> (<a href="https://pkg.go.dev/znkr.io/diff" target="_blank" rel="noopener noreferrer" class="">pkg.go.dev</a>); <a href="https://github.com/sergi/go-diff" target="_blank" rel="noopener noreferrer" class="">sergi/go-diff</a>; <a href="https://github.com/GumTreeDiff/gumtree" target="_blank" rel="noopener noreferrer" class="">GumTree</a>, <a href="https://github.com/GumTreeDiff/gumtree/wiki/Languages" target="_blank" rel="noopener noreferrer" class="">GumTree languages</a>, <a href="https://www.labri.fr/perso/xblanc/data/papers/ASE14.pdf" target="_blank" rel="noopener noreferrer" class="">Falleri et al. 2014</a>; <a href="https://difftastic.wilfred.me.uk/" target="_blank" rel="noopener noreferrer" class="">difftastic manual</a>, <a href="https://difftastic.wilfred.me.uk/diffing.html" target="_blank" rel="noopener noreferrer" class="">diffing</a>, <a href="https://github.com/Wilfred/difftastic" target="_blank" rel="noopener noreferrer" class="">README</a>, <a href="https://github.com/Wilfred/difftastic/blob/master/src/options.rs" target="_blank" rel="noopener noreferrer" class="">options.rs</a></li>
+<li class="">Merge: <a href="https://mergiraf.org/" target="_blank" rel="noopener noreferrer" class="">mergiraf</a>, <a href="https://mergiraf.org/architecture.html" target="_blank" rel="noopener noreferrer" class="">architecture</a>, <a href="https://mergiraf.org/usage.html" target="_blank" rel="noopener noreferrer" class="">usage</a>, <a href="https://mergiraf.org/languages.html" target="_blank" rel="noopener noreferrer" class="">languages</a>, <a href="https://codeberg.org/mergiraf/mergiraf" target="_blank" rel="noopener noreferrer" class="">repo</a>; <a href="https://arxiv.org/abs/2202.05329" target="_blank" rel="noopener noreferrer" class="">Spork</a>; <a href="https://git-scm.com/docs/gitattributes" target="_blank" rel="noopener noreferrer" class="">gitattributes</a>, <a href="https://git-scm.com/docs/git-merge-file" target="_blank" rel="noopener noreferrer" class="">git merge-file</a>, <a href="https://git-scm.com/docs/git-config" target="_blank" rel="noopener noreferrer" class="">git config</a>, <a href="https://git-scm.com/docs/git-rerere" target="_blank" rel="noopener noreferrer" class="">git rerere</a>, <a href="https://git-scm.com/docs/git-diff" target="_blank" rel="noopener noreferrer" class="">git diff</a></li>
+<li class="">Rendering: <a href="https://codemirror.net/docs/ref/#merge" target="_blank" rel="noopener noreferrer" class="">@codemirror/merge reference</a>, <a href="https://github.com/codemirror/merge/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer" class="">repo and CHANGELOG</a>; installed <code>frontend/node_modules/@codemirror/merge/dist/index.d.ts</code> (6.12.3), <code>frontend/node_modules/@codemirror/language-data/dist/index.js</code></li>
+<li class="">This repo: <code>docs/adr/0002-system-git-cli.md</code>, <code>.github/workflows/ci.yml</code>, <code>internal/git/conflict.go</code>, <code>frontend/src/lib/diff/*</code>, <code>frontend/src/style.css</code>, <code>docs/walkthroughs/resolve-a-conflict.md</code></li>
+</ul></div><footer class="theme-doc-footer docusaurus-mt-lg"><div class="row margin-top--sm theme-doc-footer-edit-meta-row"><div class="col noPrint_WFHX"><a href="https://github.com/Git-Revenge/GitRevenge/edit/main/docs/research/semantic-diff-merge.md" target="_blank" rel="noopener noreferrer" class="theme-edit-this-page"><svg fill="currentColor" height="20" width="20" viewBox="0 0 40 40" class="iconEdit_Z9Sw" aria-hidden="true"><g><path d="m34.5 11.7l-3 3.1-6.3-6.3 3.1-3q0.5-0.5 1.2-0.5t1.1 0.5l3.9 3.9q0.5 0.4 0.5 1.1t-0.5 1.2z m-29.5 17.1l18.4-18.5 6.3 6.3-18.4 18.4h-6.3v-6.2z"></path></g></svg>Edit this page</a></div><div class="col lastUpdated_JAkA"></div></div></footer></article><nav class="docusaurus-mt-lg pagination-nav" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/docs/adr/diffs-and-merges-read-the-code"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">ADR-0015 Diffs and merges read the code</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#the-question" class="table-of-contents__link toc-highlight">The question</a></li><li><a href="#short-answer" class="table-of-contents__link toc-highlight">Short answer</a></li><li><a href="#what-the-app-does-today" class="table-of-contents__link toc-highlight">What the app does today</a></li><li><a href="#features-worth-copying" class="table-of-contents__link toc-highlight">Features worth copying</a><ul><li><a href="#semanticdiff" class="table-of-contents__link toc-highlight">SemanticDiff</a></li><li><a href="#p4merge" class="table-of-contents__link toc-highlight">P4Merge</a></li><li><a href="#gits-own-building-blocks" class="table-of-contents__link toc-highlight">Git&#39;s own building blocks</a></li></ul></li><li><a href="#options-by-layer" class="table-of-contents__link toc-highlight">Options by layer</a><ul><li><a href="#1-parsing" class="table-of-contents__link toc-highlight">1. Parsing</a></li><li><a href="#2-diff-algorithm" class="table-of-contents__link toc-highlight">2. Diff algorithm</a></li><li><a href="#3-merge" class="table-of-contents__link toc-highlight">3. Merge</a></li><li><a href="#4-rendering" class="table-of-contents__link toc-highlight">4. Rendering</a></li></ul></li><li><a href="#recommended-architecture" class="table-of-contents__link toc-highlight">Recommended architecture</a></li><li><a href="#phased-plan" class="table-of-contents__link toc-highlight">Phased plan</a></li><li><a href="#open-questions-answered-2026-11-23" class="table-of-contents__link toc-highlight">Open questions, answered 2026-11-23</a></li><li><a href="#not-verified" class="table-of-contents__link toc-highlight">Not verified</a></li><li><a href="#sources" class="table-of-contents__link toc-highlight">Sources</a></li></ul></div></div></div></div></main></div></div></div><footer class="theme-layout-footer footer footer--dark"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">
+          <div class="footer-bar">
+            <div class="footer-bar__brand">
+              <svg viewBox="0 0 64 64" width="20" height="20" aria-hidden="true">
+                <path d="M11 8 H18 V58 H11 Z" fill="#5ba3b8"></path>
+                <path d="M18 11 C28 6 39 16 56 10 V39 C39 45 28 35 18 41 Z" fill="#e24a8a"></path>
+              </svg>
+              <span><em>Git Revenge</em>, a git client</span>
+            </div>
+            <nav class="footer-bar__links" aria-label="Footer navigation">
+              <a href="https://github.com/Git-Revenge/GitRevenge">GitHub</a>
+              <a href="https://github.com/Git-Revenge/GitRevenge/releases">Releases</a>
+              <a href="https://github.com/Git-Revenge/GitRevenge/issues">Issues</a>
+              <a href="https://github.com/Git-Revenge/GitRevenge/security/policy">Security</a>
+              <a href="/docs/privacy">Privacy</a>
+              <a href="https://github.com/sponsors/risadams">Sponsor</a>
+            </nav>
+            <div class="footer-bar__copy">© 2026 Ris Adams · Apache-2.0 · v1.1.0</div>
+          </div>
+        </div></div></div></footer></div>
+</body>
+</html>
