@@ -136,6 +136,7 @@
       update.checksOn = p.updateChecks
       prefs.zoom = p.zoom
       prefs.cloneDir = p.cloneDir
+      prefs.forgeColors = p.forgeColors
       prefs.apply()
       if (p.gitPath !== initialGit) {
         restartNote = true
@@ -184,6 +185,10 @@
         <label class="form-field">
           <span>Zoom: {p.zoom}%</span>
           <input type="range" min="80" max="150" step="5" bind:value={p.zoom} aria-valuetext="{p.zoom} percent" />
+        </label>
+        <label class="check">
+          <input type="checkbox" bind:checked={p.forgeColors} />
+          <span>Forge marks in their brands' colours (GitHub, GitLab and the like, on the Remotes panel)</span>
         </label>
       </fieldset>
 

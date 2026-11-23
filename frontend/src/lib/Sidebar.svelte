@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { DeletableBranches, DeleteMergedBranches, MergedBranches, SetShowHidden, ShowingHidden } from '../../wailsjs/go/app/App.js'
+  import { DeletableBranches, DeleteMergedBranches, MergedBranches, RemotePlaces, Remotes, SetShowHidden, ShowingHidden } from '../../wailsjs/go/app/App.js'
+  import type { git } from '../../wailsjs/go/models'
+  import { prefs } from './prefs.svelte'
+  import { remoteHeader, trackersByRemote, type RemoteHeader, type URLPlace } from './remoteHeader'
   import { repoReads } from './repoReads'
   import { onBackend } from './events'
   import { onMount, tick, untrack } from 'svelte'
@@ -93,6 +96,33 @@
   $effect(() => {
     if (ui.panel === 'filters' || filter.trim()) filtersWanted = true
   })
+
+  // Each remote's details and where its URLs point, for the Remotes panel's folder headers.
+  // They're read with the refs, and again when git config changes.
+  let remotes = $state<git.Remote[]>([])
+  let places = $state<Record<string, URLPlace>>({})
+  // The fetch ages move on by themselves.
+  let now = $state(Date.now() / 1000)
+  onMount(() => {
+    const t = setInterval(() => (now = Date.now() / 1000), 30_000)
+    return () => clearInterval(t)
+  })
+  let headers = $derived.by(() => {
+    const out: Record<string, RemoteHeader> = {}
+    if (ui.panel !== 'remotes') return out
+    const trackers = trackersByRemote(refs, remotes.map((r) => r.name))
+    for (const r of remotes) {
+      const branches = refs.filter((x) => x.kind === 'remote' && x.short.startsWith(`${r.name}/`) && !x.short.endsWith('/HEAD')).length
+      out[r.name] = remoteHeader(r, places, now, branches, trackers[r.name] ?? [])
+    }
+    return out
+  })
+
+  async function loadRemotes() {
+    const [rs, ps] = await Promise.all([Remotes(path).catch(() => null), RemotePlaces(path).catch(() => null)])
+    if (rs) remotes = rs
+    if (ps) places = ps as Record<string, URLPlace>
+  }
 
   let panels = $derived(buildPanels(refs, { showHidden: showingHidden, sort: ui.sort }))
   let current = $derived(ui.panel === 'repo' || ui.panel === 'filters' ? null : panels[ui.panel])
@@ -341,6 +371,7 @@
   async function load() {
     refs = ((await session.run(() => repoReads(path).refs())) as Ref[] | undefined) ?? []
     void loadMerged()
+    void loadRemotes()
     showingHidden = (await session.run(() => ShowingHidden(path))) ?? false
   }
 
@@ -348,9 +379,20 @@
     void load()
     // Refs are re-read with every graph reload.
     // A reload of a large history pauses instead of finishing, and reset marks its swap.
-    return onBackend('graph:progress', (p) => {
+    const offGraph = onBackend('graph:progress', (p) => {
       if (p.path === path && (p.done || p.reset)) void load()
     })
+    // A remote added, renamed or pointed elsewhere, or a forge rule saved, in this
+    // repository's config or the global one.
+    const offRepo = onBackend('repo:changed', (c) => {
+      if (c.path === path && c.kinds.includes('config')) void loadRemotes()
+    })
+    const offGlobal = onBackend('gitconfig:changed', () => void loadRemotes())
+    return () => {
+      offGraph()
+      offRepo()
+      offGlobal()
+    }
   })
   import Empty from './ui/Empty.svelte'
 </script>
@@ -430,7 +472,7 @@
             aria-expanded={row.type === 'folder' ? row.open : undefined}
             aria-selected={row.type === 'ref' && !!selectedCommit && row.ref.commit === selectedCommit}
           >
-            <SidebarRow {row} {onStackContext} {filter} {selectedCommit} mergedInto={row.type === 'ref' && row.ref.kind === 'local' ? merged[row.ref.short] : undefined} onFolderClick={clickFolder} onRefClick={clickRef} {onActivate} {onContext} />
+            <SidebarRow {row} {onStackContext} {filter} {selectedCommit} remote={row.type === 'folder' && row.remote && row.depth === 0 ? headers[row.label] : undefined} brand={prefs.forgeColors} mergedInto={row.type === 'ref' && row.ref.kind === 'local' ? merged[row.ref.short] : undefined} onFolderClick={clickFolder} onRefClick={clickRef} {onActivate} {onContext} />
           </li>
         {/each}
       </ul>

@@ -273,6 +273,8 @@ export function ReloadGitConfig(arg1:string):Promise<app.ConfigDoc>;
 
 export function RemoteAction(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
+export function RemotePlaces(arg1:string):Promise<Record<string, app.URLPlace>>;
+
 export function RemoteSettings(arg1:string):Promise<git.RemoteSettings>;
 
 export function RemoteWebLinks(arg1:string):Promise<Array<app.RemoteWeb>>;
