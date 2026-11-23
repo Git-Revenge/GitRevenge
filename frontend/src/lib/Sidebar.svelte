@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { DeletableBranches, DeleteMergedBranches, Fetch, HideRemote, TidyMarks, MergedBranches, RemoteAction, RemotePlaces, Remotes, RemoteSettings, RemoteWebLinks, SetPushDefault, SetShowHidden, ShowingHidden, ShowRemoteFolder } from '../../wailsjs/go/app/App.js'
+  import { DeletableBranches, DeleteMergedBranches, Fetch, HideRemote, SetRemotePushURLs, TidyMarks, MergedBranches, RemoteAction, RemotePlaces, Remotes, RemoteSettings, RemoteWebLinks, SetPushDefault, SetShowHidden, ShowingHidden, ShowRemoteFolder } from '../../wailsjs/go/app/App.js'
   import { BrowserOpenURL, ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
   import { errorText } from './errors'
   import { forgeAsk } from './links/forgeAsk.svelte'
@@ -163,7 +163,7 @@
     if (!remote || !onMenu) return
     const reload = () => void loadRemotes()
     const items = remoteMenuItems(
-      { remote, place: places[remote.fetchUrl], web: web.find((w) => w.remote === name), pushDefault, now: Date.now() / 1000, tidyCount: tidyByRemote[name] ?? 0 },
+      { remote, place: places[remote.fetchUrl], web: web.find((w) => w.remote === name), pushDefault, now: Date.now() / 1000, tidyCount: tidyByRemote[name] ?? 0, pushedBy: pushedBy(name) },
       {
         open: (url) => BrowserOpenURL(url),
         copy: (text, what) => {
@@ -175,6 +175,14 @@
         hide: (n, hide) => void session.run(() => HideRemote(path, n, hide)).then(reload),
         showFolder: (n) => void session.run(() => ShowRemoteFolder(path, n)),
         tidy: openTidy,
+        setPushURLs: async (r, urls) => {
+          try {
+            await SetRemotePushURLs(path, r, urls)
+            return ''
+          } catch (e) {
+            return errorText(e)
+          }
+        },
         nameForge: (host) => {
           forgeAsk.host = host
           commands.settingsOpen = true
@@ -225,6 +233,11 @@
     ),
   )
   const openTidy = (remote: string) => (tidyFor = remote)
+  /** Other remotes whose push URLs follow one, with their push URLs without it. */
+  const pushedBy = (n: string) =>
+    remotes
+      .filter((r) => r.name !== n && (r.pushes ?? []).some((p) => p.remote === n))
+      .map((r) => ({ remote: r.name, keep: (r.pushUrls ?? []).filter((u) => !(r.pushes ?? []).some((p) => p.url === u && p.remote === n)) }))
 
   async function loadRemotes() {
     const menus = ui.panel === 'remotes'

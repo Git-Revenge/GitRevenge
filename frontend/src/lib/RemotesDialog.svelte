@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { RemoteAction, RemoteFetchRules, RemotePlaces, Remotes, SetRemoteFetchRules } from '../../wailsjs/go/app/App.js'
+  import { RemoteAction, RemoteFetchRules, RemotePlaces, Remotes, SetRemoteFetchRules, SetRemotePushURLs } from '../../wailsjs/go/app/App.js'
+  import PushURLsEditor from './PushURLsEditor.svelte'
   import { git } from '../../wailsjs/go/models'
   import FetchRulesEditor from './FetchRulesEditor.svelte'
   import PlaceGlyph from './PlaceGlyph.svelte'
@@ -22,6 +23,11 @@
   // The remote's fetch rules while it's edited, and what they were, so Save writes only a change.
   let rules = $state<git.FetchRules | null>(null)
   let rulesWere = ''
+  // Where its pushes go while it's edited, its own URL among them, and what that was.
+  let pushUrls = $state<string[]>([])
+  let pushWere = ''
+  // On removing a remote others push to: whether they stop pushing there too.
+  let stopFollowers = $state(true)
   let places = $state<Record<string, URLPlace>>({})
 
   async function load() {
@@ -50,6 +56,8 @@
     url = r?.fetchUrl ?? ''
     error = ''
     rules = null
+    pushUrls = r ? [...(r.pushUrls?.length ? r.pushUrls : [r.fetchUrl])] : []
+    pushWere = JSON.stringify(pushUrls)
     if (r) {
       RemoteFetchRules(path, r.name)
         .then((fr) => {
@@ -68,7 +76,17 @@
       const old = remotes.find((r) => r.name === editing)
       if (old && name !== old.name) ok = await act('rename', [old.name, name])
       if (ok && old && url !== old.fetchUrl) ok = await act('seturl', [name, url])
-      // Written last, under the remote's new name, and only when something changed.
+      // Written last, under the remote's new name, and only when something changed. A new URL
+      // has already replaced its own push URL; the list here still has the old one.
+      if (ok && old && JSON.stringify(pushUrls) !== pushWere) {
+        const urls = pushUrls.map((u) => (u === old.fetchUrl ? url : u))
+        try {
+          await SetRemotePushURLs(path, name, urls)
+        } catch (err) {
+          error = errorText(err)
+          ok = false
+        }
+      }
       if (ok && rules && JSON.stringify(rules) !== rulesWere) {
         try {
           await SetRemoteFetchRules(path, name, git.FetchRules.createFrom($state.snapshot(rules)))
@@ -84,9 +102,29 @@
     }
   }
 
+  /** Other remotes that push to this one's URL, and their push URLs without it. */
+  function followersOf(n: string) {
+    const gone = remotes.find((r) => r.name === n)
+    if (!gone) return []
+    return remotes
+      .filter((r) => r.name !== n && (r.pushes ?? []).some((p) => p.remote === n))
+      .map((r) => ({ name: r.name, keep: (r.pushUrls ?? []).filter((u) => !(r.pushes ?? []).some((p) => p.url === u && p.remote === n)) }))
+  }
+
   async function remove(n: string) {
     confirmRemove = null
-    if (await act('remove', [n])) await load()
+    const followers = followersOf(n)
+    if (!(await act('remove', [n]))) return
+    if (stopFollowers) {
+      for (const f of followers) {
+        try {
+          await SetRemotePushURLs(path, f.name, f.keep)
+        } catch (e) {
+          error = errorText(e)
+        }
+      }
+    }
+    await load()
   }
 
   onMount(load)
@@ -105,6 +143,10 @@
             {#if r.pushUrl && r.pushUrl !== r.fetchUrl}<span class="url" title={r.pushUrl}>push: {r.pushUrl}</span>{/if}
           </div>
           {#if confirmRemove === r.name}
+            {@const followers = followersOf(r.name)}
+            {#if followers.length}
+              <label class="stop"><input type="checkbox" bind:checked={stopFollowers} /> Stop {followers.map((f) => f.name).join(' and ')} pushing there</label>
+            {/if}
             <button class="btn sm danger" onclick={() => remove(r.name)}>Remove {r.name}</button>
             <button class="btn quiet" onclick={() => (confirmRemove = null)}>Keep</button>
           {:else}
@@ -125,6 +167,12 @@
       <label class="form-field"><span>Name</span><input bind:value={name} placeholder="origin" /></label>
       <label class="form-field"><span>URL</span><input bind:value={url} placeholder="git@github.com:you/repo.git" /></label>
       {#if rules}<FetchRulesEditor remote={editing || name} bind:rules />{/if}
+      {#if editing}
+        {@const r = remotes.find((x) => x.name === editing)}
+        {#if r}
+          <PushURLsEditor remote={name || editing} fetchUrl={r.fetchUrl} bind:urls={pushUrls} others={remotes.filter((x) => x.name !== editing).map((x) => ({ name: x.name, url: x.fetchUrl }))} {places} brand={prefs.forgeColors} />
+        {/if}
+      {/if}
       {#if error}<p class="form-error" role="alert">{error}</p>{/if}
       <div class="form-actions">
         <InkButton variant="secondary" onclick={() => (editing = null)}>Cancel</InkButton>
@@ -141,6 +189,17 @@
 </Modal>
 
 <style>
+  .stop {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+  }
+
+  .stop input {
+    accent-color: var(--accent);
+  }
+
   .where {
     display: flex;
     align-items: center;

@@ -255,6 +255,8 @@ export function PushRef(arg1:string,arg2:string,arg3:string,arg4:string):Promise
 
 export function PushStack(arg1:string,arg2:Array<string>):Promise<void>;
 
+export function PushToURLs(arg1:string,arg2:string,arg3:string,arg4:Array<string>):Promise<void>;
+
 export function PushedUndo(arg1:string,arg2:boolean):Promise<app.SharedCommits>;
 
 export function ReadIgnoreFile(arg1:string,arg2:string):Promise<string>;
@@ -382,6 +384,8 @@ export function SetPushDefault(arg1:string,arg2:string):Promise<void>;
 export function SetQuietDays(arg1:string,arg2:number):Promise<void>;
 
 export function SetRemoteFetchRules(arg1:string,arg2:string,arg3:git.FetchRules):Promise<void>;
+
+export function SetRemotePushURLs(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
 export function SetRepoPreferences(arg1:string,arg2:app.RepoPreferences):Promise<void>;
 

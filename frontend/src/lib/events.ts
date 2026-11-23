@@ -14,6 +14,8 @@ export type ChangeKind = 'head' | 'refs' | 'index' | 'state' | 'config' | 'workt
  * and each is named after the Go type that's sent (see its a.emit call).
  */
 export interface BackendEvents {
+  /** PushResult: what a push to a remote with several push URLs did at each (#926). */
+  'push:result': { path: string; remote: string; refspec: string; dests: { url: string; state: string; detail?: string; name: string }[] }
   /** RepoChange: a repository on screen changed on disk, or came on screen and wants reading again. */
   'repo:changed': { path: string; kinds: ChangeKind[] }
   /** UndoChange: a repository's undo or redo history changed. */

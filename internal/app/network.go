@@ -301,7 +301,7 @@ func (a *App) PushCurrent(path string, force bool) error {
 			return err
 		}
 		p.ForceWithLease = force
-		if err := r.Git.Push(ctx, p, o); err != nil {
+		if _, err := a.pushReported(ctx, r, p, o); err != nil {
 			return pushRefusal(ctx, r.Git, st.Head, upstream, err)
 		}
 		a.pushNotesTo(ctx, r, p.Remote, o)
@@ -319,10 +319,15 @@ func (a *App) PushBranch(path, branch string) error {
 		}
 		// Asked before pushing, which moves the remote-tracking branch.
 		current := upstream != "" && sameCommit(ctx, r.Git, "refs/heads/"+branch, "refs/remotes/"+upstream)
-		if err := r.Git.Push(ctx, p, o); err != nil {
+		multi, err := a.pushReported(ctx, r, p, o)
+		if err != nil {
 			return pushRefusal(ctx, r.Git, branch, upstream, err)
 		}
 		a.pushNotesTo(ctx, r, p.Remote, o)
+		if multi {
+			// The result lists each place it went.
+			return nil
+		}
 		where := p.Remote
 		if upstream != "" && upstream != p.Remote+"/"+branch {
 			where = upstream
@@ -395,7 +400,8 @@ func (a *App) PushRef(path, remote, kind, name string) error {
 		return userError("Unknown push kind " + kind + ".")
 	}
 	return a.runNetwork(path, "push", func(ctx context.Context, r *session.Repo, o git.NetOptions) error {
-		return r.Git.Push(ctx, git.PushOptions{Remote: remote, Refspec: refspec}, o)
+		_, err := a.pushReported(ctx, r, git.PushOptions{Remote: remote, Refspec: refspec}, o)
+		return err
 	})
 }
 
@@ -481,7 +487,18 @@ func (a *App) RemoteAction(path, action string, args []string) error {
 			a.followRemote(path, arg(0), arg(1))
 		}
 	case "seturl":
-		err = r.Git.SetRemoteURL(ctx, arg(0), arg(1))
+		old := ""
+		if rs, rerr := r.Git.Remotes(ctx); rerr == nil {
+			for _, rm := range rs {
+				if rm.Name == arg(0) {
+					old = rm.FetchURL
+				}
+			}
+		}
+		if err = r.Git.SetRemoteURL(ctx, arg(0), arg(1)); err == nil && old != "" {
+			// Push URLs that followed it go where it went.
+			followURL(ctx, r.Git, old, arg(1))
+		}
 	case "remove":
 		if err = r.Git.RemoveRemote(ctx, arg(0)); err == nil {
 			fetchlog.Forget(a.fetchDir(), r.CommonDir, arg(0))

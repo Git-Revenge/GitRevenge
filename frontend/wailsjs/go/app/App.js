@@ -494,6 +494,10 @@ export function PushStack(arg1, arg2) {
   return window['go']['app']['App']['PushStack'](arg1, arg2);
 }
 
+export function PushToURLs(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['PushToURLs'](arg1, arg2, arg3, arg4);
+}
+
 export function PushedUndo(arg1, arg2) {
   return window['go']['app']['App']['PushedUndo'](arg1, arg2);
 }
@@ -748,6 +752,10 @@ export function SetQuietDays(arg1, arg2) {
 
 export function SetRemoteFetchRules(arg1, arg2, arg3) {
   return window['go']['app']['App']['SetRemoteFetchRules'](arg1, arg2, arg3);
+}
+
+export function SetRemotePushURLs(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SetRemotePushURLs'](arg1, arg2, arg3);
 }
 
 export function SetRepoPreferences(arg1, arg2) {
