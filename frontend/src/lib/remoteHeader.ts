@@ -32,6 +32,8 @@ export interface RemoteHeader {
   look: PlaceLook
   /** "4 min ago", or '' when the app hasn't seen it fetched. */
   age: string
+  /** The same, short enough for the row: "4m", "9d", "3w". */
+  ageShort: string
   stale: boolean
   /** Where pushes go, when there's more than one place. */
   fan: PlaceLook[]
@@ -64,6 +66,19 @@ export function fetchAge(at: number, now: number): string {
   return plural(Math.floor(s / (365 * 86400)), 'year')
 }
 
+/** fetchAge for a narrow row: "now", "4m", "3h", "9d", "3w", "5mo", "2y". */
+export function fetchAgeShort(at: number, now: number): string {
+  if (!at) return ''
+  const s = Math.max(0, now - at)
+  if (s < 60) return 'now'
+  if (s < 3600) return `${Math.floor(s / 60)}m`
+  if (s < 86400) return `${Math.floor(s / 3600)}h`
+  if (s < 14 * 86400) return `${Math.floor(s / 86400)}d`
+  if (s < 60 * 86400) return `${Math.floor(s / (7 * 86400))}w`
+  if (s < 365 * 86400) return `${Math.floor(s / (30 * 86400))}mo`
+  return `${Math.floor(s / (365 * 86400))}y`
+}
+
 /** A push destination's name in the fan's tooltip: its forge, or its host. */
 function pushName(p: URLPlace | undefined, url: string): string {
   if (p?.forge) return FORGE_NAMES[p.forge] ?? p.forge
@@ -93,7 +108,7 @@ export function remoteHeader(r: git.Remote, places: Record<string, URLPlace>, no
     const shown = trackers.slice(0, 5).join(', ')
     lines.push(`Tracked by ${shown}${trackers.length > 5 ? ` and ${trackers.length - 5} more` : ''}`)
   }
-  return { host: place?.place === 'local' ? '' : (place?.host ?? ''), look, age, stale, fan, tooltip: lines.join('\n') }
+  return { host: place?.place === 'local' ? '' : (place?.host ?? ''), look, age, ageShort: fetchAgeShort(r.fetchedAt, now), stale, fan, tooltip: lines.join('\n') }
 }
 
 /** The local branches tracking each remote, by remote name. A branch's upstream is

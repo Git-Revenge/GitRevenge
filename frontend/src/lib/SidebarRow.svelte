@@ -74,8 +74,10 @@
     {#if row.holdsHead && !row.open}<span class="dot" title="The checked-out branch is in here"><span class="visually-hidden">Holds the checked-out branch</span></span>{/if}
     {#if row.note}<span class="meta note">{row.note}</span>{/if}
     {#if remote?.age}
-      <span class="meta age" class:stale={remote.stale}><span class="visually-hidden">{remote.stale ? 'Stale, fetched ' : 'Fetched '}</span>{remote.age}</span>
-      <span class="visually-hidden">, {row.count.toLocaleString()} branches</span>
+      <span class="meta age" class:stale={remote.stale}><span aria-hidden="true">{remote.ageShort}</span><span class="visually-hidden">{remote.stale ? 'Stale, fetched ' : 'Fetched '}{remote.age}</span></span>
+      <span class="visually-hidden">, {row.count.toLocaleString()} {row.count === 1 ? 'branch' : 'branches'}</span>
+    {:else if remote}
+      <span class="visually-hidden">, not fetched yet that Git Revenge has seen, {row.count.toLocaleString()} {row.count === 1 ? 'branch' : 'branches'}</span>
     {:else}
       <span class="meta count">{row.count.toLocaleString()}</span>
     {/if}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { git } from '../../wailsjs/go/models'
-import { fetchAge, placeLook, remoteHeader, trackersByRemote, type URLPlace } from './remoteHeader'
+import { fetchAge, fetchAgeShort, placeLook, remoteHeader, trackersByRemote, type URLPlace } from './remoteHeader'
 
 const place = (p: Partial<URLPlace>) => ({ place: 'web', host: '', forge: '', web: '', ...p }) as URLPlace
 const remote = (r: Partial<git.Remote>) => ({ name: 'origin', fetchUrl: '', pushUrl: '', pushUrls: [], fetchedAt: 0, ...r }) as git.Remote
@@ -20,6 +20,20 @@ describe('fetchAge', () => {
     [now - 800 * 86400, '2 years ago'],
     [now + 30, 'just now'],
   ])('%i reads %s', (at, want) => expect(fetchAge(at, now)).toBe(want))
+})
+
+describe('fetchAgeShort', () => {
+  const now = 1_800_000_000
+  it.each([
+    [0, ''],
+    [now - 20, 'now'],
+    [now - 4 * 60, '4m'],
+    [now - 5 * 3600, '5h'],
+    [now - 9 * 86400, '9d'],
+    [now - 21 * 86400, '3w'],
+    [now - 150 * 86400, '5mo'],
+    [now - 800 * 86400, '2y'],
+  ])('%i reads %s', (at, want) => expect(fetchAgeShort(at, now)).toBe(want))
 })
 
 describe('placeLook', () => {
