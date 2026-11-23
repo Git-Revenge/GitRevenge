@@ -469,7 +469,7 @@
           {#if onMenu}
             {@const g = GROUPINGS.find((x) => x.id === ui.remoteGrouping) ?? GROUPINGS[0]}
             <button class="btn sm quiet group" aria-haspopup="menu" title="Grouped by {g.label.toLowerCase()}: {g.says}. Sorted by {ui.sort === 'name' ? 'name' : 'most recently updated'}. Click to change." aria-label="Grouped by {g.label.toLowerCase()}, sorted by {ui.sort === 'name' ? 'name' : 'most recently updated'}. Change how remotes are grouped and sorted." onclick={groupMenu}
-              >By {g.label.toLowerCase()}<Icon name="chevron" size={10} /></button
+              >{g.label}<Icon name="chevron" size={10} /></button
             >
           {/if}
           <button class="btn sm quiet icon" onclick={fetchEvery} title="Fetch every remote" aria-label="Fetch every remote"><Icon name="fetch" size={14} /></button>

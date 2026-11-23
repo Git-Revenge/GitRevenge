@@ -9,6 +9,8 @@
 
   // For screen readers. Written in the markup, it would lose its space.
   const STACK_PREFIX = 'Stack: '
+  // A row grouped by name shows this many remotes' chips, then how many more.
+  const CHIPS = 3
 
   let {
     row,
@@ -136,10 +138,14 @@
     {#if k}<span class="kind-icon" style:color="var({k.token})" title={k.label}><Icon name={k.icon} size={13} /><span class="visually-hidden">{k.label}</span></span>{/if}
     <span class="name">{parts.pre}{#if parts.hit}<mark>{parts.hit}</mark>{/if}{parts.post}</span>
     {#if row.onRemotes}
-      <span class="chips"
-        ><span class="visually-hidden">, on </span>{#each row.onRemotes as o, i (o.short)}{@const name = o.short.slice(0, o.short.indexOf('/'))}<span class="chip t{remoteTones[name] ?? 0}" class:differs={o.commit !== r.commit}
-            >{#if o.commit !== r.commit}<span aria-hidden="true">≠</span>{/if}{name}{#if o.commit !== r.commit}<span class="visually-hidden"> at another commit</span>{/if}</span
-          >{#if i < row.onRemotes.length - 1}<span class="visually-hidden">, </span>{/if}{/each}</span
+      <!-- Only the first few fit; screen readers hear them all. -->
+      <span class="chips" aria-hidden="true"
+        >{#each row.onRemotes.slice(0, CHIPS) as o (o.short)}{@const name = o.short.slice(0, o.short.indexOf('/'))}<span class="chip t{remoteTones[name] ?? 0}" class:differs={o.commit !== r.commit}
+            >{#if o.commit !== r.commit}≠{/if}{name}</span
+          >{/each}{#if row.onRemotes.length > CHIPS}<span class="chip more-chips">+{row.onRemotes.length - CHIPS}</span>{/if}</span
+      >
+      <span class="visually-hidden"
+        >, on {row.onRemotes.map((o) => o.short.slice(0, o.short.indexOf('/')) + (o.commit !== r.commit ? ' at another commit' : '')).join(', ')}</span
       >
     {/if}
     {#if r.focused}<span class="focused" title="The graph is focused on this"><Icon name="focus" size={13} /><span class="visually-hidden">, focused</span></span>{/if}
@@ -343,6 +349,11 @@
 
   /* Grouped by name: a chip for each remote that has the branch. Tones differ in lightness as
      well as hue, and each chip carries the remote's name, so none relies on colour. */
+  .ref:has(.chips) .name {
+    flex: none;
+    max-width: 55%;
+  }
+
   .chips {
     display: inline-flex;
     flex: 0 1 auto;
@@ -391,6 +402,11 @@
   .chip.t5 {
     color: var(--ink-ochre);
     border-style: dashed;
+  }
+
+  .chip.more-chips {
+    border-color: transparent;
+    color: var(--ink-mute);
   }
 
   /* On a commit other than the row's own: the same name, somewhere else. */
