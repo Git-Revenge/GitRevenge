@@ -37,7 +37,7 @@ export const CATALOG: KeyInfo[] = [
   k('push.autoSetupRemote', 'bool', 'Sets the upstream on the first push of a new branch.'),
   k('push.followTags', 'bool', 'Also pushes annotated tags that point at pushed commits.'),
   k('push.gpgSign', 'enum', 'Signs pushes, where the server supports it.', { values: ['false', 'true', 'if-asked'] }),
-  k('fetch.prune', 'bool', 'Removes remote-tracking branches that no longer exist on the remote.'),
+  k('fetch.prune', 'bool', "Removes remote-tracking branches that no longer exist on the remote. Git Revenge's fetches do this when it isn't set anywhere; set it to false to keep them, or set remote.<name>.prune for one remote."),
   k('fetch.pruneTags', 'bool', 'Removes local tags that no longer exist on the remote.'),
   k('fetch.parallel', 'int', 'How many fetches run at once (0 picks a default).'),
   k('merge.ff', 'enum', 'Whether a merge may fast-forward: only refuses to create a merge commit.', { values: ['true', 'false', 'only'] }),

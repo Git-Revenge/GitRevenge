@@ -236,3 +236,66 @@ func TestRemoteHost(t *testing.T) {
 		}
 	}
 }
+
+// #923: fetches prune unless config says not to, and never touch local branches.
+func TestFetchPrunesByDefault(t *testing.T) {
+	t.Parallel()
+	setup := func(t *testing.T) (*gittest.Repo, *Repo) {
+		local, remote := gittest.WithRemote(t, 1)
+		other := gittest.Clone(t, remote)
+		other.Git("push", "-q", "origin", "main:gone-soon")
+		local.Git("fetch", "-q", "origin")
+		// A local branch tracking it, which must survive.
+		local.Git("branch", "-q", "--track", "gone-soon", "origin/gone-soon")
+		other.Git("push", "-q", "origin", "--delete", "gone-soon")
+		return local, OpenRepo(newTestRunner(t), local.Dir)
+	}
+	has := func(fx *gittest.Repo, ref string) bool {
+		return strings.TrimSpace(fx.Git("for-each-ref", "--format=%(refname)", ref)) != ""
+	}
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name   string
+		config [][2]string
+		pruned bool
+	}{
+		{"no config prunes", nil, true},
+		{"remote prune false keeps", [][2]string{{"remote.origin.prune", "false"}}, false},
+		{"fetch prune false keeps", [][2]string{{"fetch.prune", "false"}}, false},
+		{"remote prune false beats fetch prune true", [][2]string{{"fetch.prune", "true"}, {"remote.origin.prune", "false"}}, false},
+		{"fetch prune true prunes", [][2]string{{"fetch.prune", "true"}}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			for _, fetchOrPull := range []string{"fetch", "pull"} {
+				fx, repo := setup(t)
+				for _, kv := range tc.config {
+					fx.Git("config", kv[0], kv[1])
+				}
+				var err error
+				if fetchOrPull == "fetch" {
+					err = repo.Fetch(ctx, "origin", NetOptions{})
+				} else {
+					err = repo.Pull(ctx, PullFFOnly, NetOptions{})
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := !has(fx, "refs/remotes/origin/gone-soon"); got != tc.pruned {
+					t.Errorf("%s: pruned = %v, want %v", fetchOrPull, got, tc.pruned)
+				}
+				if !has(fx, "refs/heads/gone-soon") {
+					t.Errorf("%s: the local branch went too", fetchOrPull)
+				}
+			}
+		})
+	}
+	// Every remote at once follows the same rule.
+	fx, repo := setup(t)
+	if err := repo.Fetch(ctx, "", NetOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if has(fx, "refs/remotes/origin/gone-soon") {
+		t.Error("fetching every remote didn't prune")
+	}
+}
