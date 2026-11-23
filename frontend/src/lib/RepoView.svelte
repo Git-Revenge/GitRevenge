@@ -14,6 +14,7 @@
   import Icon from './ui/Icon.svelte'
   import { DEFAULT_WIDTH, fitWidth, loadRightPanel, maxWidth, MIN_WIDTH, saveRightPanel } from './rightPanel'
   import { loadRefExtras } from './branchWeb'
+  import { whileBusy } from './busy'
   import { commitMenuItems, branchAtDialog, checkoutRef, dropItems, newBranchDialog, refItems, stackItems, type MenuContext } from './menus'
   import CommitPanel from './CommitPanel.svelte'
   import type { DiffTarget } from './diff/DiffView.svelte'
@@ -405,7 +406,7 @@
     onActivate={(ref) => checkoutRef(path, ref)}
     onNewBranch={() => (dialog = newBranchDialog(ctx))}
     onManageRemotes={() => (remotesOpen = true)}
-    onContext={(ref, x, y) => void loadRefExtras(path, [ref]).then((e) => openMenu(refItems(ref, ctx, e.get(ref.short)), x, y))}
+    onContext={(ref, x, y) => void whileBusy(loadRefExtras(path, [ref])).then((e) => openMenu(refItems(ref, ctx, e.get(ref.short)), x, y))}
     onStackContext={(members, x, y) => openMenu(stackItems(members, ctx), x, y)}
     onMenu={openMenu}
     onManageWorktrees={() => (worktreesOpen = true)}
@@ -426,7 +427,7 @@
     {/if}
     <div class="graph" class:hidden={diff || rebaseBase}>
       <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filter.picks.length > 0} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFilterDrop={() => filter.picks.length && setFilter(filter.picks.slice(0, -1))} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
-          void loadRefExtras(path, refs).then((e) => openMenu(commitMenuItems(row, refs, ctx, e), x, y))}
+          void whileBusy(loadRefExtras(path, refs)).then((e) => openMenu(commitMenuItems(row, refs, ctx, e), x, y))}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
           if (items.length) openMenu(items, x, y)
@@ -532,7 +533,7 @@
         if (!selected) return
         const row = selected
         const refs = graph.refsOf(row.id)
-        void loadRefExtras(path, refs).then((e) => openMenu(commitMenuItems(row, refs, ctx, e), x, y))
+        void whileBusy(loadRefExtras(path, refs)).then((e) => openMenu(commitMenuItems(row, refs, ctx, e), x, y))
       }} />
   {/if}
     </div>
