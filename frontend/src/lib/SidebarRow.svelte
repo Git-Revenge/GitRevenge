@@ -2,6 +2,8 @@
   // One row of the sidebar's list, inside its treeitem: a folder, or a branch, tag or stash.
   import { kindInfo } from './branchKinds'
   import type { Ref } from './graph/rowCache'
+  import PlaceGlyph from './PlaceGlyph.svelte'
+  import type { RemoteHeader } from './remoteHeader'
   import { matchParts, refStatus, refTooltip, stackPlace, type FolderRow, type RefRow, type TreeRow } from './sidebarTree'
   import Icon from './ui/Icon.svelte'
 
@@ -18,8 +20,14 @@
     onActivate,
     onContext,
     onStackContext,
+    remote,
+    brand = false,
   }: {
     row: TreeRow
+    /** For a remote's own folder: where it lives and how fresh it is. */
+    remote?: RemoteHeader
+    /** Forge marks in their brands' colours. */
+    brand?: boolean
     filter: string
     selectedCommit?: string
     /** The branch already holding this row's work, if any. */
@@ -44,19 +52,35 @@
       e.preventDefault()
       onStackContext(row.members, e.clientX, e.clientY)
     }}
-    title={row.stack ? `A stack of ${row.count} branches${row.note ? `, all ${row.note}` : ''}` : `${row.label}/`}
+    title={remote ? remote.tooltip : row.stack ? `A stack of ${row.count} branches${row.note ? `, all ${row.note}` : ''}` : `${row.label}/`}
     onclick={() => onFolderClick(row)}
   >
     <span class="caret" class:open={row.open}><Icon name="right" size={10} /></span>
     {#if k}
       <span class="kind-icon" style:color="var({k.token})" title={k.label}><Icon name={k.icon} size={14} /><span class="visually-hidden">{k.label}</span></span>
-    {:else}
+    {:else if !remote}
       <span class="kind-icon"><Icon name={row.stack ? 'stack' : row.remote ? 'remote' : row.open ? 'folder-open' : 'folder'} size={14} /></span>
     {/if}
     <span class="name">{#if row.stack}<span class="visually-hidden">{STACK_PREFIX}</span>{/if}{row.label}</span>
+    {#if remote}
+      <span class="host" class:bare={!remote.host}>
+        <PlaceGlyph look={remote.look} size={13} {brand} />{#if remote.host}<span class="host-name">{remote.host}</span>{/if}<span class="visually-hidden">, {remote.look.says}</span>
+      </span>
+      {#if remote.fan.length}
+        <span class="fan" aria-hidden="true">{#each remote.fan as f, i (i)}<span class="fan-mark"><PlaceGlyph look={f} size={11} {brand} /></span>{/each}</span>
+        <span class="visually-hidden">, pushes to {remote.fan.length} places</span>
+      {/if}
+    {/if}
     {#if row.holdsHead && !row.open}<span class="dot" title="The checked-out branch is in here"><span class="visually-hidden">Holds the checked-out branch</span></span>{/if}
     {#if row.note}<span class="meta note">{row.note}</span>{/if}
-    <span class="meta count">{row.count.toLocaleString()}</span>
+    {#if remote?.age}
+      <span class="meta age" class:stale={remote.stale}><span aria-hidden="true">{remote.ageShort}</span><span class="visually-hidden">{remote.stale ? 'Stale, fetched ' : 'Fetched '}{remote.age}</span></span>
+      <span class="visually-hidden">, {row.count.toLocaleString()} {row.count === 1 ? 'branch' : 'branches'}</span>
+    {:else if remote}
+      <span class="visually-hidden">, not fetched yet that Git Revenge has seen, {row.count.toLocaleString()} {row.count === 1 ? 'branch' : 'branches'}</span>
+    {:else}
+      <span class="meta count">{row.count.toLocaleString()}</span>
+    {/if}
   </div>
   {#if row.members && onStackContext}
     {@const members = row.members}
@@ -298,6 +322,70 @@
   .note {
     margin-left: auto;
     flex: none;
+  }
+
+  /* A remote's header: where it lives, as a chip, and how long since it was fetched. */
+  .name:has(+ .host) {
+    flex: none;
+    max-width: 45%;
+  }
+
+  .host {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    padding: 1px 6px 1px 5px;
+    border-radius: 4px;
+    background: var(--paper-deep);
+    color: var(--ink-soft);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.02em;
+  }
+
+  .host.bare {
+    padding: 1px 4px;
+  }
+
+  .host-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .fan {
+    display: inline-flex;
+    flex: none;
+    color: var(--ink-soft);
+  }
+
+  .fan-mark {
+    display: inline-grid;
+    place-items: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: var(--paper);
+    box-shadow: 0 0 0 1px var(--hairline);
+  }
+
+  .fan-mark + .fan-mark {
+    margin-left: -4px;
+  }
+
+  .age {
+    margin-left: auto;
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ink-mute);
+  }
+
+  .age.stale {
+    color: var(--warning);
   }
 
   .note + .count {

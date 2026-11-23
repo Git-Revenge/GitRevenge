@@ -81,6 +81,8 @@ type Settings struct {
 	CloneDir string `json:"cloneDir,omitempty"`
 	// Zoom scales the whole interface, as a percentage; 0 means 100.
 	Zoom int `json:"zoom,omitempty"`
+	// ForgeColors draws forge marks in their brands' colours rather than ink.
+	ForgeColors bool `json:"forgeColors,omitempty"`
 	// Keybindings overrides command shortcuts by command id, in "Mod+Shift+K" form; an empty
 	// value unbinds the command.
 	Keybindings map[string]string `json:"keybindings,omitempty"`

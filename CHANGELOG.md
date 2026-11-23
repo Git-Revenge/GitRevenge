@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 ### Added
 
 - **Settings › Links › Forges** names what a server of your own runs (GitLab, Gitea, Forgejo, GitHub Enterprise, Bitbucket Data Center or Azure DevOps Server), so its remotes can open on the web. It lists the hosts of the repository's remotes that have none, so picking one is a click. A forge is never guessed from a host's name. Remotes on GitHub, GitLab.com, Gitea.com, Codeberg, Bitbucket and Azure DevOps need nothing here. A rule is a line in git config, the repository's or the global one: `[gitrevenge-forge "git.example.com"]` with `type = gitlab`, and `web =` for a forge whose pages aren't at `https://` and the host, such as one reached through an SSH alias. (#918)
+- Each remote in the Remotes panel says where it lives and how fresh it is. A chip after its name shows the host with the forge's mark (GitHub, GitLab, Gitea, Forgejo, Codeberg or Bitbucket) when the remote opens on the web, or the app's own cloud for a host it doesn't know, a server for SSH only, and a folder for a path on this machine. At the right is how long ago it was fetched, such as `4m` or `9d`, which turns ochre after a week. A remote that pushes to several places shows a small fan of where. Hover for its fetch and push addresses, when it was fetched, how many branches it has and which local branches track it. **Settings › Appearance** can show the marks in their brands' colours; they're ink by default. (#919)
 
 ### Changed
 

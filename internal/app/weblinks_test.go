@@ -85,3 +85,38 @@ func TestWebLinksForRemotesAndBranches(t *testing.T) {
 		t.Fatalf("issue URL = %q", u)
 	}
 }
+
+func TestRemotePlaces(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.Commit("one")
+	fx.Git("remote", "add", "origin", "git@github.com:o/r.git")
+	fx.Git("remote", "set-url", "--add", "--push", "origin", "git@github.com:o/r.git")
+	fx.Git("remote", "set-url", "--add", "--push", "origin", "https://gitlab.example.com/o/r.git")
+	fx.Git("remote", "set-url", "--add", "--push", "origin", "git@nas.local:srv/r.git")
+	fx.Git("config", "gitrevenge-forge.gitlab.example.com.type", "gitlab")
+	fx.Git("remote", "add", "folder", "/srv/git/r.git")
+	tab, err := a.OpenRepo(fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := a.RemotePlaces(tab.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]URLPlace{
+		"git@github.com:o/r.git":             {"server", "github.com", "github", "https://github.com/o/r"},
+		"https://gitlab.example.com/o/r.git": {"web", "gitlab.example.com", "gitlab", "https://gitlab.example.com/o/r"},
+		"git@nas.local:srv/r.git":            {"server", "nas.local", "", ""},
+		"/srv/git/r.git":                     {"local", "", "", ""},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("places = %+v", got)
+	}
+	for u, w := range want {
+		if got[u] != w {
+			t.Errorf("%s = %+v, want %+v", u, got[u], w)
+		}
+	}
+}

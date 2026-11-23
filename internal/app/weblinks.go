@@ -174,3 +174,44 @@ func (a *App) UnknownHosts(path string) ([]string, error) {
 	}
 	return out, nil
 }
+
+// URLPlace is where one remote URL points, for the Remotes panel's header: the kind of place,
+// its host, and its forge and repository page when it opens on the web, from a forge known
+// by host or a forge rule. Forge is "" when it doesn't, so a mark is shown only where Open on
+// the web works.
+type URLPlace struct {
+	Place git.Place `json:"place"`
+	Host  string    `json:"host"`
+	Forge git.Forge `json:"forge"`
+	Web   string    `json:"web"`
+}
+
+// RemotePlaces returns where each of a repository's remote URLs points, fetch and push alike,
+// by URL.
+func (a *App) RemotePlaces(path string) (map[string]URLPlace, error) {
+	out := map[string]URLPlace{}
+	ctx := context.Background()
+	r, err := a.openRepo(path)
+	if err != nil {
+		return out, err
+	}
+	remotes, err := r.Git.Remotes(ctx)
+	if err != nil {
+		return out, err
+	}
+	cfg := a.linkConfig(ctx, r.Git)
+	for _, rem := range remotes {
+		for _, u := range append([]string{rem.FetchURL}, rem.PushURLs...) {
+			if _, done := out[u]; done || u == "" {
+				continue
+			}
+			loc := git.ParseLocation(u)
+			p := URLPlace{Place: loc.Place, Host: loc.Host}
+			if s, ok := weblinks.For(u, cfg); ok {
+				p.Forge, p.Web = s.Forge, s.Repo
+			}
+			out[u] = p
+		}
+	}
+	return out, nil
+}

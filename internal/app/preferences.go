@@ -31,6 +31,8 @@ type Preferences struct {
 	CloneDir string `json:"cloneDir"`
 	// Zoom scales the interface, as a percentage (80 to 150).
 	Zoom int `json:"zoom"`
+	// ForgeColors draws forge marks in their brands' colours rather than ink.
+	ForgeColors bool `json:"forgeColors"`
 }
 
 // Zoom limits, as percentages.
@@ -72,6 +74,7 @@ func (a *App) Preferences() (Preferences, error) {
 		GitInUse:          a.Environment().GitPath,
 		CloneDir:          s.CloneDir,
 		Zoom:              zoom,
+		ForgeColors:       s.ForgeColors,
 	}, nil
 }
 
@@ -139,6 +142,7 @@ func (a *App) SetPreferences(p Preferences) error {
 		s.GitPath = p.GitPath
 		s.CloneDir = p.CloneDir
 		s.Zoom = zoom
+		s.ForgeColors = p.ForgeColors
 	})
 }
 

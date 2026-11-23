@@ -1612,6 +1612,7 @@ export namespace app {
 	    gitInUse: string;
 	    cloneDir: string;
 	    zoom: number;
+	    forgeColors: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Preferences(source);
@@ -1627,6 +1628,7 @@ export namespace app {
 	        this.gitInUse = source["gitInUse"];
 	        this.cloneDir = source["cloneDir"];
 	        this.zoom = source["zoom"];
+	        this.forgeColors = source["forgeColors"];
 	    }
 	}
 	export class ProblemAction {

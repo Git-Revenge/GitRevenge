@@ -1,9 +1,11 @@
 import { Preferences } from '../../wailsjs/go/app/App.js'
 
-/** Settings that act outside the settings panel: the interface zoom and the clone folder. */
+/** Settings that act outside the settings panel: the interface zoom, the clone folder, and
+ * whether forge marks wear their brands' colours. */
 class Prefs {
   zoom = $state(100)
   cloneDir = $state('')
+  forgeColors = $state(false)
 
   /** Loads the saved settings and applies the zoom. Until then, and if they can't be read,
    * the defaults stand. */
@@ -12,6 +14,7 @@ class Prefs {
       const p = await Preferences()
       this.zoom = p.zoom
       this.cloneDir = p.cloneDir
+      this.forgeColors = p.forgeColors
     } catch {
       // Keep the defaults.
     }
