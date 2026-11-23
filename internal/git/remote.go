@@ -161,14 +161,28 @@ func (o NetOptions) cmd(args ...string) Cmd {
 	return c
 }
 
-// Fetch downloads from remote (or every remote when remote is empty), pruning
-// remote-tracking branches that no longer exist. It only updates refs/remotes and tags,
-// so it runs alongside other operations rather than waiting in the write queue.
+// pruneByDefault returns the options that make a fetch drop the remote-tracking branches
+// whose branch the remote deleted, the one place the app goes past git's own default (#923).
+// It's fetch.prune=true at the command's own scope, and only when no config file sets
+// fetch.prune: then that setting decides. A remote's own remote.<name>.prune is read ahead of
+// fetch.prune by git, so `prune = false` on a remote keeps its branches either way. Only
+// remote-tracking branches are dropped, never a local branch, and never tags.
+func (r *Repo) pruneByDefault(ctx context.Context) []string {
+	if _, err := r.Read(ctx, "config", "--get", "fetch.prune"); err == nil {
+		return nil
+	}
+	return []string{"-c", "fetch.prune=true"}
+}
+
+// Fetch downloads from remote (or every remote when remote is empty), dropping
+// remote-tracking branches whose branch the remote deleted unless config says not to (see
+// pruneByDefault). It only updates refs/remotes and tags, so it runs alongside other
+// operations rather than waiting in the write queue.
 func (r *Repo) Fetch(ctx context.Context, remote string, o NetOptions) error {
 	if err := CheckRevs(remote); err != nil {
 		return err
 	}
-	args := []string{"fetch", "--progress", "--prune"}
+	args := append(r.pruneByDefault(ctx), "fetch", "--progress")
 	if remote == "" {
 		args = append(args, "--all")
 	} else {
@@ -190,6 +204,23 @@ func (r *Repo) FetchBranch(ctx context.Context, remote, branch string, o NetOpti
 	c.Dir = r.dir
 	_, err := r.runner.Run(ctx, c)
 	return err
+}
+
+// RemoteBranches returns every remote-tracking branch's short name, without the remotes'
+// HEADs, for telling what a fetch dropped.
+func (r *Repo) RemoteBranches(ctx context.Context) map[string]bool {
+	out, err := r.Read(ctx, "for-each-ref", "--format=%(refname:short)%00%(symref)", "refs/remotes/")
+	names := map[string]bool{}
+	if err != nil {
+		return names
+	}
+	for line := range strings.SplitSeq(string(out), "\n") {
+		name, symref, _ := strings.Cut(line, "\x00")
+		if name != "" && symref == "" {
+			names[name] = true
+		}
+	}
+	return names
 }
 
 // FetchFailure is a remote that a fetch of every remote couldn't fetch.
@@ -268,8 +299,8 @@ const (
 
 // Pull fetches and integrates the current branch's upstream.
 func (r *Repo) Pull(ctx context.Context, mode PullMode, o NetOptions) error {
-	// --prune, as Fetch does, so a deleted upstream shows as gone straight away.
-	args := []string{"pull", "--progress", "--prune"}
+	// Pruning as Fetch does, so a deleted upstream shows as gone straight away.
+	args := append(r.pruneByDefault(ctx), "pull", "--progress")
 	switch mode {
 	case PullFFOnly:
 		args = append(args, "--ff-only")

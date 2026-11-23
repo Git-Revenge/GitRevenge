@@ -202,7 +202,11 @@ func (a *App) cancelNetwork(key string) {
 func (a *App) Fetch(path, remote string) error {
 	return a.runNetwork(path, "fetch", func(ctx context.Context, r *session.Repo, o git.NetOptions) error {
 		a.upstreams.remember(ctx, r.Path, r.Git)
+		before := r.Git.RemoteBranches(ctx)
 		reached, err := a.fetchRemotes(ctx, r.Git, remote, o)
+		if msg := droppedMessage(remote, before, r.Git.RemoteBranches(ctx)); msg != "" {
+			a.notice(r.Path, msg)
+		}
 		// Notes come from the remotes that answered, whether or not all of them did.
 		a.syncNotesIn(ctx, r, reached, o)
 		return err
@@ -213,8 +217,12 @@ func (a *App) Fetch(path, remote string) error {
 func (a *App) Pull(path, mode string) error {
 	return a.runNetwork(path, "pull", func(ctx context.Context, r *session.Repo, o git.NetOptions) error {
 		a.upstreams.remember(ctx, r.Path, r.Git)
+		before := r.Git.RemoteBranches(ctx)
 		if err := a.record(r, "Pull", kindMove, "", func() error { return r.Git.Pull(ctx, git.PullMode(mode), o) }); err != nil {
 			return err
+		}
+		if msg := droppedMessage(pullRemote(ctx, r.Git), before, r.Git.RemoteBranches(ctx)); msg != "" {
+			a.notice(r.Path, msg)
 		}
 		a.cleanupAfterPull(ctx, r)
 		pulled := []string{pullRemote(ctx, r.Git)}
