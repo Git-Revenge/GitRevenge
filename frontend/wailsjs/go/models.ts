@@ -600,6 +600,57 @@ export namespace app {
 		}
 	}
 	
+	export class BranchWebBase {
+	    remote: string;
+	    branch: string;
+	    compare: string;
+	    request: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BranchWebBase(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.remote = source["remote"];
+	        this.branch = source["branch"];
+	        this.compare = source["compare"];
+	        this.request = source["request"];
+	    }
+	}
+	export class BranchWeb {
+	    branch: string;
+	    bases: BranchWebBase[];
+	
+	    static createFrom(source: any = {}) {
+	        return new BranchWeb(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.branch = source["branch"];
+	        this.bases = this.convertValues(source["bases"], BranchWebBase);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class BuiltWith {
 	    go: string;
 	    wails: string;
@@ -1786,6 +1837,60 @@ export namespace app {
 	        this.forkTime = source["forkTime"];
 	    }
 	}
+	export class WebBase {
+	    remote: string;
+	    branch: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WebBase(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.remote = source["remote"];
+	        this.branch = source["branch"];
+	    }
+	}
+	export class RemoteWeb {
+	    remote: string;
+	    forge: string;
+	    repo: string;
+	    branches: string;
+	    defaultBranch: string;
+	    bases: WebBase[];
+	
+	    static createFrom(source: any = {}) {
+	        return new RemoteWeb(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.remote = source["remote"];
+	        this.forge = source["forge"];
+	        this.repo = source["repo"];
+	        this.branches = source["branches"];
+	        this.defaultBranch = source["defaultBranch"];
+	        this.bases = this.convertValues(source["bases"], WebBase);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class RepoPreferences {
 	    kinds: KindPatterns[];
 	    hide: string[];
@@ -2647,6 +2752,7 @@ export namespace app {
 	        this.available = source["available"];
 	    }
 	}
+	
 	export class WhoAnswer {
 	    written: git.Identity;
 	    shown: git.Identity;
@@ -4089,6 +4195,28 @@ export namespace graph {
 
 export namespace links {
 	
+	export class ForgeRule {
+	    host: string;
+	    forge: string;
+	    web?: string;
+	    scope: string;
+	    shadowed?: boolean;
+	    problem?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ForgeRule(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.host = source["host"];
+	        this.forge = source["forge"];
+	        this.web = source["web"];
+	        this.scope = source["scope"];
+	        this.shadowed = source["shadowed"];
+	        this.problem = source["problem"];
+	    }
+	}
 	export class Rule {
 	    name: string;
 	    pattern: string;
@@ -4120,6 +4248,7 @@ export namespace links {
 	export class Config {
 	    rules: Rule[];
 	    web: boolean;
+	    forges: ForgeRule[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -4129,6 +4258,7 @@ export namespace links {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.rules = this.convertValues(source["rules"], Rule);
 	        this.web = source["web"];
+	        this.forges = this.convertValues(source["forges"], ForgeRule);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -4149,6 +4279,7 @@ export namespace links {
 		    return a;
 		}
 	}
+	
 	export class Match {
 	    text: string;
 	    href: string;

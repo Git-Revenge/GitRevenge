@@ -36,6 +36,9 @@ const (
 	ForgeCodeberg  Forge = "codeberg"
 	ForgeBitbucket Forge = "bitbucket"
 	ForgeAzure     Forge = "azure"
+	// ForgeBitbucketServer is Bitbucket Data Center, the self-hosted Bitbucket. Only a link
+	// rule names it: no public host runs it.
+	ForgeBitbucketServer Forge = "bitbucket-server"
 )
 
 // knownHosts maps a host, as it appears in a remote URL, to its forge and the host its web
@@ -362,4 +365,26 @@ func FetchHeadURLs(content string) []string {
 		}
 	}
 	return urls
+}
+
+// RemoteHeads returns each remote's default branch as git last heard it, from
+// refs/remotes/<name>/HEAD, by remote name: "main" for origin when origin/HEAD points at
+// origin/main. A remote without that ref is missing.
+func (r *Repo) RemoteHeads(ctx context.Context) map[string]string {
+	heads := map[string]string{}
+	out, err := r.Read(ctx, "for-each-ref", "--format=%(refname)%00%(symref)", "refs/remotes/")
+	if err != nil {
+		return heads
+	}
+	for line := range strings.SplitSeq(string(out), "\n") {
+		ref, target, ok := strings.Cut(line, "\x00")
+		name, isHead := strings.CutSuffix(strings.TrimPrefix(ref, "refs/remotes/"), "/HEAD")
+		if !ok || !isHead || target == "" || name == ref {
+			continue
+		}
+		if branch, ok := strings.CutPrefix(target, "refs/remotes/"+name+"/"); ok {
+			heads[name] = branch
+		}
+	}
+	return heads
 }

@@ -9,6 +9,7 @@
   import { session } from '../session.svelte'
   import { toasts } from '../toasts.svelte'
   import Icon from '../ui/Icon.svelte'
+  import ForgeRules from './ForgeRules.svelte'
   import LinkEditor from './LinkEditor.svelte'
   import { linkStore } from './links.svelte'
 
@@ -161,6 +162,7 @@
         </select>
       {/if}
     </div>
+    <ForgeRules {repo} {repoName} rules={cfg.forges ?? []} onChanged={load} />
   {/if}
 </fieldset>
 

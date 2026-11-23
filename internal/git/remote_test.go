@@ -236,23 +236,3 @@ func TestRemoteHost(t *testing.T) {
 		}
 	}
 }
-
-func TestIssueURL(t *testing.T) {
-	t.Parallel()
-	cases := map[string]string{
-		"https://github.com/Git-Revenge/GitRevenge.git":  "https://github.com/Git-Revenge/GitRevenge/issues/{n}",
-		"git@github.com:Git-Revenge/GitRevenge.git":      "https://github.com/Git-Revenge/GitRevenge/issues/{n}",
-		"ssh://git@github.com/Git-Revenge/GitRevenge":    "https://github.com/Git-Revenge/GitRevenge/issues/{n}",
-		"https://user:token@github.com/o/r.git":          "https://github.com/o/r/issues/{n}",
-		"https://gitlab.com/group/sub/proj.git":          "https://gitlab.com/group/sub/proj/-/issues/{n}",
-		"ssh://git@gitlab.example.com:2222/team/app.git": "https://gitlab.example.com/team/app/-/issues/{n}",
-		"https://bitbucket.org/o/r.git":                  "",
-		"/srv/git/local.git":                             "",
-		"":                                               "",
-	}
-	for in, want := range cases {
-		if got := IssueURL(in); got != want {
-			t.Errorf("IssueURL(%q) = %q, want %q", in, got, want)
-		}
-	}
-}

@@ -68,10 +68,12 @@ type Rule struct {
 	Problem string `json:"problem,omitempty"`
 }
 
-// Config is every rule that applies to one repository, and whether web addresses link.
+// Config is every rule that applies to one repository, whether web addresses link, and
+// what forge each self-hosted server is.
 type Config struct {
-	Rules []Rule `json:"rules"`
-	Web   bool   `json:"web"`
+	Rules  []Rule      `json:"rules"`
+	Web    bool        `json:"web"`
+	Forges []ForgeRule `json:"forges"`
 }
 
 // Active returns the rules in use: enabled, not replaced, and valid, in matching order.
@@ -103,7 +105,11 @@ func Load(ctx context.Context, g *git.Repo, inRepo bool) (Config, error) {
 			global[i].Shadowed = true
 		}
 	}
-	c := Config{Rules: append(local, global...), Web: true}
+	forges, err := loadForges(ctx, g, inRepo)
+	if err != nil {
+		return Config{}, err
+	}
+	c := Config{Rules: append(local, global...), Web: true, Forges: forges}
 	if c.Rules == nil {
 		c.Rules = []Rule{}
 	}

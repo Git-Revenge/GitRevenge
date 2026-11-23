@@ -14,6 +14,7 @@ import (
 	"github.com/git-revenge/gitrevenge/internal/fetchlog"
 	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/session"
+	"github.com/git-revenge/gitrevenge/internal/weblinks"
 )
 
 // network holds the credential bridge and in-flight network operations.
@@ -421,14 +422,15 @@ func (a *App) RemoteSettings(path string) (git.RemoteSettings, error) {
 }
 
 // IssueURL returns a pattern for links to the repository's issues, with "{n}" for the
-// issue number, from origin (or the first remote). It's "" when the remote isn't on GitHub
-// or GitLab.
+// issue number, from origin (or the first remote). It's "" when the remote isn't on a forge
+// known by its host or a forge rule, or the forge's issues aren't numbered pages.
 func (a *App) IssueURL(path string) (string, error) {
 	r, err := a.openRepo(path)
 	if err != nil {
 		return "", err
 	}
-	remotes, err := r.Git.Remotes(context.Background())
+	ctx := context.Background()
+	remotes, err := r.Git.Remotes(ctx)
 	if err != nil || len(remotes) == 0 {
 		return "", err
 	}
@@ -438,7 +440,11 @@ func (a *App) IssueURL(path string) (string, error) {
 			pick = r
 		}
 	}
-	return git.IssueURL(pick.FetchURL), nil
+	site, ok := weblinks.For(pick.FetchURL, a.linkConfig(ctx, r.Git))
+	if !ok {
+		return "", nil
+	}
+	return site.Issues(), nil
 }
 
 // RemoteAction edits remotes: add (name, url), rename (from, to), seturl (name, url),
