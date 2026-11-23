@@ -145,7 +145,8 @@ func (idx *RefIndex) annotate(rules branchkind.Rules, remotes []string, show boo
 		switch r.Kind {
 		case git.RemoteBranch:
 			name = branchkind.Strip(r.Short, remotes)
-			fallthrough
+			idx.All[i].Hidden = rules.Hidden(name) || rules.RemoteHidden(strings.TrimSuffix(r.Short, "/"+name))
+			idx.All[i].BranchKind = string(rules.Kind(name))
 		case git.LocalBranch:
 			idx.All[i].Hidden = rules.Hidden(name)
 			idx.All[i].BranchKind = string(rules.Kind(name))

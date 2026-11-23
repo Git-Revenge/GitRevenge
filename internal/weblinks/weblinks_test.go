@@ -179,3 +179,24 @@ func TestIssues(t *testing.T) {
 		}
 	}
 }
+
+func TestClone(t *testing.T) {
+	t.Parallel()
+	c := cfg(links.ForgeRule{Host: "gitlab.example.com", Forge: git.ForgeGitLab}, links.ForgeRule{Host: "bb.acme.com", Forge: git.ForgeBitbucketServer})
+	cases := map[string][2]string{
+		"git@github.com:o/r.git":                       {"https://github.com/o/r.git", "git@github.com:o/r.git"},
+		"https://github.com/o/r":                       {"https://github.com/o/r.git", "git@github.com:o/r.git"},
+		"ssh://git@ssh.github.com:443/o/r.git":         {"https://github.com/o/r.git", "git@github.com:o/r.git"},
+		"https://gitlab.com/g/sub/p.git":               {"https://gitlab.com/g/sub/p.git", "git@gitlab.com:g/sub/p.git"},
+		"git@codeberg.org:o/r.git":                     {"https://codeberg.org/o/r.git", "git@codeberg.org:o/r.git"},
+		"https://org@dev.azure.com/org/proj/_git/repo": {"https://dev.azure.com/org/proj/_git/repo", "git@ssh.dev.azure.com:v3/org/proj/repo"},
+		"git@gitlab.example.com:team/app.git":          {"https://gitlab.example.com/team/app.git", ""},
+		"https://bb.acme.com/scm/proj/repo.git":        {"", ""},
+	}
+	for in, want := range cases {
+		https, ssh := site(t, in, c).Clone()
+		if https != want[0] || ssh != want[1] {
+			t.Errorf("Clone(%q) = %q, %q, want %q, %q", in, https, ssh, want[0], want[1])
+		}
+	}
+}

@@ -6,6 +6,7 @@
   import { links } from '../../../wailsjs/go/models'
   import { errorText } from '../errors'
   import Icon from '../ui/Icon.svelte'
+  import { forgeAsk } from './forgeAsk.svelte'
 
   let { repo, repoName, rules, onChanged }: { repo: string; repoName: string; rules: links.ForgeRule[]; onChanged: () => void } = $props()
 
@@ -69,9 +70,20 @@
   }
 
   const key = (r: links.ForgeRule) => `${r.scope}:${r.host}`
+
+  // Opened from a remote's menu for a host: start its rule, in view.
+  let section = $state<HTMLElement>()
+  $effect(() => {
+    if (!forgeAsk.host) return
+    const host = forgeAsk.host
+    forgeAsk.host = ''
+    const have = rules.find((r) => r.host === host && !r.shadowed)
+    start(have, have ? '' : host)
+    queueMicrotask(() => section?.scrollIntoView({ block: 'center' }))
+  })
 </script>
 
-<div class="forges">
+<div class="forges" bind:this={section}>
   <h4 class="meta">Forges</h4>
   <p class="hint">
     Remotes on GitHub, GitLab.com, Gitea.com, Codeberg, Bitbucket and Azure DevOps open on the web. For a server of your own, say what it runs: Git Revenge never guesses from a host's name.

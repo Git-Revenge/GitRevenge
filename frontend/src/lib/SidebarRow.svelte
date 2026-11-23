@@ -23,6 +23,7 @@
     onActivate,
     onContext,
     onStackContext,
+    onRemoteContext,
     remote,
     hostLook,
     remoteTones = {},
@@ -46,6 +47,8 @@
     onActivate?: (ref: Ref) => void
     onContext?: (ref: Ref, x: number, y: number) => void
     onStackContext?: (members: Ref[], x: number, y: number) => void
+    /** A remote's own menu, opened on its folder. */
+    onRemoteContext?: (remote: string, x: number, y: number) => void
   } = $props()
 </script>
 
@@ -57,6 +60,11 @@
     class:stack-row={row.stack}
     style:--depth={row.depth}
     oncontextmenu={(e) => {
+      if (row.remote && onRemoteContext) {
+        e.preventDefault()
+        onRemoteContext(row.label, e.clientX, e.clientY)
+        return
+      }
       if (!row.members || !onStackContext) return
       e.preventDefault()
       onStackContext(row.members, e.clientX, e.clientY)
@@ -95,7 +103,20 @@
       <span class="meta count">{row.count.toLocaleString()}</span>
     {/if}
   </div>
-  {#if row.members && onStackContext}
+  {#if row.remote && onRemoteContext}
+    <button
+      class="more"
+      tabindex="-1"
+      aria-hidden="true"
+      aria-label="More for {row.label}"
+      aria-haspopup="menu"
+      title="More"
+      onclick={(e) => {
+        const box = e.currentTarget.getBoundingClientRect()
+        onRemoteContext(row.label, box.left, box.bottom)
+      }}><Icon name="more" size={14} /></button
+    >
+  {:else if row.members && onStackContext}
     {@const members = row.members}
     <button
       class="more"

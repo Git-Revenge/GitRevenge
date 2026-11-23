@@ -180,7 +180,7 @@ func Rules(rs settings.RepoSettings) branchkind.Rules {
 	for _, k := range rs.HideKinds {
 		hidden = append(hidden, branchkind.Kind(k))
 	}
-	return branchkind.New(overrides, rs.Hide).HidingKinds(hidden).WithBotAuthors(rs.BotAuthors)
+	return branchkind.New(overrides, rs.Hide).HidingKinds(hidden).HidingRemotes(rs.HideRemotes).WithBotAuthors(rs.BotAuthors)
 }
 
 // close stops the repository's background work. Its watcher is the manager's to stop.

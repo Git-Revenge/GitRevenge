@@ -50,6 +50,8 @@ type Rules struct {
 	// botAuthors are the repository's own patterns for authors that are bots, on top of
 	// the built-in one.
 	botAuthors []string
+	// hideRemotes hides every branch of these remotes, by remote name.
+	hideRemotes map[string]bool
 }
 
 // BuiltInBotAuthor is the author pattern that always marks a bot: a GitHub App's name, such
@@ -118,6 +120,21 @@ func New(overrides map[Kind][]string, hide []string) Rules {
 }
 
 // HidingKinds returns r with every branch of the given kinds hidden as well.
+// HidingRemotes returns the rules with every branch of these remotes hidden as well.
+func (r Rules) HidingRemotes(remotes []string) Rules {
+	if len(remotes) == 0 {
+		return r
+	}
+	r.hideRemotes = map[string]bool{}
+	for _, name := range remotes {
+		r.hideRemotes[name] = true
+	}
+	return r
+}
+
+// RemoteHidden reports whether every branch of a remote is hidden.
+func (r Rules) RemoteHidden(remote string) bool { return r.hideRemotes[remote] }
+
 func (r Rules) HidingKinds(kinds []Kind) Rules {
 	if len(kinds) == 0 {
 		return r

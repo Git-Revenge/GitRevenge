@@ -34,6 +34,9 @@ type Remote struct {
 	// FetchedAt is when the remote was last fetched, in Unix seconds, or 0 when that isn't
 	// known.
 	FetchedAt int64 `json:"fetchedAt"`
+	// Hidden says the repository's settings hide every branch of this remote. Git knows
+	// nothing of it; the app fills it in.
+	Hidden bool `json:"hidden,omitempty"`
 }
 
 // Remotes lists configured remotes.

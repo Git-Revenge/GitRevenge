@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -403,7 +404,9 @@ func (a *App) Remotes(path string) ([]git.Remote, error) {
 		return nil, err
 	}
 	noted := fetchlog.Read(a.fetchDir(), r.CommonDir)
+	hidden := a.hiddenRemotes(path)
 	for i := range remotes {
+		remotes[i].Hidden = slices.Contains(hidden, remotes[i].Name)
 		if at, ok := noted[remotes[i].Name]; ok && at.Unix() > remotes[i].FetchedAt {
 			remotes[i].FetchedAt = at.Unix()
 		}
@@ -467,12 +470,14 @@ func (a *App) RemoteAction(path, action string, args []string) error {
 	case "rename":
 		if err = r.Git.RenameRemote(ctx, arg(0), arg(1)); err == nil {
 			fetchlog.Rename(a.fetchDir(), r.CommonDir, arg(0), arg(1))
+			a.followRemote(path, arg(0), arg(1))
 		}
 	case "seturl":
 		err = r.Git.SetRemoteURL(ctx, arg(0), arg(1))
 	case "remove":
 		if err = r.Git.RemoveRemote(ctx, arg(0)); err == nil {
 			fetchlog.Forget(a.fetchDir(), r.CommonDir, arg(0))
+			a.followRemote(path, arg(0), "")
 		}
 	default:
 		return userError("Unknown remote action " + action + ".")

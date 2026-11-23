@@ -15,6 +15,11 @@
     shortcut?: string
     /** Opens these as a submenu instead of running. */
     items?: MenuItem[]
+    /** A second line under the label, in small muted type: when it last ran, or why it can't. */
+    hint?: string
+    /** The menu's title rather than an item: its label and hint head the menu, and it can't
+     * be chosen. Give it disabled too, so the arrow keys pass over it. */
+    heading?: boolean
     run?: () => void | Promise<void>
   }
 </script>
@@ -54,7 +59,8 @@
 
   function openSub(i: number, focus: boolean) {
     clearTimeout(hoverTimer)
-    const el = menu.querySelectorAll<HTMLElement>('[role="menuitem"]')[i]
+    const el = menu.querySelector<HTMLElement>(`[data-index="${i}"]`)
+    if (!el) return
     const box = el.getBoundingClientRect()
     sub = { index: i, x: box.right - 4, y: box.top - 5, flipX: box.left + 4, focus }
   }
@@ -111,7 +117,7 @@
     if (i < 0) return
     active = i
     if (armed !== i) armed = -1
-    menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')[i]?.focus()
+    menu.querySelector<HTMLButtonElement>(`[data-index="${i}"]`)?.focus()
   }
 
   onMount(() => {
@@ -197,8 +203,15 @@
 <div class="menu" bind:this={menu} out:menuOut|global role="menu" tabindex="-1" style:left="{left}px" style:top="{top}px" onkeydown={onKey}>
   {#each items as item, i (i)}
     {#if item.separator && i > 0}<div class="rule" role="separator"></div>{/if}
+    {#if item.heading}
+      <div class="heading" role="presentation">
+        <span class="heading-label">{item.label}</span>
+        {#if item.hint}<span class="heading-hint">{item.hint}</span>{/if}
+      </div>
+    {:else}
     <button
       role="menuitem"
+      data-index={i}
       tabindex="-1"
       class="item"
       class:active={active === i}
@@ -216,11 +229,14 @@
       }}
     >
       {#if hasIcons}<span class="icon">{#if item.icon}<Icon name={item.icon} />{/if}</span>{/if}
-      <span class="label">{armed === i ? `Press again to ${item.label.toLowerCase()}` : item.label}</span>
+      <span class="label"
+        >{armed === i ? `Press again to ${item.label.toLowerCase()}` : item.label}{#if item.hint}<span class="hint">{item.hint}</span>{/if}</span
+      >
       {#if armed === i}<Icon name="warning" size={14} />
       {:else if item.items}<span class="arrow" aria-hidden="true"><Icon name="right" size={14} /></span>
       {:else if item.shortcut}<kbd>{formatShortcut(item.shortcut)}</kbd>{/if}
     </button>
+    {/if}
   {/each}
 </div>
 {#if sub && items[sub.index]?.items}
@@ -291,6 +307,40 @@
   .label {
     flex: 1;
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hint {
+    display: block;
+    font-size: 12px;
+    color: var(--ink-mute);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .heading {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: 100%;
+    padding: 6px 12px 8px;
+    border-bottom: 1px solid var(--hairline);
+    margin-bottom: 4px;
+    box-sizing: border-box;
+  }
+
+  .heading-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .heading-hint {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-mute);
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }

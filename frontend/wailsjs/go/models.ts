@@ -1857,6 +1857,8 @@ export namespace app {
 	    repo: string;
 	    branches: string;
 	    defaultBranch: string;
+	    cloneHttps: string;
+	    cloneSsh: string;
 	    bases: WebBase[];
 	
 	    static createFrom(source: any = {}) {
@@ -1870,6 +1872,8 @@ export namespace app {
 	        this.repo = source["repo"];
 	        this.branches = source["branches"];
 	        this.defaultBranch = source["defaultBranch"];
+	        this.cloneHttps = source["cloneHttps"];
+	        this.cloneSsh = source["cloneSsh"];
 	        this.bases = this.convertValues(source["bases"], WebBase);
 	    }
 	
@@ -3796,6 +3800,7 @@ export namespace git {
 	    skipFetchAll: boolean;
 	    fetchRefspecs: string[];
 	    fetchedAt: number;
+	    hidden?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Remote(source);
@@ -3814,6 +3819,7 @@ export namespace git {
 	        this.skipFetchAll = source["skipFetchAll"];
 	        this.fetchRefspecs = source["fetchRefspecs"];
 	        this.fetchedAt = source["fetchedAt"];
+	        this.hidden = source["hidden"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

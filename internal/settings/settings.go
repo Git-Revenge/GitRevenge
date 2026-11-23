@@ -146,6 +146,8 @@ type RepoSettings struct {
 	Hide []string `json:"hide,omitempty"`
 	// HideKinds hides every branch of these kinds (the graph's Docs and Bots toggles).
 	HideKinds []string `json:"hideKinds,omitempty"`
+	// HideRemotes hides every branch of these remotes, by name.
+	HideRemotes []string `json:"hideRemotes,omitempty"`
 	// ShowKinds shows these kinds' lanes in full in the graph, where Bot and Docs lanes
 	// otherwise fold to a line a day.
 	ShowKinds []string `json:"showKinds,omitempty"`
@@ -169,6 +171,7 @@ type RepoSettings struct {
 func (r RepoSettings) clone() RepoSettings {
 	r.Hide = slices.Clone(r.Hide)
 	r.HideKinds = slices.Clone(r.HideKinds)
+	r.HideRemotes = slices.Clone(r.HideRemotes)
 	r.ShowKinds = slices.Clone(r.ShowKinds)
 	r.BotAuthors = slices.Clone(r.BotAuthors)
 	r.StackParents = maps.Clone(r.StackParents)
@@ -184,7 +187,7 @@ func (r RepoSettings) clone() RepoSettings {
 
 // empty reports whether r holds nothing but its path, so it can be dropped.
 func (r RepoSettings) empty() bool {
-	return r.Kinds == nil && len(r.Hide) == 0 && len(r.HideKinds) == 0 && len(r.ShowKinds) == 0 && len(r.BotAuthors) == 0 && len(r.StackParents) == 0 && !r.CleanupOnPull && !r.SyncNotes
+	return r.Kinds == nil && len(r.Hide) == 0 && len(r.HideKinds) == 0 && len(r.HideRemotes) == 0 && len(r.ShowKinds) == 0 && len(r.BotAuthors) == 0 && len(r.StackParents) == 0 && !r.CleanupOnPull && !r.SyncNotes
 }
 
 // Repo returns the settings for the repository at path, or empty ones.
