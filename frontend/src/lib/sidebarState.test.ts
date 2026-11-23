@@ -16,7 +16,7 @@ describe('loadSidebar', () => {
 
   it('round-trips what was saved', () => {
     const store = memory()
-    const state = { panel: 'tags', collapsed: true, width: 300, open: { 'branches:fix': false }, sort: 'recent' } as const
+    const state = { panel: 'tags', collapsed: true, width: 300, open: { 'branches:fix': false }, sort: 'recent', remoteGrouping: 'host' } as const
     saveSidebar('/r', { ...state, open: { ...state.open } }, store)
     expect(loadSidebar('/r', store)).toEqual(state)
   })
@@ -38,6 +38,13 @@ describe('loadSidebar', () => {
     expect(loadSidebar('/r', memory({ [key]: JSON.stringify({ ...saved, collapsed: true }) }))).toEqual({ ...defaultSidebar(), collapsed: true, open: { good: true } })
     expect(loadSidebar('/r', memory({ [key]: JSON.stringify(saved) })).width).toBe(DEFAULT_WIDTH)
     expect(loadSidebar('/r', memory({ [key]: JSON.stringify({ open: ['x'] }) })).open).toEqual({})
+  })
+
+  // #920
+  it('remembers how the Remotes panel is grouped, and ignores what it doesn’t know', () => {
+    expect(loadSidebar('/r', memory({ [key]: JSON.stringify({ remoteGrouping: 'host' }) })).remoteGrouping).toBe('host')
+    expect(loadSidebar('/r', memory({ [key]: JSON.stringify({ remoteGrouping: 'name' }) })).remoteGrouping).toBe('name')
+    expect(loadSidebar('/r', memory({ [key]: JSON.stringify({ remoteGrouping: 'colour' }) })).remoteGrouping).toBe('remote')
   })
 
   it('brings a saved width back within limits', () => {

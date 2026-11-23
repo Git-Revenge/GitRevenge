@@ -11,11 +11,23 @@ export type PanelKey = 'branches' | 'remotes' | 'tags' | 'stashes'
 /** Name: A to Z, with tags and releases newest version first. Recent: last updated first. */
 export type SortOrder = 'name' | 'recent'
 
+/** How the Remotes panel groups its branches (#920). Remote: a folder per remote. Host: the
+ * remotes under the host they're on. Name: one row per branch name, with a chip for each
+ * remote that has it. */
+export type RemoteGrouping = 'remote' | 'host' | 'name'
+
 export interface PanelOptions {
   /** Include branches the repository's hide patterns match. */
   showHidden?: boolean
   sort?: SortOrder
+  remoteGrouping?: RemoteGrouping
+  /** The host a remote is on, '' for a folder on this machine, or undefined while unknown.
+   * Without it, Host groups by remote. */
+  hostOf?: (remote: string) => string | undefined
 }
+
+/** The folder name for remotes on this machine, in the Host grouping. */
+export const LOCAL_HOST = 'This machine'
 
 interface Leaf {
   ref: Ref
@@ -26,6 +38,8 @@ interface Leaf {
   total: number
   holdsHead: boolean
   newest: number
+  /** Grouped by name: the same branch on each remote that has it, the row's own ref first. */
+  onRemotes?: Ref[]
 }
 
 interface Folder {
@@ -40,6 +54,10 @@ interface Folder {
   /** The kind marking this folder, when its depth carries marks and its branches share one. */
   kind?: string
   remote: boolean
+  /** A host's folder, holding its remotes: the host, or '' for this machine. */
+  host?: string
+  /** How many remotes a host's folder holds. */
+  remotes?: number
 }
 
 export interface PanelTree {
@@ -72,6 +90,10 @@ export interface FolderRow extends RowBase {
   note?: string
   /** A stack's branches, all of them whatever a filter shows, the top first. */
   members?: Ref[]
+  /** A host's folder in the Remotes panel: the host, or '' for this machine. */
+  host?: string
+  /** How many remotes a host's folder holds. */
+  remotes?: number
 }
 
 export interface RefRow extends RowBase {
@@ -85,6 +107,8 @@ export interface RefRow extends RowBase {
   railed?: boolean
   /** The kind to mark on this row; undefined when a folder above already says it. */
   mark?: string
+  /** Grouped by name: the same branch on each remote that has it, the row's own ref first. */
+  onRemotes?: Ref[]
 }
 
 export type TreeRow = FolderRow | RefRow
@@ -170,17 +194,59 @@ function sharedKind(f: Folder): string | undefined {
   return kinds.size === 1 ? only : undefined
 }
 
-function buildPanel(panel: PanelKey, refs: Ref[], sort: SortOrder): PanelTree {
+/** A remote branch's remote: the name before its first slash. */
+const remoteOf = (r: Ref) => r.short.slice(0, r.short.indexOf('/'))
+
+/** Remotes in the order their chips go: origin first, then by name. */
+function remoteOrder(a: string, b: string): number {
+  if (a === 'origin' || b === 'origin') return a === b ? 0 : a === 'origin' ? -1 : 1
+  return collator.compare(a, b)
+}
+
+/** Groups remote branches by their name on the remote: one leaf per name, its ref the first
+ * remote's, in chip order. */
+function byName(refs: Ref[]): Map<string, Ref[]> {
+  const out = new Map<string, Ref[]>()
+  for (const r of refs) {
+    const name = r.short.slice(r.short.indexOf('/') + 1)
+    const list = out.get(name)
+    if (list) list.push(r)
+    else out.set(name, [r])
+  }
+  for (const list of out.values()) list.sort((a, b) => remoteOrder(remoteOf(a), remoteOf(b)))
+  return out
+}
+
+function buildPanel(panel: PanelKey, refs: Ref[], sort: SortOrder, grouping: RemoteGrouping = 'remote', hostOf?: PanelOptions['hostOf']): PanelTree {
   const root = newFolder(panel, '', '', false)
   const parents = panel === 'branches' ? stackParents(refs) : new Map<string, string>()
   const leaves = new Map<string, Leaf>()
   const foldersByPath = new Map<string, Folder>()
+  const remotes = panel === 'remotes' ? grouping : 'remote'
+  const byHost = remotes === 'host' && !!hostOf
 
-  for (const ref of refs) {
-    // A stash's subject is prose, so it stays whole; a stacked branch shows its full name.
-    const nests = panel !== 'stashes' && !parents.has(ref.short)
-    const parts = nests ? ref.short.split('/') : [panel === 'stashes' ? ref.subject || ref.short : ref.short]
+  // What each leaf is filed under, folder by folder. A host's folder is named "@host" in the
+  // path, so it can't meet a remote's.
+  const items: { ref: Ref; parts: string[]; onRemotes?: Ref[] }[] = []
+  if (remotes === 'name') {
+    for (const [name, list] of byName(refs)) items.push({ ref: list[0], parts: name.split('/'), onRemotes: list })
+  } else {
+    for (const ref of refs) {
+      // A stash's subject is prose, so it stays whole; a stacked branch shows its full name.
+      const nests = panel !== 'stashes' && !parents.has(ref.short)
+      const parts = nests ? ref.short.split('/') : [panel === 'stashes' ? ref.subject || ref.short : ref.short]
+      if (byHost) parts.unshift(`@${hostOf(remoteOf(ref)) ?? '?'}`)
+      items.push({ ref, parts })
+    }
+  }
+  const remoteDepth = panel !== 'remotes' || remotes === 'name' ? -1 : byHost ? 1 : 0
+
+  for (const { ref, parts, onRemotes } of items) {
     const leaf: Leaf = { ref, label: parts[parts.length - 1], kids: [], total: 1, holdsHead: ref.head, newest: ref.updated ?? 0 }
+    if (onRemotes) {
+      leaf.onRemotes = onRemotes
+      leaf.newest = Math.max(...onRemotes.map((r) => r.updated ?? 0))
+    }
     leaves.set(ref.short, leaf)
     if (parents.has(ref.short)) continue
     let at = root
@@ -189,9 +255,14 @@ function buildPanel(panel: PanelKey, refs: Ref[], sort: SortOrder): PanelTree {
       path += (path ? '/' : '') + parts[i]
       let next = foldersByPath.get(path)
       if (!next) {
-        next = newFolder(panel, path, parts[i], panel === 'remotes' && i === 0)
+        const hostFolder = byHost && i === 0
+        const host = hostFolder ? parts[0].slice(1) : undefined
+        next = newFolder(panel, path, host === undefined ? parts[i] : host === '' ? LOCAL_HOST : host === '?' ? 'Elsewhere' : host, i === remoteDepth)
+        if (hostFolder) next.host = host === '?' ? undefined : host
+        if (hostFolder) next.remotes = 0
         foldersByPath.set(path, next)
         at.folders.push(next)
+        if (i === remoteDepth && byHost) at.remotes = (at.remotes ?? 0) + 1
       }
       at = next
     }
@@ -210,13 +281,14 @@ function buildPanel(panel: PanelKey, refs: Ref[], sort: SortOrder): PanelTree {
   }
   for (const leaf of leaves.values()) if (!parents.has(leaf.ref.short)) settle(leaf)
 
-  const kindDepth = panel === 'branches' ? 0 : panel === 'remotes' ? 1 : -1
+  const kindDepth = panel === 'branches' ? 0 : panel === 'remotes' ? remoteDepth + 1 : -1
   const finish = (f: Folder, depth: number) => {
     const kept: Folder[] = []
     for (const child of f.folders) {
       finish(child, depth + 1)
-      // One branch and nothing else stays flat, except that a remote is always a folder.
-      if (child.total === 1 && !child.remote) {
+      // One branch and nothing else stays flat, except that a remote, and a host holding
+      // remotes, is always a folder.
+      if (child.total === 1 && !child.remote && child.remotes === undefined) {
         const leaf = child.leaves[0]
         leaf.label = `${child.name}/${leaf.label}`
         f.leaves.push(leaf)
@@ -242,13 +314,13 @@ function buildPanel(panel: PanelKey, refs: Ref[], sort: SortOrder): PanelTree {
 }
 
 /** Sorts refs into panels and builds each one's tree. Hidden branches stay out unless shown. */
-export function buildPanels(refs: Ref[], { showHidden = false, sort = 'name' }: PanelOptions = {}): Panels {
+export function buildPanels(refs: Ref[], { showHidden = false, sort = 'name', remoteGrouping = 'remote', hostOf }: PanelOptions = {}): Panels {
   const byPanel: Record<PanelKey, Ref[]> = { branches: [], remotes: [], tags: [], stashes: [] }
   const panelOf = { local: 'branches', remote: 'remotes', tag: 'tags', stash: 'stashes' } as const
   for (const r of refs) if (showHidden || !r.hidden) byPanel[panelOf[r.kind]].push(r)
   return {
     branches: buildPanel('branches', byPanel.branches, sort),
-    remotes: buildPanel('remotes', byPanel.remotes, sort),
+    remotes: buildPanel('remotes', byPanel.remotes, sort, remoteGrouping, hostOf),
     tags: buildPanel('tags', byPanel.tags, sort),
     stashes: buildPanel('stashes', byPanel.stashes, sort),
   }
@@ -263,6 +335,7 @@ function viewOf(panel: PanelKey, query: string, care: boolean) {
     if (careOn && !needsCare(l.ref)) return false
     if (!q) return true
     const r = l.ref
+    if (l.onRemotes) return l.onRemotes.some((x) => x.short.toLowerCase().includes(q))
     return r.short.toLowerCase().includes(q) || (r.kind === 'stash' && !!r.subject?.toLowerCase().includes(q))
   }
   const leafCounts = new Map<Leaf, number>()
@@ -343,6 +416,7 @@ export function panelRows(tree: PanelTree, options: RowOptions = {}): TreeRow[] 
       stacked,
       context: view.filtering && !view.matches(l),
       mark: kind && kind !== markedKind ? kind : undefined,
+      ...(l.onRemotes ? { onRemotes: l.onRemotes } : {}),
       startsGroup,
     })
     for (const k of l.kids) if (view.leafCount(k) > 0) addLeaf(k, depth + 1, true, markedKind, false)
@@ -365,6 +439,7 @@ export function panelRows(tree: PanelTree, options: RowOptions = {}): TreeRow[] 
         holdsHead: c.holdsHead,
         kind: c.kind,
         remote: c.remote,
+        ...(c.remotes !== undefined ? { host: c.host, remotes: c.remotes } : {}),
         startsGroup: groupStart(),
       })
       if (isOpen) addFolder(c, depth + 1, c.kind ?? markedKind)

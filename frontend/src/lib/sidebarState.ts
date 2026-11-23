@@ -1,4 +1,4 @@
-import { panelMatches, type PanelKey, type Panels, type SortOrder } from './sidebarTree'
+import { panelMatches, type PanelKey, type Panels, type RemoteGrouping, type SortOrder } from './sidebarTree'
 
 /** One of the rail's panels. Smart filters and Repository aren't ref panels, so they aren't
  * in the tree. */
@@ -13,6 +13,8 @@ export interface SidebarState {
   /** Open folders the person chose, by folder key. */
   open: Record<string, boolean>
   sort: SortOrder
+  /** How the Remotes panel groups its branches. */
+  remoteGrouping: RemoteGrouping
 }
 
 export const DEFAULT_WIDTH = 236
@@ -22,7 +24,7 @@ export const MAX_WIDTH = 560
 const PANELS: readonly SidebarPanel[] = ['branches', 'remotes', 'tags', 'filters', 'stashes', 'repo']
 
 export function defaultSidebar(): SidebarState {
-  return { panel: 'branches', collapsed: false, width: DEFAULT_WIDTH, open: {}, sort: 'name' }
+  return { panel: 'branches', collapsed: false, width: DEFAULT_WIDTH, open: {}, sort: 'name', remoteGrouping: 'remote' }
 }
 
 export function clampWidth(width: number): number {
@@ -47,6 +49,7 @@ export function loadSidebar(path: string, store: Store): SidebarState {
   if (typeof saved.collapsed === 'boolean') state.collapsed = saved.collapsed
   if (typeof saved.width === 'number' && Number.isFinite(saved.width)) state.width = clampWidth(saved.width)
   if (saved.sort === 'recent') state.sort = 'recent'
+  if (saved.remoteGrouping === 'host' || saved.remoteGrouping === 'name') state.remoteGrouping = saved.remoteGrouping
   if (typeof saved.open === 'object' && saved.open !== null && !Array.isArray(saved.open)) {
     for (const [key, value] of Object.entries(saved.open)) if (typeof value === 'boolean') state.open[key] = value
   }

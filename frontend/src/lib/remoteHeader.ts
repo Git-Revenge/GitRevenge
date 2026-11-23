@@ -123,3 +123,12 @@ export function trackersByRemote(refs: { kind: string; short: string; upstream: 
   }
   return out
 }
+
+/** The tooltip of a row grouped by name: each remote's copy of the branch and its commit,
+ * and whether they agree. */
+export function onRemotesTooltip(name: string, refs: { short: string; commit: string }[]): string {
+  const same = refs.every((r) => r.commit === refs[0]?.commit)
+  const lines = [name, ...refs.map((r) => `${r.short}  ${r.commit.slice(0, 7)}`)]
+  if (refs.length > 1) lines.push(same ? 'The same commit on every remote' : `≠ marks a remote at another commit than ${refs[0].short}`)
+  return lines.join('\n')
+}
