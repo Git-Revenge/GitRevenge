@@ -141,6 +141,7 @@ Two fixes from this run (#78): `git log` starts only from tags HEAD can't reach,
 - **Ref short names.** `%(refname:short)` is quadratic in the number of refs, so the app strips ref prefixes itself.
 - **Tags as starting points.** Every starting point makes the ordered walk go down from it before printing anything, so old tags are expensive. Tags that HEAD reaches are left out, since their commits are in the history anyway.
 - **Loose refs.** A repo with thousands of loose (unpacked) refs reads them slowly on Windows. `git pack-refs --all` fixes this, and git does it during `gc`.
+- **fsmonitor and the untracked cache.** On the kernel, `git status` takes about 0.4 s with `core.fsmonitor` and `core.untrackedCache` set and about 2 s without. The status target assumes both, as git recommends for a tree this size, so the benchmark runs with the git config of whoever runs it rather than the tests' empty one (#914).
 
 ## Milestones
 
