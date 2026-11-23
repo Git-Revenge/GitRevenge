@@ -604,7 +604,6 @@ export namespace app {
 	    remote: string;
 	    branch: string;
 	    compare: string;
-	    request: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new BranchWebBase(source);
@@ -615,7 +614,6 @@ export namespace app {
 	        this.remote = source["remote"];
 	        this.branch = source["branch"];
 	        this.compare = source["compare"];
-	        this.request = source["request"];
 	    }
 	}
 	export class BranchWeb {

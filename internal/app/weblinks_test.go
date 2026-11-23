@@ -71,8 +71,8 @@ func TestWebLinksForRemotesAndBranches(t *testing.T) {
 	if b.Branch != "https://github.com/ris/GitRevenge/tree/fix/a+b%231" || len(b.Bases) != 2 {
 		t.Fatalf("branch links = %+v", b)
 	}
-	if got, want := b.Bases[1].Request, "https://github.com/Git-Revenge/GitRevenge/compare/trunk...ris:fix/a+b%231?expand=1"; got != want {
-		t.Fatalf("request into upstream = %q, want %q", got, want)
+	if got, want := b.Bases[1].Compare, "https://github.com/Git-Revenge/GitRevenge/compare/trunk...ris:fix/a+b%231"; got != want {
+		t.Fatalf("compare with upstream = %q, want %q", got, want)
 	}
 	// The default branch isn't compared with itself.
 	if b, _ := a.BranchWebLinks(tab.Path, "origin", "main"); len(b.Bases) != 1 || b.Bases[0].Remote != "upstream" {
