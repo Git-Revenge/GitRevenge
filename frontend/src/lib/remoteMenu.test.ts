@@ -132,3 +132,34 @@ describe("a remote's menu", () => {
     expect(a.act).toHaveBeenLastCalledWith('remove', ['origin'])
   })
 })
+
+// #926
+describe('removing a remote others push to', () => {
+  it('asks whether they stop pushing there, and does it when ticked', async () => {
+    const { a, dialogs } = actions()
+    const setPushURLs = vi.fn(async () => '')
+    const items = remoteMenuItems(
+      { remote: remote({ name: 'mirror', fetchUrl: 'https://gitlab.com/t/t.git' }), place: { place: 'web', host: 'gitlab.com', forge: 'gitlab', web: '' }, pushDefault: '', now, pushedBy: [{ remote: 'origin', keep: [gh] }] },
+      { ...a, setPushURLs },
+    )
+    item(items, 'Remove mirror…').run?.()
+    expect(dialogs[0].fields?.[0]).toMatchObject({ type: 'checkbox', value: true, label: 'Stop origin pushing there too' })
+    await dialogs[0].run({ stop: true })
+    expect(a.act).toHaveBeenCalledWith('remove', ['mirror'])
+    expect(setPushURLs).toHaveBeenCalledWith('origin', [gh])
+  })
+
+  it('leaves them be when unticked, and asks nothing when no one pushes there', async () => {
+    const { a, dialogs } = actions()
+    const setPushURLs = vi.fn(async () => '')
+    remoteMenuItems({ remote: remote({ name: 'mirror' }), pushDefault: '', now, pushedBy: [{ remote: 'origin', keep: [gh] }] }, { ...a, setPushURLs })
+      .find((i) => i.label === 'Remove mirror…')
+      ?.run?.()
+    await dialogs[0].run({ stop: false })
+    expect(setPushURLs).not.toHaveBeenCalled()
+    remoteMenuItems({ remote: remote({ name: 'solo' }), pushDefault: '', now }, a)
+      .find((i) => i.label === 'Remove solo…')
+      ?.run?.()
+    expect(dialogs[1].fields).toBeUndefined()
+  })
+})

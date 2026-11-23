@@ -1,5 +1,6 @@
 import { onBackend } from './events'
-import { Undo, UndoState } from '../../wailsjs/go/app/App.js'
+import { PushToURLs, Undo, UndoState } from '../../wailsjs/go/app/App.js'
+import { pushSummary } from './pushResult'
 import { session } from './session.svelte'
 
 /** A short message in the corner, with at most one action, such as Undo. */
@@ -33,6 +34,20 @@ export const toasts = new Toasts()
  * that couldn't sync. */
 onBackend('notice', (e) => {
   toasts.show(e.message)
+})
+
+/** A push to several places: every destination, and pushing on to those it didn't reach. */
+onBackend('push:result', (e) => {
+  const { message, retry } = pushSummary(e.dests)
+  toasts.show(
+    message,
+    retry.length
+      ? {
+          label: retry.length === 1 ? `Retry ${e.dests.find((d) => d.url === retry[0])?.name ?? ''}`.trim() : 'Push to the rest',
+          run: () => void session.run(() => PushToURLs(e.path, e.remote, e.refspec, retry)),
+        }
+      : undefined,
+  )
 })
 
 /** Cleanup on pull: say what was deleted, with Undo while it's still the next undo. */

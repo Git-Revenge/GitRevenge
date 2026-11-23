@@ -19,6 +19,8 @@ export interface RemoteMenuData {
   now: number
   /** How many of its branches Tidy could delete. */
   tidyCount?: number
+  /** Other remotes whose push URLs follow this one, with their push URLs without it. */
+  pushedBy?: { remote: string; keep: string[] }[]
 }
 
 /** What the menu's items do, given by the view that opens it. */
@@ -33,6 +35,8 @@ export interface RemoteMenuActions {
   nameForge: (host: string) => void
   /** Opens Tidy for the remote. */
   tidy?: (remote: string) => void
+  /** Sets another remote's push URLs, when it stops pushing to a removed one. */
+  setPushURLs?: (remote: string, urls: string[]) => Promise<string>
   openDialog: (spec: DialogSpec) => void
   /** Runs a Remotes dialog action: rename, seturl or remove. Resolves to what went wrong, in
    * words, or '' when it worked. */
@@ -150,9 +154,21 @@ export function remoteMenuItems(d: RemoteMenuData, act: RemoteMenuActions): Menu
         act.openDialog({
           title: `Remove ${name}`,
           message: `Removes ${name} from this repository, with its remote-tracking branches. Nothing on ${local ? 'that folder' : host} changes, and local branches that tracked it stop tracking anything.`,
+          fields: d.pushedBy?.length
+            ? [{ key: 'stop', label: `Stop ${d.pushedBy.map((p) => p.remote).join(' and ')} pushing there too`, type: 'checkbox', value: true }]
+            : undefined,
           submit: `Remove ${name}`,
           danger: true,
-          run: async () => (await act.act('remove', [name])) || undefined,
+          run: async (v) => {
+            const err = await act.act('remove', [name])
+            if (err) return err
+            if (v.stop && act.setPushURLs) {
+              for (const p of d.pushedBy ?? []) {
+                const e = await act.setPushURLs(p.remote, p.keep)
+                if (e) return e
+              }
+            }
+          },
         }),
     },
   )

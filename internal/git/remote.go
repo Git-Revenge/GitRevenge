@@ -413,17 +413,7 @@ type PushOptions struct {
 
 // Push sends refs to a remote.
 func (r *Repo) Push(ctx context.Context, p PushOptions, o NetOptions) error {
-	args := []string{"push", "--progress"}
-	if p.SetUpstream {
-		args = append(args, "--set-upstream")
-	}
-	if p.ForceWithLease {
-		args = append(args, "--force-with-lease")
-	}
-	args = append(args, "--", p.Remote, p.Refspec)
-	c := o.cmd(args...)
-	c.Dir = r.dir
-	_, err := r.runner.Run(ctx, c)
+	_, err := r.PushWithReport(ctx, p, o)
 	return err
 }
 
