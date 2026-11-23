@@ -3,12 +3,15 @@
   import { kindInfo } from './branchKinds'
   import type { Ref } from './graph/rowCache'
   import PlaceGlyph from './PlaceGlyph.svelte'
-  import type { RemoteHeader } from './remoteHeader'
+  import { onRemotesTooltip, type PlaceLook, type RemoteHeader } from './remoteHeader'
   import { matchParts, refStatus, refTooltip, stackPlace, type FolderRow, type RefRow, type TreeRow } from './sidebarTree'
   import Icon from './ui/Icon.svelte'
 
   // For screen readers. Written in the markup, it would lose its space.
   const STACK_PREFIX = 'Stack: '
+  // A row grouped by name shows the first few remotes' chips that fit, and how many remotes
+  // have it in all.
+  const CHIPS = 4
 
   let {
     row,
@@ -21,11 +24,17 @@
     onContext,
     onStackContext,
     remote,
+    hostLook,
+    remoteTones = {},
     brand = false,
   }: {
     row: TreeRow
     /** For a remote's own folder: where it lives and how fresh it is. */
     remote?: RemoteHeader
+    /** For a host's folder: its mark. */
+    hostLook?: PlaceLook
+    /** Each remote's chip tone, 0 to 5. */
+    remoteTones?: Record<string, number>
     /** Forge marks in their brands' colours. */
     brand?: boolean
     filter: string
@@ -52,12 +61,14 @@
       e.preventDefault()
       onStackContext(row.members, e.clientX, e.clientY)
     }}
-    title={remote ? remote.tooltip : row.stack ? `A stack of ${row.count} branches${row.note ? `, all ${row.note}` : ''}` : `${row.label}/`}
+    title={remote ? remote.tooltip : row.remotes !== undefined ? `${row.label}: ${row.remotes} ${row.remotes === 1 ? 'remote' : 'remotes'}, ${row.count.toLocaleString()} ${row.count === 1 ? 'branch' : 'branches'}` : row.stack ? `A stack of ${row.count} branches${row.note ? `, all ${row.note}` : ''}` : `${row.label}/`}
     onclick={() => onFolderClick(row)}
   >
     <span class="caret" class:open={row.open}><Icon name="right" size={10} /></span>
     {#if k}
       <span class="kind-icon" style:color="var({k.token})" title={k.label}><Icon name={k.icon} size={14} /><span class="visually-hidden">{k.label}</span></span>
+    {:else if hostLook}
+      <span class="kind-icon" title={hostLook.says}><PlaceGlyph look={hostLook} size={14} {brand} /></span>
     {:else if !remote}
       <span class="kind-icon"><Icon name={row.stack ? 'stack' : row.remote ? 'remote' : row.open ? 'folder-open' : 'folder'} size={14} /></span>
     {/if}
@@ -76,6 +87,8 @@
     {#if remote?.age}
       <span class="meta age" class:stale={remote.stale}><span aria-hidden="true">{remote.ageShort}</span><span class="visually-hidden">{remote.stale ? 'Stale, fetched ' : 'Fetched '}{remote.age}</span></span>
       <span class="visually-hidden">, {row.count.toLocaleString()} {row.count === 1 ? 'branch' : 'branches'}</span>
+    {:else if row.remotes !== undefined}
+      <span class="meta note">{row.remotes} {row.remotes === 1 ? 'remote' : 'remotes'}</span>
     {:else if remote}
       <span class="visually-hidden">, not fetched yet that Git Revenge has seen, {row.count.toLocaleString()} {row.count === 1 ? 'branch' : 'branches'}</span>
     {:else}
@@ -120,11 +133,22 @@
       e.preventDefault()
       onContext(r, e.clientX, e.clientY)
     }}
-    title={refTooltip(r, mergedInto)}
+    title={row.onRemotes ? onRemotesTooltip(row.label, row.onRemotes) : refTooltip(r, mergedInto)}
   >
     {#if r.head}<span class="here"><span class="visually-hidden">Checked out: </span></span>{/if}
     {#if k}<span class="kind-icon" style:color="var({k.token})" title={k.label}><Icon name={k.icon} size={13} /><span class="visually-hidden">{k.label}</span></span>{/if}
     <span class="name">{parts.pre}{#if parts.hit}<mark>{parts.hit}</mark>{/if}{parts.post}</span>
+    {#if row.onRemotes}
+      <!-- Only the first few fit; screen readers hear them all. -->
+      <span class="chips" aria-hidden="true"
+        >{#each row.onRemotes.slice(0, CHIPS) as o (o.short)}{@const name = o.short.slice(0, o.short.indexOf('/'))}<span class="chip t{remoteTones[name] ?? 0}" class:differs={o.commit !== r.commit}
+            >{#if o.commit !== r.commit}≠{/if}{name}</span
+          >{/each}</span
+      >{#if row.onRemotes.length > 1}<span class="chip more-chips" aria-hidden="true">{row.onRemotes.length}</span>{/if}
+      <span class="visually-hidden"
+        >, on {row.onRemotes.map((o) => o.short.slice(0, o.short.indexOf('/')) + (o.commit !== r.commit ? ' at another commit' : '')).join(', ')}</span
+      >
+    {/if}
     {#if r.focused}<span class="focused" title="The graph is focused on this"><Icon name="focus" size={13} /><span class="visually-hidden">, focused</span></span>{/if}
     {#if r.worktree}<span class="worktree" title="Checked out in the worktree at {r.worktree}"><Icon name="worktree" size={13} /><span class="visually-hidden">, in a worktree</span></span>{/if}
     {#if r.hidden}<span class="visually-hidden">, hidden</span>{/if}
@@ -322,6 +346,86 @@
   .note {
     margin-left: auto;
     flex: none;
+  }
+
+  /* Grouped by name: a chip for each remote that has the branch. Tones differ in lightness as
+     well as hue, and each chip carries the remote's name, so none relies on colour. */
+  .ref:has(.chips) .name {
+    flex: none;
+    max-width: 55%;
+  }
+
+  /* Chips that don't fit wrap onto a second line, which is clipped, so a chip goes whole. */
+  .chips {
+    display: inline-flex;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    gap: 3px;
+    height: 18px;
+    min-width: 18px;
+    overflow: hidden;
+  }
+
+  .chip {
+    flex: none;
+    padding: 0 5px;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 400;
+  }
+
+  .chip.t0 {
+    background: var(--ink-teal);
+    border-color: var(--ink-teal);
+    color: var(--paper);
+  }
+
+  .chip.t1 {
+    color: var(--ink-rose);
+  }
+
+  .chip.t2 {
+    background: var(--ink-plum);
+    border-color: var(--ink-plum);
+    color: var(--paper);
+  }
+
+  .chip.t3 {
+    color: var(--ink-sepia);
+  }
+
+  .chip.t4 {
+    background: var(--ink-soft);
+    border-color: var(--ink-soft);
+    color: var(--paper);
+  }
+
+  .chip.t5 {
+    color: var(--ink-ochre);
+    border-style: dashed;
+  }
+
+  .chip.more-chips {
+    flex: none;
+    margin-left: auto;
+    border-color: transparent;
+    color: var(--ink-mute);
+  }
+
+  /* On a commit other than the row's own: the same name, somewhere else. */
+  .chip.differs {
+    opacity: 0.55;
+  }
+
+  @media (forced-colors: active) {
+    .chip {
+      background: none !important;
+      color: CanvasText !important;
+      border-color: CanvasText !important;
+    }
   }
 
   /* A remote's header: where it lives, as a chip, and how long since it was fetched. */

@@ -399,4 +399,40 @@ test.describe("a remote's header", () => {
     await expect(upstream.locator('.age')).toHaveClass(/stale/)
     await expect(upstream.locator('.age')).toContainText('Stale, fetched 9 days ago')
   })
+  // #920
+  const grouped = (page: Page, grouping: string) =>
+    page.addInitScript((g) => localStorage.setItem('gitrevenge.sidebar:/repo', JSON.stringify({ panel: 'remotes', remoteGrouping: g })), grouping)
+  const both = { ...withRemotes, responses: { ...withRemotes.responses, Refs: [...REFS, remote('upstream/one')] } }
+
+  test('the grouping button offers each grouping and both sorts', async ({ page }) => {
+    await open(page, 'sidebar', withRemotes)
+    await page.getByRole('button', { name: 'Remotes', exact: true }).click()
+    await page.getByRole('button', { name: /Grouped by remote/ }).click()
+    const [[items]] = (await events(page, 'menu')) as [[{ label: string; icon?: string }[]]]
+    expect(items.map((i) => (i.icon === 'check' ? '✓ ' : '') + i.label)).toEqual([
+      '✓ Group by remote',
+      'Group by host',
+      'Group by name',
+      '✓ Sort by name',
+      'Sort by most recently updated',
+    ])
+  })
+
+  test('by host puts remotes under their host', async ({ page }) => {
+    await grouped(page, 'host')
+    await open(page, 'sidebar', withRemotes)
+    await expectOutline(page, ['code.example.org/', '  upstream/', '    main', 'github.com/', '  origin/', '    main'])
+    await expect(page.locator('.row.folder', { hasText: 'github.com' }).first()).toContainText('1 remote')
+  })
+
+  test('by name gives a branch one row with a chip for each remote', async ({ page }) => {
+    await grouped(page, 'name')
+    await open(page, 'sidebar', both)
+    await expectOutline(page, ['main', 'one'])
+    const main = page.locator('.row.ref', { hasText: 'main' })
+    // The harness gives each remote's copy its own commit.
+    await expect(main.locator('.chip:not(.more-chips)')).toHaveText(['origin', '≠upstream'])
+    await expect(main).toContainText('on origin, upstream at another commit')
+    await expect(page.locator('.row.ref', { hasText: 'one' }).locator('.chip')).toHaveText(['upstream'])
+  })
 })

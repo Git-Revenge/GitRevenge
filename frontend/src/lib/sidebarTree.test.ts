@@ -573,3 +573,84 @@ describe('matchParts', () => {
     expect(matchParts('v0.8', 'release/')).toEqual({ pre: 'v0.8', hit: '', post: '' })
   })
 })
+
+// #920
+describe('grouping the Remotes panel', () => {
+  const refs = [
+    remote('origin/main'),
+    remote('origin/fix/harbor'),
+    remote('upstream/main'),
+    remote('upstream/release/v1'),
+    remote('mirror/main'),
+    remote('backup/main'),
+  ]
+  const hosts: Record<string, string> = { origin: 'github.com', upstream: 'github.com', mirror: 'gitlab.com', backup: '' }
+  const hostOf = (r: string) => hosts[r]
+  const rows = (grouping: 'remote' | 'host' | 'name', list = refs, query = '') => panelRows(buildPanels(list, { remoteGrouping: grouping, hostOf }).remotes, { query })
+
+  it('by remote is a folder per remote, as before', () => {
+    expect(outline(rows('remote'))).toEqual(['backup/', '  main', 'mirror/', '  main', 'origin/', '  fix/harbor', '  main', 'upstream/', '  main', '  release/v1'])
+  })
+
+  it('by host puts each remote under its host, a folder on this machine under its own', () => {
+    const r = rows('host')
+    expect(outline(r)).toEqual([
+      'github.com/',
+      '  origin/',
+      '    fix/harbor',
+      '    main',
+      '  upstream/',
+      '    main',
+      '    release/v1',
+      'gitlab.com/',
+      '  mirror/',
+      '    main',
+      'This machine/',
+      '  backup/',
+      '    main',
+    ])
+    expect(folder(r, 'github.com')).toMatchObject({ host: 'github.com', remotes: 2, remote: false })
+    expect(folder(r, 'This machine')).toMatchObject({ host: '', remotes: 1 })
+    expect(folder(r, 'origin').remote).toBe(true)
+  })
+
+  it('by host keeps a host with one remote and one branch a folder', () => {
+    expect(outline(rows('host', [remote('mirror/main')]))).toEqual(['gitlab.com/', '  mirror/', '    main'])
+  })
+
+  it('by host files remotes whose host is unknown yet under Elsewhere, and groups by remote with no hosts at all', () => {
+    expect(outline(panelRows(buildPanels([remote('new/main')], { remoteGrouping: 'host', hostOf }).remotes))).toEqual(['Elsewhere/', '  new/', '    main'])
+    expect(outline(panelRows(buildPanels([remote('new/main')], { remoteGrouping: 'host' }).remotes))).toEqual(['new/', '  main'])
+  })
+
+  it('by name is one row per branch name, with every remote that has it, origin first', () => {
+    const r = rows('name')
+    expect(outline(r)).toEqual(['fix/harbor', 'main', 'release/v1'])
+    const main = r.find((x) => x.label === 'main')
+    if (main?.type !== 'ref') throw new Error('no main')
+    expect(main.ref.short).toBe('origin/main')
+    expect(main.onRemotes?.map((x) => x.short)).toEqual(['origin/main', 'backup/main', 'mirror/main', 'upstream/main'])
+  })
+
+  it('by name still nests at slashes', () => {
+    const list = [remote('origin/fix/a'), remote('upstream/fix/a'), remote('origin/fix/b'), remote('origin/main')]
+    expect(outline(rows('name', list))).toEqual(['fix/', '  a', '  b', 'main'])
+  })
+
+  it('by name filters on any remote’s full name', () => {
+    expect(outline(rows('name', refs, 'upstream/'))).toEqual(['main', 'release/v1'])
+    expect(panelMatches(buildPanels(refs, { remoteGrouping: 'name' }).remotes, 'mirror')).toBe(1)
+  })
+
+  it('every grouping copes with one remote, and with none', () => {
+    for (const g of ['remote', 'host', 'name'] as const) {
+      expect(rows(g, [])).toEqual([])
+      expect(rows(g, [remote('origin/main')]).length).toBeGreaterThan(0)
+    }
+  })
+
+  it('leaves the other panels alone', () => {
+    const p = buildPanels([ref('fix/a'), ref('fix/b'), remote('origin/fix/a')], { remoteGrouping: 'name', hostOf })
+    expect(outline(panelRows(p.branches))).toEqual(['fix/', '  a', '  b'])
+  })
+})

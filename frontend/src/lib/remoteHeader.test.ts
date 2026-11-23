@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { git } from '../../wailsjs/go/models'
-import { fetchAge, fetchAgeShort, placeLook, remoteHeader, trackersByRemote, type URLPlace } from './remoteHeader'
+import { fetchAge, fetchAgeShort, onRemotesTooltip, placeLook, remoteHeader, trackersByRemote, type URLPlace } from './remoteHeader'
 
 const place = (p: Partial<URLPlace>) => ({ place: 'web', host: '', forge: '', web: '', ...p }) as URLPlace
 const remote = (r: Partial<git.Remote>) => ({ name: 'origin', fetchUrl: '', pushUrl: '', pushUrls: [], fetchedAt: 0, ...r }) as git.Remote
@@ -115,5 +115,15 @@ describe('trackersByRemote', () => {
       { kind: 'remote', short: 'origin/main', upstream: '' },
     ]
     expect(trackersByRemote(refs, ['origin', 'origin/team'])).toEqual({ origin: ['main', 'y'], 'origin/team': ['x'] })
+  })
+})
+
+describe('onRemotesTooltip', () => {
+  it('lists each copy and says whether they agree', () => {
+    expect(onRemotesTooltip('main', [{ short: 'origin/main', commit: 'aaaaaaaaa' }, { short: 'upstream/main', commit: 'aaaaaaaaa' }])).toBe(
+      'main\norigin/main  aaaaaaa\nupstream/main  aaaaaaa\nThe same commit on every remote',
+    )
+    expect(onRemotesTooltip('fix', [{ short: 'origin/fix', commit: 'aaaaaaaaa' }, { short: 'upstream/fix', commit: 'bbbbbbbbb' }])).toContain('≠ marks a remote at another commit than origin/fix')
+    expect(onRemotesTooltip('solo', [{ short: 'origin/solo', commit: 'aaaaaaaaa' }])).toBe('solo\norigin/solo  aaaaaaa')
   })
 })

@@ -2,7 +2,8 @@
   import { DeletableBranches, DeleteMergedBranches, MergedBranches, RemotePlaces, Remotes, SetShowHidden, ShowingHidden } from '../../wailsjs/go/app/App.js'
   import type { git } from '../../wailsjs/go/models'
   import { prefs } from './prefs.svelte'
-  import { remoteHeader, trackersByRemote, type RemoteHeader, type URLPlace } from './remoteHeader'
+  import { placeLook, remoteHeader, trackersByRemote, type PlaceLook, type RemoteHeader, type URLPlace } from './remoteHeader'
+  import { commands } from './commands.svelte'
   import { repoReads } from './repoReads'
   import { onBackend } from './events'
   import { onMount, tick, untrack } from 'svelte'
@@ -21,7 +22,7 @@
   import SidebarRow from './SidebarRow.svelte'
   import { scrollToShow, treeAction, treePositions } from './sidebarKeys'
   import { clampWidth, DEFAULT_WIDTH, loadSidebar, otherPanelWithMatches, ROW_HEIGHT, saveSidebar, visibleRange, type SidebarPanel } from './sidebarState'
-  import { buildPanels, careCount, panelMatches, panelRows, type FolderRow, type RefRow, type TreeRow, needsCare } from './sidebarTree'
+  import { buildPanels, careCount, panelMatches, panelRows, type FolderRow, type RefRow, type RemoteGrouping, type TreeRow, needsCare } from './sidebarTree'
 
   let {
     path,
@@ -100,7 +101,49 @@
   // Each remote's details and where its URLs point, for the Remotes panel's folder headers.
   // They're read with the refs, and again when git config changes.
   let remotes = $state<git.Remote[]>([])
+  let remotesRead = $state(false)
   let places = $state<Record<string, URLPlace>>({})
+  // The host each remote is on, for the Host grouping; '' for a folder on this machine.
+  let hostOf = $derived.by(() => {
+    if (!remotesRead) return undefined
+    const hosts: Record<string, string> = {}
+    for (const r of remotes) {
+      const p = places[r.fetchUrl]
+      hosts[r.name] = !p || p.place === 'local' ? '' : p.host
+    }
+    return (name: string): string | undefined => (Object.hasOwn(hosts, name) ? hosts[name] : undefined)
+  })
+  // A host's mark: its first remote's, so github.com shows GitHub's when that remote opens on
+  // the web.
+  let hostLooks = $derived.by(() => {
+    const out: Record<string, PlaceLook> = {}
+    for (const r of remotes) {
+      const host = hostOf?.(r.name) ?? ''
+      if (!(host in out)) out[host] = placeLook(places[r.fetchUrl])
+    }
+    return out
+  })
+  // Each remote's chip tone, by its place in name order, so a remote keeps its tone.
+  let remoteTones = $derived(Object.fromEntries([...remotes.map((r) => r.name)].sort().map((n, i) => [n, i % 6])) as Record<string, number>)
+
+  const GROUPINGS: { id: RemoteGrouping; label: string; says: string }[] = [
+    { id: 'remote', label: 'Remote', says: 'A folder for each remote' },
+    { id: 'host', label: 'Host', says: 'Remotes under the host they’re on' },
+    { id: 'name', label: 'Name', says: 'One row for each branch name, with the remotes that have it' },
+  ]
+  function groupMenu(e: MouseEvent) {
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    onMenu?.(
+      [
+        ...GROUPINGS.map((g) => ({ label: `Group by ${g.label.toLowerCase()}`, icon: ui.remoteGrouping === g.id ? ('check' as const) : undefined, run: () => void (ui.remoteGrouping = g.id) })),
+        { label: 'Sort by name', separator: true, icon: ui.sort === 'name' ? ('check' as const) : undefined, run: () => void (ui.sort = 'name') },
+        { label: 'Sort by most recently updated', icon: ui.sort === 'recent' ? ('check' as const) : undefined, run: () => void (ui.sort = 'recent') },
+      ],
+      box.left,
+      box.bottom,
+    )
+  }
+  const fetchEvery = () => commands.all().find((c) => c.id === 'repo.fetch')?.run()
   // The fetch ages move on by themselves.
   let now = $state(Date.now() / 1000)
   onMount(() => {
@@ -122,9 +165,10 @@
     const [rs, ps] = await Promise.all([Remotes(path).catch(() => null), RemotePlaces(path).catch(() => null)])
     if (rs) remotes = rs
     if (ps) places = ps as Record<string, URLPlace>
+    remotesRead = !!rs && !!ps
   }
 
-  let panels = $derived(buildPanels(refs, { showHidden: showingHidden, sort: ui.sort }))
+  let panels = $derived(buildPanels(refs, { showHidden: showingHidden, sort: ui.sort, remoteGrouping: ui.remoteGrouping, hostOf }))
   let current = $derived(ui.panel === 'repo' || ui.panel === 'filters' ? null : panels[ui.panel])
   let careOn = $derived(care && ui.panel === 'branches')
   let merged = $derived(session.merged[path] ?? {})
@@ -411,7 +455,7 @@
       <div class="heading">
         <h2>{tab.label}</h2>
         {#if ui.panel === 'filters'}<span class="hand from">from trailers</span>{/if}
-        {#if ui.panel === 'branches' || ui.panel === 'remotes' || ui.panel === 'tags'}
+        {#if ui.panel === 'branches' || ui.panel === 'tags' || (ui.panel === 'remotes' && !onMenu)}
           <button
             class="btn sm quiet sort"
             title={ui.sort === 'name' ? 'Sorted by name. Click to sort by most recently updated.' : 'Sorted by most recently updated. Click to sort by name.'}
@@ -421,8 +465,17 @@
         {/if}
         {#if ui.panel === 'branches' && onNewBranch}
           <button class="btn sm quiet icon" onclick={onNewBranch} title="New branch from HEAD" aria-label="New branch"><Icon name="plus" size={14} /></button>
-        {:else if ui.panel === 'remotes' && onManageRemotes}
-          <button class="btn sm quiet icon" onclick={onManageRemotes} title="Add, edit or remove remotes" aria-label="Manage remotes"><Icon name="gear" size={14} /></button>
+        {:else if ui.panel === 'remotes'}
+          {#if onMenu}
+            {@const g = GROUPINGS.find((x) => x.id === ui.remoteGrouping) ?? GROUPINGS[0]}
+            <button class="btn sm quiet group" aria-haspopup="menu" title="Grouped by {g.label.toLowerCase()}: {g.says}. Sorted by {ui.sort === 'name' ? 'name' : 'most recently updated'}. Click to change." aria-label="Grouped by {g.label.toLowerCase()}, sorted by {ui.sort === 'name' ? 'name' : 'most recently updated'}. Change how remotes are grouped and sorted." onclick={groupMenu}
+              >{g.label}<Icon name="chevron" size={10} /></button
+            >
+          {/if}
+          <button class="btn sm quiet icon" onclick={fetchEvery} title="Fetch every remote" aria-label="Fetch every remote"><Icon name="fetch" size={14} /></button>
+          {#if onManageRemotes}
+            <button class="btn sm quiet icon" onclick={onManageRemotes} title="Add, edit or remove remotes" aria-label="Manage remotes"><Icon name="gear" size={14} /></button>
+          {/if}
         {/if}
       </div>
       <label class="filter">
@@ -472,7 +525,7 @@
             aria-expanded={row.type === 'folder' ? row.open : undefined}
             aria-selected={row.type === 'ref' && !!selectedCommit && row.ref.commit === selectedCommit}
           >
-            <SidebarRow {row} {onStackContext} {filter} {selectedCommit} remote={row.type === 'folder' && row.remote && row.depth === 0 ? headers[row.label] : undefined} brand={prefs.forgeColors} mergedInto={row.type === 'ref' && row.ref.kind === 'local' ? merged[row.ref.short] : undefined} onFolderClick={clickFolder} onRefClick={clickRef} {onActivate} {onContext} />
+            <SidebarRow {row} {onStackContext} {filter} {selectedCommit} remote={row.type === 'folder' && row.remote ? headers[row.label] : undefined} hostLook={row.type === 'folder' && row.remotes !== undefined ? hostLooks[row.host ?? ''] : undefined} {remoteTones} brand={prefs.forgeColors} mergedInto={row.type === 'ref' && row.ref.kind === 'local' ? merged[row.ref.short] : undefined} onFolderClick={clickFolder} onRefClick={clickRef} {onActivate} {onContext} />
           </li>
         {/each}
       </ul>
@@ -606,6 +659,12 @@
 
   .sort {
     flex: none;
+    padding-inline: 8px;
+  }
+
+  .group {
+    flex: none;
+    gap: 4px;
     padding-inline: 8px;
   }
 
