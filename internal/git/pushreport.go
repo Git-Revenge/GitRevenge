@@ -30,10 +30,14 @@ type PushDest struct {
 	Detail string `json:"detail,omitempty"`
 }
 
-// porcelainBlocks reads `git push --porcelain` output: for each "To <url>" block, its refs'
-// flags and summaries.
-func porcelainBlocks(out string) (urls []string, refs map[string][][2]string) {
-	refs = map[string][][2]string{}
+// porcelainRef is one ref of a `git push --porcelain` block.
+type porcelainRef struct {
+	flag, from, to, summary string
+}
+
+// porcelainBlocks reads `git push --porcelain` output: for each "To <url>" block, its refs.
+func porcelainBlocks(out string) (urls []string, refs map[string][]porcelainRef) {
+	refs = map[string][]porcelainRef{}
 	cur := ""
 	for line := range strings.SplitSeq(out, "\n") {
 		line = strings.TrimRight(line, "\r")
@@ -46,7 +50,8 @@ func porcelainBlocks(out string) (urls []string, refs map[string][][2]string) {
 			// "<flag>\t<from>:<to>\t<summary>"
 			parts := strings.SplitN(line, "\t", 3)
 			if len(parts) == 3 {
-				refs[cur] = append(refs[cur], [2]string{parts[0], parts[2]})
+				from, to, _ := strings.Cut(parts[1], ":")
+				refs[cur] = append(refs[cur], porcelainRef{flag: parts[0], from: from, to: to, summary: parts[2]})
 			}
 		}
 	}
@@ -58,7 +63,7 @@ func porcelainBlocks(out string) (urls []string, refs map[string][][2]string) {
 // failed, and the ones after it weren't tried.
 func PushDests(pushURLs []string, out string, err error) []PushDest {
 	_, refs := porcelainBlocks(out)
-	blockFor := func(u string) ([][2]string, bool) {
+	blockFor := func(u string) ([]porcelainRef, bool) {
 		for got, rs := range refs {
 			if SameRemoteURL(got, u) || got == u {
 				return rs, true
@@ -84,9 +89,9 @@ func PushDests(pushURLs []string, out string, err error) []PushDest {
 		default:
 			d.State = PushUpToDate
 			for _, r := range rs {
-				switch r[0] {
+				switch r.flag {
 				case "!":
-					d.State, d.Detail = PushRejected, rejectionReason(r[1])
+					d.State, d.Detail = PushRejected, rejectionReason(r.summary)
 				case "=":
 				default:
 					if d.State != PushRejected {
@@ -150,7 +155,43 @@ func (r *Repo) PushWithReport(ctx context.Context, p PushOptions, o NetOptions) 
 			}
 		}
 	}
-	return PushDests(urls, string(out), err), err
+	dests := PushDests(urls, string(out), err)
+	// --porcelain puts a refused ref on stdout, where git's plain push puts
+	// " ! [rejected] main -> main (fetch first)" on stderr. Whatever explains a refusal reads
+	// that line, so it's added to stderr as git would have written it.
+	var gerr *Error
+	if errors.As(err, &gerr) {
+		if lines := classicRefusals(string(out)); lines != "" {
+			gerr.Stderr = strings.TrimRight(gerr.Stderr, "\n") + "\n" + lines
+		}
+	}
+	return dests, err
+}
+
+// classicRefusals writes the refused refs of `git push --porcelain` output as a plain push
+// writes them: " ! [rejected] main -> main (fetch first)".
+func classicRefusals(out string) string {
+	_, refs := porcelainBlocks(out)
+	var b strings.Builder
+	for _, rs := range refs {
+		for _, r := range rs {
+			if r.flag != "!" {
+				continue
+			}
+			// "[remote rejected] (pre-receive hook declined)": the bracket, then the reason.
+			kind, reason := r.summary, ""
+			if end := strings.Index(r.summary, "]"); strings.HasPrefix(r.summary, "[") && end >= 0 {
+				kind, reason = r.summary[:end+1], strings.TrimSpace(r.summary[end+1:])
+			}
+			short := func(ref string) string { return strings.TrimPrefix(ref, "refs/heads/") }
+			b.WriteString(" ! " + kind + " " + short(r.from) + " -> " + short(r.to))
+			if reason != "" {
+				b.WriteString(" " + reason)
+			}
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
 }
 
 // PushToURL pushes one refspec to one URL, for going on with the URLs a push didn't reach. It

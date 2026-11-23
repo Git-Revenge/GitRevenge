@@ -3,6 +3,7 @@ package git
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/git-revenge/gitrevenge/internal/gittest"
@@ -74,5 +75,25 @@ func TestRejectionReason(t *testing.T) {
 		if got := rejectionReason(in); got != want {
 			t.Errorf("rejectionReason(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// A refusal in --porcelain output reads, on stderr, as git's plain push writes it, so what
+// explains refusals keeps working.
+func TestClassicRefusals(t *testing.T) {
+	t.Parallel()
+	out := "To ../r.git\n" +
+		"!\trefs/heads/main:refs/heads/main\t[remote rejected] (pre-receive hook declined)\n" +
+		"!\trefs/heads/fix:refs/heads/fix\t[rejected] (fetch first)\n" +
+		"*\trefs/heads/new:refs/heads/new\t[new branch]\n" +
+		"Done\n"
+	got := classicRefusals(out)
+	for _, want := range []string{" ! [remote rejected] main -> main (pre-receive hook declined)\n", " ! [rejected] fix -> fix (fetch first)\n"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "new") {
+		t.Errorf("a pushed ref came out as refused:\n%s", got)
 	}
 }
