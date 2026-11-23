@@ -28,6 +28,10 @@ type Site struct {
 	// Name is the repository's own name, the last part of its path.
 	Name string `json:"name"`
 	host string
+	// path is the repository's path in its clone URLs, and public says the forge is one
+	// known by its host, whose SSH address is known too.
+	path   string
+	public bool
 }
 
 // For returns where a remote URL's repository is on the web, or false when its forge isn't
@@ -52,7 +56,9 @@ func For(remoteURL string, cfg links.Config) (Site, bool) {
 		base += ":" + loc.Port
 	}
 	forge := loc.Forge
-	if rule, ok := cfg.ForgeFor(loc.Host); ok {
+	rule, ruled := cfg.ForgeFor(loc.Host)
+	switch {
+	case ruled:
 		forge = rule.Forge
 		if rule.Web != "" {
 			base = rule.Web
@@ -69,12 +75,12 @@ func For(remoteURL string, cfg links.Config) (Site, bool) {
 				return Site{}, false
 			}
 		}
-	} else if loc.Forge == git.ForgeNone {
+	case loc.Forge == git.ForgeNone:
 		return Site{}, false
-	} else if loc.Place != git.PlaceWeb {
+	case loc.Place != git.PlaceWeb:
 		base = "https://" + loc.Host
 	}
-	s := Site{Forge: forge, Repo: base + "/" + escapePath(path), host: loc.Host}
+	s := Site{Forge: forge, Repo: base + "/" + escapePath(path), host: loc.Host, path: loc.Path, public: loc.Forge != git.ForgeNone && !ruled}
 	if i := strings.LastIndex(loc.Path, "/"); i >= 0 {
 		s.Owner, s.Name = loc.Path[:i], loc.Path[i+1:]
 	} else {
@@ -187,6 +193,27 @@ func (s Site) Compare(branch string, base Base) string {
 		return s.Repo + "/branchCompare?baseVersion=GB" + url.QueryEscape(base.Branch) + "&targetVersion=GB" + url.QueryEscape(branch)
 	}
 	return ""
+}
+
+// Clone returns the addresses the repository can be cloned from over HTTPS and over SSH, for
+// copying. Either is "" when it isn't known: a self-hosted forge's SSH user and port are its
+// own, and Bitbucket Data Center's paths differ by protocol.
+func (s Site) Clone() (https, ssh string) {
+	switch s.Forge {
+	case git.ForgeBitbucketServer:
+		return "", ""
+	case git.ForgeAzure:
+		https = s.Repo
+		if s.public && s.host == "dev.azure.com" {
+			ssh = "git@ssh.dev.azure.com:v3/" + strings.Replace(s.path, "/_git/", "/", 1)
+		}
+		return https, ssh
+	}
+	https = s.Repo + ".git"
+	if s.public {
+		ssh = "git@" + s.host + ":" + s.path + ".git"
+	}
+	return https, ssh
 }
 
 // Issues returns an address for the repository's issues with "{n}" for the number, or ""

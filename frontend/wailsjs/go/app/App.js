@@ -262,6 +262,10 @@ export function HideBranch(arg1, arg2, arg3) {
   return window['go']['app']['App']['HideBranch'](arg1, arg2, arg3);
 }
 
+export function HideRemote(arg1, arg2, arg3) {
+  return window['go']['app']['App']['HideRemote'](arg1, arg2, arg3);
+}
+
 export function HomeDir() {
   return window['go']['app']['App']['HomeDir']();
 }
@@ -718,6 +722,10 @@ export function SetPreferences(arg1) {
   return window['go']['app']['App']['SetPreferences'](arg1);
 }
 
+export function SetPushDefault(arg1, arg2) {
+  return window['go']['app']['App']['SetPushDefault'](arg1, arg2);
+}
+
 export function SetRepoPreferences(arg1, arg2) {
   return window['go']['app']['App']['SetRepoPreferences'](arg1, arg2);
 }
@@ -764,6 +772,10 @@ export function SetWebLinks(arg1, arg2) {
 
 export function SetWorkTreeContent(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['SetWorkTreeContent'](arg1, arg2, arg3, arg4);
+}
+
+export function ShowRemoteFolder(arg1, arg2) {
+  return window['go']['app']['App']['ShowRemoteFolder'](arg1, arg2);
 }
 
 export function ShowingHidden(arg1) {

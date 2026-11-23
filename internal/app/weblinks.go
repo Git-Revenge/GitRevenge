@@ -19,6 +19,10 @@ type RemoteWeb struct {
 	// DefaultBranch is the branch refs/remotes/<name>/HEAD points at, or "" when git
 	// hasn't heard (git remote set-head <name> --auto asks).
 	DefaultBranch string `json:"defaultBranch"`
+	// CloneHTTPS and CloneSSH are the addresses to clone it from over each protocol, for
+	// copying, or "" where that isn't known.
+	CloneHTTPS string `json:"cloneHttps"`
+	CloneSSH   string `json:"cloneSsh"`
 	// Bases are what the remote's branches can be compared with:
 	// the remote's own default branch first, then those of remotes it looks like a fork of.
 	Bases []WebBase `json:"bases"`
@@ -68,6 +72,7 @@ func (a *App) remoteSites(ctx context.Context, path string) ([]RemoteWeb, map[st
 	for _, name := range order {
 		s := sites[name]
 		w := RemoteWeb{Remote: name, Forge: s.Forge, Repo: s.Repo, Branches: s.Branches(), DefaultBranch: heads[name], Bases: []WebBase{}}
+		w.CloneHTTPS, w.CloneSSH = s.Clone()
 		w.Bases = append(w.Bases, WebBase{Remote: name, Branch: heads[name]})
 		for _, other := range order {
 			// Only a base the forge can compare with by address is offered.

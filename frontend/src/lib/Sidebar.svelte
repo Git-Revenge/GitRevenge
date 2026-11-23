@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { DeletableBranches, DeleteMergedBranches, MergedBranches, RemotePlaces, Remotes, SetShowHidden, ShowingHidden } from '../../wailsjs/go/app/App.js'
+  import { DeletableBranches, DeleteMergedBranches, Fetch, HideRemote, MergedBranches, RemoteAction, RemotePlaces, Remotes, RemoteSettings, RemoteWebLinks, SetPushDefault, SetShowHidden, ShowingHidden, ShowRemoteFolder } from '../../wailsjs/go/app/App.js'
+  import { BrowserOpenURL, ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
+  import { errorText } from './errors'
+  import { forgeAsk } from './links/forgeAsk.svelte'
+  import { remoteMenuItems } from './remoteMenu'
+  import { toasts } from './toasts.svelte'
   import type { git } from '../../wailsjs/go/models'
   import { prefs } from './prefs.svelte'
   import { placeLook, remoteHeader, trackersByRemote, type PlaceLook, type RemoteHeader, type URLPlace } from './remoteHeader'
@@ -144,6 +149,43 @@
     )
   }
   const fetchEvery = () => commands.all().find((c) => c.id === 'repo.fetch')?.run()
+
+  /** A remote's own menu: read what it needs fresh, since it can open long after a load. */
+  async function remoteMenu(name: string, x: number, y: number) {
+    const [web, set] = await Promise.all([RemoteWebLinks(path).catch(() => []), RemoteSettings(path).catch(() => null)])
+    const remote = remotes.find((r) => r.name === name)
+    if (!remote || !onMenu) return
+    const reload = () => void loadRemotes()
+    const items = remoteMenuItems(
+      { remote, place: places[remote.fetchUrl], web: web.find((w) => w.remote === name), pushDefault: set?.pushDefault ?? '', now: Date.now() / 1000 },
+      {
+        open: (url) => BrowserOpenURL(url),
+        copy: (text, what) => {
+          void ClipboardSetText(text)
+          toasts.show(`Copied ${name}'s ${what}.`)
+        },
+        fetch: (n) => void session.run(() => Fetch(path, n)),
+        setPushDefault: (n) => void session.run(() => SetPushDefault(path, n)).then(reload),
+        hide: (n, hide) => void session.run(() => HideRemote(path, n, hide)).then(reload),
+        showFolder: (n) => void session.run(() => ShowRemoteFolder(path, n)),
+        nameForge: (host) => {
+          forgeAsk.host = host
+          commands.settingsOpen = true
+        },
+        openDialog,
+        act: async (action, args) => {
+          try {
+            await RemoteAction(path, action, args)
+            reload()
+            return ''
+          } catch (e) {
+            return errorText(e)
+          }
+        },
+      },
+    )
+    onMenu(items, x, y)
+  }
   // The fetch ages move on by themselves.
   let now = $state(Date.now() / 1000)
   onMount(() => {
@@ -240,6 +282,7 @@
     const x = (box?.left ?? 0) + 32
     const y = box?.bottom ?? 0
     if (row?.type === 'ref') onContext?.(row.ref, x, y)
+    else if (row?.remote) void remoteMenu(row.label, x, y)
     else if (row?.members) onStackContext?.(row.members, x, y)
   }
 
@@ -525,7 +568,7 @@
             aria-expanded={row.type === 'folder' ? row.open : undefined}
             aria-selected={row.type === 'ref' && !!selectedCommit && row.ref.commit === selectedCommit}
           >
-            <SidebarRow {row} {onStackContext} {filter} {selectedCommit} remote={row.type === 'folder' && row.remote ? headers[row.label] : undefined} hostLook={row.type === 'folder' && row.remotes !== undefined ? hostLooks[row.host ?? ''] : undefined} {remoteTones} brand={prefs.forgeColors} mergedInto={row.type === 'ref' && row.ref.kind === 'local' ? merged[row.ref.short] : undefined} onFolderClick={clickFolder} onRefClick={clickRef} {onActivate} {onContext} />
+            <SidebarRow {row} {onStackContext} onRemoteContext={onMenu ? (n, x, y) => void remoteMenu(n, x, y) : undefined} {filter} {selectedCommit} remote={row.type === 'folder' && row.remote ? headers[row.label] : undefined} hostLook={row.type === 'folder' && row.remotes !== undefined ? hostLooks[row.host ?? ''] : undefined} {remoteTones} brand={prefs.forgeColors} mergedInto={row.type === 'ref' && row.ref.kind === 'local' ? merged[row.ref.short] : undefined} onFolderClick={clickFolder} onRefClick={clickRef} {onActivate} {onContext} />
           </li>
         {/each}
       </ul>
@@ -662,10 +705,11 @@
     padding-inline: 8px;
   }
 
+  /* Tight, so "Remotes" keeps its whole width beside "Remote ▾" at the default width. */
   .group {
     flex: none;
-    gap: 4px;
-    padding-inline: 8px;
+    gap: 2px;
+    padding-inline: 4px;
   }
 
   .filter {
