@@ -49,7 +49,7 @@
     <div class="dest">
       <PlaceGlyph look={placeLook(places[u])} size={14} {brand} />
       <span class="t">
-        <span class="url" title={u}>{u}</span>
+        <span class="url" title={u}><bdi>{u}</bdi></span>
         {#if own}<span class="d">its own URL</span>{:else if f}<span class="d"><Icon name="link" size={12} /> follows {f}: moves when {f}'s URL does</span>{/if}
       </span>
       {#if !own}
@@ -101,12 +101,15 @@
     min-width: 0;
   }
 
+  /* Cut from the start: the end of an address (the repository's name) tells them apart. */
   .url {
     font-family: var(--font-mono);
     font-size: 13px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    direction: rtl;
+    text-align: left;
   }
 
   .d {

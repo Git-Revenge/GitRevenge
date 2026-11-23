@@ -2,7 +2,10 @@ package app
 
 import (
 	"context"
+	"path"
+	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/session"
@@ -67,7 +70,8 @@ func named(ds []git.PushDest) []PushDest {
 	for i, d := range ds {
 		name := git.ParseLocation(d.URL).Host
 		if name == "" {
-			name = d.URL
+			// A folder on this machine: its own name, not the whole path.
+			name = path.Base(strings.TrimRight(filepath.ToSlash(d.URL), "/"))
 		}
 		out[i] = PushDest{PushDest: d, Name: name}
 	}
