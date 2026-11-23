@@ -11,8 +11,10 @@ import (
 	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
-// hiddenRefs waits for the graph to reload and returns which refs are hidden, by short name.
-func hiddenRefs(t *testing.T, a *App, path string, want int) []string {
+// hiddenRefs waits until the hidden refs are exactly want, by short name, as the graph
+// reloads, and returns the last ones it saw. Waiting on a count alone would pass on the
+// graph before a rename reloads it.
+func hiddenRefs(t *testing.T, a *App, path string, want ...string) []string {
 	t.Helper()
 	var hidden []string
 	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
@@ -27,11 +29,11 @@ func hiddenRefs(t *testing.T, a *App, path string, want int) []string {
 				hidden = append(hidden, r.Short)
 			}
 		}
-		if len(hidden) == want {
+		slices.Sort(hidden)
+		if slices.Equal(hidden, want) {
 			break
 		}
 	}
-	slices.Sort(hidden)
 	return hidden
 }
 
@@ -53,7 +55,7 @@ func TestHideRemote(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Only upstream's branches: not origin/main, and not the local main of the same name.
-	if got := hiddenRefs(t, a, tab.Path, 2); !slices.Equal(got, []string{"upstream/fix", "upstream/main"}) {
+	if got := hiddenRefs(t, a, tab.Path, "upstream/fix", "upstream/main"); !slices.Equal(got, []string{"upstream/fix", "upstream/main"}) {
 		t.Fatalf("hidden = %v", got)
 	}
 	remoteHidden := func() map[string]bool {
@@ -78,13 +80,13 @@ func TestHideRemote(t *testing.T) {
 	if h := remoteHidden(); !h["theirs"] {
 		t.Fatalf("after rename: %v", h)
 	}
-	if got := hiddenRefs(t, a, tab.Path, 2); !slices.Equal(got, []string{"theirs/fix", "theirs/main"}) {
+	if got := hiddenRefs(t, a, tab.Path, "theirs/fix", "theirs/main"); !slices.Equal(got, []string{"theirs/fix", "theirs/main"}) {
 		t.Fatalf("hidden after rename = %v", got)
 	}
 	if err := a.HideRemote(tab.Path, "theirs", false); err != nil {
 		t.Fatal(err)
 	}
-	if got := hiddenRefs(t, a, tab.Path, 0); len(got) != 0 {
+	if got := hiddenRefs(t, a, tab.Path); len(got) != 0 {
 		t.Fatalf("hidden after showing = %v", got)
 	}
 	if err := a.HideRemote(tab.Path, "theirs", true); err != nil {
