@@ -372,7 +372,7 @@
     border: 1px solid currentColor;
     border-radius: 4px;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     line-height: 16px;
     font-weight: 400;
   }

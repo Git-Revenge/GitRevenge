@@ -106,12 +106,12 @@
   // The host each remote is on, for the Host grouping; '' for a folder on this machine.
   let hostOf = $derived.by(() => {
     if (!remotesRead) return undefined
-    const hosts = new Map<string, string>()
+    const hosts: Record<string, string> = {}
     for (const r of remotes) {
       const p = places[r.fetchUrl]
-      hosts.set(r.name, !p || p.place === 'local' ? '' : p.host)
+      hosts[r.name] = !p || p.place === 'local' ? '' : p.host
     }
-    return (name: string) => hosts.get(name)
+    return (name: string): string | undefined => (Object.hasOwn(hosts, name) ? hosts[name] : undefined)
   })
   // A host's mark: its first remote's, so github.com shows GitHub's when that remote opens on
   // the web.
