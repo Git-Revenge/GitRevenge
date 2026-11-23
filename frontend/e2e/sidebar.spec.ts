@@ -364,3 +364,39 @@ test('the Repository panel opens Ignore rules, and its filter finds it', async (
   // Opening the tab remembers it for this repository.
   await expect.poll(() => calls(page, 'SetIgnoreTab')).not.toHaveLength(0)
 })
+
+// #919
+test.describe("a remote's header", () => {
+  const now = Math.floor(Date.now() / 1000)
+  const gh = 'git@github.com:ris/tidewater.git'
+  const remotes = [
+    { name: 'origin', fetchUrl: gh, pushUrl: gh, pushUrls: [gh, 'git@nas.local:srv/t.git'], fetchedAt: now - 240 },
+    { name: 'upstream', fetchUrl: 'https://code.example.org/t/t.git', pushUrl: 'https://code.example.org/t/t.git', pushUrls: ['https://code.example.org/t/t.git'], fetchedAt: now - 9 * 86400 },
+  ]
+  const places = {
+    [gh]: { place: 'server', host: 'github.com', forge: 'github', web: 'https://github.com/ris/tidewater' },
+    'git@nas.local:srv/t.git': { place: 'server', host: 'nas.local', forge: '', web: '' },
+    'https://code.example.org/t/t.git': { place: 'web', host: 'code.example.org', forge: '', web: '' },
+  }
+  const withRemotes = { ...scenario, responses: { ...scenario.responses, Remotes: remotes, RemotePlaces: places } }
+
+  test('says where each remote lives and how fresh it is', async ({ page }) => {
+    await open(page, 'sidebar', withRemotes)
+    await page.getByRole('button', { name: 'Remotes', exact: true }).click()
+    const origin = page.locator('.row.folder', { hasText: 'origin' })
+    await expect(origin.locator('.host')).toContainText('github.com')
+    await expect(origin.locator('.host')).toContainText('GitHub')
+    await expect(origin.locator('.age')).toContainText('4m')
+    await expect(origin.locator('.age')).not.toHaveClass(/stale/)
+    await expect(origin.locator('.fan .fan-mark')).toHaveCount(2)
+    await expect(origin).toHaveAttribute('title', /Push to origin: GitHub, nas\.local/)
+    await expect(origin).toHaveAttribute('title', /Tracked by main, feature\/one/)
+
+    const upstream = page.locator('.row.folder', { hasText: 'upstream' })
+    await expect(upstream.locator('.host')).toContainText("A host we don't recognise")
+    // The app's own stroked cloud, not a filled forge mark.
+    await expect(upstream.locator('.host svg path')).toHaveAttribute('fill', 'none')
+    await expect(upstream.locator('.age')).toHaveClass(/stale/)
+    await expect(upstream.locator('.age')).toContainText('Stale, fetched 9 days ago')
+  })
+})
