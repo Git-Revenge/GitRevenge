@@ -1,6 +1,8 @@
 // Package weblinks builds the addresses of a remote's pages on its forge: the repository,
-// its branches, one branch, a comparison and a new pull or merge request. They're built from
-// the remote URL and nothing else; nothing here contacts the forge.
+// its branches, one branch and a comparison of two branches. They're built from the remote
+// URL and nothing else; nothing here contacts the forge. There are no links that start a
+// pull or merge request: the app doesn't take part in them, and a link that seemed to would
+// only confuse.
 //
 // A forge is known by its host (github.com, gitlab.com and the like) or from a forge rule in
 // git config, never guessed from a host's name. A remote on a host with neither has no web
@@ -137,7 +139,7 @@ func (s Site) Branch(branch string) string {
 	return ""
 }
 
-// Base is what a branch is compared with, or asked to be merged into: a branch of the
+// Base is what a branch is compared with: a branch of the
 // remote's own repository, or of another remote's on the same forge that it's a fork of.
 type Base struct {
 	Site   Site
@@ -183,64 +185,6 @@ func (s Site) Compare(branch string, base Base) string {
 		return s.Repo + "/compare/commits?sourceBranch=" + url.QueryEscape("refs/heads/"+branch) + "&targetBranch=" + url.QueryEscape("refs/heads/"+base.Branch)
 	case git.ForgeAzure:
 		return s.Repo + "/branchCompare?baseVersion=GB" + url.QueryEscape(base.Branch) + "&targetVersion=GB" + url.QueryEscape(branch)
-	}
-	return ""
-}
-
-// Request returns the page that opens a new pull or merge request from a branch into a base,
-// or "" when the forge can't start one by address. With no base branch known, the forge's
-// own default target is used where it has one.
-func (s Site) Request(branch string, base Base) string {
-	cross, ok := s.crossFork(base)
-	if !ok {
-		return ""
-	}
-	if cross {
-		if base.Branch == "" {
-			return ""
-		}
-		u := base.Site.Repo + "/compare/" + escapePath(base.Branch) + "..." + url.PathEscape(s.Owner) + ":" + escapePath(branch)
-		if s.Forge == git.ForgeGitHub {
-			u += "?expand=1"
-		}
-		return u
-	}
-	q := url.QueryEscape
-	switch s.Forge {
-	case git.ForgeGitHub:
-		if base.Branch == "" {
-			return s.Repo + "/compare/" + escapePath(branch) + "?expand=1"
-		}
-		return s.Repo + "/compare/" + escapePath(base.Branch) + "..." + escapePath(branch) + "?expand=1"
-	case git.ForgeGitea, git.ForgeForgejo, git.ForgeCodeberg:
-		if base.Branch == "" {
-			return ""
-		}
-		return s.Repo + "/compare/" + escapePath(base.Branch) + "..." + escapePath(branch)
-	case git.ForgeGitLab:
-		u := s.Repo + "/-/merge_requests/new?" + q("merge_request[source_branch]") + "=" + q(branch)
-		if base.Branch != "" {
-			u += "&" + q("merge_request[target_branch]") + "=" + q(base.Branch)
-		}
-		return u
-	case git.ForgeBitbucket:
-		u := s.Repo + "/pull-requests/new?source=" + q(branch)
-		if base.Branch != "" {
-			u += "&dest=" + q(base.Branch)
-		}
-		return u
-	case git.ForgeBitbucketServer:
-		u := s.Repo + "/pull-requests?create&sourceBranch=" + q("refs/heads/"+branch)
-		if base.Branch != "" {
-			u += "&targetBranch=" + q("refs/heads/"+base.Branch)
-		}
-		return u
-	case git.ForgeAzure:
-		u := s.Repo + "/pullrequestcreate?sourceRef=" + q(branch)
-		if base.Branch != "" {
-			u += "&targetRef=" + q(base.Branch)
-		}
-		return u
 	}
 	return ""
 }

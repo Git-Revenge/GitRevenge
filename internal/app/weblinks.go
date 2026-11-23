@@ -19,33 +19,32 @@ type RemoteWeb struct {
 	// DefaultBranch is the branch refs/remotes/<name>/HEAD points at, or "" when git
 	// hasn't heard (git remote set-head <name> --auto asks).
 	DefaultBranch string `json:"defaultBranch"`
-	// Bases are what the remote's branches can be compared with and asked to merge into:
+	// Bases are what the remote's branches can be compared with:
 	// the remote's own default branch first, then those of remotes it looks like a fork of.
 	Bases []WebBase `json:"bases"`
 }
 
-// WebBase is one remote's branch a comparison or request can target.
+// WebBase is one remote's branch a comparison can be made with.
 type WebBase struct {
 	Remote string `json:"remote"`
 	Branch string `json:"branch"`
 }
 
-// BranchWeb is a remote branch's pages: the branch itself, and a comparison and new request
-// against each base. A link the forge can't make by address is "".
+// BranchWeb is a remote branch's pages: the branch itself, and a comparison with each base.
+// A link the forge can't make by address is "".
 type BranchWeb struct {
 	Branch string          `json:"branch"`
 	Bases  []BranchWebBase `json:"bases"`
 }
 
-// BranchWebBase is a branch's comparison and new request against one base.
+// BranchWebBase is a branch's comparison with one base.
 type BranchWebBase struct {
 	WebBase
 	Compare string `json:"compare"`
-	Request string `json:"request"`
 }
 
 // remoteSites reads where each remote is on the web, the default branches, and the bases
-// each remote's branches can target. Remotes with no known forge are left out.
+// each remote's branches can be compared with. Remotes with no known forge are left out.
 func (a *App) remoteSites(ctx context.Context, path string) ([]RemoteWeb, map[string]weblinks.Site, error) {
 	r, err := a.openRepo(path)
 	if err != nil {
@@ -112,7 +111,7 @@ func (a *App) BranchWebLinks(path, remote, branch string) (BranchWeb, error) {
 				// A branch isn't compared with itself.
 				continue
 			}
-			res.Bases = append(res.Bases, BranchWebBase{WebBase: b, Compare: s.Compare(branch, base), Request: s.Request(branch, base)})
+			res.Bases = append(res.Bases, BranchWebBase{WebBase: b, Compare: s.Compare(branch, base)})
 		}
 	}
 	return res, nil

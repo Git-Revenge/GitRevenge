@@ -101,29 +101,26 @@ func TestBranchPages(t *testing.T) {
 	c := cfg(links.ForgeRule{Host: "bb.acme.com", Forge: git.ForgeBitbucketServer}, links.ForgeRule{Host: "git.acme.com", Forge: git.ForgeForgejo})
 	const b = "feature/a b"
 	cases := []struct {
-		url, branches, branch, compare, request string
+		url, branches, branch, compare string
 	}{
 		{"git@github.com:o/r.git", "https://github.com/o/r/branches", "https://github.com/o/r/tree/feature/a%20b",
-			"https://github.com/o/r/compare/main...feature/a%20b", "https://github.com/o/r/compare/main...feature/a%20b?expand=1"},
+			"https://github.com/o/r/compare/main...feature/a%20b"},
 		{"git@gitlab.com:g/p.git", "https://gitlab.com/g/p/-/branches", "https://gitlab.com/g/p/-/tree/feature/a%20b",
-			"https://gitlab.com/g/p/-/compare/main...feature/a%20b",
-			"https://gitlab.com/g/p/-/merge_requests/new?merge_request%5Bsource_branch%5D=feature%2Fa+b&merge_request%5Btarget_branch%5D=main"},
+			"https://gitlab.com/g/p/-/compare/main...feature/a%20b"},
 		{"https://gitea.com/o/r", "https://gitea.com/o/r/branches", "https://gitea.com/o/r/src/branch/feature/a%20b",
-			"https://gitea.com/o/r/compare/main...feature/a%20b", "https://gitea.com/o/r/compare/main...feature/a%20b"},
+			"https://gitea.com/o/r/compare/main...feature/a%20b"},
 		{"git@git.acme.com:o/r.git", "https://git.acme.com/o/r/branches", "https://git.acme.com/o/r/src/branch/feature/a%20b",
-			"https://git.acme.com/o/r/compare/main...feature/a%20b", "https://git.acme.com/o/r/compare/main...feature/a%20b"},
+			"https://git.acme.com/o/r/compare/main...feature/a%20b"},
 		{"git@codeberg.org:o/r.git", "https://codeberg.org/o/r/branches", "https://codeberg.org/o/r/src/branch/feature/a%20b",
-			"https://codeberg.org/o/r/compare/main...feature/a%20b", "https://codeberg.org/o/r/compare/main...feature/a%20b"},
+			"https://codeberg.org/o/r/compare/main...feature/a%20b"},
 		{"git@bitbucket.org:t/r.git", "https://bitbucket.org/t/r/branches", "https://bitbucket.org/t/r/src/feature/a%20b",
-			"https://bitbucket.org/t/r/branches/compare/feature/a%20b%0Dmain", "https://bitbucket.org/t/r/pull-requests/new?source=feature%2Fa+b&dest=main"},
+			"https://bitbucket.org/t/r/branches/compare/feature/a%20b%0Dmain"},
 		{"https://bb.acme.com/scm/proj/repo.git", "https://bb.acme.com/projects/PROJ/repos/repo/branches",
 			"https://bb.acme.com/projects/PROJ/repos/repo/browse?at=refs%2Fheads%2Ffeature%2Fa+b",
-			"https://bb.acme.com/projects/PROJ/repos/repo/compare/commits?sourceBranch=refs%2Fheads%2Ffeature%2Fa+b&targetBranch=refs%2Fheads%2Fmain",
-			"https://bb.acme.com/projects/PROJ/repos/repo/pull-requests?create&sourceBranch=refs%2Fheads%2Ffeature%2Fa+b&targetBranch=refs%2Fheads%2Fmain"},
+			"https://bb.acme.com/projects/PROJ/repos/repo/compare/commits?sourceBranch=refs%2Fheads%2Ffeature%2Fa+b&targetBranch=refs%2Fheads%2Fmain"},
 		{"git@ssh.dev.azure.com:v3/org/proj/repo", "https://dev.azure.com/org/proj/_git/repo/branches",
 			"https://dev.azure.com/org/proj/_git/repo?version=GBfeature%2Fa+b",
-			"https://dev.azure.com/org/proj/_git/repo/branchCompare?baseVersion=GBmain&targetVersion=GBfeature%2Fa+b",
-			"https://dev.azure.com/org/proj/_git/repo/pullrequestcreate?sourceRef=feature%2Fa+b&targetRef=main"},
+			"https://dev.azure.com/org/proj/_git/repo/branchCompare?baseVersion=GBmain&targetVersion=GBfeature%2Fa+b"},
 	}
 	for _, tc := range cases {
 		s := site(t, tc.url, c)
@@ -132,7 +129,6 @@ func TestBranchPages(t *testing.T) {
 			{"Branches", s.Branches(), tc.branches},
 			{"Branch", s.Branch(b), tc.branch},
 			{"Compare", s.Compare(b, base), tc.compare},
-			{"Request", s.Request(b, base), tc.request},
 		} {
 			if got.got != got.want {
 				t.Errorf("%s: %s = %q, want %q", tc.url, got.name, got.got, got.want)
@@ -146,17 +142,6 @@ func TestNoBaseKnown(t *testing.T) {
 	gh := site(t, "git@github.com:o/r.git", links.Config{})
 	if got := gh.Compare("x", Base{Site: gh}); got != "" {
 		t.Errorf("compare with no base = %q", got)
-	}
-	if got, want := gh.Request("x", Base{Site: gh}), "https://github.com/o/r/compare/x?expand=1"; got != want {
-		t.Errorf("request with no base = %q, want %q", got, want)
-	}
-	gl := site(t, "git@gitlab.com:g/p.git", links.Config{})
-	if got, want := gl.Request("x", Base{Site: gl}), "https://gitlab.com/g/p/-/merge_requests/new?merge_request%5Bsource_branch%5D=x"; got != want {
-		t.Errorf("request with no base = %q, want %q", got, want)
-	}
-	gt := site(t, "https://gitea.com/o/r", links.Config{})
-	if got := gt.Request("x", Base{Site: gt}); got != "" {
-		t.Errorf("gitea request with no base = %q", got)
 	}
 }
 
@@ -172,9 +157,6 @@ func TestForks(t *testing.T) {
 	base := Base{Site: up, Branch: "main"}
 	if got, want := fork.Compare("fix/x", base), "https://github.com/Git-Revenge/gitrevenge/compare/main...ris:fix/x"; got != want {
 		t.Errorf("compare across forks = %q, want %q", got, want)
-	}
-	if got, want := fork.Request("fix/x", base), "https://github.com/Git-Revenge/gitrevenge/compare/main...ris:fix/x?expand=1"; got != want {
-		t.Errorf("request across forks = %q, want %q", got, want)
 	}
 	labUp := site(t, "git@gitlab.com:team/GitRevenge.git", links.Config{})
 	if got := lab.Compare("x", Base{Site: labUp, Branch: "main"}); got != "" {
