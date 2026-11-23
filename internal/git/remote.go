@@ -9,11 +9,31 @@ import (
 	"strings"
 )
 
-// Remote is a configured remote repository.
+// Remote is a configured remote repository. Remotes fills in the names and URLs; the rest
+// comes from RemoteDetails.
 type Remote struct {
 	Name     string `json:"name"`
 	FetchURL string `json:"fetchUrl"`
-	PushURL  string `json:"pushUrl"`
+	// PushURL is the first URL a push goes to, and PushURLs every one of them: the
+	// remote's pushurl entries, or its URL when it has none.
+	PushURL  string   `json:"pushUrl"`
+	PushURLs []string `json:"pushUrls"`
+
+	// Location is where FetchURL points.
+	Location Location `json:"location"`
+	// Pushes are PushURLs, each with the remote whose own URL it is.
+	Pushes []PushTarget `json:"pushes"`
+	// Prune is remote.<name>.prune, nil when it isn't set.
+	Prune *bool `json:"prune"`
+	// TagOpt is remote.<name>.tagOpt: "", "--tags" or "--no-tags".
+	TagOpt string `json:"tagOpt"`
+	// SkipFetchAll keeps the remote out of a fetch of every remote.
+	SkipFetchAll bool `json:"skipFetchAll"`
+	// FetchRefspecs are remote.<name>.fetch, in order.
+	FetchRefspecs []string `json:"fetchRefspecs"`
+	// FetchedAt is when the remote was last fetched, in Unix seconds, or 0 when that isn't
+	// known.
+	FetchedAt int64 `json:"fetchedAt"`
 }
 
 // Remotes lists configured remotes.
@@ -38,7 +58,11 @@ func (r *Repo) Remotes(ctx context.Context) ([]Remote, error) {
 			order = append(order, name)
 		}
 		if kind == "(push)" {
-			rm.PushURL = url
+			// A remote with several pushurl entries has a (push) line for each.
+			if rm.PushURL == "" {
+				rm.PushURL = url
+			}
+			rm.PushURLs = append(rm.PushURLs, url)
 		} else {
 			rm.FetchURL = url
 		}
@@ -403,7 +427,11 @@ func webLocation(remoteURL string) (host, path string) {
 		host, path, _ = strings.Cut(u, "/")
 		host, _, _ = strings.Cut(host, ":") // drop a port
 	} else {
-		// scp-style: [user@]host:path
+		// scp-style: [user@]host:path. Git reads C:\repo, or a slash before the colon, as a
+		// path on this machine.
+		if localPath(u) {
+			return "", ""
+		}
 		if at := strings.Index(u, "@"); at >= 0 {
 			u = u[at+1:]
 		}

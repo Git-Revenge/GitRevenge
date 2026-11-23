@@ -3,18 +3,47 @@ package app
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/git-revenge/gitrevenge/internal/fetchlog"
 	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
 // fetchRemotes fetches remote, or every remote when it's "", and returns the remotes that
 // were fetched. Git calls a fetch of every remote failed when any one of them fails, though
 // the others are up to date: here the ones it reached are returned, along with a Problem
-// that names the ones it didn't (#806). With nothing fetched, the error is git's own.
-func fetchRemotes(ctx context.Context, g *git.Repo, remote string, o git.NetOptions) ([]string, error) {
+// that names the ones it didn't (#806). With nothing fetched, the error is git's own. The
+// remotes it reached are written down as fetched now (see fetchlog).
+func (a *App) fetchRemotes(ctx context.Context, g *git.Repo, remote string, o git.NetOptions) ([]string, error) {
+	reached, err := fetchRemotesOf(ctx, g, remote, o)
+	a.noteFetched(ctx, g, reached)
+	return reached, err
+}
+
+// noteFetched writes down that the named remotes of g were fetched just now.
+func (a *App) noteFetched(ctx context.Context, g *git.Repo, names []string) {
+	if len(names) == 0 {
+		return
+	}
+	if common, err := g.CommonDir(ctx); err == nil {
+		fetchlog.Note(a.fetchDir(), common, names, time.Now())
+	}
+}
+
+// fetchDir is where fetch times are kept: the operating system's cache folder, or beside a
+// test's settings so a test never writes to the real cache.
+func (a *App) fetchDir() string {
+	if a.settingsPath != "" {
+		return filepath.Join(filepath.Dir(a.settingsPath), "fetched")
+	}
+	return fetchlog.Dir()
+}
+
+func fetchRemotesOf(ctx context.Context, g *git.Repo, remote string, o git.NetOptions) ([]string, error) {
 	err := g.Fetch(ctx, remote, o)
 	switch {
 	case err == nil:

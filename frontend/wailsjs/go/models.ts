@@ -3462,6 +3462,26 @@ export namespace git {
 		    return a;
 		}
 	}
+	export class Location {
+	    place: string;
+	    forge: string;
+	    host: string;
+	    port: string;
+	    path: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Location(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.place = source["place"];
+	        this.forge = source["forge"];
+	        this.host = source["host"];
+	        this.port = source["port"];
+	        this.path = source["path"];
+	    }
+	}
 	export class MailmapNote {
 	    line: number;
 	    kind: string;
@@ -3560,6 +3580,20 @@ export namespace git {
 	        this.subject = source["subject"];
 	    }
 	}
+	export class PushTarget {
+	    url: string;
+	    remote: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PushTarget(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.url = source["url"];
+	        this.remote = source["remote"];
+	    }
+	}
 	export class RebaseItem {
 	    commit: string;
 	    subject: string;
@@ -3648,6 +3682,14 @@ export namespace git {
 	    name: string;
 	    fetchUrl: string;
 	    pushUrl: string;
+	    pushUrls: string[];
+	    location: Location;
+	    pushes: PushTarget[];
+	    prune?: boolean;
+	    tagOpt: string;
+	    skipFetchAll: boolean;
+	    fetchRefspecs: string[];
+	    fetchedAt: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Remote(source);
@@ -3658,6 +3700,52 @@ export namespace git {
 	        this.name = source["name"];
 	        this.fetchUrl = source["fetchUrl"];
 	        this.pushUrl = source["pushUrl"];
+	        this.pushUrls = source["pushUrls"];
+	        this.location = this.convertValues(source["location"], Location);
+	        this.pushes = this.convertValues(source["pushes"], PushTarget);
+	        this.prune = source["prune"];
+	        this.tagOpt = source["tagOpt"];
+	        this.skipFetchAll = source["skipFetchAll"];
+	        this.fetchRefspecs = source["fetchRefspecs"];
+	        this.fetchedAt = source["fetchedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class RemoteSettings {
+	    pushDefault: string;
+	    fetchPrune?: boolean;
+	    pushMode: string;
+	    autoSetupRemote?: boolean;
+	    followTags?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new RemoteSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.pushDefault = source["pushDefault"];
+	        this.fetchPrune = source["fetchPrune"];
+	        this.pushMode = source["pushMode"];
+	        this.autoSetupRemote = source["autoSetupRemote"];
+	        this.followTags = source["followTags"];
 	    }
 	}
 	export class ShippedItem {

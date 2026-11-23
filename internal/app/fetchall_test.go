@@ -264,3 +264,50 @@ func TestGroupFetchWithARemoteThatIsGone(t *testing.T) {
 		t.Errorf("origin/main = %s, want %s", got, other.Head())
 	}
 }
+
+// The app writes down which remotes each of its fetches reached, so a remote's last fetch is
+// known even after a later fetch of another remote has rewritten FETCH_HEAD. A remote that
+// wasn't reached keeps no time, and the time follows a rename.
+func TestRemotesKnowWhenTheAppFetchedThem(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	local, _ := gittest.WithRemote(t, 1)
+	_, upstream := gittest.WithRemote(t, 1)
+	local.Git("remote", "add", "upstream", upstream.Dir)
+	local.Git("remote", "add", "gone", filepath.Join(t.TempDir(), "gone.git"))
+	tab, err := a.OpenRepo(local.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Fetch(tab.Path, "upstream"); err != nil {
+		t.Fatal(err)
+	}
+	// Origin's fetch rewrites FETCH_HEAD, which then says nothing of upstream.
+	if err := a.Fetch(tab.Path, "origin"); err != nil {
+		t.Fatal(err)
+	}
+	_ = a.Fetch(tab.Path, "gone")
+
+	fetched := func() map[string]int64 {
+		rs, err := a.Remotes(tab.Path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		at := map[string]int64{}
+		for _, r := range rs {
+			at[r.Name] = r.FetchedAt
+		}
+		return at
+	}
+	at := fetched()
+	if at["origin"] == 0 || at["upstream"] == 0 || at["gone"] != 0 {
+		t.Fatalf("fetched at %v", at)
+	}
+
+	if err := a.RemoteAction(tab.Path, "rename", []string{"upstream", "mirror"}); err != nil {
+		t.Fatal(err)
+	}
+	if after := fetched(); after["mirror"] != at["upstream"] {
+		t.Fatalf("after rename: %v", after)
+	}
+}
