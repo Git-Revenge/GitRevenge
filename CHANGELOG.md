@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-22
+
 ### Added
 
 - **People**, a tab opened from the Repository panel or the command palette: everyone a repository's history names, as its mailmap reads them, with the names joined to each person and the line that joins them. **Take apart** removes that line, **Text** shows the `.mailmap` with what each line does (what it joins, that it matches nobody, or why git skips it), and **Who is this?** answers for any name or address. An edit shows what it does before it's saved, and saving puts the change in `.mailmap` for you to commit. A repository needs no mailmap: the tab works without one, and the first `.mailmap` is only created after you say yes. (#837, #846, #847, #848)
@@ -18,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 - The search box suggests as you type: the trailer keys and values that contain the text, each with its count, people by name and address. The text search is always the first row, so **Enter** still moves between matches; arrow down to a value and **Enter** adds it to the filter, **Tab** completes it in the box, and **Backspace** in an empty box takes the last filter value off. Counts are within the filter that's on. (#830)
 - Search also understands `has:reviewed-by` for any value of a trailer, a leading `-` for the commits that don't match (`-has:reviewed-by`, `-changelog: none`), and a key by any of its endings, so `closed: #14` finds `Closes` too. (#830)
 - Under a smart filter, a day's line says how the filter sits in it: "1 of 3 commits" under **Only these**, and "3 commits · 1 match" under **Highlight**. A commit's **Trailers** tab marks the line the filter picked. The commit you had selected stays in the panel when the filter hides its row, and is selected again when it comes back. Where the way back to the checked-out commit would be, the graph says when that commit isn't in the filter. While trailers are still being read, the ruler's foot is hatched for the history whose matches aren't known yet. (#863)
+- Under **Highlight**, the filter strip has **Previous match** and **Next match**: they go to the commit before or after the selected one that the filter keeps, round from either end as search does, through every match however long the history. Enter on the graph still opens the author's card. (#866, #891)
 - Pin a trailer key to the graph's rows, and its values show as chips after each commit's subject in the timeline, so you can read `Changelog: fixed` or `Closes #14` down the history without opening each commit. Click a chip to filter the graph to it. The pin is beside each key in the Smart filters panel and in a commit's **Trailers** tab; nothing is pinned until you pin it, and the panel offers a repository's most used label once. A pin is a line in git config, the repository's or the global one: `[gitrevenge-trailer "Changelog"]` with `show = rows`. (#831)
 - In the **Compact** density a pinned key has a column of its own, left of Author, with the key said once in the heading and each commit's value under it. Click a value to filter the graph to it, or use the heading's filter button for the selected commit's value. Up to two keys get a column while the message has room to be read; a narrower window gives the columns up and moves nothing else. (#868)
 - A repository can say how its trailers are read, with rules in git config beside its smart links: under `[gitrevenge-trailer "Reviewed-by"]`, `also = Rviewed-by` reads a misspelled key as the right one, `kind = people` says what its values are, and `show = panel` or `show = held` says whether the Smart filters panel offers it. A rule changes how the history is read and never a commit, and a repository's rule replaces a global one for the same key. (#870)
@@ -378,7 +381,8 @@ The foundation: open a repository and read its history fast.
 - Search commits by message, author or SHA.
 - Works with the `git` you have installed, and checks its version.
 
-[Unreleased]: https://github.com/Git-Revenge/GitRevenge/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/Git-Revenge/GitRevenge/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Git-Revenge/GitRevenge/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/Git-Revenge/GitRevenge/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Git-Revenge/GitRevenge/compare/v0.11.0...v1.0.0
 [0.11.0]: https://github.com/Git-Revenge/GitRevenge/compare/v0.10.0...v0.11.0
