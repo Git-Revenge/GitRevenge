@@ -1837,6 +1837,22 @@ export namespace app {
 	        this.forkTime = source["forkTime"];
 	    }
 	}
+	export class RemoteBranchStatus {
+	    base: string;
+	    ahead: number;
+	    behind: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RemoteBranchStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.base = source["base"];
+	        this.ahead = source["ahead"];
+	        this.behind = source["behind"];
+	    }
+	}
 	export class WebBase {
 	    remote: string;
 	    branch: string;

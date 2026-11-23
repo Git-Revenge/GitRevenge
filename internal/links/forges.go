@@ -74,28 +74,24 @@ func (c Config) ForgeFor(host string) (ForgeRule, bool) {
 	return ForgeRule{}, false
 }
 
-// readForges returns one config file's forge rules.
-func readForges(ctx context.Context, g *git.Repo, scope string) ([]ForgeRule, error) {
-	out, err := g.Read(ctx, "config", scope, "-z", "--get-regexp", `^`+regexp.QuoteMeta(ForgeSection)+`\.`)
-	var gerr *git.Error
-	if errors.As(err, &gerr) && gerr.ExitCode == 1 {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
+// forgesFrom reads forge rules from config entries, "key\nvalue" each. Entries of other
+// sections are skipped.
+func forgesFrom(entries []string, scope string) []ForgeRule {
 	var rules []*ForgeRule
 	byHost := map[string]*ForgeRule{}
-	for entry := range strings.SplitSeq(string(out), "\x00") {
+	for _, entry := range entries {
 		key, value, _ := strings.Cut(entry, "\n")
+		if !strings.HasPrefix(strings.ToLower(key), ForgeSection+".") {
+			continue
+		}
 		first, last := strings.Index(key, "."), strings.LastIndex(key, ".")
-		if key == "" || first < 0 || first == last {
+		if first < 0 || first == last {
 			continue
 		}
 		host, field := strings.ToLower(key[first+1:last]), strings.ToLower(key[last+1:])
 		f := byHost[host]
 		if f == nil {
-			f = &ForgeRule{Host: host, Scope: strings.TrimPrefix(scope, "--")}
+			f = &ForgeRule{Host: host, Scope: scope}
 			byHost[host] = f
 			rules = append(rules, f)
 		}
@@ -113,28 +109,18 @@ func readForges(ctx context.Context, g *git.Repo, scope string) ([]ForgeRule, er
 		}
 		res = append(res, *f)
 	}
-	return res, nil
+	return res
 }
 
-// loadForges reads the global rules and, in a repository, its own, marking global rules a
+// mergeForges puts a repository's rules before the global ones, marking global rules a
 // repository rule replaces.
-func loadForges(ctx context.Context, g *git.Repo, inRepo bool) ([]ForgeRule, error) {
-	global, err := readForges(ctx, g, "--global")
-	if err != nil {
-		return nil, err
-	}
-	var local []ForgeRule
-	if inRepo {
-		if local, err = readForges(ctx, g, "--local"); err != nil {
-			return nil, err
-		}
-	}
+func mergeForges(local, global []ForgeRule) []ForgeRule {
 	for i := range global {
 		if slices.ContainsFunc(local, func(f ForgeRule) bool { return f.Host == global[i].Host }) {
 			global[i].Shadowed = true
 		}
 	}
-	return append(append([]ForgeRule{}, local...), global...), nil
+	return append(append([]ForgeRule{}, local...), global...)
 }
 
 // SaveForge writes a forge rule to its scope, replacing any rule for the same host there.

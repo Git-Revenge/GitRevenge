@@ -180,6 +180,18 @@ func (r *Repo) Fetch(ctx context.Context, remote string, o NetOptions) error {
 	return err
 }
 
+// FetchBranch fetches one branch of a remote into its remote-tracking branch, and nothing
+// else: no other branches, no tags, nothing pruned.
+func (r *Repo) FetchBranch(ctx context.Context, remote, branch string, o NetOptions) error {
+	if err := CheckRevs(remote, branch); err != nil {
+		return err
+	}
+	c := o.cmd("fetch", "--progress", "--no-tags", remote, "+refs/heads/"+branch+":refs/remotes/"+remote+"/"+branch)
+	c.Dir = r.dir
+	_, err := r.runner.Run(ctx, c)
+	return err
+}
+
 // FetchFailure is a remote that a fetch of every remote couldn't fetch.
 type FetchFailure struct {
 	Remote string

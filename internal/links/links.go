@@ -88,38 +88,49 @@ func (c Config) Active() []Rule {
 }
 
 // Load reads the rules from a repository's config and the global config. g may be a Repo
-// opened outside any repository, which reads only the global rules.
+// opened outside any repository, which reads only the global rules. Everything comes from one
+// git call: menus read the rules as they open, and on Windows each git call costs about 40ms.
 func Load(ctx context.Context, g *git.Repo, inRepo bool) (Config, error) {
-	global, err := read(ctx, g, "--global")
-	if err != nil {
+	out, err := g.Read(ctx, "config", "--show-scope", "-z", "--get-regexp", `^(`+regexp.QuoteMeta(Section)+`|`+regexp.QuoteMeta(ForgeSection)+`)\.|^`+regexp.QuoteMeta(WebKey)+`$`)
+	var gerr *git.Error
+	// Exit 1: no such keys.
+	if err != nil && (!errors.As(err, &gerr) || gerr.ExitCode != 1) {
 		return Config{}, err
 	}
+	byScope := map[string][]string{}
+	c := Config{Web: true}
+	fields := strings.Split(string(out), "\x00")
+	for i := 0; i+1 < len(fields); i += 2 {
+		scope, entry := fields[i], fields[i+1]
+		key, value, _ := strings.Cut(entry, "\n")
+		if strings.EqualFold(key, WebKey) {
+			// git's own reading of a boolean; the last one set wins, as git's --get does.
+			c.Web = boolValue(value)
+			continue
+		}
+		byScope[scope] = append(byScope[scope], entry)
+	}
+	global := rulesFrom(byScope[Global], Global)
 	var local []Rule
 	if inRepo {
-		if local, err = read(ctx, g, "--local"); err != nil {
-			return Config{}, err
-		}
+		local = rulesFrom(byScope[Local], Local)
 	}
 	for i := range global {
 		if slices.ContainsFunc(local, func(r Rule) bool { return r.Name == global[i].Name }) {
 			global[i].Shadowed = true
 		}
 	}
-	forges, err := loadForges(ctx, g, inRepo)
-	if err != nil {
-		return Config{}, err
+	c.Rules = append(append([]Rule{}, local...), global...)
+	globalForges := forgesFrom(byScope[Global], Global)
+	var localForges []ForgeRule
+	if inRepo {
+		localForges = forgesFrom(byScope[Local], Local)
 	}
-	c := Config{Rules: append(local, global...), Web: true, Forges: forges}
-	if c.Rules == nil {
-		c.Rules = []Rule{}
-	}
-	if v, err := g.ReadString(ctx, "config", "--type=bool", "--get", WebKey); err == nil && v == "false" {
-		c.Web = false
-	}
+	c.Forges = mergeForges(localForges, globalForges)
 	return c, nil
 }
 
-// read returns one config file's rules in file order.
+// read returns one config file's rules in file order, for writing them back.
 func read(ctx context.Context, g *git.Repo, scope string) ([]Rule, error) {
 	out, err := g.Read(ctx, "config", scope, "-z", "--get-regexp", `^`+regexp.QuoteMeta(Section)+`\.`)
 	var gerr *git.Error
@@ -130,18 +141,27 @@ func read(ctx context.Context, g *git.Repo, scope string) ([]Rule, error) {
 	if err != nil {
 		return nil, err
 	}
+	return rulesFrom(strings.Split(string(out), "\x00"), strings.TrimPrefix(scope, "--")), nil
+}
+
+// rulesFrom reads rules from config entries, "key\nvalue" each, in file order. Entries of
+// other sections are skipped.
+func rulesFrom(entries []string, scope string) []Rule {
 	var rules []*Rule
 	byName := map[string]*Rule{}
-	for entry := range strings.SplitSeq(string(out), "\x00") {
+	for _, entry := range entries {
 		key, value, _ := strings.Cut(entry, "\n")
+		if !strings.HasPrefix(strings.ToLower(key), Section+".") {
+			continue
+		}
 		first, last := strings.Index(key, "."), strings.LastIndex(key, ".")
-		if key == "" || first < 0 || first == last {
+		if first < 0 || first == last {
 			continue
 		}
 		name, field := key[first+1:last], strings.ToLower(key[last+1:])
 		r := byName[name]
 		if r == nil {
-			r = &Rule{Name: name, Enabled: true, Scope: strings.TrimPrefix(scope, "--"), In: AllPlaces}
+			r = &Rule{Name: name, Enabled: true, Scope: scope, In: AllPlaces}
 			byName[name] = r
 			rules = append(rules, r)
 		}
@@ -165,7 +185,7 @@ func read(ctx context.Context, g *git.Repo, scope string) ([]Rule, error) {
 		}
 		res = append(res, *r)
 	}
-	return res, nil
+	return res
 }
 
 func places(v string) []string {

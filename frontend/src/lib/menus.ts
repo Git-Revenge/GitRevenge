@@ -1,4 +1,4 @@
-import { DeleteBranchAndWorktree, DeleteStack, PushStack, RebaseStack, RestoreStack, StackDeletePlan, StackPushPlan, Unstack, UpdateStack, BranchAction, BranchCaseTwin, BranchMergeState, HideBranch, Integrate, MarkBranchKind, Pull, PullBranch, PushBranch, PushRef, Refs, Restack, SetGraphFocus, SetStackParent, StashAction, Worktrees } from '../../wailsjs/go/app/App.js'
+import { FetchBranch, DeleteBranchAndWorktree, DeleteStack, PushStack, RebaseStack, RestoreStack, StackDeletePlan, StackPushPlan, Unstack, UpdateStack, BranchAction, BranchCaseTwin, BranchMergeState, HideBranch, Integrate, MarkBranchKind, Pull, PullBranch, PushBranch, PushRef, Refs, Restack, SetGraphFocus, SetStackParent, StashAction, Worktrees } from '../../wailsjs/go/app/App.js'
 import { CONFIRM_DELETE, CONFIRM_FORCE_PUSH, KINDS, kindWarning } from './branchKinds'
 import type { MenuItem } from './ContextMenu.svelte'
 import type { DialogSpec } from './Dialog.svelte'
@@ -6,7 +6,8 @@ import type { Ref, Row } from './graph/rowCache'
 import { errorText } from './errors'
 import { session } from './session.svelte'
 import { toasts } from './toasts.svelte'
-import { BrowserOpenURL } from '../../wailsjs/runtime/runtime.js'
+import { BrowserOpenURL, ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
+import { remoteBranchHint, type RefExtras } from './branchWeb'
 import { linkStore } from './links/links.svelte'
 
 /** What the menus need from the view that opens them. */
@@ -272,13 +273,43 @@ export function linkItems(path: string, name: string): MenuItem[] {
     .map((m) => ({ label: `Open ${m.text} in ${m.rule}`, icon: 'external' as const, run: () => BrowserOpenURL(m.href) }))
 }
 
-/** Menu items for one ref (branch, remote branch, tag or stash). */
-export function refItems(ref: Ref, ctx: MenuContext): MenuItem[] {
+/** A remote branch's pages on its forge (#922), under the host's name so it's clear they leave
+ * the app. Left out, not greyed, without a web address: the remote's own menu explains that.
+ * Nothing here starts a pull or merge request. */
+export function webItems(short: string, e: RefExtras | undefined): MenuItem[] {
+  const web = e?.web
+  if (!e || !web?.branch) return []
+  const items: MenuItem[] = [
+    { label: `${short} on ${e.host}`, heading: true, disabled: true },
+    { label: `Open ${short}`, icon: 'external', run: () => BrowserOpenURL(web.branch) },
+  ]
+  for (const b of web.bases ?? []) {
+    if (!b.compare) continue
+    const compare = b.compare
+    items.push({ label: `Compare ${short} with ${b.remote}/${b.branch}`, icon: 'external', run: () => BrowserOpenURL(compare) })
+  }
+  items.push({
+    label: `Copy ${short}'s web link`,
+    icon: 'copy',
+    hint: web.branch,
+    run: () => {
+      void ClipboardSetText(web.branch)
+      toasts.show(`Copied the link to ${short}.`)
+    },
+  })
+  return items
+}
+
+/** Menu items for one ref (branch, remote branch, tag or stash). extras are what its menu
+ * reads as it opens (branchWeb.ts): its pages on the forge, and for a remote branch, how far it
+ * is from the default branch and who tracks it. */
+export function refItems(ref: Ref, ctx: MenuContext, extras?: RefExtras): MenuItem[] {
   const { path, openDialog } = ctx
   switch (ref.kind) {
     case 'local':
       return groups(
         linkItems(path, ref.short),
+        webItems(ref.upstream, extras),
         [
           // The checked-out branch keeps these items, disabled, so the menu's shape doesn't shift.
           // Git won't check out a branch that's in another worktree, so that one goes there instead.
@@ -344,12 +375,33 @@ export function refItems(ref: Ref, ctx: MenuContext): MenuItem[] {
       )
     case 'remote':
       {
-        const [remote, ...rest] = ref.short.split('/')
+        const [first, ...tail] = ref.short.split('/')
+        const remote = extras?.remote ?? first
+        const rest = (extras?.branch ?? tail.join('/')).split('/')
+        const name = rest.join('/')
+        const hint = remoteBranchHint(ref.short, extras)
         return groups(
-          linkItems(path, rest.join('/')),
-          [{ label: `Checkout ${ref.short}`, icon: 'branch', run: () => session.run(() => branch(path, 'checkout', ref.short)) }, ...integrateItems(ctx, ref.short, ref.short)],
-          [...focusItems(ctx, ref, rest.join('/')), hideItem(ctx, ref, rest.join('/'))],
-          [markItem(ctx, ref, rest.join('/'))],
+          hint ? [{ label: ref.short, hint, heading: true, disabled: true }] : [],
+          linkItems(path, name),
+          webItems(ref.short, extras),
+          [
+            // Git makes a local branch tracking it, or switches to the one of that name.
+            extras?.localExists
+              ? { label: `Checkout ${name}`, icon: 'branch', hint: 'Your local branch of the same name', run: () => session.run(() => branch(path, 'checkout', ref.short)) }
+              : {
+                  label: extras ? 'Check out as a local branch' : `Checkout ${ref.short}`,
+                  icon: 'branch',
+                  hint: extras ? `Makes ${name}, tracking ${ref.short}` : undefined,
+                  run: () => session.run(() => branch(path, 'checkout', ref.short)),
+                },
+            ...integrateItems(ctx, ref.short, ref.short),
+          ],
+          [
+            { label: `Fetch just ${name}`, icon: 'fetch', hint: `From ${remote}, and nothing else`, run: () => session.run(() => FetchBranch(path, remote, name)) },
+            ...focusItems(ctx, ref, name),
+            hideItem(ctx, ref, name),
+          ],
+          [markItem(ctx, ref, name)],
           [
             {
               label: `Delete ${ref.short} from ${remote}`,
@@ -493,12 +545,12 @@ const REF_ICONS = { local: 'branch', remote: 'remote', tag: 'tag', stash: 'stash
  * items, since a commit can carry several refs and a flat list runs to 30 items. A stash has no
  * commit items, so its own go straight in the menu.
  */
-export function commitMenuItems(row: Row, refs: Ref[], ctx: MenuContext): MenuItem[] {
+export function commitMenuItems(row: Row, refs: Ref[], ctx: MenuContext, extras?: Map<string, RefExtras>): MenuItem[] {
   const own = commitItems(row, refs, ctx)
-  if (own.length === 0) return groups(...refs.map((r) => refItems(r, ctx)))
+  if (own.length === 0) return groups(...refs.map((r) => refItems(r, ctx, extras?.get(r.short))))
   return groups(
     own,
-    refs.map((r) => ({ label: r.short, icon: REF_ICONS[r.kind], items: refItems(r, ctx) })),
+    refs.map((r) => ({ label: r.short, icon: REF_ICONS[r.kind], items: refItems(r, ctx, extras?.get(r.short)) })),
   )
 }
 

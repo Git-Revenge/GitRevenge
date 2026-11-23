@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 	"os"
 	"os/exec"
@@ -12,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/session"
 	"github.com/git-revenge/gitrevenge/internal/settings"
 )
 
@@ -165,4 +167,44 @@ func showFolder(dir string) error {
 	// Explorer exits 1 even when it opens the folder, so how it ends says nothing.
 	go func() { _ = cmd.Wait() }()
 	return nil
+}
+
+// FetchBranch fetches one branch of a remote, for a remote branch's menu (#922). The remote's
+// fetch time isn't noted: only one branch of it came.
+func (a *App) FetchBranch(path, remote, branch string) error {
+	return a.runNetwork(path, "fetch", func(ctx context.Context, r *session.Repo, o git.NetOptions) error {
+		return r.Git.FetchBranch(ctx, remote, branch, o)
+	})
+}
+
+// RemoteBranchStatus is how far a remote branch is from its remote's default branch.
+type RemoteBranchStatus struct {
+	// Base is the default branch as git last heard it, or "" when it doesn't know.
+	Base   string `json:"base"`
+	Ahead  int    `json:"ahead"`
+	Behind int    `json:"behind"`
+}
+
+// RemoteBranchStatus says how many commits a remote branch has that its remote's default
+// branch doesn't, and the other way round, for the heading of its menu.
+func (a *App) RemoteBranchStatus(path, remote, branch string) (RemoteBranchStatus, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return RemoteBranchStatus{}, err
+	}
+	ctx := context.Background()
+	base := r.Git.RemoteHeads(ctx)[remote]
+	if base == "" || base == branch {
+		return RemoteBranchStatus{Base: base}, nil
+	}
+	if err := git.CheckRevs(remote, branch); err != nil {
+		return RemoteBranchStatus{}, err
+	}
+	out, err := r.Git.ReadString(ctx, "rev-list", "--left-right", "--count", "refs/remotes/"+remote+"/"+branch+"...refs/remotes/"+remote+"/"+base, "--")
+	if err != nil {
+		return RemoteBranchStatus{Base: base}, nil
+	}
+	st := RemoteBranchStatus{Base: base}
+	_, _ = fmt.Sscan(out, &st.Ahead, &st.Behind)
+	return st, nil
 }

@@ -4,6 +4,8 @@
   import { errorText } from './errors'
   import { forgeAsk } from './links/forgeAsk.svelte'
   import { remoteMenuItems } from './remoteMenu'
+  import { whileBusy } from './busy'
+  import type { app } from '../../wailsjs/go/models'
   import { toasts } from './toasts.svelte'
   import type { git } from '../../wailsjs/go/models'
   import { prefs } from './prefs.svelte'
@@ -152,12 +154,14 @@
 
   /** A remote's own menu: read what it needs fresh, since it can open long after a load. */
   async function remoteMenu(name: string, x: number, y: number) {
-    const [web, set] = await Promise.all([RemoteWebLinks(path).catch(() => []), RemoteSettings(path).catch(() => null)])
+    // Read already when the panel opened; only a menu opened before that waits.
+    if (!webLinks) await whileBusy(loadRemotes())
+    const web = webLinks ?? []
     const remote = remotes.find((r) => r.name === name)
     if (!remote || !onMenu) return
     const reload = () => void loadRemotes()
     const items = remoteMenuItems(
-      { remote, place: places[remote.fetchUrl], web: web.find((w) => w.remote === name), pushDefault: set?.pushDefault ?? '', now: Date.now() / 1000 },
+      { remote, place: places[remote.fetchUrl], web: web.find((w) => w.remote === name), pushDefault, now: Date.now() / 1000 },
       {
         open: (url) => BrowserOpenURL(url),
         copy: (text, what) => {
@@ -203,12 +207,29 @@
     return out
   })
 
+  // What a remote's menu shows, read with the remotes while the Remotes panel is open, so the
+  // menu opens at once.
+  let webLinks = $state<app.RemoteWeb[] | null>(null)
+  let pushDefault = $state('')
+
   async function loadRemotes() {
-    const [rs, ps] = await Promise.all([Remotes(path).catch(() => null), RemotePlaces(path).catch(() => null)])
+    const menus = ui.panel === 'remotes'
+    const [rs, ps, web, set] = await Promise.all([
+      Remotes(path).catch(() => null),
+      RemotePlaces(path).catch(() => null),
+      menus ? RemoteWebLinks(path).catch(() => null) : null,
+      menus ? RemoteSettings(path).catch(() => null) : null,
+    ])
     if (rs) remotes = rs
     if (ps) places = ps as Record<string, URLPlace>
     remotesRead = !!rs && !!ps
+    if (web) webLinks = web
+    if (set) pushDefault = set.pushDefault
   }
+  // Opening the panel reads what its menus need.
+  $effect(() => {
+    if (ui.panel === 'remotes' && !untrack(() => webLinks)) void loadRemotes()
+  })
 
   let panels = $derived(buildPanels(refs, { showHidden: showingHidden, sort: ui.sort, remoteGrouping: ui.remoteGrouping, hostOf }))
   let current = $derived(ui.panel === 'repo' || ui.panel === 'filters' ? null : panels[ui.panel])

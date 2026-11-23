@@ -568,6 +568,12 @@ textarea {
   transform: translateX(3px);
 }
 
+/* A click is waiting on a read, such as a menu reading what it needs (busy.ts). */
+html.busy,
+html.busy * {
+  cursor: progress !important;
+}
+
 /* Busy: the label and width stay; three ink dots pulse before it. */
 .btn[aria-busy='true'] {
   cursor: progress;

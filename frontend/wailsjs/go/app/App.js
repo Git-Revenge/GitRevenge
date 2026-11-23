@@ -178,6 +178,10 @@ export function Fetch(arg1, arg2) {
   return window['go']['app']['App']['Fetch'](arg1, arg2);
 }
 
+export function FetchBranch(arg1, arg2, arg3) {
+  return window['go']['app']['App']['FetchBranch'](arg1, arg2, arg3);
+}
+
 export function FileContents(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['app']['App']['FileContents'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
@@ -532,6 +536,10 @@ export function ReloadGitConfig(arg1) {
 
 export function RemoteAction(arg1, arg2, arg3) {
   return window['go']['app']['App']['RemoteAction'](arg1, arg2, arg3);
+}
+
+export function RemoteBranchStatus(arg1, arg2, arg3) {
+  return window['go']['app']['App']['RemoteBranchStatus'](arg1, arg2, arg3);
 }
 
 export function RemotePlaces(arg1) {
