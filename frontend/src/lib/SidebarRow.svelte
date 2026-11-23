@@ -9,8 +9,9 @@
 
   // For screen readers. Written in the markup, it would lose its space.
   const STACK_PREFIX = 'Stack: '
-  // A row grouped by name shows this many remotes' chips, then how many more.
-  const CHIPS = 3
+  // A row grouped by name shows the first few remotes' chips that fit, and how many remotes
+  // have it in all.
+  const CHIPS = 4
 
   let {
     row,
@@ -142,8 +143,8 @@
       <span class="chips" aria-hidden="true"
         >{#each row.onRemotes.slice(0, CHIPS) as o (o.short)}{@const name = o.short.slice(0, o.short.indexOf('/'))}<span class="chip t{remoteTones[name] ?? 0}" class:differs={o.commit !== r.commit}
             >{#if o.commit !== r.commit}≠{/if}{name}</span
-          >{/each}{#if row.onRemotes.length > CHIPS}<span class="chip more-chips">+{row.onRemotes.length - CHIPS}</span>{/if}</span
-      >
+          >{/each}</span
+      >{#if row.onRemotes.length > 1}<span class="chip more-chips" aria-hidden="true">{row.onRemotes.length}</span>{/if}
       <span class="visually-hidden"
         >, on {row.onRemotes.map((o) => o.short.slice(0, o.short.indexOf('/')) + (o.commit !== r.commit ? ' at another commit' : '')).join(', ')}</span
       >
@@ -354,11 +355,14 @@
     max-width: 55%;
   }
 
+  /* Chips that don't fit wrap onto a second line, which is clipped, so a chip goes whole. */
   .chips {
     display: inline-flex;
     flex: 0 1 auto;
+    flex-wrap: wrap;
     gap: 3px;
-    min-width: 0;
+    height: 18px;
+    min-width: 18px;
     overflow: hidden;
   }
 
@@ -405,6 +409,8 @@
   }
 
   .chip.more-chips {
+    flex: none;
+    margin-left: auto;
     border-color: transparent;
     color: var(--ink-mute);
   }
