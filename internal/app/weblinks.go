@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"slices"
+	"sync"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/links"
@@ -54,12 +55,20 @@ func (a *App) remoteSites(ctx context.Context, path string) ([]RemoteWeb, map[st
 	if err != nil {
 		return nil, nil, err
 	}
-	remotes, err := r.Git.Remotes(ctx)
+	// Three reads that don't need each other, at once: a menu waits on them as it opens.
+	var (
+		remotes []git.Remote
+		cfg     links.Config
+		heads   map[string]string
+		wg      sync.WaitGroup
+	)
+	wg.Go(func() { remotes, err = r.Git.Remotes(ctx) })
+	wg.Go(func() { cfg = a.linkConfig(ctx, r.Git) })
+	wg.Go(func() { heads = r.Git.RemoteHeads(ctx) })
+	wg.Wait()
 	if err != nil {
 		return nil, nil, err
 	}
-	cfg := a.linkConfig(ctx, r.Git)
-	heads := r.Git.RemoteHeads(ctx)
 	sites := map[string]weblinks.Site{}
 	var order []string
 	for _, rem := range remotes {
