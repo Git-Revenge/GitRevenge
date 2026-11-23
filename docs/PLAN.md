@@ -36,6 +36,7 @@ This document records the decisions from the initial requirements session (2026-
 | Branch kinds | Six built-in kinds (Trunk, Release, Environment, Docs, Bot, Feature) matched by local per-repo patterns | [0009](adr/0009-branch-kinds.md) |
 | Where settings live | A repository's settings in git config, its own over the global one; the app's own settings and state in the app's file | [0011](adr/0011-repository-settings-in-git-config.md) |
 | Whose name shows | The mailmap git reads, wherever a name is shown, the Map included; Insights keeps the committed one | [0012](adr/0012-names-follow-gits-mailmap.md) |
+| Diffs and merges | Worked out in Go over syntax tokens (gotreesitter, no cgo), line diff as the fallback; git's merge decides conflicts, token merges pre-fill suggestions | [0015](adr/0015-diffs-and-merges-read-the-code.md) |
 
 ### Backend
 
