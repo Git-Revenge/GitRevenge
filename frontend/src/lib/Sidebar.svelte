@@ -161,7 +161,7 @@
       {
         open: (url) => BrowserOpenURL(url),
         copy: (text, what) => {
-          ClipboardSetText(text)
+          void ClipboardSetText(text)
           toasts.show(`Copied ${name}'s ${what}.`)
         },
         fetch: (n) => void session.run(() => Fetch(path, n)),
