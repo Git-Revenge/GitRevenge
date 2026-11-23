@@ -94,7 +94,7 @@ func Load(ctx context.Context, g *git.Repo, inRepo bool) (Config, error) {
 	out, err := g.Read(ctx, "config", "--show-scope", "-z", "--get-regexp", `^(`+regexp.QuoteMeta(Section)+`|`+regexp.QuoteMeta(ForgeSection)+`)\.|^`+regexp.QuoteMeta(WebKey)+`$`)
 	var gerr *git.Error
 	// Exit 1: no such keys.
-	if err != nil && !(errors.As(err, &gerr) && gerr.ExitCode == 1) {
+	if err != nil && (!errors.As(err, &gerr) || gerr.ExitCode != 1) {
 		return Config{}, err
 	}
 	byScope := map[string][]string{}
@@ -120,10 +120,7 @@ func Load(ctx context.Context, g *git.Repo, inRepo bool) (Config, error) {
 			global[i].Shadowed = true
 		}
 	}
-	c.Rules = append(local, global...)
-	if c.Rules == nil {
-		c.Rules = []Rule{}
-	}
+	c.Rules = append(append([]Rule{}, local...), global...)
 	globalForges := forgesFrom(byScope[Global], Global)
 	var localForges []ForgeRule
 	if inRepo {
