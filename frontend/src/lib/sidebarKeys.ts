@@ -23,7 +23,7 @@ function parentOf(rows: TreeRow[], index: number): number {
   return -1
 }
 
-const hasMenu = (row: TreeRow) => row.type === 'ref' || !!row.stack
+const hasMenu = (row: TreeRow) => row.type === 'ref' || (row.type === 'folder' && (!!row.stack || row.remote))
 const hasChildren = (rows: TreeRow[], index: number) => index + 1 < rows.length && rows[index + 1].depth > rows[index].depth
 
 /**

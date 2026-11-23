@@ -17,6 +17,8 @@ export interface RemoteMenuData {
   /** remote.pushDefault as git reads it now, or ''. */
   pushDefault: string
   now: number
+  /** How many of its branches Tidy could delete. */
+  tidyCount?: number
 }
 
 /** What the menu's items do, given by the view that opens it. */
@@ -29,6 +31,8 @@ export interface RemoteMenuActions {
   showFolder: (remote: string) => void
   /** Opens Settings › Links › Forges with the host filled in. */
   nameForge: (host: string) => void
+  /** Opens Tidy for the remote. */
+  tidy?: (remote: string) => void
   openDialog: (spec: DialogSpec) => void
   /** Runs a Remotes dialog action: rename, seturl or remove. Resolves to what went wrong, in
    * words, or '' when it worked. */
@@ -97,6 +101,11 @@ export function remoteMenuItems(d: RemoteMenuData, act: RemoteMenuActions): Menu
     },
     { label: r.hidden ? `Show ${name}'s branches` : `Hide ${name}'s branches`, icon: 'eye', run: () => act.hide(name, !r.hidden) },
   )
+  if (act.tidy) {
+    const tidy = act.tidy
+    const n = d.tidyCount ?? 0
+    items.push({ label: `Tidy ${name}…`, icon: 'trash', hint: n ? `${n} ${n === 1 ? 'branch' : 'branches'} could be tidied` : 'Nothing marked gone, merged or quiet', run: () => tidy(name) })
+  }
 
   // Changing it.
   items.push(

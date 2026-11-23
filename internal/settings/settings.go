@@ -148,6 +148,9 @@ type RepoSettings struct {
 	HideKinds []string `json:"hideKinds,omitempty"`
 	// HideRemotes hides every branch of these remotes, by name.
 	HideRemotes []string `json:"hideRemotes,omitempty"`
+	// QuietDays is how long a remote branch goes without a commit before Tidy calls it
+	// quiet; 0, the default, calls none quiet.
+	QuietDays int `json:"quietDays,omitempty"`
 	// ShowKinds shows these kinds' lanes in full in the graph, where Bot and Docs lanes
 	// otherwise fold to a line a day.
 	ShowKinds []string `json:"showKinds,omitempty"`
@@ -187,7 +190,7 @@ func (r RepoSettings) clone() RepoSettings {
 
 // empty reports whether r holds nothing but its path, so it can be dropped.
 func (r RepoSettings) empty() bool {
-	return r.Kinds == nil && len(r.Hide) == 0 && len(r.HideKinds) == 0 && len(r.HideRemotes) == 0 && len(r.ShowKinds) == 0 && len(r.BotAuthors) == 0 && len(r.StackParents) == 0 && !r.CleanupOnPull && !r.SyncNotes
+	return r.Kinds == nil && len(r.Hide) == 0 && len(r.HideKinds) == 0 && len(r.HideRemotes) == 0 && r.QuietDays == 0 && len(r.ShowKinds) == 0 && len(r.BotAuthors) == 0 && len(r.StackParents) == 0 && !r.CleanupOnPull && !r.SyncNotes
 }
 
 // Repo returns the settings for the repository at path, or empty ones.

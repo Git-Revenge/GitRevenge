@@ -1,9 +1,11 @@
 <script lang="ts">
-  import { DeletableBranches, DeleteMergedBranches, Fetch, HideRemote, MergedBranches, RemoteAction, RemotePlaces, Remotes, RemoteSettings, RemoteWebLinks, SetPushDefault, SetShowHidden, ShowingHidden, ShowRemoteFolder } from '../../wailsjs/go/app/App.js'
+  import { DeletableBranches, DeleteMergedBranches, Fetch, HideRemote, TidyMarks, MergedBranches, RemoteAction, RemotePlaces, Remotes, RemoteSettings, RemoteWebLinks, SetPushDefault, SetShowHidden, ShowingHidden, ShowRemoteFolder } from '../../wailsjs/go/app/App.js'
   import { BrowserOpenURL, ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
   import { errorText } from './errors'
   import { forgeAsk } from './links/forgeAsk.svelte'
   import { remoteMenuItems } from './remoteMenu'
+  import { addTidyRows, tidyCounts } from './remoteTidy'
+  import TidyDialog from './TidyDialog.svelte'
   import { whileBusy } from './busy'
   import type { app } from '../../wailsjs/go/models'
   import { toasts } from './toasts.svelte'
@@ -161,7 +163,7 @@
     if (!remote || !onMenu) return
     const reload = () => void loadRemotes()
     const items = remoteMenuItems(
-      { remote, place: places[remote.fetchUrl], web: web.find((w) => w.remote === name), pushDefault, now: Date.now() / 1000 },
+      { remote, place: places[remote.fetchUrl], web: web.find((w) => w.remote === name), pushDefault, now: Date.now() / 1000, tidyCount: tidyByRemote[name] ?? 0 },
       {
         open: (url) => BrowserOpenURL(url),
         copy: (text, what) => {
@@ -172,6 +174,7 @@
         setPushDefault: (n) => void session.run(() => SetPushDefault(path, n)).then(reload),
         hide: (n, hide) => void session.run(() => HideRemote(path, n, hide)).then(reload),
         showFolder: (n) => void session.run(() => ShowRemoteFolder(path, n)),
+        tidy: openTidy,
         nameForge: (host) => {
           forgeAsk.host = host
           commands.settingsOpen = true
@@ -211,15 +214,28 @@
   // menu opens at once.
   let webLinks = $state<app.RemoteWeb[] | null>(null)
   let pushDefault = $state('')
+  // Which branches Tidy could delete, by name, for the marks and each remote's foot (#924).
+  let tidyMarks = $state<Record<string, string>>({})
+  let tidyFor = $state('')
+  let tidyByRemote = $derived(
+    tidyCounts(
+      tidyMarks,
+      refs,
+      remotes.map((r) => r.name),
+    ),
+  )
+  const openTidy = (remote: string) => (tidyFor = remote)
 
   async function loadRemotes() {
     const menus = ui.panel === 'remotes'
-    const [rs, ps, web, set] = await Promise.all([
+    const [rs, ps, web, set, marks] = await Promise.all([
       Remotes(path).catch(() => null),
       RemotePlaces(path).catch(() => null),
       menus ? RemoteWebLinks(path).catch(() => null) : null,
       menus ? RemoteSettings(path).catch(() => null) : null,
+      menus ? TidyMarks(path).catch(() => null) : null,
     ])
+    if (marks) tidyMarks = marks
     if (rs) remotes = rs
     if (ps) places = ps as Record<string, URLPlace>
     remotesRead = !!rs && !!ps
@@ -237,7 +253,11 @@
   let merged = $derived(session.merged[path] ?? {})
   let deletable = $state<string[]>([])
   let deleting = $state(false)
-  let rows = $derived(current ? panelRows(current, { open: ui.open, query: filter, care: careOn, merged }) : [])
+  let rows = $derived.by(() => {
+    const base = current ? panelRows(current, { open: ui.open, query: filter, care: careOn, merged }) : []
+    // Not while filtering: the foot rows aren't matches.
+    return ui.panel === 'remotes' && !filter.trim() ? addTidyRows(base, tidyByRemote) : base
+  })
   let filtering = $derived(filter.trim().length > 0)
   let needCare = $derived(careCount(panels.branches))
   let matches = $derived(!filtering ? 0 : current ? panelMatches(current, filter) : ui.panel === 'filters' ? filterMatches : repoMatches)
@@ -303,8 +323,8 @@
     const x = (box?.left ?? 0) + 32
     const y = box?.bottom ?? 0
     if (row?.type === 'ref') onContext?.(row.ref, x, y)
-    else if (row?.remote) void remoteMenu(row.label, x, y)
-    else if (row?.members) onStackContext?.(row.members, x, y)
+    else if (row?.type === 'folder' && row.remote) void remoteMenu(row.label, x, y)
+    else if (row?.type === 'folder' && row.members) onStackContext?.(row.members, x, y)
   }
 
   let typed = ''
@@ -329,6 +349,7 @@
     if (action.type === 'move') setActive(action.index)
     else if (action.type === 'toggle' && row?.type === 'folder') toggleFolder(row)
     else if (action.type === 'pick' && row?.type === 'ref') onPick(row.ref)
+    else if ((action.type === 'pick' || action.type === 'checkout') && row?.type === 'tidy') openTidy(row.remote)
     else if (action.type === 'checkout' && row?.type === 'ref') onActivate?.(row.ref)
     else if (action.type === 'menu') openMenuFor(activeIndex)
   }
@@ -419,7 +440,7 @@
     e.preventDefault()
   }
 
-  const rowKey = (r: TreeRow) => (r.type === 'folder' ? `folder:${r.key}` : r.ref.name)
+  const rowKey = (r: TreeRow) => (r.type === 'folder' ? `folder:${r.key}` : r.type === 'tidy' ? `tidy:${r.remote}` : r.ref.name)
 
   provideCommands(() => [
     {
@@ -505,6 +526,10 @@
   import Empty from './ui/Empty.svelte'
 </script>
 
+{#if tidyFor}
+  <TidyDialog {path} remote={tidyFor} onClose={() => (tidyFor = '')} onDone={() => void loadRemotes()} />
+{/if}
+
 <aside class="sidebar">
   <SidebarRail
     tabs={TABS.map((t) => ({ key: t.key, label: t.label, icon: t.icon, badge: badge(t.key) }))}
@@ -589,7 +614,7 @@
             aria-expanded={row.type === 'folder' ? row.open : undefined}
             aria-selected={row.type === 'ref' && !!selectedCommit && row.ref.commit === selectedCommit}
           >
-            <SidebarRow {row} {onStackContext} onRemoteContext={onMenu ? (n, x, y) => void remoteMenu(n, x, y) : undefined} {filter} {selectedCommit} remote={row.type === 'folder' && row.remote ? headers[row.label] : undefined} hostLook={row.type === 'folder' && row.remotes !== undefined ? hostLooks[row.host ?? ''] : undefined} {remoteTones} brand={prefs.forgeColors} mergedInto={row.type === 'ref' && row.ref.kind === 'local' ? merged[row.ref.short] : undefined} onFolderClick={clickFolder} onRefClick={clickRef} {onActivate} {onContext} />
+            <SidebarRow {row} {onStackContext} onRemoteContext={onMenu ? (n, x, y) => void remoteMenu(n, x, y) : undefined} {filter} {selectedCommit} remote={row.type === 'folder' && row.remote ? headers[row.label] : undefined} onTidy={openTidy} tidyMark={row.type === 'ref' && row.ref.kind === 'remote' ? tidyMarks[row.ref.short] : undefined} hostLook={row.type === 'folder' && row.remotes !== undefined ? hostLooks[row.host ?? ''] : undefined} {remoteTones} brand={prefs.forgeColors} mergedInto={row.type === 'ref' && row.ref.kind === 'local' ? merged[row.ref.short] : undefined} onFolderClick={clickFolder} onRefClick={clickRef} {onActivate} {onContext} />
           </li>
         {/each}
       </ul>

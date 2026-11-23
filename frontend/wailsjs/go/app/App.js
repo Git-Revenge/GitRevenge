@@ -550,6 +550,10 @@ export function RemoteSettings(arg1) {
   return window['go']['app']['App']['RemoteSettings'](arg1);
 }
 
+export function RemoteTidy(arg1, arg2) {
+  return window['go']['app']['App']['RemoteTidy'](arg1, arg2);
+}
+
 export function RemoteWebLinks(arg1) {
   return window['go']['app']['App']['RemoteWebLinks'](arg1);
 }
@@ -734,6 +738,10 @@ export function SetPushDefault(arg1, arg2) {
   return window['go']['app']['App']['SetPushDefault'](arg1, arg2);
 }
 
+export function SetQuietDays(arg1, arg2) {
+  return window['go']['app']['App']['SetQuietDays'](arg1, arg2);
+}
+
 export function SetRepoPreferences(arg1, arg2) {
   return window['go']['app']['App']['SetRepoPreferences'](arg1, arg2);
 }
@@ -836,6 +844,14 @@ export function TakeTrustQuestion() {
 
 export function Theme() {
   return window['go']['app']['App']['Theme']();
+}
+
+export function TidyHere(arg1, arg2, arg3) {
+  return window['go']['app']['App']['TidyHere'](arg1, arg2, arg3);
+}
+
+export function TidyMarks(arg1) {
+  return window['go']['app']['App']['TidyMarks'](arg1);
 }
 
 export function TrailerCare(arg1) {

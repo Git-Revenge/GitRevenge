@@ -283,6 +283,8 @@ export function RemotePlaces(arg1:string):Promise<Record<string, app.URLPlace>>;
 
 export function RemoteSettings(arg1:string):Promise<git.RemoteSettings>;
 
+export function RemoteTidy(arg1:string,arg2:string):Promise<app.TidyReport>;
+
 export function RemoteWebLinks(arg1:string):Promise<Array<app.RemoteWeb>>;
 
 export function Remotes(arg1:string):Promise<Array<git.Remote>>;
@@ -375,6 +377,8 @@ export function SetPreferences(arg1:app.Preferences):Promise<void>;
 
 export function SetPushDefault(arg1:string,arg2:string):Promise<void>;
 
+export function SetQuietDays(arg1:string,arg2:number):Promise<void>;
+
 export function SetRepoPreferences(arg1:string,arg2:app.RepoPreferences):Promise<void>;
 
 export function SetShowHidden(arg1:string,arg2:boolean):Promise<void>;
@@ -426,6 +430,10 @@ export function TakeProblem(arg1:string):Promise<app.Problem>;
 export function TakeTrustQuestion():Promise<app.TrustQuestion>;
 
 export function Theme():Promise<string>;
+
+export function TidyHere(arg1:string,arg2:Array<string>,arg3:Array<string>):Promise<Array<app.TidyResult>>;
+
+export function TidyMarks(arg1:string):Promise<Record<string, string>>;
 
 export function TrailerCare(arg1:string):Promise<app.TrailerCare>;
 
