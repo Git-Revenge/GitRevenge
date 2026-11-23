@@ -3214,6 +3214,28 @@ export namespace git {
 		    return a;
 		}
 	}
+	export class FetchRules {
+	    skipFetchAll: boolean;
+	    prune: boolean;
+	    tagOpt: string;
+	    allBranches: boolean;
+	    patterns: string[];
+	    other: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new FetchRules(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.skipFetchAll = source["skipFetchAll"];
+	        this.prune = source["prune"];
+	        this.tagOpt = source["tagOpt"];
+	        this.allBranches = source["allBranches"];
+	        this.patterns = source["patterns"];
+	        this.other = source["other"];
+	    }
+	}
 	export class FileChange {
 	    status: string;
 	    path: string;
