@@ -9,7 +9,7 @@ const outline = (rows: TreeRow[]) => rows.map((r) => '  '.repeat(r.depth) + (r.t
 describe('tidy in the Remotes panel', () => {
   it('counts each remote’s branches, a local branch under its upstream’s remote', () => {
     const marks = { 'origin/a': 'merged', 'origin/b': 'gone', 'team/x/c': 'quiet', fix: 'gone' }
-    const refs = [{ kind: 'local', short: 'fix', upstream: 'team/x/fix' }]
+    const refs = [{ kind: 'local' as const, short: 'fix', upstream: 'team/x/fix' }]
     expect(tidyCounts(marks, refs, ['origin', 'team', 'team/x'])).toEqual({ origin: 2, 'team/x': 2 })
   })
 
@@ -20,7 +20,7 @@ describe('tidy in the Remotes panel', () => {
       '  origin/a',
       '  release',
       '    origin/release/1',
-      `  [${tidyLabel('origin', 2)}]`,
+      '  [2 could be tidied]',
       'upstream',
       '  upstream/a',
       'closed',

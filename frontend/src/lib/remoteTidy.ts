@@ -33,7 +33,7 @@ export function addTidyRows(rows: TreeRow[], counts: Record<string, number>): Tr
     if (!open) return
     const count = counts[open.remote] ?? 0
     if (count > 0) {
-      const row: TidyRow = { type: 'tidy', remote: open.remote, count, depth: open.depth + 1, label: tidyLabel(open.remote, count), startsGroup: false }
+      const row: TidyRow = { type: 'tidy', remote: open.remote, count, depth: open.depth + 1, label: `${count} could be tidied`, startsGroup: false }
       out.push(row)
     }
     open = null
@@ -47,6 +47,8 @@ export function addTidyRows(rows: TreeRow[], counts: Record<string, number>): Tr
   return out
 }
 
+/** The foot row's full sentence, for its tooltip; the row itself sits under the remote, so it
+ * shows only the count. */
 export const tidyLabel = (remote: string, count: number) => `${count} ${count === 1 ? 'branch' : 'branches'} on ${remote} could be tidied`
 
 /** A remote branch's mark, in words, never colour alone. */

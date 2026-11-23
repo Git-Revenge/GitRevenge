@@ -4,7 +4,7 @@
   import type { Ref } from './graph/rowCache'
   import PlaceGlyph from './PlaceGlyph.svelte'
   import { onRemotesTooltip, type PlaceLook, type RemoteHeader } from './remoteHeader'
-  import { tidyStatus } from './remoteTidy'
+  import { tidyLabel, tidyStatus } from './remoteTidy'
   import { matchParts, refStatus, refTooltip, stackPlace, type FolderRow, type RefRow, type TreeRow } from './sidebarTree'
   import Icon from './ui/Icon.svelte'
 
@@ -142,8 +142,8 @@
   {/if}
 {:else if row.type === 'tidy'}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="row tidy" style:--depth={row.depth} title="Open Tidy for {row.remote}" onclick={() => onTidy?.(row.remote)}>
-    <span class="tidy-text">{row.label}</span><span class="tidy-arrow" aria-hidden="true">→</span>
+  <div class="row tidy" style:--depth={row.depth} title="{tidyLabel(row.remote, row.count)}. Click to open Tidy." onclick={() => onTidy?.(row.remote)}>
+    <span class="tidy-text">{row.label}<span class="visually-hidden"> on {row.remote}. Open Tidy</span></span><span class="tidy-arrow" aria-hidden="true">→</span>
   </div>
 {:else}
   {@const r = row.ref}
