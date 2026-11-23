@@ -100,7 +100,8 @@ func (r *Repo) FetchNotes(ctx context.Context, remote string, o NetOptions) erro
 	if err := CheckRevs(remote); err != nil {
 		return err
 	}
-	c := o.cmd("fetch", "--progress", "--prune", "--no-tags", remote, "+refs/notes/*:"+notesMirror(remote)+"*")
+	// FETCH_HEAD stays the last fetch of branches: "last fetched" and Tidy read it.
+	c := o.cmd("fetch", "--progress", "--prune", "--no-tags", "--no-write-fetch-head", remote, "+refs/notes/*:"+notesMirror(remote)+"*")
 	c.Dir = r.dir
 	_, err := r.runner.Run(ctx, c)
 	return err

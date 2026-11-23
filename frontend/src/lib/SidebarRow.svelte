@@ -4,8 +4,11 @@
   import type { Ref } from './graph/rowCache'
   import PlaceGlyph from './PlaceGlyph.svelte'
   import { onRemotesTooltip, type PlaceLook, type RemoteHeader } from './remoteHeader'
+  import { tidyLabel, tidyStatus } from './remoteTidy'
   import { matchParts, refStatus, refTooltip, stackPlace, type FolderRow, type RefRow, type TreeRow } from './sidebarTree'
   import Icon from './ui/Icon.svelte'
+
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
   // For screen readers. Written in the markup, it would lose its space.
   const STACK_PREFIX = 'Stack: '
@@ -24,6 +27,8 @@
     onContext,
     onStackContext,
     onRemoteContext,
+    onTidy,
+    tidyMark,
     remote,
     hostLook,
     remoteTones = {},
@@ -49,6 +54,10 @@
     onStackContext?: (members: Ref[], x: number, y: number) => void
     /** A remote's own menu, opened on its folder. */
     onRemoteContext?: (remote: string, x: number, y: number) => void
+    /** Opens Tidy for a remote, from the row at its foot. */
+    onTidy?: (remote: string) => void
+    /** A remote branch's Tidy mark: gone, merged or quiet. */
+    tidyMark?: string
   } = $props()
 </script>
 
@@ -131,10 +140,15 @@
       }}><Icon name="more" size={14} /></button
     >
   {/if}
+{:else if row.type === 'tidy'}
+  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <div class="row tidy" style:--depth={row.depth} title="{tidyLabel(row.remote, row.count)}. Click to open Tidy." onclick={() => onTidy?.(row.remote)}>
+    <span class="tidy-text">{row.label}<span class="visually-hidden"> on {row.remote}. Open Tidy</span></span><span class="tidy-arrow" aria-hidden="true">→</span>
+  </div>
 {:else}
   {@const r = row.ref}
   {@const k = kindInfo(row.mark)}
-  {@const status = refStatus(r, mergedInto)}
+  {@const status = (r.kind === 'remote' ? tidyStatus(tidyMark) : undefined) ?? refStatus(r, mergedInto)}
   {@const parts = matchParts(row.label, filter)}
   {@const isSelected = !!selectedCommit && r.commit === selectedCommit}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -146,6 +160,7 @@
     class:stacked={row.stacked}
     class:railed={row.railed}
     class:context={row.context}
+    class:gone={status?.text === 'gone'}
     style:--depth={row.depth}
     onclick={() => onRefClick(row)}
     ondblclick={() => onActivate?.(r)}
@@ -154,7 +169,8 @@
       e.preventDefault()
       onContext(r, e.clientX, e.clientY)
     }}
-    title={row.onRemotes ? onRemotesTooltip(row.label, row.onRemotes) : refTooltip(r, mergedInto)}
+    title={row.onRemotes ? onRemotesTooltip(row.label, row.onRemotes) : refTooltip(r, mergedInto) + (r.kind === 'remote' && tidyStatus(tidyMark) ? `
+${capitalize(tidyStatus(tidyMark)!.spoken)}: Tidy can delete it` : '')}
   >
     {#if r.head}<span class="here"><span class="visually-hidden">Checked out: </span></span>{/if}
     {#if k}<span class="kind-icon" style:color="var({k.token})" title={k.label}><Icon name={k.icon} size={13} /><span class="visually-hidden">{k.label}</span></span>{/if}
@@ -367,6 +383,30 @@
   .note {
     margin-left: auto;
     flex: none;
+  }
+
+  /* Gone: struck through, and the mark says so in words. */
+  .ref.gone .name {
+    text-decoration: line-through;
+    text-decoration-color: var(--ink-mute);
+  }
+
+  /* The row at a remote's foot that opens Tidy. */
+  .tidy {
+    gap: 6px;
+    padding: 2px 10px 2px calc(28px + var(--depth, 0) * 14px);
+    font-size: 13px;
+    color: var(--link);
+  }
+
+  .tidy:hover .tidy-text {
+    text-decoration: underline;
+  }
+
+  .tidy-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   /* Grouped by name: a chip for each remote that has the branch. Tones differ in lightness as

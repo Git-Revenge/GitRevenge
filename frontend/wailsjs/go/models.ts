@@ -2392,6 +2392,84 @@ export namespace app {
 		}
 	}
 	
+	export class TidyItem {
+	    kind: string;
+	    name: string;
+	    local?: boolean;
+	    stale?: boolean;
+	    unpushed?: number;
+	    onlyHere?: number;
+	    lastAuthor?: string;
+	    lastDate?: number;
+	    ticked: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new TidyItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.name = source["name"];
+	        this.local = source["local"];
+	        this.stale = source["stale"];
+	        this.unpushed = source["unpushed"];
+	        this.onlyHere = source["onlyHere"];
+	        this.lastAuthor = source["lastAuthor"];
+	        this.lastDate = source["lastDate"];
+	        this.ticked = source["ticked"];
+	    }
+	}
+	export class TidyReport {
+	    remote: string;
+	    base: string;
+	    quietDays: number;
+	    items: TidyItem[];
+	
+	    static createFrom(source: any = {}) {
+	        return new TidyReport(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.remote = source["remote"];
+	        this.base = source["base"];
+	        this.quietDays = source["quietDays"];
+	        this.items = this.convertValues(source["items"], TidyItem);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class TidyResult {
+	    name: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TidyResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.error = source["error"];
+	    }
+	}
 	export class TrailerCare {
 	    questions: trailerindex.Question[];
 	    open: number;

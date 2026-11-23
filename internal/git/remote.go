@@ -200,7 +200,9 @@ func (r *Repo) FetchBranch(ctx context.Context, remote, branch string, o NetOpti
 	if err := CheckRevs(remote, branch); err != nil {
 		return err
 	}
-	c := o.cmd("fetch", "--progress", "--no-tags", remote, "+refs/heads/"+branch+":refs/remotes/"+remote+"/"+branch)
+	// One branch would leave FETCH_HEAD naming only it, and Tidy would read every other
+	// branch as deleted on the remote.
+	c := o.cmd("fetch", "--progress", "--no-tags", "--no-write-fetch-head", remote, "+refs/heads/"+branch+":refs/remotes/"+remote+"/"+branch)
 	c.Dir = r.dir
 	_, err := r.runner.Run(ctx, c)
 	return err

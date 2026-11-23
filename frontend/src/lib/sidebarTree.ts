@@ -111,7 +111,14 @@ export interface RefRow extends RowBase {
   onRemotes?: Ref[]
 }
 
-export type TreeRow = FolderRow | RefRow
+/** At the foot of a remote's branches: how many could be tidied, opening Tidy (#924). */
+export interface TidyRow extends RowBase {
+  type: 'tidy'
+  remote: string
+  count: number
+}
+
+export type TreeRow = FolderRow | RefRow | TidyRow
 
 export interface RowOptions {
   /** Open state the person chose, by folder key; other folders use the default. */
