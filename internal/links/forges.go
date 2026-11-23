@@ -24,7 +24,7 @@ import (
 // the repository's config replaces a global rule for the same host.
 const ForgeSection = "gitrevenge-forge"
 
-// The kinds of forge a rule can name. Bitbucket Data Center is the self-hosted Bitbucket,
+// ForgeKinds are the kinds of forge a rule can name. Bitbucket Data Center is the self-hosted Bitbucket,
 // whose pages differ from bitbucket.org's; Azure DevOps Server is the self-hosted Azure.
 var ForgeKinds = []git.Forge{git.ForgeGitHub, git.ForgeGitLab, git.ForgeGitea, git.ForgeForgejo, git.ForgeBitbucketServer, git.ForgeAzure}
 
@@ -134,11 +134,7 @@ func loadForges(ctx context.Context, g *git.Repo, inRepo bool) ([]ForgeRule, err
 			global[i].Shadowed = true
 		}
 	}
-	all := append(local, global...)
-	if all == nil {
-		all = []ForgeRule{}
-	}
-	return all, nil
+	return append(append([]ForgeRule{}, local...), global...), nil
 }
 
 // SaveForge writes a forge rule to its scope, replacing any rule for the same host there.
