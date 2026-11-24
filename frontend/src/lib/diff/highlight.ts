@@ -6,6 +6,36 @@ import { classHighlighter, highlightCode } from '@lezer/highlight'
 export interface Token {
   text: string
   cls: string
+  /** Set on text the diff marks as changed within the line. */
+  changed?: boolean
+}
+
+/**
+ * Splits a line's tokens where changed text starts and ends, and flags the changed pieces.
+ * marks are [from, to) offsets into the line, in UTF-16 code units as JavaScript counts.
+ */
+export function withMarks(tokens: Token[], marks: readonly [number, number][] | undefined): Token[] {
+  if (!marks?.length) return tokens
+  const sorted = [...marks].sort((a, b) => a[0] - b[0])
+  const out: Token[] = []
+  let at = 0
+  for (const t of tokens) {
+    let start = 0
+    while (start < t.text.length) {
+      const pos = at + start
+      const inside = sorted.find(([f, e]) => pos >= f && pos < e)
+      // The piece runs to the next edge of a mark, or the token's end.
+      let end = t.text.length
+      for (const [f, e] of sorted) {
+        if (f > pos && f - at < end) end = f - at
+        if (e > pos && e - at < end) end = e - at
+      }
+      out.push(inside ? { text: t.text.slice(start, end), cls: t.cls, changed: true } : { text: t.text.slice(start, end), cls: t.cls })
+      start = end
+    }
+    at += t.text.length
+  }
+  return out
 }
 
 const cache = new Map<string, Promise<LanguageSupport | null>>()

@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/semdiff"
 	"github.com/git-revenge/gitrevenge/internal/settings"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -33,6 +34,13 @@ type Preferences struct {
 	Zoom int `json:"zoom"`
 	// ForgeColors draws forge marks in their brands' colours rather than ink.
 	ForgeColors bool `json:"forgeColors"`
+	// DiffAlgorithm is the line diff for the diff views, or "" to follow each repository's
+	// diff.algorithm.
+	DiffAlgorithm string `json:"diffAlgorithm"`
+	// DiffRibbon joins the split view's sides with the ribbon instead of padding them.
+	DiffRibbon bool `json:"diffRibbon"`
+	// DiffMoves shows lines that moved as moves.
+	DiffMoves bool `json:"diffMoves"`
 }
 
 // Zoom limits, as percentages.
@@ -75,6 +83,9 @@ func (a *App) Preferences() (Preferences, error) {
 		CloneDir:          s.CloneDir,
 		Zoom:              zoom,
 		ForgeColors:       s.ForgeColors,
+		DiffAlgorithm:     s.DiffAlgorithm,
+		DiffRibbon:        !s.DiffRibbonOff,
+		DiffMoves:         !s.DiffMovesOff,
 	}, nil
 }
 
@@ -94,6 +105,9 @@ func (a *App) SetPreferences(p Preferences) error {
 		if !slices.Contains(experimentalViews, v) {
 			return userError("Unknown graph view " + v + ".")
 		}
+	}
+	if p.DiffAlgorithm != "" && !slices.Contains(semdiff.Algorithms, p.DiffAlgorithm) {
+		return userError("Unknown line diff " + p.DiffAlgorithm + ".")
 	}
 	if p.Zoom < minZoom || p.Zoom > maxZoom {
 		return userError("Zoom must be between 80% and 150%.")
@@ -143,6 +157,9 @@ func (a *App) SetPreferences(p Preferences) error {
 		s.CloneDir = p.CloneDir
 		s.Zoom = zoom
 		s.ForgeColors = p.ForgeColors
+		s.DiffAlgorithm = p.DiffAlgorithm
+		s.DiffRibbonOff = !p.DiffRibbon
+		s.DiffMovesOff = !p.DiffMoves
 	})
 }
 

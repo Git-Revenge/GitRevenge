@@ -46,7 +46,9 @@ type App struct {
 	sigs      sigCache
 	configs   gitConfigs
 	conflicts conflictChecks
-	insights  insightsCache
+	// diffs keeps recent comparisons for the diff views (see FileDiff).
+	diffs    diffCache
+	insights insightsCache
 	// mapAuthors holds the Map's Authors mode results, by repository, window and ref state.
 	mapAuthors insightsCache
 	// people holds who each repository's history names, for the People view (see people.go).

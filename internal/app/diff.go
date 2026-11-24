@@ -5,8 +5,10 @@ import (
 	"encoding/base64"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/semdiff"
 )
 
 // Diff modes for FileContents.
@@ -50,6 +52,76 @@ func (a *App) FileContents(path, mode, commit, file, oldPath string, force bool)
 		return git.FileContents{}, userError("Unknown diff mode " + mode + ".")
 	}
 	return r.Git.Contents(ctx, file, from, to, force)
+}
+
+// FileDiff is a file's two versions and how they differ, for the diff views.
+type FileDiff struct {
+	Contents git.FileContents `json:"contents"`
+	// Diff compares the two texts. It's nil unless Contents.Kind is "text".
+	Diff *semdiff.Result `json:"diff"`
+}
+
+// FileDiff returns both versions of a file, as FileContents does, and compares them by the
+// line diff chosen in settings, or else the repository's diff.algorithm. The comparison
+// stops if the repository closes first.
+func (a *App) FileDiff(path, mode, commit, file, oldPath string, force bool) (FileDiff, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return FileDiff{}, err
+	}
+	m, err := a.sessions()
+	if err != nil {
+		return FileDiff{}, err
+	}
+	s := m.Settings().Get()
+	opts := semdiff.Options{Algorithm: s.DiffAlgorithm, Moves: !s.DiffMovesOff}
+	// git's setting is read while the file is, so following it costs no wait.
+	fromGit := make(chan string, 1)
+	if opts.Algorithm == "" {
+		go func() { fromGit <- gitDiffAlgorithm(r.Git) }()
+	}
+	contents, err := a.FileContents(path, mode, commit, file, oldPath, force)
+	if opts.Algorithm == "" {
+		opts.Algorithm = <-fromGit
+	}
+	if err != nil || contents.Kind != "text" {
+		return FileDiff{Contents: contents}, err
+	}
+	res, err := a.diffs.get().Diff(r.Git.Context(), contents.Old.Text, contents.New.Text, opts)
+	if err != nil {
+		return FileDiff{}, err
+	}
+	return FileDiff{Contents: contents, Diff: &res}, nil
+}
+
+// GitDiffAlgorithm returns the line diff the repository's diff.algorithm names, or "" when it
+// names none git knows, for the setting that follows it.
+func (a *App) GitDiffAlgorithm(path string) (string, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return "", err
+	}
+	return gitDiffAlgorithm(r.Git), nil
+}
+
+func gitDiffAlgorithm(g *git.Repo) string {
+	name, _ := g.ReadString(context.Background(), "config", "--get", "diff.algorithm")
+	return semdiff.Algorithm(strings.ToLower(name))
+}
+
+// diffCache holds recent comparisons, made on first use.
+type diffCache struct {
+	once  sync.Once
+	cache *semdiff.Cache
+}
+
+// recentDiffs is how many comparisons are kept: enough to go back and forth through a
+// commit's files without comparing them again.
+const recentDiffs = 64
+
+func (d *diffCache) get() *semdiff.Cache {
+	d.once.Do(func() { d.cache = semdiff.NewCache(recentDiffs) })
+	return d.cache
 }
 
 // FileImage returns an image in the repository as a data URL, at the version a diff of

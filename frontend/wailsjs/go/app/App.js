@@ -190,6 +190,10 @@ export function FileData(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['FileData'](arg1, arg2, arg3, arg4);
 }
 
+export function FileDiff(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['app']['App']['FileDiff'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
 export function FileHistory(arg1, arg2) {
   return window['go']['app']['App']['FileHistory'](arg1, arg2);
 }
@@ -224,6 +228,10 @@ export function GitConfigKeys() {
 
 export function GitConfigScopes(arg1) {
   return window['go']['app']['App']['GitConfigScopes'](arg1);
+}
+
+export function GitDiffAlgorithm(arg1) {
+  return window['go']['app']['App']['GitDiffAlgorithm'](arg1);
 }
 
 export function GraphDensity() {

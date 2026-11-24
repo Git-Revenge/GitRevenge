@@ -124,3 +124,77 @@ func TestFileData(t *testing.T) {
 		t.Fatalf("missing file = %q, %v", got, err)
 	}
 }
+
+func TestFileDiffComparesTheVersions(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.CommitFile("a.txt", "keep\nold line\nkeep\n", "first")
+	tab, err := a.OpenRepo(fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fx.WriteFile("a.txt", "keep\nnew line\nkeep\n")
+	fd, err := a.FileDiff(tab.Path, DiffUnstaged, "", "a.txt", "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fd.Contents.New.Text != "keep\nnew line\nkeep\n" || fd.Diff == nil {
+		t.Fatalf("got %+v", fd)
+	}
+	if len(fd.Diff.Blocks) != 1 || fd.Diff.Blocks[0].OldStart != 1 || fd.Diff.Blocks[0].NewEnd != 2 || fd.Diff.Algorithm != "myers" {
+		t.Errorf("diff %+v, want line 2 changed, by myers", fd.Diff)
+	}
+	if want := 0; len(fd.Diff.Blocks[0].New) == 0 || fd.Diff.Blocks[0].New[0].From != want {
+		t.Errorf("marks %+v, want the first word of line 2", fd.Diff.Blocks[0].New)
+	}
+}
+
+func TestFileDiffFollowsGitsAlgorithmUnlessOneIsChosen(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.CommitFile("a.txt", "a\nb\n", "first")
+	fx.Git("config", "diff.algorithm", "Histogram")
+	tab, err := a.OpenRepo(fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fx.WriteFile("a.txt", "a\nc\n")
+	if got, _ := a.GitDiffAlgorithm(tab.Path); got != "histogram" {
+		t.Errorf("git's algorithm = %q, want histogram", got)
+	}
+	fd, err := a.FileDiff(tab.Path, DiffUnstaged, "", "a.txt", "", false)
+	if err != nil || fd.Diff.Algorithm != "histogram" {
+		t.Fatalf("algorithm %v, %v; want histogram, from git", fd.Diff, err)
+	}
+
+	p, _ := a.Preferences()
+	p.DiffAlgorithm, p.DiffMoves = "patience", false
+	if err := a.SetPreferences(p); err != nil {
+		t.Fatal(err)
+	}
+	if fd, _ = a.FileDiff(tab.Path, DiffUnstaged, "", "a.txt", "", false); fd.Diff.Algorithm != "patience" {
+		t.Errorf("algorithm %s, want patience, as chosen", fd.Diff.Algorithm)
+	}
+	if p, _ = a.Preferences(); p.DiffAlgorithm != "patience" || p.DiffMoves || !p.DiffRibbon {
+		t.Errorf("preferences %+v, want patience, no moves, the ribbon", p)
+	}
+	p.DiffAlgorithm = "quantum"
+	if err := a.SetPreferences(p); err == nil {
+		t.Error("took an unknown line diff")
+	}
+}
+
+func TestFileDiffLeavesBinaryFilesUncompared(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.CommitFile("b.bin", "a\x00b", "first")
+	tab, _ := a.OpenRepo(fx.Dir)
+	fx.WriteFile("b.bin", "a\x00c")
+	fd, err := a.FileDiff(tab.Path, DiffUnstaged, "", "b.bin", "", false)
+	if err != nil || fd.Contents.Kind != "binary" || fd.Diff != nil {
+		t.Errorf("got %+v, %v; want a binary file with no diff", fd, err)
+	}
+}

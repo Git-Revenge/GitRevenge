@@ -103,6 +103,8 @@ export function FileContents(arg1:string,arg2:string,arg3:string,arg4:string,arg
 
 export function FileData(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
 
+export function FileDiff(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:boolean):Promise<app.FileDiff>;
+
 export function FileHistory(arg1:string,arg2:string):Promise<Array<git.FileCommit>>;
 
 export function FileImage(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
@@ -120,6 +122,8 @@ export function GitConfigFileText(arg1:string):Promise<string>;
 export function GitConfigKeys():Promise<Array<string>>;
 
 export function GitConfigScopes(arg1:string):Promise<app.ConfigScopes>;
+
+export function GitDiffAlgorithm(arg1:string):Promise<string>;
 
 export function GraphDensity():Promise<string>;
 

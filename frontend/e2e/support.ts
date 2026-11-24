@@ -19,6 +19,8 @@ export interface Scenario {
   commandKeys?: boolean
   /** The file whose diff is open in the working tree panel. */
   diffFile?: string
+  /** What the diff view compares; a commit's file unless said. */
+  diffTarget?: { mode: 'commit' | 'staged' | 'unstaged'; file: string; commit?: string }
   /** What's checked out, as the tab shows it. */
   head?: string
   menuX?: number

@@ -37,6 +37,10 @@ func (r *Repo) Dir() string { return r.dir }
 // file and half its work behind. Closing is optional; a Repo holds nothing else.
 func (r *Repo) Close() { r.closed() }
 
+// Context ends when the Repo closes. Work for the repository done in Go rather than by git,
+// such as comparing two versions of a file, stops with it.
+func (r *Repo) Context() context.Context { return r.open }
+
 // reading returns ctx for a read: it also ends when the Repo closes. Call done when the
 // read is over.
 func (r *Repo) reading(ctx context.Context) (reading context.Context, done func()) {

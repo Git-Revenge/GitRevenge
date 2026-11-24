@@ -459,6 +459,18 @@ const mounts = {
     const { default: RepoPanel } = await import('../src/lib/RepoPanel.svelte')
     mount(RepoPanel, { target: host, props: { path: '/r', filter: '', openDialog: () => {} } })
   },
+  async diff() {
+    host.style.cssText = 'display:block;height:100vh'
+    const { default: DiffView } = await import('../src/lib/diff/DiffView.svelte')
+    const { prefs } = await import('../src/lib/prefs.svelte')
+    await prefs.load()
+    if (scenario.commandKeys) {
+      const { commands } = await import('../src/lib/commands.svelte')
+      window.addEventListener('keydown', (e) => commands.dispatch(e))
+    }
+    const target = scenario.diffTarget ?? { mode: 'commit', commit: 'c0ffee'.padEnd(40, '0'), file: 'internal/tides/forecast.go' }
+    mount(DiffView, { target: host, props: { path: '/r', target, onClose: record('close'), onOpen: record('open') } })
+  },
   async closingDiff() {
     host.style.cssText = 'display:block;height:100vh'
     const { default: DiffView } = await import('../src/lib/diff/DiffView.svelte')
@@ -585,6 +597,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'closingDiff':
     await mounts.closingDiff()
+    break
+  case 'diff':
+    await mounts.diff()
     break
   case 'stackedDialogs':
     await mounts.stackedDialogs()

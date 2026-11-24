@@ -914,6 +914,38 @@ export namespace app {
 	        this.error = source["error"];
 	    }
 	}
+	export class FileDiff {
+	    contents: git.FileContents;
+	    diff?: semdiff.Result;
+	
+	    static createFrom(source: any = {}) {
+	        return new FileDiff(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.contents = this.convertValues(source["contents"], git.FileContents);
+	        this.diff = this.convertValues(source["diff"], semdiff.Result);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class FilterPick {
 	    key: string;
 	    value: string;
@@ -1613,6 +1645,9 @@ export namespace app {
 	    cloneDir: string;
 	    zoom: number;
 	    forgeColors: boolean;
+	    diffAlgorithm: string;
+	    diffRibbon: boolean;
+	    diffMoves: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Preferences(source);
@@ -1629,6 +1664,9 @@ export namespace app {
 	        this.cloneDir = source["cloneDir"];
 	        this.zoom = source["zoom"];
 	        this.forgeColors = source["forgeColors"];
+	        this.diffAlgorithm = source["diffAlgorithm"];
+	        this.diffRibbon = source["diffRibbon"];
+	        this.diffMoves = source["diffMoves"];
 	    }
 	}
 	export class ProblemAction {
@@ -4499,6 +4537,125 @@ export namespace links {
 	        this.href = source["href"];
 	        this.rule = source["rule"];
 	    }
+	}
+
+}
+
+export namespace semdiff {
+	
+	export class Span {
+	    line: number;
+	    from: number;
+	    to: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Span(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.line = source["line"];
+	        this.from = source["from"];
+	        this.to = source["to"];
+	    }
+	}
+	export class Block {
+	    oldStart: number;
+	    oldEnd: number;
+	    newStart: number;
+	    newEnd: number;
+	    old?: Span[];
+	    new?: Span[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Block(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.oldStart = source["oldStart"];
+	        this.oldEnd = source["oldEnd"];
+	        this.newStart = source["newStart"];
+	        this.newEnd = source["newEnd"];
+	        this.old = this.convertValues(source["old"], Span);
+	        this.new = this.convertValues(source["new"], Span);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Move {
+	    oldStart: number;
+	    oldEnd: number;
+	    newStart: number;
+	    newEnd: number;
+	    reindented: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Move(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.oldStart = source["oldStart"];
+	        this.oldEnd = source["oldEnd"];
+	        this.newStart = source["newStart"];
+	        this.newEnd = source["newEnd"];
+	        this.reindented = source["reindented"];
+	    }
+	}
+	export class Result {
+	    blocks: Block[];
+	    moves: Move[];
+	    algorithm: string;
+	    added: number;
+	    removed: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Result(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.blocks = this.convertValues(source["blocks"], Block);
+	        this.moves = this.convertValues(source["moves"], Move);
+	        this.algorithm = source["algorithm"];
+	        this.added = source["added"];
+	        this.removed = source["removed"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }

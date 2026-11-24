@@ -83,6 +83,14 @@ type Settings struct {
 	Zoom int `json:"zoom,omitempty"`
 	// ForgeColors draws forge marks in their brands' colours rather than ink.
 	ForgeColors bool `json:"forgeColors,omitempty"`
+	// DiffAlgorithm is the line diff the diff views use (see semdiff.Algorithms), or empty to
+	// follow each repository's diff.algorithm.
+	DiffAlgorithm string `json:"diffAlgorithm,omitempty"`
+	// DiffRibbonOff pads the split view's sides to line up, instead of joining them with the
+	// ribbon.
+	DiffRibbonOff bool `json:"diffRibbonOff,omitempty"`
+	// DiffMovesOff shows moved lines as a deletion and an addition.
+	DiffMovesOff bool `json:"diffMovesOff,omitempty"`
 	// FetchAfterPush fetches, after a push to several places, the remotes those places
 	// belong to, so their remote-tracking branches match what was sent.
 	FetchAfterPush bool `json:"fetchAfterPush,omitempty"`
