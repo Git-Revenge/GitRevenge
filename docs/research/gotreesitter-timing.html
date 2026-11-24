@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="en" dir="ltr" class="docs-wrapper plugin-docs plugin-id-default docs-version-current docs-doc-page docs-doc-id-research/gotreesitter-timing" data-has-hydrated="false">
+<head>
+<meta charset="UTF-8">
+<meta name="generator" content="Docusaurus v3.10.2">
+<title data-rh="true">gotreesitter timings | Git Revenge</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" name="twitter:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" property="og:url" content="https://gitrevenge.com/docs/research/gotreesitter-timing"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="gotreesitter timings | Git Revenge"><meta data-rh="true" name="description" content="- Date: 2026-11-23"><meta data-rh="true" property="og:description" content="- Date: 2026-11-23"><link data-rh="true" rel="icon" href="/img/favicon.svg"><link data-rh="true" rel="canonical" href="https://gitrevenge.com/docs/research/gotreesitter-timing"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/research/gotreesitter-timing" hreflang="en"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/research/gotreesitter-timing" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"gotreesitter timings","item":"https://gitrevenge.com/docs/research/gotreesitter-timing"}]}</script><link rel="apple-touch-icon" href="/img/apple-touch-icon.png"><link rel="stylesheet" href="/assets/css/styles.1bf894f5.css">
+<script src="/assets/js/runtime~main.42f88962.js" defer="defer"></script>
+<script src="/assets/js/main.fddb85cc.js" defer="defer"></script>
+</head>
+<body>
+<svg style="display: none;"><defs>
+<symbol id="theme-svg-external-link" viewBox="0 0 24 24"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"/></symbol>
+</defs></svg>
+<script>!function(){var t=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();document.documentElement.setAttribute("data-theme",t||(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")),document.documentElement.setAttribute("data-theme-choice",t||"system")}(),function(){try{const c=new URLSearchParams(window.location.search).entries();for(var[t,e]of c)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script><div id="__docusaurus"><link rel="preload" as="image" href="/img/logo.svg"><div role="region" aria-label="Skip to main content"><a class="skipToContent_fXgn" href="#__docusaurus_skipToContent_fallback">Skip to main content</a></div><nav aria-label="Main" class="theme-layout-navbar navbar navbar--fixed-top"><div class="navbar__inner"><div class="theme-layout-navbar-left navbar__items"><button aria-label="Toggle navigation bar" aria-expanded="false" class="navbar__toggle clean-btn" type="button"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2" d="M4 7h22M4 15h22M4 23h22"></path></svg></button><a class="navbar__brand" href="/"><div class="navbar__logo"><img src="/img/logo.svg" alt="Git Revenge" class="themedComponent_mlkZ themedComponent--light_NVdE"><img src="/img/logo.svg" alt="Git Revenge" class="themedComponent_mlkZ themedComponent--dark_xIcU"></div><b class="navbar__title text--truncate">Git Revenge</b></a><a aria-current="page" class="navbar__item navbar__link navbar__link--active" href="/docs/guide">Docs</a><a href="https://github.com/Git-Revenge/GitRevenge/releases" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link">Releases<svg width="13.5" height="13.5" aria-label="(opens in new tab)" class="iconExternalLink_nPIU"><use href="#theme-svg-external-link"></use></svg></a></div><div class="theme-layout-navbar-right navbar__items navbar__items--right"><div class="navbar__item"><span class="navbar-version-badge">v1.1.0</span></div><a href="https://github.com/sponsors/risadams" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link header-sponsor-link">Sponsor<svg width="13.5" height="13.5" aria-label="(opens in new tab)" class="iconExternalLink_nPIU"><use href="#theme-svg-external-link"></use></svg></a><a href="https://github.com/Git-Revenge/GitRevenge" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link header-github-link" aria-label="GitHub repository"></a><div class="toggle_vylO colorModeToggle_DEke"><button class="clean-btn toggleButton_gllP toggleButtonDisabled_aARS" type="button" disabled="" title="system mode" aria-label="Switch between dark and light mode (currently system mode)"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP lightToggleIcon_pyhR"><path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP darkToggleIcon_wfgR"><path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP systemToggleIcon_QzmC"><path fill="currentColor" d="m12 21c4.971 0 9-4.029 9-9s-4.029-9-9-9-9 4.029-9 9 4.029 9 9 9zm4.95-13.95c1.313 1.313 2.05 3.093 2.05 4.95s-0.738 3.637-2.05 4.95c-1.313 1.313-3.093 2.05-4.95 2.05v-14c1.857 0 3.637 0.737 4.95 2.05z"></path></svg></button></div><div class="navbarSearchContainer_Bca1"></div></div></div><div role="presentation" class="navbar-sidebar__backdrop"></div></nav><div id="__docusaurus_skipToContent_fallback" class="theme-layout-main main-wrapper mainWrapper_z2l0"><div class="docsWrapper_hBAB"><button aria-label="Scroll back to top" class="clean-btn theme-back-to-top-button backToTopButton_sjWU" type="button"></button><div class="docRoot_UBD9"><aside class="theme-doc-sidebar-container docSidebarContainer_YfHR"><div class="sidebarViewport_aRkj"><div class="sidebar_njMd"><nav aria-label="Docs sidebar" class="menu thin-scrollbar menu_SIkG"><ul class="theme-doc-sidebar-menu menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/docs/guide"><span class="linkLabel_WmDU">Introduction</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/docs/guide/install"><span class="linkLabel_WmDU">Installing</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/docs/guide/tour"><span class="linkLabel_WmDU">A tour of the window</span></a></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist" href="/docs/walkthroughs"><span class="categoryLinkLabel_W154">Walkthroughs</span></a><button aria-label="Expand sidebar category &#x27;Walkthroughs&#x27;" aria-expanded="false" type="button" class="clean-btn menu__caret"></button></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/docs/guide/repositories"><span class="categoryLinkLabel_W154">User guide</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret menu__link--active" role="button" aria-expanded="true" href="/docs/PLAN"><span class="categoryLinkLabel_W154">The project</span></a></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/docs/PLAN"><span class="linkLabel_WmDU">Plan</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/docs/RELEASING"><span class="linkLabel_WmDU">Releasing</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/docs/privacy"><span class="linkLabel_WmDU">Privacy policy</span></a></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-2 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" tabindex="0" href="/docs/adr/wails-desktop-shell"><span class="categoryLinkLabel_W154">Design decisions</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-2 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret menu__link--active" role="button" aria-expanded="true" tabindex="0" href="/docs/research/semantic-diff-merge"><span class="categoryLinkLabel_W154">Research</span></a></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link" tabindex="0" href="/docs/research/semantic-diff-merge"><span class="linkLabel_WmDU">Semantic diff and merge</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-3 menu__list-item"><a class="menu__link menu__link--active" aria-current="page" tabindex="0" href="/docs/research/gotreesitter-timing"><span class="linkLabel_WmDU">gotreesitter timings</span></a></li></ul></li></ul></li></ul></nav></div></div></aside><main class="docMainContainer_TBSr"><div class="container padding-top--md padding-bottom--lg"><div class="row"><div class="col docItemCol_VOVn"><div class="docItemContainer_Djhp"><article><nav class="theme-doc-breadcrumbs breadcrumbsContainer_Z_bl" aria-label="Breadcrumbs"><ul class="breadcrumbs"><li class="breadcrumbs__item"><a aria-label="Home page" class="breadcrumbs__link" href="/"><svg viewBox="0 0 24 24" class="breadcrumbHomeIcon_YNFT"><path d="M10 19v-5h4v5c0 .55.45 1 1 1h3c.55 0 1-.45 1-1v-7h1.7c.46 0 .68-.57.33-.87L12.67 3.6c-.38-.34-.96-.34-1.34 0l-8.36 7.53c-.34.3-.13.87.33.87H5v7c0 .55.45 1 1 1h3c.55 0 1-.45 1-1z" fill="currentColor"></path></svg></a></li><li class="breadcrumbs__item"><span class="breadcrumbs__link">The project</span></li><li class="breadcrumbs__item"><span class="breadcrumbs__link">Research</span></li><li class="breadcrumbs__item breadcrumbs__item--active"><span class="breadcrumbs__link">gotreesitter timings</span></li></ul></nav><div class="tocCollapsible_ETCw theme-doc-toc-mobile tocMobile_ITEo"><button type="button" class="clean-btn tocCollapsibleButton_TO0P">On this page</button></div><div class="theme-doc-markdown markdown"><header><h1>gotreesitter timings</h1></header>
+<ul>
+<li class="">Date: 2026-11-23</li>
+<li class="">Issue: #943, for <a class="" href="/docs/adr/diffs-and-merges-read-the-code">ADR 0015</a></li>
+<li class="">Status: measured. The ADR&#x27;s Consequences and fallback rule now use these numbers.</li>
+</ul>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="the-question">The question<a href="#the-question" class="hash-link" aria-label="Direct link to The question" title="Direct link to The question" translate="no">​</a></h2>
+<p>Is <a href="https://github.com/odvcencio/gotreesitter" target="_blank" rel="noopener noreferrer" class="">gotreesitter</a> v0.58.0 fast enough, small enough and correct enough to parse every diff the app shows? And are the budgets in the <a class="" href="/docs/research/semantic-diff-merge">research note</a> right: 1 MB per side, 150 ms, 200,000 tokens, and a line diff on any parse error?</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="short-answer">Short answer<a href="#short-answer" class="hash-link" aria-label="Direct link to Short answer" title="Direct link to Short answer" translate="no">​</a></h2>
+<p><strong>Go, with four changes to how it&#x27;s used.</strong></p>
+<ol>
+<li class=""><strong>The speed depends on which of gotreesitter&#x27;s two engines a grammar uses.</strong> gotreesitter has a new C-faithful engine, <code>ccore</code>, and an older one. A grammar runs on <code>ccore</code> only after it passes upstream&#x27;s certification. C, TypeScript, Python, CSS, JSON and Rust are on it. They read 6–22 MB a second, and C parses 2.3 times <em>faster</em> than the official cgo bindings on the same machine. Go, JavaScript, TSX, C#, Java, SCSS, Vue, HTML, Lua and XML are still on the older engine. Most of them read 0.7–4 MB a second, and Go parses about 3 times <em>slower</em> than cgo overall, and up to 17 times on single files. They also use far more memory while parsing.</li>
+<li class=""><strong>The 150 ms limit is enforced by gotreesitter&#x27;s own timeout, not guessed from file size.</strong> <code>Parser.SetTimeoutMicros(150_000)</code> stopped every slow parse within 154 ms. The 1 MB check stays, so huge files aren&#x27;t read at all. The ccore grammars parse 1 MB in about 100 ms, so for them the size check binds first. On the older engine the timeout binds first. Most C#, JavaScript and Go files still parse in time. The exceptions are a few large C# files (46–317 KB) and bundled or minified JavaScript.</li>
+<li class=""><strong>&quot;Any parse error falls back&quot; is the wrong rule.</strong> 67% of kernel C files have at least one ERROR node, nearly all from macros. In the median such file it covers 0.2% of the bytes. A token diff still works around a small error, because the tokens inside it are still tokens. The rule becomes: fall back when more than a quarter of either version&#x27;s bytes sit inside ERROR nodes. That catches 1.2% of kernel files and 9% of Bootstrap&#x27;s SCSS.</li>
+<li class=""><strong>Walk the tree with <code>Node.Children()</code>, use a plain <code>Parser</code>, and share nothing but the <code>Language</code>.</strong> On ccore trees, <code>Children()</code> is 2–3 times faster than the cursor or <code>Child(i)</code>. The C grammar&#x27;s hand-written token source is 5 times slower than the default lexer and produces no fewer errors. A <code>Parser</code> isn&#x27;t safe for concurrent use, but a <code>ParserPool</code> is, and 16 goroutines parse 5 times faster than one.</li>
+</ol>
+<p>Size: the first-pass grammars add <strong>10.8 MB to the app</strong> and <strong>4.8 MB to the Windows installer</strong>.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="method">Method<a href="#method" class="hash-link" aria-label="Direct link to Method" title="Direct link to Method" translate="no">​</a></h2>
+<ul>
+<li class="">
+<p><strong>Machine:</strong> Intel i9-11900KF (8 cores, 16 threads), 64 GB, Windows 11 Pro. Go 1.27.4, <code>CGO_ENABLED=0</code>. Builds used <code>-tags &#x27;grammar_subset grammar_subset_&lt;lang&gt;… gotreesitter_no_copyleft&#x27;</code>.</p>
+</li>
+<li class="">
+<p><strong>cgo comparison:</strong> WSL 2 (Debian) on the same machine, Go 1.27.4 linux/amd64, gcc 14.2. It used <a href="https://github.com/tree-sitter/go-tree-sitter" target="_blank" rel="noopener noreferrer" class="">go-tree-sitter</a> v0.25.0, tree-sitter-c v0.24.2 and tree-sitter-go v0.25.0. gotreesitter was cross-compiled for Linux and run on the same files, so both sides of each comparison come from one OS.</p>
+</li>
+<li class="">
+<p><strong>Kernel:</strong> <code>A:/linux</code> at c339f4010dea (2026-10-28), 37,738 <code>.c</code> files. Its size percentiles are p10 1.6 KB, p50 9.1 KB, p90 45 KB, p99 148 KB and max 1.8 MB. The detail files are those percentiles, then <code>kernel/sched/core.c</code>, then the six largest files under 1 MB. The sweep is 2,000 files picked by a seeded shuffle (PCG seed 943), the same files for both runtimes.</p>
+</li>
+<li class="">
+<p><strong>This repo:</strong> all 375 <code>.go</code> files at 351a3a71.</p>
+</li>
+<li class="">
+<p><strong>Other languages:</strong></p>
+<ul>
+<li class="">JavaScript, TypeScript (no <code>.d.ts</code>), CSS, JSON and HTML: the app&#x27;s own <code>frontend/node_modules</code>.</li>
+<li class="">Python: the CPython 3.12 standard library.</li>
+<li class="">Rust: the cargo registry cache.</li>
+<li class="">XML and Vue: the Go module cache.</li>
+<li class="">C#: JamesNK/Newtonsoft.Json at 52fa3ae.</li>
+<li class="">Java: google/gson at d9b5079.</li>
+<li class="">Lua: luarocks/luarocks at 85bfe36.</li>
+<li class="">SCSS and more HTML: twbs/bootstrap at 03f96ca.</li>
+</ul>
+<p>Each sweep takes up to 400 files with the same seed.</p>
+</li>
+<li class="">
+<p><strong>Timing:</strong></p>
+<ul>
+<li class="">Each file is parsed once untimed, then 5 times timed, and the median is reported.</li>
+<li class="">&quot;Walk&quot; collects every leaf as <code>{start, end, symbol}</code> in document order, which is what the token diff needs.</li>
+<li class="">Sweep figures are totals over the sample, so the coarse Windows clock doesn&#x27;t affect them. Times under about 2 ms for a single file aren&#x27;t reliable on Windows.</li>
+</ul>
+</li>
+<li class="">
+<p><strong>Memory:</strong> measured on the first parse in a fresh process, before gotreesitter&#x27;s arena pool warms up. Later parses reuse the pool and allocate almost nothing.</p>
+<ul>
+<li class="">&quot;alloc&quot; is bytes allocated.</li>
+<li class="">&quot;peak&quot; is the largest Go heap seen during the parse, sampled every 0.2 ms.</li>
+<li class="">&quot;tree&quot; is the heap still held while the tree is alive.</li>
+<li class="">For cgo, the figure is growth in peak resident memory (<code>VmHWM</code>).</li>
+</ul>
+</li>
+<li class="">
+<p><strong>Size:</strong> <code>wails build -clean -s -skipbindings</code> from <code>main</code>, then <code>makensis</code> on <code>build/windows/installer/project.nsi</code>. This was done once as-is, and once with a throwaway file in <code>package main</code> importing the 15 grammar packages (the 14 first-pass languages plus TSX) under the subset tags.</p>
+</li>
+</ul>
+<p>The scratch programs aren&#x27;t committed. #945 should add a kernel parse benchmark to <code>internal/perf</code> beside the graph ones, so these numbers can be retaken on every gotreesitter upgrade.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="results">Results<a href="#results" class="hash-link" aria-label="Direct link to Results" title="Direct link to Results" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="c-on-the-kernel-file-by-file-windows">C on the kernel, file by file (Windows)<a href="#c-on-the-kernel-file-by-file-windows" class="hash-link" aria-label="Direct link to C on the kernel, file by file (Windows)" title="Direct link to C on the kernel, file by file (Windows)" translate="no">​</a></h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>File</th><th style="text-align:right">KB</th><th style="text-align:right">Parse</th><th style="text-align:right">Walk</th><th style="text-align:right">Leaves</th><th style="text-align:right">Peak heap</th><th style="text-align:right">ERROR nodes</th></tr></thead><tbody><tr><td><code>drivers/gpu/drm/nouveau/nvkm/subdev/fb/gf108.c</code> (p10)</td><td style="text-align:right">1.6</td><td style="text-align:right">&lt;1 ms</td><td style="text-align:right">&lt;1 ms</td><td style="text-align:right">98</td><td style="text-align:right">—</td><td style="text-align:right">0</td></tr><tr><td><code>drivers/iio/chemical/vz89x.c</code> (p50)</td><td style="text-align:right">9.1</td><td style="text-align:right">&lt;1 ms</td><td style="text-align:right">&lt;1 ms</td><td style="text-align:right">1,813</td><td style="text-align:right">—</td><td style="text-align:right">4</td></tr><tr><td><code>crypto/ecc.c</code> (p90)</td><td style="text-align:right">45</td><td style="text-align:right">4.0 ms</td><td style="text-align:right">3.8 ms</td><td style="text-align:right">9,958</td><td style="text-align:right">—</td><td style="text-align:right">0</td></tr><tr><td><code>kernel/bpf/helpers.c</code> (p99)</td><td style="text-align:right">148</td><td style="text-align:right">14.6 ms</td><td style="text-align:right">7.0 ms</td><td style="text-align:right">21,502</td><td style="text-align:right">—</td><td style="text-align:right">350</td></tr><tr><td><code>kernel/sched/core.c</code></td><td style="text-align:right">296</td><td style="text-align:right">20.8 ms</td><td style="text-align:right">12.8 ms</td><td style="text-align:right">37,176</td><td style="text-align:right">8.2 MB</td><td style="text-align:right">225</td></tr><tr><td><code>net/wireless/nl80211.c</code></td><td style="text-align:right">668</td><td style="text-align:right">45.8 ms</td><td style="text-align:right">39.6 ms</td><td style="text-align:right">122,953</td><td style="text-align:right">—</td><td style="text-align:right">133</td></tr><tr><td><code>drivers/scsi/lpfc/lpfc_sli.c</code></td><td style="text-align:right">685</td><td style="text-align:right">43.6 ms</td><td style="text-align:right">31.6 ms</td><td style="text-align:right">96,611</td><td style="text-align:right">—</td><td style="text-align:right">144</td></tr><tr><td><code>kernel/bpf/verifier.c</code></td><td style="text-align:right">722</td><td style="text-align:right">46.1 ms</td><td style="text-align:right">37.6 ms</td><td style="text-align:right">118,948</td><td style="text-align:right">17.7 MB</td><td style="text-align:right">149</td></tr><tr><td><code>…/dml2_core/dml2_core_dcn4_calcs.c</code></td><td style="text-align:right">760</td><td style="text-align:right">40.6 ms</td><td style="text-align:right">36.8 ms</td><td style="text-align:right">123,491</td><td style="text-align:right">—</td><td style="text-align:right">41</td></tr><tr><td><code>fs/nls/nls_cp949.c</code></td><td style="text-align:right">855</td><td style="text-align:right">81.0 ms</td><td style="text-align:right">54.9 ms</td><td style="text-align:right">220,407</td><td style="text-align:right">30.2 MB</td><td style="text-align:right">4</td></tr><tr><td><code>drivers/net/wireless/broadcom/brcm80211/brcmsmac/phy/phy_n.c</code></td><td style="text-align:right">915</td><td style="text-align:right">94.2 ms</td><td style="text-align:right">69.7 ms</td><td style="text-align:right">265,608</td><td style="text-align:right">36.2 MB</td><td style="text-align:right">5</td></tr></tbody></table>
+<p>Walk times for the last three files are with <code>Children()</code>. With the cursor they were 165, 146 and 115 ms.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="gotreesitter-against-the-official-cgo-bindings-wsl-same-files">gotreesitter against the official cgo bindings (WSL, same files)<a href="#gotreesitter-against-the-official-cgo-bindings-wsl-same-files" class="hash-link" aria-label="Direct link to gotreesitter against the official cgo bindings (WSL, same files)" title="Direct link to gotreesitter against the official cgo bindings (WSL, same files)" translate="no">​</a></h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th></th><th style="text-align:right">gotreesitter</th><th style="text-align:right">cgo tree-sitter</th></tr></thead><tbody><tr><td>C, 2,000 kernel files (39.0 MB), parse and walk, one goroutine</td><td style="text-align:right">4.67 s, <strong>8.4 MB/s</strong></td><td style="text-align:right">10.54 s, 3.7 MB/s</td></tr><tr><td>C, parse p50 / p99 / max</td><td style="text-align:right">0.7 / 12.9 / 46.1 ms</td><td style="text-align:right">1.4 / 25.7 / 78.6 ms</td></tr><tr><td>C, 16 goroutines</td><td style="text-align:right">836 ms, 46.6 MB/s</td><td style="text-align:right">1.66 s, 23.5 MB/s</td></tr><tr><td>C, <code>kernel/sched/core.c</code> parse</td><td style="text-align:right">22.6 ms</td><td style="text-align:right">42.4 ms</td></tr><tr><td>C, <code>phy_n.c</code> (915 KB) parse</td><td style="text-align:right">100.3 ms</td><td style="text-align:right">194.1 ms</td></tr><tr><td>C, peak memory for <code>core.c</code> / <code>verifier.c</code> / <code>phy_n.c</code></td><td style="text-align:right">8.2 / 17.7 / 36.2 MB</td><td style="text-align:right">6.1 / 17.2 / 38.6 MB</td></tr><tr><td>Go, 375 files of this repo (2.1 MB), parse and walk</td><td style="text-align:right">2.03 s, 1.0 MB/s</td><td style="text-align:right">0.73 s, <strong>2.9 MB/s</strong></td></tr><tr><td>Go, parse p50 / p99 / max</td><td style="text-align:right">3.5 / 38.7 / 77.5 ms</td><td style="text-align:right">0.9 / 3.5 / 6.5 ms</td></tr><tr><td>Go, <code>internal/session/session.go</code> (28 KB) parse</td><td style="text-align:right">76.9 ms</td><td style="text-align:right">4.4 ms</td></tr><tr><td>Go, peak memory for <code>session.go</code></td><td style="text-align:right">58 MB</td><td style="text-align:right">1.0 MB</td></tr></tbody></table>
+<p>The two runtimes agree closely:</p>
+<ul>
+<li class=""><strong>C:</strong> the same leaf count on all 11 detail files. Over the 2,000-file sweep there were 6,757,256 leaves against 6,757,242. 1,341 files had an ERROR or MISSING node under both runtimes, and the counts above each error threshold differ by at most two.</li>
+<li class=""><strong>Go:</strong> 460,828 leaves against 460,827. One file, <code>internal/git/mailmapfile_test.go</code>, gets five ERROR nodes from gotreesitter on valid code; the trouble starts at <code>if (got != id) &amp;&amp; len(by) == 0 {</code>. The same line alone in a small file parses cleanly, so I didn&#x27;t reduce it further.</li>
+</ul>
+<p>The grammar versions aren&#x27;t identical: gotreesitter embeds its own blob of each grammar.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="every-first-pass-language-windows-one-goroutine">Every first-pass language (Windows, one goroutine)<a href="#every-first-pass-language-windows-one-goroutine" class="hash-link" aria-label="Direct link to Every first-pass language (Windows, one goroutine)" title="Direct link to Every first-pass language (Windows, one goroutine)" translate="no">​</a></h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Language</th><th>Engine</th><th style="text-align:right">Files</th><th style="text-align:right">MB</th><th style="text-align:right">MB/s</th><th style="text-align:right">Parse p99</th><th style="text-align:right">Slowest parse</th><th style="text-align:right">Files with ERROR</th><th style="text-align:right">Over 25% ERROR</th></tr></thead><tbody><tr><td>C (kernel)</td><td>ccore</td><td style="text-align:right">2,000</td><td style="text-align:right">39.0</td><td style="text-align:right">8.7</td><td style="text-align:right">12 ms</td><td style="text-align:right">45 ms</td><td style="text-align:right">67%</td><td style="text-align:right">23 (1.2%)</td></tr><tr><td>TypeScript</td><td>ccore</td><td style="text-align:right">372</td><td style="text-align:right">2.3</td><td style="text-align:right">6.1</td><td style="text-align:right">8 ms</td><td style="text-align:right">12 ms</td><td style="text-align:right">0</td><td style="text-align:right">0</td></tr><tr><td>Python</td><td>ccore</td><td style="text-align:right">400</td><td style="text-align:right">6.9</td><td style="text-align:right">6.1</td><td style="text-align:right">25 ms</td><td style="text-align:right">31 ms</td><td style="text-align:right">1</td><td style="text-align:right">0</td></tr><tr><td>CSS</td><td>ccore</td><td style="text-align:right">39</td><td style="text-align:right">1.1</td><td style="text-align:right">9.1</td><td style="text-align:right">12 ms</td><td style="text-align:right">12 ms</td><td style="text-align:right">25 (64%), all under 5% of bytes</td><td style="text-align:right">0</td></tr><tr><td>JSON</td><td>ccore</td><td style="text-align:right">400</td><td style="text-align:right">4.9</td><td style="text-align:right">22.5</td><td style="text-align:right">7 ms</td><td style="text-align:right">10 ms</td><td style="text-align:right">0</td><td style="text-align:right">0</td></tr><tr><td>Rust</td><td>ccore</td><td style="text-align:right">400</td><td style="text-align:right">6.1</td><td style="text-align:right">7.9</td><td style="text-align:right">14 ms</td><td style="text-align:right">23 ms</td><td style="text-align:right">3</td><td style="text-align:right">0</td></tr><tr><td>Go</td><td>older</td><td style="text-align:right">375</td><td style="text-align:right">2.1</td><td style="text-align:right">1.1</td><td style="text-align:right">37 ms</td><td style="text-align:right">75 ms</td><td style="text-align:right">1</td><td style="text-align:right">0</td></tr><tr><td>JavaScript</td><td>older</td><td style="text-align:right">400</td><td style="text-align:right">3.5</td><td style="text-align:right">0.8</td><td style="text-align:right">95 ms</td><td style="text-align:right"><strong>2.5 s</strong> (<code>d3.min.js</code>, 273 KB)</td><td style="text-align:right">2</td><td style="text-align:right">1</td></tr><tr><td>C#</td><td>older</td><td style="text-align:right">400</td><td style="text-align:right">3.4</td><td style="text-align:right">0.7</td><td style="text-align:right"><strong>417 ms</strong></td><td style="text-align:right"><strong>619 ms</strong></td><td style="text-align:right">27 (6.8%)</td><td style="text-align:right">1</td></tr><tr><td>Java</td><td>older</td><td style="text-align:right">268</td><td style="text-align:right">2.1</td><td style="text-align:right">2.0</td><td style="text-align:right">59 ms</td><td style="text-align:right">179 ms</td><td style="text-align:right">0</td><td style="text-align:right">0</td></tr><tr><td>SCSS</td><td>older</td><td style="text-align:right">142</td><td style="text-align:right">0.5</td><td style="text-align:right">3.0</td><td style="text-align:right">9 ms</td><td style="text-align:right">19 ms</td><td style="text-align:right"><strong>121 (85%)</strong></td><td style="text-align:right"><strong>13 (9.2%)</strong></td></tr><tr><td>HTML</td><td>older</td><td style="text-align:right">35</td><td style="text-align:right">0.3</td><td style="text-align:right">8.9</td><td style="text-align:right">5 ms</td><td style="text-align:right">5 ms</td><td style="text-align:right">7</td><td style="text-align:right">0</td></tr><tr><td>Lua</td><td>older</td><td style="text-align:right">162</td><td style="text-align:right">1.1</td><td style="text-align:right">3.9</td><td style="text-align:right">13 ms</td><td style="text-align:right">15 ms</td><td style="text-align:right">0</td><td style="text-align:right">0</td></tr><tr><td>XML</td><td>older</td><td style="text-align:right">400</td><td style="text-align:right">2.3</td><td style="text-align:right">1.5</td><td style="text-align:right">28 ms</td><td style="text-align:right">48 ms</td><td style="text-align:right">0</td><td style="text-align:right">0</td></tr><tr><td>Vue</td><td>older</td><td style="text-align:right">22</td><td style="text-align:right">0.02</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">0</td><td style="text-align:right">0</td></tr></tbody></table>
+<p>Which engine a grammar uses comes from matching each grammar package&#x27;s <code>BlobSHA256</code> against the module&#x27;s <code>testdata/ccore_certificates.json</code>. TSX is on the older engine, unlike TypeScript. The 22 Vue files were too small to time. Why CSS and SCSS have so many errors wasn&#x27;t investigated; newer syntax the grammars don&#x27;t know is the likely cause.</p>
+<p>Over 150 ms, without a timeout:</p>
+<ul>
+<li class=""><strong>C#:</strong> 8 of 400 files, all central Newtonsoft.Json sources of 45–317 KB. <code>JsonReader.cs</code> (45 KB) took 306 ms and <code>DefaultContractResolver.cs</code> (77 KB) took 561 ms.</li>
+<li class=""><strong>JavaScript:</strong> 3 of 400, all bundled or minified (<code>d3.min.js</code>, two Vite pre-bundles of 274–311 KB).</li>
+<li class=""><strong>Java:</strong> 1 of 268.</li>
+<li class=""><strong>Every other language:</strong> none.</li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="memory-on-the-older-engine">Memory on the older engine<a href="#memory-on-the-older-engine" class="hash-link" aria-label="Direct link to Memory on the older engine" title="Direct link to Memory on the older engine" translate="no">​</a></h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>File</th><th style="text-align:right">KB</th><th style="text-align:right">Parse</th><th style="text-align:right">Allocated</th><th style="text-align:right">Peak heap</th><th style="text-align:right">Tree held</th></tr></thead><tbody><tr><td>Go <code>internal/trailerindex/reading.go</code></td><td style="text-align:right">31</td><td style="text-align:right">29 ms</td><td style="text-align:right">23 MB</td><td style="text-align:right">23 MB</td><td style="text-align:right">23 MB</td></tr><tr><td>Go <code>internal/session/session.go</code></td><td style="text-align:right">28</td><td style="text-align:right">69 ms</td><td style="text-align:right">62 MB</td><td style="text-align:right">58 MB</td><td style="text-align:right">58 MB</td></tr><tr><td>C# <code>JsonReader.cs</code></td><td style="text-align:right">45</td><td style="text-align:right">307 ms</td><td style="text-align:right">107 MB</td><td style="text-align:right">89 MB</td><td style="text-align:right">75 MB</td></tr><tr><td>C# <code>Linq/JToken.cs</code></td><td style="text-align:right">112</td><td style="text-align:right">530 ms</td><td style="text-align:right">421 MB</td><td style="text-align:right">146 MB</td><td style="text-align:right">74 MB</td></tr><tr><td>JavaScript <code>d3.min.js</code></td><td style="text-align:right">273</td><td style="text-align:right">2.5 s</td><td style="text-align:right">305 MB</td><td style="text-align:right">277 MB</td><td style="text-align:right">159 MB</td></tr><tr><td>Python <code>typing.py</code> (ccore, for contrast)</td><td style="text-align:right">120</td><td style="text-align:right">10 ms</td><td style="text-align:right">3.7 MB</td><td style="text-align:right">3.6 MB</td><td style="text-align:right">3.6 MB</td></tr></tbody></table>
+<p>ccore trees cost about 30–40 bytes per source byte. Older-engine trees cost 0.3–2 KB per source byte. The token diff keeps a token list, not a tree, so each tree can be released straight after its walk. Peak memory is the cost to watch, and the 150 ms timeout bounds it.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="the-timeout">The timeout<a href="#the-timeout" class="hash-link" aria-label="Direct link to The timeout" title="Direct link to The timeout" translate="no">​</a></h3>
+<p>With <code>SetTimeoutMicros(150_000)</code>, no parse in any sweep took longer than 154 ms. <code>d3.min.js</code> and five of the eight slow C# files stopped there and reported <code>ParseStoppedEarly()</code>, each with a partial tree: <code>JToken.cs</code> gave 780 leaves instead of 9,131.</p>
+<p>The other three C# files (<code>JsonReader.cs</code>, <code>JsonConvert.cs</code>, <code>ReflectionUtils.cs</code>) also returned at 151–154 ms, but did <em>not</em> report a stop. Their trees were complete, with the same leaf and ERROR counts as an untimed parse. At the deadline gotreesitter seems to finish by a cheaper route when it can. So decide by <code>ParseStoppedEarly()</code>, not by the elapsed time.</p>
+<p>With the timeout on, the C# sweep&#x27;s total time fell from 5.1 s to 3.3 s.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="parse-errors">Parse errors<a href="#parse-errors" class="hash-link" aria-label="Direct link to Parse errors" title="Direct link to Parse errors" translate="no">​</a></h3>
+<p>The share of bytes inside outermost ERROR nodes, among kernel files that have any:</p>
+<ul>
+<li class=""><strong>Spread:</strong> p50 0.20%, p90 1.77%, p99 38%, max 100%.</li>
+<li class=""><strong>Files over each threshold:</strong> more than 1% of bytes: 212 of 2,000. More than 5%: 65. More than 10%: 43. More than 25%: 23. More than 50%: 10.</li>
+</ul>
+<p>cgo tree-sitter&#x27;s counts matched to within two files at every threshold, so this is the C grammar meeting kernel macros, not a gotreesitter bug.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="walking-the-tree">Walking the tree<a href="#walking-the-tree" class="hash-link" aria-label="Direct link to Walking the tree" title="Direct link to Walking the tree" translate="no">​</a></h3>
+<p>ccore builds node views lazily, so the walk costs 25–45% as much as the parse on ccore grammars:</p>
+<ul>
+<li class=""><strong><code>Node.Children()</code>:</strong> fetches each node&#x27;s children once. It is fastest: 69.7 ms on <code>phy_n.c</code> and 54.9 ms on <code>nls_cp949.c</code>.</li>
+<li class=""><strong><code>TreeCursor</code> and <code>Child(i)</code>:</strong> these re-find each child by its index, which is slow on nodes with thousands of children, such as big array initialisers. They took 111–121 ms and 146–166 ms on the same files.</li>
+<li class=""><strong>Older-engine trees:</strong> already fully built, so walking is nearly free (1–7 ms).</li>
+</ul>
+<p>On the older engine, ccore is 5–10 times slower to parse. <code>SetAdmissionCandidateRoute(false)</code> forces C onto it: <code>phy_n.c</code> took 1.09 s and 296 MB, against 94 ms and 36 MB on ccore. So the cheap walk never pays for the slower parse.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="the-c-token-source">The C token source<a href="#the-c-token-source" class="hash-link" aria-label="Direct link to The C token source" title="Direct link to The C token source" translate="no">​</a></h3>
+<p><code>grammars.LangEntry.Parse</code> uses a hand-written token source for C, C++, Java and authzed. On the 2,000 kernel files it was 5 times slower than a plain <code>Parser</code> (2.5 MB/s against 8.7). It also left more files over 25% ERROR (34 against 23), and 21 parses stopped early. Use a plain <code>Parser</code>.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="sharing">Sharing<a href="#sharing" class="hash-link" aria-label="Direct link to Sharing" title="Direct link to Sharing" translate="no">​</a></h3>
+<p><code>Parser</code> says it &quot;is not safe for concurrent use&quot; (<code>parser.go</code>). <code>NewParserPool</code> is documented as &quot;a concurrency-safe parser pool&quot;, and a <code>Language</code> is shared read-only. A pool on 16 goroutines parsed and walked the kernel sample 5.1 times faster than one goroutine on Windows (5.6 times on Linux), and the Go files 5.1 times faster. Parse the two versions of a file on two goroutines from one pool per language.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="grammar-loading">Grammar loading<a href="#grammar-loading" class="hash-link" aria-label="Direct link to Grammar loading" title="Direct link to Grammar loading" translate="no">​</a></h3>
+<p>Each grammar&#x27;s tables decode on first use, taking 7–14 ms (C 1.4 MB of tables, Go 2.1 MB). Load them lazily.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="size">Size<a href="#size" class="hash-link" aria-label="Direct link to Size" title="Direct link to Size" translate="no">​</a></h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Windows amd64 build</th><th style="text-align:right">App</th><th style="text-align:right">Installer</th></tr></thead><tbody><tr><td><code>main</code> at 351a3a71</td><td style="text-align:right">25,950,208 bytes</td><td style="text-align:right">11,687,759 bytes</td></tr><tr><td>With gotreesitter and the 15 first-pass grammar packages</td><td style="text-align:right">36,756,992 bytes</td><td style="text-align:right">16,457,990 bytes</td></tr><tr><td>Difference</td><td style="text-align:right"><strong>+10.8 MB (+42%)</strong></td><td style="text-align:right"><strong>+4.8 MB (+41%)</strong></td></tr></tbody></table>
+<p>That is less than the research note&#x27;s 15 MB for 22 grammars. The app already links most of the standard library that the runtime needs.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="the-budgets-confirmed-or-changed">The budgets, confirmed or changed<a href="#the-budgets-confirmed-or-changed" class="hash-link" aria-label="Direct link to The budgets, confirmed or changed" title="Direct link to The budgets, confirmed or changed" translate="no">​</a></h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Rule</th><th>Before</th><th>After</th></tr></thead><tbody><tr><td>File size</td><td>Either side over 1 MB: line diff</td><td><strong>Kept.</strong> Checked before parsing. ccore grammars parse 1 MB in about 100 ms</td></tr><tr><td>Time</td><td>Over 150 ms: line diff</td><td><strong>Kept, and enforced per parse</strong> with <code>SetTimeoutMicros(150_000)</code>. Both versions parse at once, so the wait is the slower of the two. Read <code>ParseStoppedEarly()</code></td></tr><tr><td>Tokens</td><td>Over 200,000 per side: line diff</td><td><strong>Kept.</strong> The leaf counts run from 89 per KB (JSON) to 227 (Go), so only files near 1 MB reach it. It bounds the token diff&#x27;s work, not the parse</td></tr><tr><td>Parse errors</td><td>Any error in either version: line diff</td><td><strong>Changed:</strong> more than 25% of either version&#x27;s bytes inside ERROR nodes. A smaller error is shown as a quiet note on the diff</td></tr><tr><td>Memory</td><td>None</td><td><strong>New:</strong> <code>SetMemoryBudgetBytes(256 &lt;&lt; 20)</code> per parse. gotreesitter&#x27;s default is 512 MB. A stopped parse falls back like a timeout. Trees are released straight after the walk; only tokens are cached</td></tr></tbody></table>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="what-this-means-for-the-first-pass-languages">What this means for the first-pass languages<a href="#what-this-means-for-the-first-pass-languages" class="hash-link" aria-label="Direct link to What this means for the first-pass languages" title="Direct link to What this means for the first-pass languages" translate="no">​</a></h2>
+<p>TypeScript, Python, CSS, JSON and Rust get code diffs on effectively every file, as C would. Go, Java, Lua, XML, HTML and SCSS get them on nearly every file. JavaScript loses only bundled or minified files, which are poor material for any diff. <strong>C# loses some of its large files</strong>: 5 of the 400 Newtonsoft.Json files sampled (1.3%, 46–317 KB). They&#x27;re few, but they&#x27;re the central ones people edit. As upstream certifies more grammars for ccore, these get faster with no change on our side.</p>
+<p><strong>Open for #945:</strong> when a parse hits the timeout, should the view show the line diff at once and then switch to the code diff once a longer parse finishes in the background, say within 2 s? That would rescue those C# files, at the cost of a view that changes under the reader.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="not-measured">Not measured<a href="#not-measured" class="hash-link" aria-label="Direct link to Not measured" title="Direct link to Not measured" translate="no">​</a></h2>
+<ul>
+<li class="">macOS and Linux desktops. On WSL the C and Go sweep totals were within 10% of Windows, though single files varied more (<code>kernel/bpf/verifier.c</code> took 46 ms on Windows and 63 ms on WSL).</li>
+<li class="">The token diff itself (<code>znkr.io/diff</code> over tokens). #944 and #945 time it.</li>
+<li class="">Lezer&#x27;s highlighting parse, which stays in the frontend.</li>
+</ul></div><footer class="theme-doc-footer docusaurus-mt-lg"><div class="row margin-top--sm theme-doc-footer-edit-meta-row"><div class="col noPrint_WFHX"><a href="https://github.com/Git-Revenge/GitRevenge/edit/main/docs/research/gotreesitter-timing.md" target="_blank" rel="noopener noreferrer" class="theme-edit-this-page"><svg fill="currentColor" height="20" width="20" viewBox="0 0 40 40" class="iconEdit_Z9Sw" aria-hidden="true"><g><path d="m34.5 11.7l-3 3.1-6.3-6.3 3.1-3q0.5-0.5 1.2-0.5t1.1 0.5l3.9 3.9q0.5 0.4 0.5 1.1t-0.5 1.2z m-29.5 17.1l18.4-18.5 6.3 6.3-18.4 18.4h-6.3v-6.2z"></path></g></svg>Edit this page</a></div><div class="col lastUpdated_JAkA"></div></div></footer></article><nav class="docusaurus-mt-lg pagination-nav" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/docs/research/semantic-diff-merge"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">Semantic diff and merge</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#the-question" class="table-of-contents__link toc-highlight">The question</a></li><li><a href="#short-answer" class="table-of-contents__link toc-highlight">Short answer</a></li><li><a href="#method" class="table-of-contents__link toc-highlight">Method</a></li><li><a href="#results" class="table-of-contents__link toc-highlight">Results</a><ul><li><a href="#c-on-the-kernel-file-by-file-windows" class="table-of-contents__link toc-highlight">C on the kernel, file by file (Windows)</a></li><li><a href="#gotreesitter-against-the-official-cgo-bindings-wsl-same-files" class="table-of-contents__link toc-highlight">gotreesitter against the official cgo bindings (WSL, same files)</a></li><li><a href="#every-first-pass-language-windows-one-goroutine" class="table-of-contents__link toc-highlight">Every first-pass language (Windows, one goroutine)</a></li><li><a href="#memory-on-the-older-engine" class="table-of-contents__link toc-highlight">Memory on the older engine</a></li><li><a href="#the-timeout" class="table-of-contents__link toc-highlight">The timeout</a></li><li><a href="#parse-errors" class="table-of-contents__link toc-highlight">Parse errors</a></li><li><a href="#walking-the-tree" class="table-of-contents__link toc-highlight">Walking the tree</a></li><li><a href="#the-c-token-source" class="table-of-contents__link toc-highlight">The C token source</a></li><li><a href="#sharing" class="table-of-contents__link toc-highlight">Sharing</a></li><li><a href="#grammar-loading" class="table-of-contents__link toc-highlight">Grammar loading</a></li><li><a href="#size" class="table-of-contents__link toc-highlight">Size</a></li></ul></li><li><a href="#the-budgets-confirmed-or-changed" class="table-of-contents__link toc-highlight">The budgets, confirmed or changed</a></li><li><a href="#what-this-means-for-the-first-pass-languages" class="table-of-contents__link toc-highlight">What this means for the first-pass languages</a></li><li><a href="#not-measured" class="table-of-contents__link toc-highlight">Not measured</a></li></ul></div></div></div></div></main></div></div></div><footer class="theme-layout-footer footer footer--dark"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">
+          <div class="footer-bar">
+            <div class="footer-bar__brand">
+              <svg viewBox="0 0 64 64" width="20" height="20" aria-hidden="true">
+                <path d="M11 8 H18 V58 H11 Z" fill="#5ba3b8"></path>
+                <path d="M18 11 C28 6 39 16 56 10 V39 C39 45 28 35 18 41 Z" fill="#e24a8a"></path>
+              </svg>
+              <span><em>Git Revenge</em>, a git client</span>
+            </div>
+            <nav class="footer-bar__links" aria-label="Footer navigation">
+              <a href="https://github.com/Git-Revenge/GitRevenge">GitHub</a>
+              <a href="https://github.com/Git-Revenge/GitRevenge/releases">Releases</a>
+              <a href="https://github.com/Git-Revenge/GitRevenge/issues">Issues</a>
+              <a href="https://github.com/Git-Revenge/GitRevenge/security/policy">Security</a>
+              <a href="/docs/privacy">Privacy</a>
+              <a href="https://github.com/sponsors/risadams">Sponsor</a>
+            </nav>
+            <div class="footer-bar__copy">© 2026 Ris Adams · Apache-2.0 · v1.1.0</div>
+          </div>
+        </div></div></div></footer></div>
+</body>
+</html>
