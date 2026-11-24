@@ -32,7 +32,8 @@ After that, the guide covers each part of the app in turn:
 | [Branches, merges and rebases](branches.md) | Merging, rebasing, previews and interactive rebase. |
 | [Resolving conflicts](conflicts.md) | The conflict tool, suggestions where code can be combined, and merge drivers. |
 | [Branch care](branch-care.md) | Branch kinds, hiding, cleaning up merged branches, and stacks. |
-| [Diffs and history](history.md) | Diffs, rendered previews, blame, the reflog, bisect, notes and signatures. |
+| [Reading a diff](diffs.md) | Layouts and the ribbon, code read token by token, formatting, renames and moved code. |
+| [Previews and history](history.md) | Rendered previews, file history and blame, the reflog, bisect, notes and signatures. |
 | [Remotes, LFS and submodules](remotes.md) | Fetch, pull and push, signing in, and what to do when one fails. |
 | [Git config](git-config.md) | Editing git's own settings files. |
 | [People and the mailmap](people.md) | Who a history names, joining the names that are one person, and the `.mailmap`. |

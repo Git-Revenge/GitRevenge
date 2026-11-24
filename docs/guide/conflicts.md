@@ -26,7 +26,7 @@ See [Resolve a merge conflict](../walkthroughs/resolve-a-conflict.md) for the wh
 
 ## Suggestions
 
-git compares lines, so two edits to the same line conflict even when they don't touch: one side adds an argument at the start, the other one at the end. For a file in a language the app [reads as code](history.md#reading-the-code), the conflict tool merges each place again token by token, using the three versions: ours, theirs and the original.
+git compares lines, so two edits to the same line conflict even when they don't touch: one side adds an argument at the start, the other one at the end. For a file in a language the app [reads as code](diffs.md#reading-the-code), the conflict tool merges each place again token by token, using the three versions: ours, theirs and the original.
 
 - **Where the sides changed different tokens,** both changes go in, and the place starts filled in and marked **Suggested**, with a dashed edge. Its heading says why, such as *ours added `ctx context.Context,`; theirs added `, step time.Duration`*.
 - **In the result,** each part of a suggestion is washed by where it came from: teal for ours and plum for theirs, the colours the tool already uses for each side.

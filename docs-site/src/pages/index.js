@@ -105,13 +105,18 @@ const features = [
   },
   {
     title: 'The hard parts',
-    body: 'An interactive rebase editor that shows the branch as it will be. A conflict tool built around the result. Bisect, blame, file history, the reflog and git notes.',
+    body: 'An interactive rebase editor that shows the branch as it will be. A conflict tool built around the result, which suggests where both sides’ edits combine. Bisect, blame, file history, the reflog and git notes.',
     to: '/docs/guide/branches',
   },
   {
     title: 'Branch care',
     body: 'Branches have kinds, so release and bot branches stop crowding your work. Merged branches clean themselves up after a pull, squash merges included, and stacked branches restack in one click.',
     to: '/docs/guide/branch-care',
+  },
+  {
+    title: 'Diffs that read the code',
+    body: 'In 47 languages, a diff tells changes from formatting, renames and moved code, so a tidy-up doesn’t bury the line that matters. A ribbon joins each change across the split view.',
+    to: '/docs/guide/diffs',
   },
   {
     title: 'Previews, not only diffs',
