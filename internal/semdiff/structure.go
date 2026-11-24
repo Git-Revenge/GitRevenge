@@ -20,24 +20,36 @@ func matchVersions(ctx context.Context, a, b *version, segs []*segment) {
 	if a.nodes == nil || b.nodes == nil {
 		return
 	}
+	// Only the code around segments that need it is matched: the top-level declarations
+	// they touch.
+	var wantA, wantB [][2]int
+	for _, s := range segs {
+		if needsTrees(a, b, s) {
+			wantA = append(wantA, [2]int{a.t.start[s.o0], a.t.start[s.o1]})
+			wantB = append(wantB, [2]int{b.t.start[s.n0], b.t.start[s.n1]})
+		}
+	}
+	if len(wantA) == 0 {
+		return
+	}
 	a.changed, b.changed = make([]bool, len(a.toks)), make([]bool, len(b.toks))
-	any := false
+	some := false
 	for _, s := range segs {
 		for k, t := range s.ot {
 			if s.chO[k] {
-				a.changed[t], any = true, true
+				a.changed[t], some = true, true
 			}
 		}
 		for k, t := range s.nt {
 			if s.chN[k] {
-				b.changed[t], any = true, true
+				b.changed[t], some = true, true
 			}
 		}
 	}
-	if !any {
+	if !some {
 		return
 	}
-	ta, tb := buildTree(a, a.nodes), buildTree(b, b.nodes)
+	ta, tb := buildTree(a, a.nodes, wantA), buildTree(b, b.nodes, wantB)
 	if ta == nil || tb == nil {
 		return
 	}
@@ -52,6 +64,30 @@ func matchVersions(ctx context.Context, a, b *version, segs []*segment) {
 			b.leaf[g.tok] = int32(i)
 		}
 	}
+}
+
+// needsTrees reports whether matching the trees could find anything in a segment: its syntax
+// changed around its unchanged tokens, or a changed name or value in it is found changed on
+// the other side too. Most segments are neither, and a diff with none skips matching.
+func needsTrees(a, b *version, s *segment) bool {
+	if s.whole || a.nodes == nil || b.nodes == nil {
+		return false
+	}
+	if s.reshape {
+		return true
+	}
+	gone := map[string]bool{}
+	for k, t := range s.ot {
+		if s.chO[k] && movable(a.toks[t].class) {
+			gone[a.toks[t].key] = true
+		}
+	}
+	for k, t := range s.nt {
+		if s.chN[k] && movable(b.toks[t].class) && gone[b.toks[t].key] {
+			return true
+		}
+	}
+	return false
 }
 
 // movable reports whether a token can be said to move on its own: a name, a literal, a
@@ -73,13 +109,13 @@ func takeMoved(v, other *version, run, near []int, list *[]mark) []int {
 		p := v.partner[t]
 		return p >= 0 && other.changed[p] && v.toks[t].key == other.toks[p].key && slices.Contains(near, int(p))
 	}
-	any := false
+	some := false
 	for _, t := range run {
 		if movable(v.toks[t].class) && moved(t) {
-			any = true
+			some = true
 		}
 	}
-	if !any {
+	if !some {
 		return run
 	}
 	var rest []int

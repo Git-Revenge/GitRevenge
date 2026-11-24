@@ -59,7 +59,7 @@ func TestMatchingIdenticalTreesMatchesEveryToken(t *testing.T) {
 	l.load()
 	r := readVersion(context.Background(), l, src, -1, true)
 	v := newVersion(split(src), r.toks, nil)
-	ta, tb := buildTree(v, r.nodes), buildTree(v, r.nodes)
+	ta, tb := buildTree(v, r.nodes, nil), buildTree(v, r.nodes, nil)
 	pa, _, ok := matchTrees(context.Background(), ta, tb, len(r.toks), len(r.toks))
 	if !ok {
 		t.Fatal("ran out of budget")

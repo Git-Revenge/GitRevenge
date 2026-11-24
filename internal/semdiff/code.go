@@ -107,8 +107,13 @@ func refine(ctx context.Context, a, b *version, blocks []Block) ([]Block, []Rena
 		}
 		segs = append(segs, splitBlock(a, b, k, blk)...)
 	}
-	matchVersions(ctx, a, b, segs)
 	renames, confirmed := findRenames(a, b, segs)
+	for _, s := range segs {
+		if !s.whole {
+			s.reshape = s.reshaped(a, b, confirmed)
+		}
+	}
+	matchVersions(ctx, a, b, segs)
 	var nested []Move
 	for _, s := range segs {
 		classify(a, b, s, confirmed)
@@ -592,7 +597,6 @@ func classify(a, b *version, s *segment, renames map[[2]string]int) {
 	})
 	// What the segment is follows from its tokens, not from how the diff lined them up: equal
 	// tokens in the same syntax are formatting, whatever a tie in the diff marked.
-	s.reshape = s.reshaped(a, b, renames)
 	switch {
 	case s.moves(a, b) || s.reshape || movedToks > 0:
 		s.kind = KindChange

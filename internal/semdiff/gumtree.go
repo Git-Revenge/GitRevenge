@@ -58,8 +58,13 @@ type gtree struct {
 }
 
 // buildTree makes a version's tree from its tokens and recorded nodes. Whitespace and
-// optional punctuation aren't leaves. It returns nil for a tree too big to match.
-func buildTree(v *version, nodes []nodeRec) *gtree {
+// optional punctuation aren't leaves. With want set, only the top-level nodes overlapping
+// those byte ranges are kept, with everything in them. It returns nil for a tree too big to
+// match.
+func buildTree(v *version, nodes []nodeRec, want [][2]int) *gtree {
+	if want != nil {
+		nodes, v = keepWanted(v, nodes, want)
+	}
 	type item struct {
 		from, to int
 		node     int // into nodes, or -1 for a token
@@ -468,4 +473,82 @@ func (m *matching) recover(x, y int32) {
 		m.link(i, j)
 		m.recover(i, j)
 	})
+}
+
+// keepWanted narrows a version's nodes and tokens to the declarations overlapping want: the
+// children of the file's root node that overlap a wanted byte range, with everything in
+// them. The roots themselves stay, and tokens outside every declaration stay where they
+// overlap want. Tokens left out become whitespace, so every token keeps its index.
+func keepWanted(v *version, nodes []nodeRec, want [][2]int) ([]nodeRec, *version) {
+	overlaps := func(from, to int) bool {
+		for _, w := range want {
+			if from < w[1] && to > w[0] {
+				return true
+			}
+		}
+		return false
+	}
+	order := make([]int, len(nodes))
+	for i := range order {
+		order[i] = i
+	}
+	// Outer before inner; for equal ranges the parent, recorded later, first.
+	slices.SortFunc(order, func(x, y int) int {
+		switch {
+		case nodes[x].from != nodes[y].from:
+			return nodes[x].from - nodes[y].from
+		case nodes[x].to != nodes[y].to:
+			return nodes[y].to - nodes[x].to
+		}
+		return y - x
+	})
+	keep := make([]bool, len(nodes))
+	var decls [][2]int // the declarations: depth one
+	type open struct{ to, depth int }
+	var stack []open
+	under := -1 // the end of the kept declaration being passed through, or -1
+	for _, i := range order {
+		n := nodes[i]
+		// Close the nodes this one doesn't sit inside.
+		for len(stack) > 0 && (n.from >= stack[len(stack)-1].to || n.to > stack[len(stack)-1].to) {
+			stack = stack[:len(stack)-1]
+		}
+		depth := len(stack)
+		switch depth {
+		case 0:
+			keep[i] = true
+		case 1:
+			decls = append(decls, [2]int{n.from, n.to})
+			if overlaps(n.from, n.to) {
+				keep[i], under = true, n.to
+			} else {
+				under = -1
+			}
+		default:
+			keep[i] = under >= n.to
+		}
+		stack = append(stack, open{n.to, depth})
+	}
+	var outNodes []nodeRec
+	for i, n := range nodes {
+		if keep[i] {
+			outNodes = append(outNodes, n)
+		}
+	}
+	// decls are in order and don't overlap.
+	declAt := func(from, to int) (int, bool) {
+		k := sort.Search(len(decls), func(k int) bool { return decls[k][1] >= to })
+		return k, k < len(decls) && decls[k][0] <= from
+	}
+	sub := *v
+	sub.toks = make([]tok, len(v.toks))
+	for i, t := range v.toks {
+		k, in := declAt(t.from, t.to)
+		if (in && overlaps(decls[k][0], decls[k][1])) || (!in && overlaps(t.from, t.to)) {
+			sub.toks[i] = t
+		} else {
+			sub.toks[i] = tok{class: clsSpace, from: t.from, to: t.to}
+		}
+	}
+	return outNodes, &sub
 }
