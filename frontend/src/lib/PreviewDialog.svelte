@@ -2,7 +2,7 @@
   import { Integrate, PreviewMerge, PreviewRebase, RepoState } from '../../wailsjs/go/app/App.js'
   import type { app } from '../../wailsjs/go/models'
   import { errorText } from './errors'
-  import { mergeChoices, mergeSummary, mergeVerb, plural, rebaseVerb, type MergeHow } from './preview'
+  import { mergeChoices, mergeSummary, mergeVerb, placesNote, plural, rebaseVerb, type MergeHow } from './preview'
   import { session } from './session.svelte'
   import Icon from './ui/Icon.svelte'
   import Modal from './ui/Modal.svelte'
@@ -138,7 +138,7 @@
             {#each conflicts as c (c.path)}
               <li>
                 <span class="mono path" title={c.path}>{c.path}</span>
-                {#if c.places}<span class="form-note">{plural(c.places, 'place', 'places')}</span>{/if}
+                {#if c.places}<span class="form-note">{placesNote(c)}</span>{/if}
               </li>
             {/each}
           </ul>

@@ -13,6 +13,9 @@ type ForecastConflict struct {
 	// Places is how many separate conflicts the file would have; 0 when that can't be
 	// counted, such as a binary file.
 	Places int `json:"places"`
+	// Combinable is how many of them read as code with the sides changing different tokens,
+	// so the conflict tool would suggest them combined.
+	Combinable int `json:"combinable"`
 }
 
 // ForecastCommit is a commit a merge would bring in or a rebase would write again.
@@ -70,10 +73,17 @@ type RebasePreview struct {
 	Upstream string `json:"upstream"`
 }
 
-func forecastConflicts(in []git.ForecastConflict) []ForecastConflict {
+func forecastConflicts(ctx context.Context, g *git.Repo, in []git.ForecastConflict) []ForecastConflict {
 	out := make([]ForecastConflict, 0, len(in))
+	var paths []string
 	for _, c := range in {
-		out = append(out, ForecastConflict{Path: c.Path, Places: c.Places})
+		if len(c.Texts) > 0 {
+			paths = append(paths, c.Path)
+		}
+	}
+	langs := fileLanguages(g, paths)
+	for _, c := range in {
+		out = append(out, ForecastConflict{Path: c.Path, Places: c.Places, Combinable: combinable(ctx, langs[c.Path], c.Texts)})
 	}
 	return out
 }
@@ -112,7 +122,7 @@ func (a *App) PreviewMerge(path, source string) (MergePreview, error) {
 	return MergePreview{
 		Into: currentBranch(ctx, r.Git), AlreadyMerged: f.AlreadyMerged, FastForward: f.FastForward,
 		Commits: forecastCommits(f.Commits), CommitCount: f.CommitCount, IntoOnly: f.OursOnly, Files: f.Files,
-		Conflicts: forecastConflicts(f.Conflicts), Unknown: f.Incomplete,
+		Conflicts: forecastConflicts(ctx, r.Git, f.Conflicts), Unknown: f.Incomplete,
 	}, nil
 }
 
@@ -138,7 +148,7 @@ func (a *App) PreviewRebase(path, onto string) (RebasePreview, error) {
 	}
 	p := RebasePreview{
 		Branch: branch, Commits: forecastCommits(f.Commits), CommitCount: f.CommitCount, UpToDate: f.UpToDate,
-		StopsAt: f.StopsAt, Conflicts: forecastConflicts(f.Conflicts), Incomplete: f.Incomplete, Pushed: f.Pushed, Upstream: f.Upstream,
+		StopsAt: f.StopsAt, Conflicts: forecastConflicts(ctx, r.Git, f.Conflicts), Incomplete: f.Incomplete, Pushed: f.Pushed, Upstream: f.Upstream,
 	}
 	for i, c := range p.Commits {
 		if c.FixupOf != "" {

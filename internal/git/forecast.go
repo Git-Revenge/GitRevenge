@@ -18,7 +18,13 @@ type ForecastConflict struct {
 	// Places is how many separate conflicts the file would have; 0 when it can't be counted,
 	// such as a binary file or one deleted on one side and changed on the other.
 	Places int
+	// Texts are those places' versions, for reading them as code; nil past the cap or for a
+	// file too large to read.
+	Texts []ConflictText
 }
+
+// forecastTextCap is the largest conflicted file whose places are kept for reading.
+const forecastTextCap = 1 << 20
 
 // ForecastCommit is a commit that would be merged in or written again.
 type ForecastCommit struct {
@@ -85,7 +91,8 @@ type RebaseForecast struct {
 // paths, and whether git could do it at all. base, when set, is used as the merge base in
 // place of the commits' own.
 func (r *Repo) mergeTree(ctx context.Context, base, ours, theirs string) (tree string, conflicted []string, err error) {
-	args := []string{"merge-tree", "--write-tree", "--name-only", "-z", "--no-messages"}
+	// diff3 markers keep each place's original, so the places can be read as code.
+	args := []string{"-c", "merge.conflictStyle=diff3", "merge-tree", "--write-tree", "--name-only", "-z", "--no-messages"}
 	if base != "" {
 		args = append(args, "--merge-base="+base)
 	}
@@ -121,6 +128,9 @@ func (r *Repo) conflictsIn(ctx context.Context, tree string, paths []string) []F
 					if strings.HasPrefix(line, "<<<<<<< ") {
 						c.Places++
 					}
+				}
+				if len(b) <= forecastTextCap && !isBinary(b) {
+					c.Texts = ConflictTexts(string(b))
 				}
 			}
 		}

@@ -146,6 +146,14 @@ export function ConflictOrigin(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['app']['App']['ConflictOrigin'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function ConflictStop(arg1) {
+  return window['go']['app']['App']['ConflictStop'](arg1);
+}
+
+export function ConflictSuggestions(arg1, arg2, arg3) {
+  return window['go']['app']['App']['ConflictSuggestions'](arg1, arg2, arg3);
+}
+
 export function DeletableBranches(arg1, arg2) {
   return window['go']['app']['App']['DeletableBranches'](arg1, arg2);
 }

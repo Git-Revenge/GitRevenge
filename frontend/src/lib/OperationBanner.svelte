@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { Refs, RepoState, RunOperationAction, Undo, UndoState } from '../../wailsjs/go/app/App.js'
+  import { ConflictStop, Refs, RepoState, RunOperationAction, Undo, UndoState } from '../../wailsjs/go/app/App.js'
   import type { app } from '../../wailsjs/go/models'
   import { ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
   import { bisect, expectedSteps } from './bisect.svelte'
   import { commands, formatShortcut, provideCommands } from './commands.svelte'
-  import { abortEffect, abortedMessage, beads as stepBeads, blockedBy, continueLabel, finishedMessage, OP_NOUN, opNote, opTitle } from './operation'
+  import { abortEffect, abortedMessage, beads as stepBeads, blockedBy, continueLabel, finishedMessage, OP_NOUN, opNote, opTitle, stopTally } from './operation'
   import { operations } from './operation.svelte'
   import { toasts } from './toasts.svelte'
   import { session } from './session.svelte'
@@ -15,11 +15,22 @@
 
   let opState = $state<app.RepoState | null>(null)
   let busy = $state(false)
+  /** The stop read as code (#946): suggestions, undecided places, files a merge driver settled. */
+  let tally = $state<app.ConflictStop | null>(null)
 
   async function refresh() {
     opState = (await session.run(() => RepoState(path))) ?? null
     operations.state[path] = opState
     void bisect.refresh(path)
+    const at = opState
+    if (!at?.operation || at.operation === 'bisect') tally = null
+    // It reads every conflicted file, so it follows a moment behind.
+    else
+      void ConflictStop(path)
+        .then((t) => {
+          if (opState === at) tally = t ?? null
+        })
+        .catch(() => {})
   }
 
   // A merge, rebase, cherry-pick or revert in progress (issue #593).
@@ -184,7 +195,7 @@
         {title.join}
         {#if title.b}<span class="mono">{title.b}</span>{/if}
       </strong>
-      <span class="note">{opNote(opState, seen)}</span>
+      <span class="note">{opNote(opState, seen)}{#if stopTally(tally)}<span class="tally">{` · ${stopTally(tally)}`}</span>{/if}</span>
     </div>
     {#if stepBeads(opState).length}
       <span class="beads" role="img" aria-label="{opState.step - 1} of {opState.total} done, {conflicts.length ? 'stopped at' : 'now at'} {opState.step}">

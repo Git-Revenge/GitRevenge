@@ -87,6 +87,10 @@ func TestForecastMergeConflicts(t *testing.T) {
 	if c := f.Conflicts[0]; c.Path != "f.txt" || c.Places != 2 {
 		t.Fatalf("conflict = %+v, want f.txt in 2 places", c)
 	}
+	// Each place keeps its three versions, for reading them as code.
+	if texts := f.Conflicts[0].Texts; len(texts) != 2 || texts[0] != (ConflictText{Ours: "ONE ours\n", Base: "one\n", Theirs: "ONE theirs\n", HasBase: true}) {
+		t.Fatalf("texts = %+v", texts)
+	}
 	if after := untouched(t, fx); after != before {
 		t.Fatalf("the forecast changed the repository:\n%s\n%s", before, after)
 	}

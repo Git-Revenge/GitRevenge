@@ -119,3 +119,21 @@ export function rebaseMarks(s: OpState | null | undefined): BisectMarks | null {
   const glyph = s.step > 0 && s.step < 10 ? String(s.step) : '…'
   return { terms, inQuestion: null, current: s.commit, found: '', currentNote: note, currentGlyph: glyph }
 }
+
+/** What a stop holds beyond its files (#946): places the conflict tool will suggest combined,
+ * the places left undecided beside them, and files a merge driver settled. "" when there's
+ * nothing more to say. */
+export function stopTally(t: { files: { places: number; suggested: number }[]; settled: { driver: string }[] } | null | undefined): string {
+  if (!t) return ''
+  const parts: string[] = []
+  const suggested = t.files.reduce((n, f) => n + f.suggested, 0)
+  const open = t.files.reduce((n, f) => n + f.places - f.suggested, 0)
+  if (suggested) {
+    parts.push(count(suggested, 'suggestion', 'suggestions'))
+    if (open) parts.push(`${open} undecided`)
+  }
+  const by = new Map<string, number>()
+  for (const s of t.settled) by.set(s.driver, (by.get(s.driver) ?? 0) + 1)
+  for (const [driver, n] of by) parts.push(`${n} settled by ${driver}`)
+  return parts.join(' · ')
+}

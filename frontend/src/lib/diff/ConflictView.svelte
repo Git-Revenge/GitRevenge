@@ -12,15 +12,16 @@
   import { EditorState } from '@codemirror/state'
   import { EditorView, lineNumbers } from '@codemirror/view'
   import { classHighlighter } from '@lezer/highlight'
-  import { ConflictContext, ConflictFile, ConflictOrigin, OpenMergeTool, RepoState, ResolveConflict, TakeConflictSide } from '../../../wailsjs/go/app/App.js'
+  import { ConflictContext, ConflictFile, ConflictOrigin, ConflictStop, ConflictSuggestions, OpenMergeTool, RepoState, ResolveConflict, TakeConflictSide } from '../../../wailsjs/go/app/App.js'
   import type { app, git } from '../../../wailsjs/go/models'
+  import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
   import { session } from '../session.svelte'
   import Icon from '../ui/Icon.svelte'
   import Loading from '../ui/Loading.svelte'
   import { highlightLines, languageFor, type Token } from './highlight'
-  import { nextPlace, parsePlaces, placeLines, sideView, sourceOf, startingResult, textFor, undecided, withChoice, type Parsed, type PlaceState, type Side, type Status } from './places'
+  import { lineMarks, markTokens, nextPlace, parsePlaces, placeLines, sideView, sourceOf, startingResult, suggested, textFor, undecided, withChoice, type Parsed, type PlaceState, type Side, type Status, type Suggestion } from './places'
   import { placeDecorations } from './placesDeco'
-  import { currentField, placesField, setCurrent, setPlaces } from './placesField'
+  import { currentField, placesField, setCurrent, setPlaces, setSuggestions, suggestionsField } from './placesField'
 
   /** The conflict tool (issue #597): the result is the main view, each conflicted place a block
    * in it with its own choices. Conflict markers are never shown and never saved. */
@@ -43,11 +44,19 @@
   let busy = $state(false)
   let inTool = $state(false)
   let lang = $state.raw<LanguageSupport | null>(null)
+  /** The file read as code (#946): its language, its places merged by token, its merge driver. */
+  let reading = $state.raw<app.ConflictReading | null>(null)
+  let suggestions = $state.raw<(Suggestion | null)[]>([])
+  /** How each file of this stop stands, and what a merge driver settled. */
+  let stop = $state.raw<app.ConflictStop | null>(null)
 
   let host = $state<HTMLDivElement>()
   let view: EditorView | undefined
 
-  let left = $derived(undecided(places))
+  /** Suggestions still to keep, and places with nothing in them: both count as undecided. */
+  let toKeep = $derived(suggested(places))
+  let open = $derived(undecided(places))
+  let left = $derived(toKeep + open)
   let total = $derived(places.length)
   /** A side deleted the file, or it's binary: there are no lines to choose between. */
   let wholeOnly = $derived(!!cf && (cf.binary || !cf.ours.exists || !cf.theirs.exists))
@@ -61,6 +70,10 @@
   let theirsIs = $derived(rebasing ? 'your commit being replayed' : "what's coming in")
 
   async function refreshFiles() {
+    // The tally reads every file of the stop, so it arrives on its own when it's ready.
+    void ConflictStop(path)
+      .then((t) => (stop = t ?? null))
+      .catch(() => {})
     const [st, ctx] = await Promise.all([RepoState(path).catch(() => null), ConflictContext(path).catch(() => null)])
     op = st
     around = ctx
@@ -79,9 +92,43 @@
     const c = await session.run(() => ConflictFile(path, file))
     if (!c) return
     lang = await languageFor(file)
-    parsed = parsePlaces(sourceOf(c))
+    const p = parsePlaces(sourceOf(c))
+    parsed = p
+    reading = null
+    suggestions = []
     cf = c
     current = parsed.places.length ? 0 : -1
+    void suggest(p)
+  }
+
+  /** Reads the file as code and pre-fills each place whose sides can be combined. The tool is
+   * already open by then, so places already chosen or typed into are left as they are. */
+  async function suggest(p: Parsed) {
+    const want = file
+    const r = await ConflictSuggestions(
+      path,
+      want,
+      p.places.map((x) => ({ ours: x.ours, base: x.base ?? '', theirs: x.theirs, hasBase: x.base !== null })),
+    ).catch(() => null)
+    if (!r || parsed !== p || file !== want) return
+    reading = r
+    suggestions = r.suggestions?.length === p.places.length ? r.suggestions : []
+    fill()
+  }
+
+  function fill() {
+    if (!view) return
+    const was = view.state.field(placesField)
+    let now = was
+    const changes: { from: number; to: number; insert: string }[] = []
+    was.forEach((q, i) => {
+      const s = suggestions[i]
+      if (!s?.ok || q.status !== 'undecided') return
+      // Changes are given against the text as it was; the places as they end up.
+      changes.push({ from: q.from, to: q.to, insert: s.text })
+      now = withChoice(now, i, 'suggested', s.text)
+    })
+    view.dispatch({ changes, effects: [setSuggestions.of(suggestions), setPlaces.of(now)] })
   }
 
   $effect(() => {
@@ -106,7 +153,7 @@
   })
 
   function build(parent: HTMLDivElement) {
-    const start = startingResult(parsed)
+    const start = startingResult(parsed, suggestions)
     const v = new EditorView({
       parent,
       state: EditorState.create({
@@ -117,6 +164,7 @@
           ...(lang ? [lang] : []),
           placesField,
           currentField,
+          suggestionsField,
           // Clicking a place puts the cursor there, ready to type.
           placeDecorations(parsed, { choose, go: (i) => go(i, true, true) }),
           EditorView.updateListener.of((u) => {
@@ -132,7 +180,7 @@
         ],
       }),
     })
-    v.dispatch({ effects: [setPlaces.of(start.places), setCurrent.of(start.places.length ? 0 : -1)] })
+    v.dispatch({ effects: [setPlaces.of(start.places), setCurrent.of(start.places.length ? 0 : -1), setSuggestions.of(suggestions)] })
     view = v
     return () => {
       v.destroy()
@@ -145,9 +193,19 @@
     const now = view.state.field(placesField)
     const p = now[index]
     if (!p) return
-    const text = textFor(parsed.places[index], status)
-    view.dispatch({ changes: { from: p.from, to: p.to, insert: text }, effects: [setPlaces.of(withChoice(now, index, status, text)), setCurrent.of(index)] })
+    const text = textFor(parsed.places[index], status, suggestions[index])
+    // Writing a place by hand starts with the cursor at the end of what's there to edit.
+    const writing = status === 'edited' ? { selection: { anchor: p.from + text.replace(/\n$/, '').length } } : {}
+    view.dispatch({ changes: { from: p.from, to: p.to, insert: text }, effects: [setPlaces.of(withChoice(now, index, status, text)), setCurrent.of(index)], ...writing })
     current = index
+    if (status === 'edited') view.focus()
+  }
+
+  /** Keeps every suggestion still waiting, after a look at them. Their text is already there. */
+  function keepAll() {
+    if (!view) return
+    const now = view.state.field(placesField)
+    view.dispatch({ effects: setPlaces.of(now.map((p) => (p.status === 'suggested' ? { ...p, status: 'combined' as const } : p))) })
   }
 
   function go(index: number, scroll = true, focus = false) {
@@ -169,9 +227,11 @@
   let panes = $derived.by(() => {
     if (show === 'result' || current < 0 || !parsed.places[current]) return []
     const sides: Side[] = show === 'three' && hasBase ? ['ours', 'base', 'theirs'] : ['ours', 'theirs']
+    const s = suggestions[current]
     return sides.map((side) => {
       const v = sideView(parsed, current, side)
-      const tokens: Token[][] = highlightLines(v.lines.join('\n'), lang)
+      const own = side === 'base' || !s ? [] : lineMarks(side === 'ours' ? parsed.places[current].ours : parsed.places[current].theirs, side === 'ours' ? s.ours : s.theirs)
+      const tokens = highlightLines(v.lines.join('\n'), lang).map((line: Token[], n: number) => markTokens(line, own[n - v.from] ?? []))
       return { side, ...v, tokens }
     })
   })
@@ -258,10 +318,42 @@
       e.preventDefault()
       choose(current, e.key === '1' ? 'ours' : 'theirs')
     }
+    // 3 keeps the current place's suggestion, when it has one.
+    if (e.key === '3' && current >= 0 && suggestions[current]?.ok && (e.altKey || !typing) && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault()
+      choose(current, 'combined')
+    }
   }
 
   const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
-  let blocked = $derived(left ? `${count(left, 'place is', 'places are')} still undecided` : '')
+  let blocked = $derived([toKeep ? `${count(toKeep, 'suggestion', 'suggestions')} to keep` : '', open ? `${count(open, 'place is', 'places are')} still undecided` : ''].filter(Boolean).join(', '))
+
+  /** How the file was read, for the chip beside its name: as code, or by lines and why. */
+  let engine = $derived.by(() => {
+    if (!reading?.language) return null
+    const lang = reading.language
+    const why: Record<string, string> = {
+      size: 'the file is over 1 MB',
+      time: `reading it as ${lang} took too long`,
+      memory: `reading it as ${lang} needed too much memory`,
+      errors: `more than a quarter of it doesn’t parse as ${lang}`,
+      tokens: 'it’s too long to compare token by token',
+    }
+    if (reading.fallback) return { code: false, label: 'Read by lines', title: `No suggestions: ${why[reading.fallback] ?? `it couldn’t be read as ${lang}`}.` }
+    return { code: true, label: `Read as ${lang}`, title: `Both sides parsed as ${lang}, so each place was merged token by token` }
+  })
+  let anySuggested = $derived(suggestions.some((s) => s?.ok))
+  /** What a file in the list says about itself, from the stop's tally. */
+  const tallyOf = (f: string) => stop?.files.find((t) => t.path === f)
+  const fileNote = (f: string) => {
+    const t = tallyOf(f)
+    if (!t?.places) return ''
+    if (!t.suggested) return count(t.places, 'place', 'places')
+    return t.suggested === t.places ? `${count(t.places, 'place', 'places')}, all suggested` : `${t.suggested} suggested, ${t.places - t.suggested} undecided`
+  }
+  const MERGE_DRIVERS = 'https://gitrevenge.com/docs/guide/conflicts#merge-drivers'
+  /** Files git merged on its own; those a merge driver settled are listed with the driver. */
+  let clean = $derived((around?.clean ?? []).filter((f) => !stop?.settled.some((d) => d.path === f)))
 </script>
 
 <!-- The keys are heard at the window: on WebKit a clicked button doesn't take focus, so a
@@ -273,10 +365,17 @@
     <button class="btn quiet" onclick={onClose} title="Back"><Icon name="back" />Back</button>
     <span class="view-badge danger">Conflict</span>
     <span class="view-file" title={file}>{file}</span>
+    {#if engine && !wholeOnly}
+      <span class={['tag', 'engine', engine.code ? 'code' : 'lines']} title={engine.title}><span class="dot" aria-hidden="true"></span>{engine.label}</span>
+    {/if}
     {#if cf && !wholeOnly && total}
-      <span class={['tag', left ? 'left' : 'green']} role="status">{left ? `${left} of ${count(total, 'place', 'places')} left` : `${total === 1 ? 'The place is' : `All ${total} places are`} decided`}</span>
+      <span class={['tag', left ? 'left' : 'green']} role="status">{left ? `${left} of ${count(total, 'place', 'places')} left${toKeep ? ` · ${toKeep} suggested` : ''}` : `${total === 1 ? 'The place is' : `All ${total} places are`} decided`}</span>
     {/if}
     <span class="spacer"></span>
+    {#if cf && !wholeOnly && toKeep > 1}
+      <!-- A single suggestion is kept in its place; this is for keeping several after a look. -->
+      <button class="btn sm secondary" onclick={keepAll} title="Keep every suggestion still waiting, as it is in the result">Keep all {toKeep} suggestions</button>
+    {/if}
     {#if cf && !wholeOnly}
       {#if total > 1}
         <button class="btn sm quiet" onclick={() => step(-1)} title="The previous place (Shift+F7)"><span class="flip"><Icon name="chevron" size={14} /></span>Previous</button>
@@ -323,7 +422,7 @@
                     <button class="chip" onclick={() => choose(current, pane.side as Status)} title="Take {pane.side} for this place">Take <kbd>{pane.side === 'ours' ? '1' : '2'}</kbd></button>
                   {/if}
                 </h4>
-                <pre>{#each pane.tokens as line, n (n)}<span class={['ln', n >= pane.from && n < pane.to && 'own']}><span class="n">{pane.first + n}</span><span class="t">{#each line as t, k (k)}<span class={t.cls}>{t.text}</span>{/each}</span>
+                <pre>{#each pane.tokens as line, n (n)}<span class={['ln', n >= pane.from && n < pane.to && 'own']}><span class="n">{pane.first + n}</span><span class="t">{#each line as t, k (k)}<span class={[t.cls, t.mark && 'changed']}>{t.text}</span>{/each}</span>
 </span>{/each}{#if pane.from === pane.to}<span class="ln none"><span class="n"></span><span class="t">nothing here on this side</span>
 </span>{/if}</pre>
                 <p class="origin">{#if origin}{origin.author} · {origin.subject}{:else}&nbsp;{/if}</p>
@@ -334,7 +433,18 @@
         <section class="result">
           <h4 class="meta">
             <span>Result</span>
-            <span class="plain">editable: type anywhere, as in any editor</span>
+            {#if anySuggested}
+              <span class="legend" aria-label="What the colours in the result mean">
+                <span class="key ours"><i aria-hidden="true"></i>From ours</span>
+                <span class="key theirs"><i aria-hidden="true"></i>From theirs</span>
+                <span class="key edited"><i aria-hidden="true"></i>Written by you</span>
+                <span class="key suggested"><i aria-hidden="true"></i>Suggested, not yet kept</span>
+              </span>
+            {:else if engine && !engine.code}
+              <span class="plain" role="note">{engine.title}</span>
+            {:else}
+              <span class="plain">editable: type anywhere, as in any editor</span>
+            {/if}
             <span class="spacer"></span>
             <span class="plain">saved without conflict markers</span>
           </h4>
@@ -355,11 +465,14 @@
           <li class:on={f === file}>
             <span class="ic warn"><Icon name="warning" size={16} /></span>
             {#if f === file || !onOpen}<span class="mono name" title={f}>{f}</span>{:else}<button class="btn sm text name" title="Open {f}" onclick={() => onOpen(f)}>{f}</button>{/if}
-            {#if f === file && !wholeOnly && total}<span class="note">{total - left} of {count(total, 'place', 'places')}</span>{/if}
+            {#if f === file && !wholeOnly && total}<span class="note">{total - left} of {count(total, 'place', 'places')}</span>{:else if f !== file && fileNote(f)}<span class="note">{fileNote(f)}</span>{/if}
           </li>
         {/each}
         {#each settled as f (f)}
           <li><span class="ic ok"><Icon name="check" size={16} /></span><span class="mono name" title={f}>{f}</span><span class="note">resolved</span></li>
+        {/each}
+        {#each stop?.settled ?? [] as d (d.path)}
+          <li title="git ran this file's merge driver, set in .gitattributes, and it left no conflict"><span class="ic ok"><Icon name="check" size={16} /></span><span class="mono name">{d.path}</span><span class="driver">merged by {d.driver}</span></li>
         {/each}
       </ul>
 
@@ -379,12 +492,28 @@
         </div>
       {/if}
 
-      {#if around?.clean.length}
+      {#if cf && !wholeOnly && reading}
+        <div class="drivers">
+          <span class="meta">Merge driver</span>
+          {#if reading.driver && reading.driverCommand}
+            <strong>{reading.driver} ran first</strong>
+            <p>.gitattributes sends this file to {reading.driver}. What's here is what it couldn't settle.</p>
+            <span class="mono cmd" title="merge.{reading.driver}.driver in your git config">{reading.driverCommand}</span>
+          {:else if reading.driver}
+            <strong>{reading.driver} isn't set up</strong>
+            <p>.gitattributes sends this file to {reading.driver}, but git config has no <span class="mono">merge.{reading.driver}.driver</span>, so git used its own line merge.</p>
+          {:else}
+            <p>git used its own line merge. A merge driver such as mergiraf can merge by syntax in the terminal too; the app works with whatever git runs. <button class="btn sm text link" onclick={() => BrowserOpenURL(MERGE_DRIVERS)}>Using a merge driver</button></p>
+          {/if}
+        </div>
+      {/if}
+
+      {#if clean.length}
         <div class="clean">
-          <span class="meta">Merged cleanly · {around.clean.length}</span>
+          <span class="meta">Merged cleanly · {clean.length}</span>
           <ul>
-            {#each around.clean.slice(0, 8) as f (f)}<li class="mono" title={f}>{f}</li>{/each}
-            {#if around.clean.length > 8}<li class="note">and {around.clean.length - 8} more</li>{/if}
+            {#each clean.slice(0, 8) as f (f)}<li class="mono" title={f}>{f}</li>{/each}
+            {#if clean.length > 8}<li class="note">and {clean.length - 8} more</li>{/if}
           </ul>
         </div>
       {/if}
@@ -427,6 +556,26 @@
   .tag.left {
     background: var(--warning-wash);
     color: var(--warning);
+  }
+
+  /* How the file was read: as code, or by lines with the reason in its title. */
+  .tag.engine {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--paper-warm);
+    color: var(--ink-soft);
+  }
+
+  .tag.engine .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--success);
+  }
+
+  .tag.engine.lines .dot {
+    background: var(--ink-mute);
   }
 
   /* Off until every place is decided, but still there to say why. */
@@ -550,6 +699,17 @@
     background: rgba(255, 255, 255, 0.08);
   }
 
+  /* What each side changed against the original, P4Merge-style. */
+  .pane.ours .changed {
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--code-string) 40%, transparent);
+  }
+
+  .pane.theirs .changed {
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--code-function) 44%, transparent);
+  }
+
   .ln.none .t {
     font-family: var(--font-serif);
     font-style: italic;
@@ -659,7 +819,11 @@
   }
 
   /* A place in the result: its heading with the choices, then its own lines. */
+  /* Its own text never widens the editor: a long reason wraps instead of pushing the
+     choices out of view. */
   .editor :global(.place) {
+    contain: inline-size;
+    white-space: normal;
     margin-top: 2px;
     border-top: 1px solid rgba(255, 255, 255, 0.16);
     font-family: var(--font-serif);
@@ -747,6 +911,82 @@
     background: color-mix(in srgb, var(--code-number) 16%, transparent);
   }
 
+  /* A suggestion not yet kept: a dashed edge down its heading and lines. */
+  .editor :global(.place.suggested .place-head),
+  .editor :global(.place-line.suggested) {
+    box-shadow: inset 2px 0 0 transparent;
+    border-left: 2px dashed var(--code-type);
+  }
+
+  .editor :global(.place.suggested.current .place-head) {
+    box-shadow: inset 3px 0 0 var(--code-keyword);
+  }
+
+  .editor :global(.place-line.combined) {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .editor :global(.place-why) {
+    min-width: 0;
+    font-size: 13px;
+    font-style: italic;
+    color: var(--code-comment);
+  }
+
+  /* Where each part of a suggestion came from. */
+  .editor :global(.origin.ours) {
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--code-string) 30%, transparent);
+  }
+
+  .editor :global(.origin.theirs) {
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--code-function) 34%, transparent);
+  }
+
+  .editor :global(.origin.both) {
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .legend {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+
+  .key {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .key i {
+    width: 12px;
+    height: 10px;
+    border-radius: 2px;
+  }
+
+  .key.ours i {
+    background: color-mix(in srgb, var(--code-string) 55%, transparent);
+  }
+
+  .key.theirs i {
+    background: color-mix(in srgb, var(--code-function) 60%, transparent);
+  }
+
+  .key.edited i {
+    background: color-mix(in srgb, var(--code-number) 45%, transparent);
+  }
+
+  .key.suggested i {
+    border-left: 2px dashed var(--code-type);
+    border-radius: 0;
+  }
+
   /* The files of the operation, beside the tool. */
   .files {
     flex: none;
@@ -828,6 +1068,43 @@
     padding: 12px 14px;
     border-radius: var(--r-md);
     background: var(--paper-warm);
+  }
+
+  .driver {
+    flex: none;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--accent-b-wash, var(--paper-warm));
+    color: var(--accent-b, var(--ink-soft));
+  }
+
+  .drivers {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--paper-edge);
+  }
+
+  .drivers p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+  }
+
+  .drivers .cmd {
+    font-size: 12px;
+    color: var(--ink-mute);
+    overflow-wrap: anywhere;
+  }
+
+  .link {
+    display: inline;
+    height: auto;
+    padding: 0;
   }
 
   .clean li {

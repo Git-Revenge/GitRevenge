@@ -1,5 +1,5 @@
 import { StateEffect, StateField, type Transaction } from '@codemirror/state'
-import { touches, type PlaceState } from './places'
+import { touches, type PlaceState, type Suggestion } from './places'
 
 // The conflict tool's places as editor state: they move with the text, and typing inside one
 // makes it edited by hand. No view code here, so it can be tested without a browser.
@@ -35,5 +35,16 @@ export const currentField = StateField.define<number>({
   update(current, tr) {
     for (const e of tr.effects) if (e.is(setCurrent)) return e.value
     return current
+  },
+})
+
+/** Sets each place's suggestion, in order: the sides merged by token, or null. */
+export const setSuggestions = StateEffect.define<(Suggestion | null)[]>()
+
+export const suggestionsField = StateField.define<(Suggestion | null)[]>({
+  create: () => [],
+  update(value, tr) {
+    for (const e of tr.effects) if (e.is(setSuggestions)) return e.value
+    return value
   },
 })

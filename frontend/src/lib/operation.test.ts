@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { abortedMessage, abortEffect, beads, blockedBy, continueLabel, finishedMessage, opNote, opTitle, rebaseMarks, type OpState } from './operation'
+import { abortedMessage, abortEffect, beads, blockedBy, continueLabel, finishedMessage, opNote, opTitle, rebaseMarks, stopTally, type OpState } from './operation'
 
 const id = (c: string) => c.repeat(40)
 const state = (over: Partial<OpState> = {}): OpState => ({ operation: 'rebase', step: 3, total: 5, conflicts: ['src/feed.js'], ours: 'feature/offline-cache', theirs: 'main', commit: id('c'), subject: 'Fall back to the cached reading', origHead: id('d'), written: [id('b'), id('a')], ...over })
@@ -89,5 +89,21 @@ describe('beads and rebaseMarks', () => {
     expect(marks.inQuestion).toBeNull()
     expect(rebaseMarks(merge())).toBeNull()
     expect(rebaseMarks(null)).toBeNull()
+  })
+})
+
+describe('stopTally', () => {
+  const tally = (files: [number, number][], settled: string[] = []) => ({ files: files.map(([places, suggested]) => ({ places, suggested })), settled: settled.map((driver) => ({ driver })) })
+  it('counts suggestions and the places beside them', () => {
+    expect(stopTally(tally([[2, 1], [1, 1]]))).toBe('2 suggestions · 1 undecided')
+    expect(stopTally(tally([[1, 1]]))).toBe('1 suggestion')
+  })
+  it('says nothing more than the files when nothing can be suggested', () => {
+    expect(stopTally(tally([[3, 0]]))).toBe('')
+    expect(stopTally(null)).toBe('')
+  })
+  it('counts the files each merge driver settled', () => {
+    expect(stopTally(tally([[3, 0]], ['mergiraf', 'mergiraf']))).toBe('2 settled by mergiraf')
+    expect(stopTally(tally([[1, 1]], ['mergiraf']))).toBe('1 suggestion · 1 settled by mergiraf')
   })
 })

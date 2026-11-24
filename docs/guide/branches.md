@@ -32,7 +32,7 @@ You can also drag. Drop a branch or commit onto the checked-out branch to merge,
 
 Merge and rebase first show what they would do. Nothing has happened yet: **Cancel** leaves everything as it was, and <kbd>Enter</kbd> goes ahead.
 
-The preview says whether files will conflict, and names them with how many places in each. It works this out in memory, without touching your files, your index or any branch. It's a forecast: the operation itself still has the last word. If the conflicts can't be checked, the preview says so and you can still go ahead.
+The preview says whether files will conflict, and names them with how many places in each. For a file in a language it [reads as code](history.md#reading-the-code), it also says how many of those places look combinable: the conflict tool will [suggest them](conflicts.md#suggestions) when you get there. It works this out in memory, without touching your files, your index or any branch. It's a forecast: the operation itself still has the last word. If the conflicts can't be checked, the preview says so and you can still go ahead.
 
 A merge preview also lists the commits and the number of files coming in, and asks **how** to merge:
 
@@ -89,44 +89,6 @@ The walkthrough [Tidy a branch before you share it](../walkthroughs/tidy-a-branc
 
 ## Conflicts
 
-When a merge, rebase or cherry-pick stops on conflicts, the conflicted files are listed with your uncommitted changes. For each one you can:
-
-- resolve it with **ours** or **theirs** in one click, or
-- open the **conflict tool** to decide place by place.
-
-In the conflict tool the **result** is the main view: the file as it will be saved, with a block wherever the two sides disagree. Conflict markers never appear in it and are never saved.
-
-- Each **place** has its own choices: **Ours**, **Theirs** or **Both** (ours first). Until you choose, the place is empty and shows what each side would put there. **Start again** puts a place back to undecided.
-- The result is an ordinary editor. Typing inside a place makes it **Edited**, which counts as decided; typing anywhere else just changes the file.
-- Above the result, **Ours and theirs** shows both sides of the current place with a few lines around them, each labelled with its branch and the commit that last changed those lines. **Three-way** adds the **Original**, where both sides started. **Result only** hides them. **Take** on a side, or <kbd>1</kbd> and <kbd>2</kbd> (with <kbd>Alt</kbd> while typing), takes that side for the current place.
-- **Next** and **Previous**, or <kbd>F7</kbd> and <kbd>Shift</kbd>+<kbd>F7</kbd>, move between places, going to the undecided ones first.
-- **Mark resolved** stays off until every place is decided, and its tooltip says how many are left. It saves the result, stages the file, and opens the next conflicted file if there is one.
-
-The panel on the right lists the files of the operation with their progress, and the files that merged without help. For the whole file it offers **Take ours** and **Take theirs**, **Start this file again**, and, when `merge.tool` is set in your git config, **Open in** that tool.
-
-A binary file, or one a side deleted, has no lines to choose between: the tool offers the whole-file choices only.
-
-![The conflict tool: both sides of a place above the result](../img/conflict-tool-light.webp#gh-light-mode-only)
-![The conflict tool: both sides of a place above the result](../img/conflict-tool-dark.webp#gh-dark-mode-only)
-
-See [Resolve a merge conflict](../walkthroughs/resolve-a-conflict.md) for the whole thing, step by step.
-
-### While a merge or rebase is in progress
-
-A strip at the top stays until the operation is finished. It names the operation and both sides, such as *Rebasing feature/offline-cache onto main*, and says where things stand: which commit a rebase stopped on and how far along it is, or how many of a merge's conflicted files are resolved.
-
-![The strip for a merge in progress, with one file left to resolve](../img/operation-strip-light.webp#gh-light-mode-only)
-![The strip for a merge in progress, with one file left to resolve](../img/operation-strip-dark.webp#gh-dark-mode-only)
-
-- **Resolve N files** opens the first conflicted file in the conflict tool.
-- **Continue** is off while anything is conflicted, and its tooltip names what's left. Once everything is resolved it says what it will do: **Continue with 2 more**, **Finish the rebase** or **Commit the merge**. <kbd>Ctrl</kbd>+<kbd>Enter</kbd> presses it.
-- **Skip this commit** leaves out the commit a rebase, cherry-pick or revert stopped on.
-- **Abort…** asks first, and says what it undoes: where your branch goes back to, and what is thrown away.
-
-During a rebase the graph ticks each commit as it's written again on top of the target, and the commit in hand carries its number.
-
-When the operation finishes, a notice says what happened and offers **Undo**, which puts the branch back where it was before the operation began. After a rebase of a branch that was already pushed, a second notice offers **Force push…**.
-
-The strip appears for an operation started in a terminal too.
+When a merge, rebase or cherry-pick stops on conflicts, a strip at the top says where things stand, and the conflict tool helps you settle each file place by place. Where both sides changed different parts of the same line, it reads the code and suggests the two combined. See [Resolving conflicts](conflicts.md).
 
 Any of these can be undone afterwards; see [Undo and redo](changes.md#undo-and-redo).

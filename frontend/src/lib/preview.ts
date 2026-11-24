@@ -55,3 +55,15 @@ export function mergeSummary(p: Merge, how: MergeHow, into: string, from: string
 export function rebaseVerb(p: Pick<app.RebasePreview, 'commitCount'>, edit: boolean): string {
   return edit ? 'Choose what to do with each commit' : `Rebase ${plural(p.commitCount, 'commit', 'commits')}`
 }
+
+/** What a forecast says about one conflicted file: its places, and how many of them read as
+ * code with each side changing different things, which the conflict tool will suggest. */
+export function placesNote(c: { places: number; combinable?: number }): string {
+  if (!c.places) return ''
+  const n = c.combinable ?? 0
+  const places = plural(c.places, 'place', 'places')
+  if (!n) return places
+  if (c.places === 1) return '1 place, looks combinable'
+  if (n === c.places) return `${places}, ${c.places === 2 ? 'both' : 'all'} look combinable`
+  return `${places}, ${n} ${n === 1 ? 'looks' : 'look'} combinable`
+}
