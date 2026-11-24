@@ -1801,7 +1801,7 @@ test.describe('commit graph', () => {
     await open(page, 'repoView', {
       graphRows: 3,
       graphRefs: { [id]: [branch('main', { head: true, branchKind: 'trunk' }), remote('origin/main', { branchKind: 'trunk' }), tag('v1.0')] },
-      responses: { Refs: [remote('origin/main')], CommitSignatures: [], WorkingTree: { status: { files: [] } }, CommitDetail: { commit, files: [] } },
+      responses: { Refs: [remote('origin/main')], CommitSignatures: [], WorkingTree: { status: { files: [] }, signing: { enabled: false }, identity: { name: 'A', email: 'a@b' } }, CommitDetail: { commit, files: [] } },
     })
     const box = (await page.locator('.scroller').boundingBox())!
     await page.mouse.click(box.x + 500, box.y + ROW + 26)
@@ -2070,7 +2070,13 @@ test('blame shows the whole date, whatever the length of the author name', async
 })
 
 test.describe('before the first load has answered', () => {
-  const repoView = (files: unknown[]) => ({ graphRows: 0, delays: { WorkingTree: 500 }, responses: { Refs: [], CommitSignatures: [], WorkingTree: { status: { files } } } })
+  // The working tree as the backend always sends it, signing and identity too: without them the
+  // panel failed to draw whenever it opened before the bar said "1 file", and this test failed.
+  const repoView = (files: unknown[]) => ({
+    graphRows: 0,
+    delays: { WorkingTree: 500 },
+    responses: { Refs: [], CommitSignatures: [], WorkingTree: { status: { files }, signing: { enabled: false }, identity: { name: 'A', email: 'a@b' } } },
+  })
   const bar = (page: Page) => page.locator('button.wip')
 
   test('the working tree bar claims nothing, then says it is clean', async ({ page }) => {
@@ -2084,22 +2090,21 @@ test.describe('before the first load has answered', () => {
   })
 
   test('a conflicted tree never shows as clean', async ({ page }) => {
+    // Every state the bar passes through, recorded from before the page starts: a retrying
+    // assertion would wait out a wrong one, and watching only once the page had opened missed
+    // the change when the status arrived first, then waited for one that had already been.
+    await page.addInitScript(() => {
+      const w = window as unknown as { wipTexts: string[] }
+      w.wipTexts = []
+      new MutationObserver(() => {
+        const text = document.querySelector('button.wip')?.textContent
+        if (text !== undefined && text !== null && w.wipTexts.at(-1) !== text) w.wipTexts.push(text)
+      }).observe(document, { subtree: true, childList: true, characterData: true })
+    })
     await open(page, 'repoView', repoView([{ path: 'a.txt', index: 'U', workTree: 'U', conflicted: true }]))
-    // Every state it passes through, since a retrying assertion would wait out a wrong one.
-    const seen = await bar(page).evaluate(
-      (el) =>
-        new Promise<string[]>((resolve) => {
-          const texts = [el.textContent ?? '']
-          const observer = new MutationObserver(() => {
-            texts.push(el.textContent ?? '')
-            if (/1 file/i.test(el.textContent ?? '')) {
-              observer.disconnect()
-              resolve(texts)
-            }
-          })
-          observer.observe(el, { subtree: true, childList: true, characterData: true })
-        }),
-    )
+    await expect(bar(page)).toContainText(/1 file/i)
+    const seen = await page.evaluate(() => (window as unknown as { wipTexts: string[] }).wipTexts)
+    expect(seen.length).toBeGreaterThan(0)
     expect(seen.join(' / ')).not.toMatch(/clean/i)
   })
 

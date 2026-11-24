@@ -20,7 +20,11 @@ export default defineConfig({
   // Linux runs the app in WebKit, so it's tested too. Playwright's WebKit isn't WebKitGTK, so this
   // checks compatibility, not rendering or speed.
   projects: [
-    { name: 'chromium', use: { browserName: 'chromium', channel } },
+    // Canvases are drawn in software, as headless Chromium on Linux draws them in CI. Edge on
+    // Windows draws them on the GPU, which rounds anti-aliased edges by a level or two
+    // differently from one run to the next, so tests that compare a graph's pixels failed there
+    // for no reason in the code.
+    { name: 'chromium', use: { browserName: 'chromium', channel, launchOptions: { args: ['--disable-accelerated-2d-canvas'] } } },
     { name: 'webkit', use: { browserName: 'webkit' } },
   ],
   webServer: {
