@@ -99,7 +99,7 @@ func changed(side []string, m []int) []Stretch {
 func pieces(ctx context.Context, id, s string) []string {
 	if l := byID(id); l != nil && s != "" {
 		l.load()
-		r := readVersion(ctx, l, s, QuickRead)
+		r := readVersion(ctx, l, s, QuickRead, false)
 		if r.stop == "" {
 			var out []string
 			at := 0

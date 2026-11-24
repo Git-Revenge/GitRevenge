@@ -42,6 +42,15 @@ type version struct {
 	first []int // the line each token starts on
 	last  []int // the line each token ends on
 	moved map[int]bool
+
+	// Set when the trees were matched (#947): the named nodes read, each token's partner on
+	// the other side or -1, which tokens the token diff left changed, and the tree itself
+	// with each token's leaf in it.
+	nodes   []nodeRec
+	partner []int32
+	changed []bool
+	tree    *gtree
+	leaf    []int32
 }
 
 func newVersion(t text, toks []tok, moved map[int]bool) *version {
@@ -81,6 +90,7 @@ type segment struct {
 	ot, nt         []int
 	chO, chN       []bool
 	whole          bool // too big to compare by tokens; marked by words instead
+	reshape        bool // its unchanged tokens sit in different syntax on the two sides
 	kind           string
 	note           string
 	old, new       []Span
@@ -89,17 +99,22 @@ type segment struct {
 // refine reads the line diff's blocks as code: each block is compared token by token and
 // split where its parts differ in kind, so formatting and renames stand apart from changes.
 // Lines left identical by the split go back to being unchanged.
-func refine(ctx context.Context, a, b *version, blocks []Block) ([]Block, []Rename, error) {
+func refine(ctx context.Context, a, b *version, blocks []Block) ([]Block, []Rename, []Move, error) {
 	var segs []*segment
 	for k, blk := range blocks {
 		if err := ctx.Err(); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		segs = append(segs, splitBlock(a, b, k, blk)...)
 	}
+	matchVersions(ctx, a, b, segs)
 	renames, confirmed := findRenames(a, b, segs)
+	var nested []Move
 	for _, s := range segs {
 		classify(a, b, s, confirmed)
+		if s.reshape && s.kind == KindChange {
+			nested = append(nested, nestedMoves(a, b, s)...)
+		}
 	}
 	out := make([]Block, 0, len(segs))
 	for i := 0; i < len(segs); i++ {
@@ -124,7 +139,7 @@ func refine(ctx context.Context, a, b *version, blocks []Block) ([]Block, []Rena
 		}
 		out = append(out, blk)
 	}
-	return out, renames, nil
+	return out, renames, joinNested(nested), nil
 }
 
 // splitBlock compares a block's tokens and cuts it into segments at lines where the comparison
@@ -484,7 +499,7 @@ func classify(a, b *version, s *segment, renames map[[2]string]int) {
 		total += len(b.text(t))
 	}
 	kept := total
-	changes, renamed := 0, 0
+	changes, renamed, movedToks := 0, 0, 0
 	var renamedFrom string
 	values, punct := false, map[string]bool{}
 	s.walk(func(i, j int) {
@@ -499,6 +514,15 @@ func classify(a, b *version, s *segment, renames map[[2]string]int) {
 			values = true
 		}
 	}, func(c change) {
+		// Tokens the trees say moved here from elsewhere in the change are moves, not edits.
+		was := len(c.old) + len(c.new)
+		c.old, c.new = takeMoved(a, b, c.old, s.nt, &marks.old), takeMoved(b, a, c.new, s.ot, &marks.new)
+		if len(c.old)+len(c.new) < was {
+			movedToks++
+			if len(c.old) == 0 && len(c.new) == 0 {
+				return
+			}
+		}
 		o, n := meaningful(a, c.old), meaningful(b, c.new)
 		if len(o) == 0 && len(n) == 0 {
 			// Only optional punctuation came or went: formatting.
@@ -568,8 +592,9 @@ func classify(a, b *version, s *segment, renames map[[2]string]int) {
 	})
 	// What the segment is follows from its tokens, not from how the diff lined them up: equal
 	// tokens in the same syntax are formatting, whatever a tie in the diff marked.
+	s.reshape = s.reshaped(a, b, renames)
 	switch {
-	case s.moves(a, b) || s.reshaped(a, b, renames):
+	case s.moves(a, b) || s.reshape || movedToks > 0:
 		s.kind = KindChange
 	case renamed > 0:
 		s.kind, s.note = KindRename, "renamed from "+renamedFrom
