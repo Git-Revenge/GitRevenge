@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/settings"
@@ -52,7 +53,8 @@ func scopeFlag(scope string) (string, error) {
 
 // PushSettingsFor reads the Pushing panel for a repository, in scope "local" or "global".
 func (a *App) PushSettingsFor(path, scope string) (PushSettings, error) {
-	flag, err := scopeFlag(scope)
+	// Checked only: the read below covers every scope and keeps this one's values.
+	_, err := scopeFlag(scope)
 	if err != nil {
 		return PushSettings{}, err
 	}
@@ -62,15 +64,38 @@ func (a *App) PushSettingsFor(path, scope string) (PushSettings, error) {
 	}
 	ctx := context.Background()
 	out := PushSettings{Scope: scope, Settings: []PushSetting{}, Remotes: []string{}, FetchAfterPush: a.fetchAfterPush()}
-	if remotes, err := r.Git.Remotes(ctx); err == nil {
-		for _, rm := range remotes {
-			out.Remotes = append(out.Remotes, rm.Name)
+	// Two reads at once, one of them all four keys in every scope: the panel reloads after
+	// each change, and on Windows each git call costs about 40ms.
+	var (
+		remotes []git.Remote
+		raw     []byte
+		wg      sync.WaitGroup
+	)
+	wg.Go(func() { remotes, _ = r.Git.Remotes(ctx) })
+	wg.Go(func() {
+		raw, _ = r.Git.Read(ctx, "config", "--show-scope", "-z", "--get-regexp", `^(remote\.pushdefault|push\.(default|autosetupremote|followtags))$`)
+	})
+	wg.Wait()
+	for _, rm := range remotes {
+		out.Remotes = append(out.Remotes, rm.Name)
+	}
+	here, inUse := map[string]string{}, map[string]string{}
+	fields := strings.Split(string(raw), "\x00")
+	for i := 0; i+1 < len(fields); i += 2 {
+		key, value, ok := strings.Cut(fields[i+1], "\n")
+		if !ok {
+			// A key written bare is true.
+			value = "true"
+		}
+		key = strings.ToLower(key)
+		// The last one read wins, as git's own --get does.
+		inUse[key] = value
+		if fields[i] == scope {
+			here[key] = value
 		}
 	}
 	for _, k := range []string{"remote.pushDefault", "push.default", "push.autoSetupRemote", "push.followTags"} {
-		here, _ := r.Git.ReadString(ctx, "config", flag, "--get", k)
-		inUse, _ := r.Git.ReadString(ctx, "config", "--get", k)
-		out.Settings = append(out.Settings, PushSetting{Key: k, Here: here, InUse: inUse})
+		out.Settings = append(out.Settings, PushSetting{Key: k, Here: here[strings.ToLower(k)], InUse: inUse[strings.ToLower(k)]})
 	}
 	return out, nil
 }
