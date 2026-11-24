@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/git-revenge/gitrevenge/internal/semdiff"
 )
 
 func TestPreferencesRoundTrip(t *testing.T) {
@@ -28,6 +30,8 @@ func TestPreferencesRoundTrip(t *testing.T) {
 	}
 	got, _ := a.Preferences()
 	got.GitInUse = ""
+	// The languages read as code come from the app, not from what was saved.
+	want.Languages = semdiff.Languages()
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("saved = %+v, want %+v", got, want)
 	}
