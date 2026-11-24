@@ -37,12 +37,13 @@ func (a *App) PreviewRebasePlan(path, base string, items []git.RebaseItem) (Reba
 	if err != nil {
 		return RebasePlanPreview{}, err
 	}
-	f, err := r.Git.ForecastPlan(context.Background(), base, items)
+	ctx := context.Background()
+	f, err := r.Git.ForecastPlan(ctx, base, items)
 	if err != nil {
 		return RebasePlanPreview{}, friendly(err)
 	}
 	out := RebasePlanPreview{
-		StopsAt: f.StopsAt, Conflicts: forecastConflicts(f.Conflicts), Incomplete: f.Incomplete,
+		StopsAt: f.StopsAt, Conflicts: forecastConflicts(ctx, r.Git, f.Conflicts), Incomplete: f.Incomplete,
 		Pushed: f.Pushed, Upstream: f.Upstream, Dropped: []DroppedCommit{},
 	}
 	for _, d := range f.Dropped {

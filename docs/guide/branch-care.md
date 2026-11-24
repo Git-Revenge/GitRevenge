@@ -107,7 +107,7 @@ When a host squash-merges the branch below, the branch on top still carries the 
 
 If the branch on top has no work of its own left to land, it says **merged** instead: there's nothing to restack, and it only needs deleting.
 
-Right-click it and choose **Restack**. Git Revenge checks it out if it isn't already, then moves just its own commits onto the latest Trunk, leaving the merged branch's old commits behind. If that runs into conflicts, you resolve them as in any [rebase](branches.md#conflicts). Undo puts the branch back where it was.
+Right-click it and choose **Restack**. Git Revenge checks it out if it isn't already, then moves just its own commits onto the latest Trunk, leaving the merged branch's old commits behind. If that runs into conflicts, you resolve them as in any [rebase](conflicts.md). Undo puts the branch back where it was.
 
 ## Safety checks
 

@@ -139,3 +139,16 @@ test('a cherry-pick names its commit and can be skipped', async ({ page }) => {
   await s.getByRole('button', { name: 'Skip this commit' }).click()
   await expect.poll(() => calls(page, 'RunOperationAction')).toEqual([['/r', 'skip']])
 })
+
+test('a stop read as code counts its suggestions and what a merge driver settled (#946)', async ({ page }) => {
+  const stop = {
+    files: [
+      { path: 'src/feed.js', places: 2, suggested: 1, language: 'JavaScript', driver: '' },
+      { path: 'src/units.js', places: 1, suggested: 1, language: 'JavaScript', driver: '' },
+    ],
+    settled: [{ path: 'stations.json', driver: 'mergiraf' }],
+    drivers: [{ name: 'mergiraf', command: 'mergiraf merge' }],
+  }
+  await open(page, 'operation', scenario(rebase({ conflicts: ['src/feed.js', 'src/units.js'] }), { ConflictStop: stop }))
+  await expect(strip(page)).toContainText('Stopped at commit 3 of 5: Fall back to the cached reading · 2 suggestions · 1 undecided · 1 settled by mergiraf')
+})

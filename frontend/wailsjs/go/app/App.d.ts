@@ -81,6 +81,10 @@ export function ConflictFile(arg1:string,arg2:string):Promise<git.ConflictFile>;
 
 export function ConflictOrigin(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number):Promise<git.PlaceOrigin>;
 
+export function ConflictStop(arg1:string):Promise<app.ConflictStop>;
+
+export function ConflictSuggestions(arg1:string,arg2:string,arg3:Array<app.ConflictPlace>):Promise<app.ConflictReading>;
+
 export function DeletableBranches(arg1:string,arg2:Array<string>):Promise<Array<string>>;
 
 export function DeleteBranchAndWorktree(arg1:string,arg2:string,arg3:boolean,arg4:boolean):Promise<string>;

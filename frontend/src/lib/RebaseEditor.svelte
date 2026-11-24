@@ -3,6 +3,7 @@
   import { InteractiveRebase, PreviewRebasePlan, RebasePlan, RepoState } from '../../wailsjs/go/app/App.js'
   import type { app, git } from '../../wailsjs/go/models'
   import { errorText } from './errors'
+  import { placesNote } from './preview'
   import { ACTIONS, actionForKey, isCommitId, actionLabel, changed, foldable, foldIn, foldTarget, move, newPlan, outcome, problem as problemOf, setAction, toRun, type Action, type PlanItem } from './rebasePlan'
   import { session } from './session.svelte'
   import Icon from './ui/Icon.svelte'
@@ -384,7 +385,7 @@
             </div>
             <ul>
               {#each forecast.conflicts as c (c.path)}
-                <li><span class="mono">{c.path}</span>{#if c.places}<span class="note">{count(c.places, 'place', 'places')}</span>{/if}</li>
+                <li><span class="mono">{c.path}</span>{#if c.places}<span class="note">{placesNote(c)}</span>{/if}</li>
               {/each}
             </ul>
             <p class="note">You can resolve it when it stops, or try another order. Later commits can't be tried until this one is settled.</p>

@@ -29,7 +29,8 @@ After that, the guide covers each part of the app in turn:
 | [Experimental views](experimental-views.md) | Horizontal, with time running across, and Map, a picture of every branch around the trunk, or of everyone who wrote the commits. |
 | [Changes and commits](changes.md) | Staging, committing, stashing, and undo. |
 | [Ignoring files](ignoring.md) | Ignoring a file from its menu, and the Ignore rules tab. |
-| [Branches, merges and rebases](branches.md) | Previews, interactive rebase, and the conflict tool. |
+| [Branches, merges and rebases](branches.md) | Merging, rebasing, previews and interactive rebase. |
+| [Resolving conflicts](conflicts.md) | The conflict tool, suggestions where code can be combined, and merge drivers. |
 | [Branch care](branch-care.md) | Branch kinds, hiding, cleaning up merged branches, and stacks. |
 | [Diffs and history](history.md) | Diffs, rendered previews, blame, the reflog, bisect, notes and signatures. |
 | [Remotes, LFS and submodules](remotes.md) | Fetch, pull and push, signing in, and what to do when one fails. |

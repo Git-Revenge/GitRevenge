@@ -860,6 +860,146 @@ export namespace app {
 	        this.clean = source["clean"];
 	    }
 	}
+	export class ConflictPlace {
+	    ours: string;
+	    base: string;
+	    theirs: string;
+	    hasBase: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ConflictPlace(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ours = source["ours"];
+	        this.base = source["base"];
+	        this.theirs = source["theirs"];
+	        this.hasBase = source["hasBase"];
+	    }
+	}
+	export class ConflictReading {
+	    language: string;
+	    fallback: string;
+	    suggestions: semdiff.Suggestion[];
+	    driver: string;
+	    driverCommand: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ConflictReading(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.language = source["language"];
+	        this.fallback = source["fallback"];
+	        this.suggestions = this.convertValues(source["suggestions"], semdiff.Suggestion);
+	        this.driver = source["driver"];
+	        this.driverCommand = source["driverCommand"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MergeDriver {
+	    name: string;
+	    command: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MergeDriver(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.command = source["command"];
+	    }
+	}
+	export class DriverSettled {
+	    path: string;
+	    driver: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DriverSettled(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.driver = source["driver"];
+	    }
+	}
+	export class ConflictTally {
+	    path: string;
+	    places: number;
+	    suggested: number;
+	    language: string;
+	    driver: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ConflictTally(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.places = source["places"];
+	        this.suggested = source["suggested"];
+	        this.language = source["language"];
+	        this.driver = source["driver"];
+	    }
+	}
+	export class ConflictStop {
+	    files: ConflictTally[];
+	    settled: DriverSettled[];
+	    drivers: MergeDriver[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ConflictStop(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.files = this.convertValues(source["files"], ConflictTally);
+	        this.settled = this.convertValues(source["settled"], DriverSettled);
+	        this.drivers = this.convertValues(source["drivers"], MergeDriver);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
 	export class DroppedCommit {
 	    commit: string;
 	    files: string[];
@@ -987,6 +1127,7 @@ export namespace app {
 	export class ForecastConflict {
 	    path: string;
 	    places: number;
+	    combinable: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new ForecastConflict(source);
@@ -996,6 +1137,7 @@ export namespace app {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
 	        this.places = source["places"];
+	        this.combinable = source["combinable"];
 	    }
 	}
 	export class GraphPage {
@@ -1432,6 +1574,7 @@ export namespace app {
 		    return a;
 		}
 	}
+	
 	
 	export class MergePreview {
 	    into: string;
@@ -4631,6 +4774,22 @@ export namespace semdiff {
 	        this.reindented = source["reindented"];
 	    }
 	}
+	export class Origin {
+	    from: number;
+	    to: number;
+	    side: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Origin(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.from = source["from"];
+	        this.to = source["to"];
+	        this.side = source["side"];
+	    }
+	}
 	export class Rename {
 	    from: string;
 	    to: string;
@@ -4675,6 +4834,61 @@ export namespace semdiff {
 	        this.unparsed = source["unparsed"];
 	        this.added = source["added"];
 	        this.removed = source["removed"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class Stretch {
+	    from: number;
+	    to: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Stretch(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.from = source["from"];
+	        this.to = source["to"];
+	    }
+	}
+	export class Suggestion {
+	    ok: boolean;
+	    text: string;
+	    reason: string;
+	    origins: Origin[];
+	    ours: Stretch[];
+	    theirs: Stretch[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Suggestion(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.text = source["text"];
+	        this.reason = source["reason"];
+	        this.origins = this.convertValues(source["origins"], Origin);
+	        this.ours = this.convertValues(source["ours"], Stretch);
+	        this.theirs = this.convertValues(source["theirs"], Stretch);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

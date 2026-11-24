@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { mergeChoices, mergeSummary, mergeVerb, plural, rebaseVerb } from './preview'
+import { mergeChoices, mergeSummary, mergeVerb, placesNote, plural, rebaseVerb } from './preview'
 
-const merge = (over: object = {}) => ({ fastForward: false, conflicts: [] as { path: string; places: number }[], unknown: false, intoOnly: 2, commitCount: 3, ...over })
-const conflicted = merge({ conflicts: [{ path: 'a', places: 2 }, { path: 'b', places: 1 }] })
+const merge = (over: object = {}) => ({ fastForward: false, conflicts: [] as { path: string; places: number; combinable: number }[], unknown: false, intoOnly: 2, commitCount: 3, ...over })
+const conflicted = merge({ conflicts: [{ path: 'a', places: 2, combinable: 0 }, { path: 'b', places: 1, combinable: 0 }] })
 
 describe('mergeChoices', () => {
   it('offers a fast-forward first when one is possible', () => {
@@ -31,7 +31,7 @@ describe('mergeVerb', () => {
     expect(mergeVerb(merge({ fastForward: true }), 'ff-only', 'main')).toBe('Fast-forward main')
     expect(mergeVerb(merge(), 'squash', 'main')).toBe('Squash into main')
     expect(mergeVerb(conflicted, 'no-ff', 'main')).toBe('Merge, and resolve 2 conflicts')
-    expect(mergeVerb(merge({ conflicts: [{ path: 'a', places: 1 }] }), 'no-ff', 'main')).toBe('Merge, and resolve 1 conflict')
+    expect(mergeVerb(merge({ conflicts: [{ path: 'a', places: 1, combinable: 0 }] }), 'no-ff', 'main')).toBe('Merge, and resolve 1 conflict')
   })
 
   it("doesn't promise conflicts it couldn't check", () => {
@@ -55,5 +55,16 @@ describe('rebaseVerb and plural', () => {
     expect(rebaseVerb({ commitCount: 5 }, false)).toBe('Rebase 5 commits')
     expect(rebaseVerb({ commitCount: 1 }, false)).toBe('Rebase 1 commit')
     expect(rebaseVerb({ commitCount: 5 }, true)).toBe('Choose what to do with each commit')
+  })
+})
+
+describe('placesNote', () => {
+  it('counts the places, and says which look combinable', () => {
+    expect(placesNote({ places: 0, combinable: 0 })).toBe('')
+    expect(placesNote({ places: 2, combinable: 0 })).toBe('2 places')
+    expect(placesNote({ places: 1, combinable: 1 })).toBe('1 place, looks combinable')
+    expect(placesNote({ places: 2, combinable: 2 })).toBe('2 places, both look combinable')
+    expect(placesNote({ places: 3, combinable: 3 })).toBe('3 places, all look combinable')
+    expect(placesNote({ places: 3, combinable: 1 })).toBe('3 places, 1 looks combinable')
   })
 })

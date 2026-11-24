@@ -112,11 +112,12 @@ test('a reword edits the subject in place, Esc puts it back, and the new message
 })
 
 test('says where this order would stop, and asks again when the order changes', async ({ page }) => {
-  await open(page, 'rebaseEditor', scenario({ ...clean, stopsAt: id('d'), conflicts: [{ path: 'src/cache.js', places: 2 }] }))
+  await open(page, 'rebaseEditor', scenario({ ...clean, stopsAt: id('d'), conflicts: [{ path: 'src/cache.js', places: 2, combinable: 1 }] }))
   const after = page.getByRole('complementary')
   await expect(after.getByText('It will stop at Fall back to the cached reading')).toBeVisible()
   await expect(after.getByText('src/cache.js')).toBeVisible()
-  await expect(after.getByText('2 places')).toBeVisible()
+  // One of its places reads as code with each side changing something different (#946).
+  await expect(after.getByText('2 places, 1 looks combinable')).toBeVisible()
   await expect.poll(async () => (await calls(page, 'PreviewRebasePlan')).length).toBe(1)
 
   await rows(page).nth(0).focus()
