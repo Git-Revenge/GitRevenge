@@ -16,6 +16,7 @@
   import { update } from './update.svelte'
   import Loading from './ui/Loading.svelte'
   import LinksSettings from './links/LinksSettings.svelte'
+  import PushingSettings from './PushingSettings.svelte'
   import { trailerCare } from './filters/careDialog.svelte'
 
   let { onClose }: { onClose: () => void } = $props()
@@ -261,6 +262,8 @@
           void gitConfig.show(repo)
         }}
       />
+
+      <PushingSettings repo={repoPath} />
 
       <fieldset>
         <legend class="meta">Repositories</legend>

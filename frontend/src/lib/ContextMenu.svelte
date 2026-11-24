@@ -292,6 +292,12 @@
     box-shadow: inset 3px 0 0 var(--ink);
   }
 
+  /* On the highlight, a hint takes the highlight's own ink: muted grey can't be read there. */
+  .item.active .hint {
+    color: inherit;
+    opacity: 0.85;
+  }
+
   .item[aria-disabled='true'] {
     color: var(--ink-faint);
     cursor: default;

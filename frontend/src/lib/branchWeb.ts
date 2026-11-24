@@ -2,8 +2,8 @@
  * remote branch is from its remote's default branch, and which local branches track it. It's
  * read from the backend as the menu opens, so the menus themselves stay plain functions. */
 
-import { BranchWebLinks, RemoteBranchStatus } from '../../wailsjs/go/app/App.js'
-import type { app } from '../../wailsjs/go/models'
+import { BranchWebLinks, PushPlan, RemoteBranchStatus, Remotes } from '../../wailsjs/go/app/App.js'
+import type { app, git } from '../../wailsjs/go/models'
 import type { Ref } from './graph/rowCache'
 import { repoReads } from './repoReads'
 
@@ -21,6 +21,10 @@ export interface RefExtras {
   trackedBy: string[]
   /** Whether a local branch of the same name is there already. */
   localExists: boolean
+  /** Every remote, for Push this branch to ▸. */
+  remotes: string[]
+  /** Where Push sends a local branch, by git's rules and the Pushing settings. */
+  plan?: git.PushPlan
 }
 
 /** Splits a remote branch's short name at its remote, the longest remote name first. */
@@ -49,11 +53,30 @@ const hostOf = (u: string) => {
  * a read that fails leaves its ref out rather than holding up the menu. */
 export async function loadRefExtras(path: string, refs: Ref[]): Promise<Map<string, RefExtras>> {
   const out = new Map<string, RefExtras>()
+  // Plans read before a branch's extras exist, joined to them at the end.
+  const pending = new Map<string, git.PushPlan>()
+  if (!refs.some((r) => r.kind === 'local' || remoteBranchOf(r))) return out
   const wanted = refs.filter((r) => remoteBranchOf(r))
-  if (!wanted.length) return out
   const all = ((await repoReads(path).refs().catch(() => [])) ?? []) as Ref[]
   const remoteRefs = all.filter((r) => r.kind === 'remote').map((r) => r.short)
-  const remotes = [...new Set([...remoteRefs, ...wanted.map((r) => remoteBranchOf(r)!)].map((s) => s.slice(0, s.indexOf('/'))))]
+  const listed = await Remotes(path).catch(() => null)
+  const remotes = listed ? listed.map((r) => r.name) : [...new Set([...remoteRefs, ...wanted.map((r) => remoteBranchOf(r)!)].map((s) => s.slice(0, s.indexOf('/'))))]
+  // A local branch with no upstream still gets the remotes, for Push this branch to ▸.
+  for (const ref of refs) {
+    if (ref.kind === 'local' && !remoteBranchOf(ref)) out.set(ref.short, { remote: '', branch: ref.short, host: '', trackedBy: [], localExists: true, remotes })
+  }
+  // And every local branch, where Push sends it.
+  await Promise.all(
+    refs
+      .filter((r) => r.kind === 'local')
+      .map(async (r) => {
+        const plan = await PushPlan(path, r.short).catch(() => null)
+        if (!plan) return
+        const e = out.get(r.short)
+        if (e) e.plan = plan
+        else pending.set(r.short, plan)
+      }),
+  )
   await Promise.all(
     wanted.map(async (ref) => {
       const short = remoteBranchOf(ref)!
@@ -70,9 +93,14 @@ export async function loadRefExtras(path: string, refs: Ref[]): Promise<Map<stri
         status: status ?? undefined,
         trackedBy: all.filter((r) => r.kind === 'local' && r.upstream === short).map((r) => r.short),
         localExists: all.some((r) => r.kind === 'local' && r.short === branch),
+        remotes,
       })
     }),
   )
+  for (const [short, plan] of pending) {
+    const e = out.get(short)
+    if (e) e.plan = plan
+  }
   return out
 }
 

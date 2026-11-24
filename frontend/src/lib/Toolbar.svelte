@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { CancelNetwork, Fetch, ForcePushLoss, Pull, PushCurrent, PushedUndo, Redo, Refs, Undo, UndoState } from '../../wailsjs/go/app/App.js'
-  import type { app } from '../../wailsjs/go/models'
+  import { CancelNetwork, Fetch, ForcePushLoss, Pull, PushBranchTo, PushCurrent, PushedUndo, PushPlan, Redo, Refs, Undo, UndoState } from '../../wailsjs/go/app/App.js'
+  import type { app, git } from '../../wailsjs/go/models'
+  import { pushWords } from './pushPlan'
   import CommitLines from './CommitLines.svelte'
   import PushedUndoDialog from './PushedUndoDialog.svelte'
   import { CONFIRM_FORCE_PUSH, kindWarning } from './branchKinds'
@@ -52,7 +53,18 @@
     void session.revision[path]
     void session.undoRevision[path]
     void refreshUndo()
+    void refreshPlan()
   })
+
+  // Where Push goes, by git's rules and the Pushing settings (#927), for its words.
+  let plan = $state<git.PushPlan | null>(null)
+  async function refreshPlan() {
+    plan = await PushPlan(path, '').catch(() => null)
+  }
+  let words = $derived(pushWords(plan))
+
+  // A first push with nowhere set asks where it goes.
+  let askFirst = $state<{ branch: string; remotes: string[]; remote: string } | null>(null)
 
   // Undoing or redoing what's already on the remote asks first. With no answer, it goes ahead:
   // it's local, and can be taken back.
@@ -85,7 +97,14 @@
 
   const fetchAll = () => run('fetch', () => Fetch(path, ''))
   const pull = (mode: string) => run('pull', () => Pull(path, mode))
-  const push = (force: boolean) => run('push', () => PushCurrent(path, force))
+  async function push(force: boolean) {
+    const p = await PushPlan(path, '').catch(() => null)
+    if (p?.ask && !force) {
+      askFirst = { branch: p.branch, remotes: p.remotes, remote: p.remotes.includes('origin') ? 'origin' : (p.remotes[0] ?? '') }
+      return
+    }
+    await run('push', () => PushCurrent(path, force))
+  }
 
   // Force-pushing a Trunk, Release or Environment branch asks first, naming the kind.
   let confirmForce = $state<{ branch: string; warning: string; loss: app.SharedCommits | null } | null>(null)
@@ -166,8 +185,8 @@
     >
   </span>
   <span class="split">
-    <button class="btn quiet" class:icon={!netWords} aria-label="Push" disabled={!!running} onclick={() => push(false)} title="Push the current branch ({formatShortcut('Mod+Shift+U')})"
-      ><Icon name="push" />{#if netWords}Push{/if}</button
+    <button class="btn quiet" class:icon={!netWords} aria-label={words.spoken} disabled={!!running} onclick={() => push(false)} title="{words.title} ({formatShortcut('Mod+Shift+U')})"
+      ><Icon name="push" />{#if netWords}{words.label}{/if}</button
     >
     <button
       class="btn quiet caret"
@@ -193,6 +212,30 @@
 {#if pushedStep}
   {@const s = pushedStep}
   <PushedUndoDialog {path} verb={s.undo ? 'Undo' : 'Redo'} label={s.label} shared={s.shared} onConfirm={() => take(s.undo)} onClose={() => (pushedStep = null)} />
+{/if}
+
+{#if askFirst}
+  {@const a = askFirst}
+  <Modal title="Push {a.branch}" eyebrow="first push" onClose={() => (askFirst = null)}>
+    <p class="confirm-text">{a.branch} hasn't been pushed, and nothing says where its first push goes. It goes to the remote you choose, under the same name, and tracks the branch it makes there.</p>
+    <label class="form-field">
+      <span>Push to</span>
+      <select bind:value={a.remote}>
+        {#each a.remotes as r (r)}<option value={r}>{r}</option>{/each}
+      </select>
+    </label>
+    <p class="confirm-text hint">To skip this question, choose where first pushes go in Settings › Pushing.</p>
+    <div class="form-actions">
+      <InkButton variant="secondary" onclick={() => (askFirst = null)}>Cancel</InkButton>
+      <InkButton
+        onclick={() => {
+          const go = a
+          askFirst = null
+          void run('push', () => PushBranchTo(path, go.branch, go.remote))
+        }}>Push to {a.remote}</InkButton
+      >
+    </div>
+  </Modal>
 {/if}
 
 {#if confirmForce}

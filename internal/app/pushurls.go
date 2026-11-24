@@ -56,6 +56,9 @@ type PushResult struct {
 	Remote  string     `json:"remote"`
 	Refspec string     `json:"refspec"`
 	Dests   []PushDest `json:"dests"`
+	// Refreshed are the other remotes fetched after the push, because a place it went is
+	// theirs, when Fetch after a push is on (#927).
+	Refreshed []string `json:"refreshed"`
 }
 
 // PushDest is one push URL's outcome, with the name the result shows for it.
@@ -85,13 +88,42 @@ func (a *App) pushReported(ctx context.Context, r *session.Repo, p git.PushOptio
 	if len(dests) < 2 {
 		return false, err
 	}
-	a.emit("push:result", PushResult{Path: r.Path, Remote: p.Remote, Refspec: p.Refspec, Dests: named(dests)})
+	res := PushResult{Path: r.Path, Remote: p.Remote, Refspec: p.Refspec, Dests: named(dests), Refreshed: a.refreshAfterPush(ctx, r, p.Remote, dests, o)}
+	a.emit("push:result", res)
 	for _, d := range dests {
 		if d.State == git.PushPushed || d.State == git.PushUpToDate {
 			return true, nil
 		}
 	}
 	return true, err
+}
+
+// refreshAfterPush fetches the other remotes whose URL a push just went to, when the app's
+// Fetch after a push is on, so their remote-tracking branches match what was sent. It returns
+// the ones it fetched.
+func (a *App) refreshAfterPush(ctx context.Context, r *session.Repo, pushed string, dests []git.PushDest, o git.NetOptions) []string {
+	out := []string{}
+	if !a.fetchAfterPush() {
+		return out
+	}
+	remotes, err := r.Git.Remotes(ctx)
+	if err != nil {
+		return out
+	}
+	for _, d := range dests {
+		if d.State != git.PushPushed {
+			continue
+		}
+		for _, rm := range remotes {
+			if rm.Name == pushed || slices.Contains(out, rm.Name) || !git.SameRemoteURL(rm.FetchURL, d.URL) {
+				continue
+			}
+			if _, err := a.fetchRemotes(ctx, r.Git, rm.Name, o); err == nil {
+				out = append(out, rm.Name)
+			}
+		}
+	}
+	return out
 }
 
 // PushToURLs pushes one refspec to some of a remote's push URLs, one at a time, carrying on
@@ -114,7 +146,7 @@ func (a *App) PushToURLs(path, remote, refspec string, urls []string) error {
 			}
 			dests = append(dests, r.Git.PushToURL(ctx, u, refspec, o))
 		}
-		a.emit("push:result", PushResult{Path: r.Path, Remote: remote, Refspec: refspec, Dests: named(dests)})
+		a.emit("push:result", PushResult{Path: r.Path, Remote: remote, Refspec: refspec, Dests: named(dests), Refreshed: a.refreshAfterPush(ctx, r, remote, dests, o)})
 		return nil
 	})
 }

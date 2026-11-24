@@ -186,6 +186,7 @@ ${capitalize(tidyStatus(tidyMark)!.spoken)}: Tidy can delete it` : '')}
         >, on {row.onRemotes.map((o) => o.short.slice(0, o.short.indexOf('/')) + (o.commit !== r.commit ? ' at another commit' : '')).join(', ')}</span
       >
     {/if}
+    {#if r.pushRemote}<span class="push-remote" title="Pushes to {r.pushRemote}, for this branch alone (branch.{r.short}.pushRemote)"><Icon name="push" size={12} />{r.pushRemote}<span class="visually-hidden">, pushes to {r.pushRemote}</span></span>{/if}
     {#if r.focused}<span class="focused" title="The graph is focused on this"><Icon name="focus" size={13} /><span class="visually-hidden">, focused</span></span>{/if}
     {#if r.worktree}<span class="worktree" title="Checked out in the worktree at {r.worktree}"><Icon name="worktree" size={13} /><span class="visually-hidden">, in a worktree</span></span>{/if}
     {#if r.hidden}<span class="visually-hidden">, hidden</span>{/if}
@@ -383,6 +384,17 @@ ${capitalize(tidyStatus(tidyMark)!.spoken)}: Tidy can delete it` : '')}
   .note {
     margin-left: auto;
     flex: none;
+  }
+
+  /* A branch that pushes somewhere of its own. */
+  .push-remote {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-mute);
   }
 
   /* Gone: struck through, and the mark says so in words. */

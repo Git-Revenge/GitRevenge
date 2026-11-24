@@ -83,6 +83,9 @@ type Settings struct {
 	Zoom int `json:"zoom,omitempty"`
 	// ForgeColors draws forge marks in their brands' colours rather than ink.
 	ForgeColors bool `json:"forgeColors,omitempty"`
+	// FetchAfterPush fetches, after a push to several places, the remotes those places
+	// belong to, so their remote-tracking branches match what was sent.
+	FetchAfterPush bool `json:"fetchAfterPush,omitempty"`
 	// Keybindings overrides command shortcuts by command id, in "Mod+Shift+K" form; an empty
 	// value unbinds the command.
 	Keybindings map[string]string `json:"keybindings,omitempty"`

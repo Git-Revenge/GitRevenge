@@ -60,6 +60,8 @@ export interface Ref {
   subject?: string
   /** When the ref last changed, in Unix seconds; missing for stashes. */
   updated?: number
+  /** The remote this branch alone pushes to (branch.<name>.pushRemote), when it sets one. */
+  pushRemote?: string
 }
 
 /** A pinned trailer key's value on a commit (trailerindex.Chip in Go): what a pick is made of,

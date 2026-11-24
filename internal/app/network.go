@@ -341,32 +341,62 @@ func (a *App) PushBranch(path, branch string) error {
 	})
 }
 
-// pushTarget works out where a branch pushes: to its upstream if it tracks a remote branch,
-// otherwise to the only remote (or "origin"), recording that as the upstream. upstream is the
-// short name of what it already tracks there, or "".
+// pushTarget works out where a branch pushes, by git's own rules (git.PlanPush): its
+// pushRemote, remote.pushDefault or upstream, and push.default for the name there. upstream is
+// the short name of what it tracks now, or "". A push git would refuse is refused in words; one
+// with nowhere set asks first, in the frontend, through PushPlan and PushBranchTo.
 func pushTarget(ctx context.Context, g *git.Repo, branch string) (p git.PushOptions, upstream string, err error) {
-	source := "refs/heads/" + branch
-	// A remote of "." means it tracks a local branch, which isn't somewhere to push.
 	if remote, merge, err := g.BranchUpstream(ctx, branch); err == nil && remote != "." {
 		upstream = remote + "/" + strings.TrimPrefix(merge, "refs/heads/")
-		return git.PushOptions{Remote: remote, Refspec: source + ":" + merge}, upstream, nil
 	}
-	remotes, err := g.Remotes(ctx)
-	if err != nil {
-		return p, "", err
-	}
-	p = git.PushOptions{Refspec: source, SetUpstream: true}
+	plan, err := g.PlanPush(ctx, branch)
 	switch {
-	case len(remotes) == 0:
-		return p, "", userError("This repository has no remotes. Add one first.")
-	case len(remotes) == 1:
-		p.Remote = remotes[0].Name
-	case hasRemote(remotes, "origin"):
-		p.Remote = "origin"
-	default:
-		return p, "", userError("This branch has no upstream and there's no \"origin\" remote. Set an upstream first.")
+	case err != nil:
+		return p, upstream, err
+	case plan.Refusal != "":
+		return p, upstream, userError(plan.Refusal)
+	case plan.Ask:
+		return p, upstream, userError(branch + " has never been pushed and nothing says where to. Choose a remote for it, or set Push goes to in Settings, Pushing.")
 	}
-	return p, "", nil
+	return git.PushOptions{Remote: plan.Remote, Refspec: "refs/heads/" + branch + ":refs/heads/" + plan.Ref, SetUpstream: plan.SetUpstream}, upstream, nil
+}
+
+// PushPlan says where pushing a branch would go, for the Push button's words and for asking
+// about a first push. branch "" means the checked-out branch.
+func (a *App) PushPlan(path, branch string) (git.PushPlan, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return git.PushPlan{}, err
+	}
+	ctx := context.Background()
+	if branch == "" {
+		st, err := r.Git.Status(ctx)
+		if err != nil {
+			return git.PushPlan{}, err
+		}
+		if st.Head == "" {
+			return git.PushPlan{Remotes: []string{}, Refusal: "HEAD is detached. Check out a branch to push it."}, nil
+		}
+		branch = st.Head
+	}
+	return r.Git.PlanPush(ctx, branch)
+}
+
+// PushBranchTo pushes a branch's first push to a remote chosen for it, under the same name,
+// and makes it track what that creates.
+func (a *App) PushBranchTo(path, branch, remote string) error {
+	return a.runNetwork(path, "push", func(ctx context.Context, r *session.Repo, o git.NetOptions) error {
+		if err := git.CheckRevs(branch, remote); err != nil {
+			return err
+		}
+		p := git.PushOptions{Remote: remote, Refspec: "refs/heads/" + branch + ":refs/heads/" + branch, SetUpstream: true}
+		if _, err := a.pushReported(ctx, r, p, o); err != nil {
+			return pushRefusal(ctx, r.Git, branch, "", err)
+		}
+		a.pushNotesTo(ctx, r, remote, o)
+		a.notice(r.Path, "Pushed "+branch+" to "+remote+", and it tracks "+remote+"/"+branch+" now.")
+		return nil
+	})
 }
 
 // sameCommit reports whether two refs both exist and point at the same commit.
@@ -377,15 +407,6 @@ func sameCommit(ctx context.Context, g *git.Repo, a, b string) bool {
 	}
 	second, err := g.ReadString(ctx, "rev-parse", "--verify", "-q", b)
 	return err == nil && first == second
-}
-
-func hasRemote(rs []git.Remote, name string) bool {
-	for _, r := range rs {
-		if r.Name == name {
-			return true
-		}
-	}
-	return false
 }
 
 // PushRef pushes a tag, or deletes a ref from a remote: kind is "tag", "delete-branch" or

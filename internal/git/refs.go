@@ -67,6 +67,9 @@ type Ref struct {
 	// Updated is when the ref last changed, in Unix seconds: the tag date for an annotated
 	// tag, otherwise the commit date. 0 for stashes.
 	Updated int64 `json:"updated,omitempty"`
+	// PushRemote is the remote this branch alone pushes to (branch.<name>.pushRemote), for
+	// local branches that set one.
+	PushRemote string `json:"pushRemote,omitempty"`
 }
 
 // refFormat deliberately avoids %(refname:short): git makes it unambiguous by comparing
@@ -184,18 +187,19 @@ func (r *Repo) Refs(ctx context.Context) ([]Ref, error) {
 
 // addUpstreams fills in the upstream fields of the local branches that have one.
 func (r *Repo) addUpstreams(ctx context.Context, refs []Ref) error {
-	configured, known, err := r.branchesWithUpstream(ctx)
+	configured, known, pushRemotes, err := r.branchesWithUpstream(ctx)
 	if err != nil {
 		return err
-	}
-	if known && len(configured) == 0 {
-		return nil
 	}
 	byName := make(map[string]*Ref, len(refs))
 	for i := range refs {
 		if refs[i].Kind == LocalBranch {
 			byName[refs[i].Name] = &refs[i]
+			refs[i].PushRemote = pushRemotes[refs[i].Short]
 		}
+	}
+	if known && len(configured) == 0 {
+		return nil
 	}
 	args := []string{"for-each-ref", "--format=" + upstreamFormat}
 	args = append(args, upstreamPatterns(configured, known, byName)...)
@@ -256,24 +260,31 @@ func (ref *Ref) setUpstream(short, track string) {
 
 // branchesWithUpstream lists the branches whose config names an upstream. known is false if that
 // couldn't be read, in which case the caller should check every branch.
-func (r *Repo) branchesWithUpstream(ctx context.Context) (names []string, known bool, err error) {
-	out, err := r.Read(ctx, "config", "-z", "--get-regexp", "^branch\\..*\\.merge$")
+func (r *Repo) branchesWithUpstream(ctx context.Context) (names []string, known bool, pushRemotes map[string]string, err error) {
+	// The branches' own push remotes (#927) come in the same read, so a big repository pays
+	// nothing more for them.
+	pushRemotes = map[string]string{}
+	out, err := r.Read(ctx, "config", "-z", "--get-regexp", "^branch\\..*\\.(merge|pushremote)$")
 	if err != nil {
 		var gerr *Error
 		if errors.As(err, &gerr) && gerr.ExitCode == 1 && gerr.Stderr == "" {
-			return nil, true, nil // Nothing matched: no branch has an upstream.
+			return nil, true, pushRemotes, nil // Nothing matched: no branch has an upstream.
 		}
 		if ctx.Err() != nil {
-			return nil, false, ctx.Err()
+			return nil, false, pushRemotes, ctx.Err()
 		}
-		return nil, false, nil
+		return nil, false, pushRemotes, nil
 	}
 	seen := map[string]bool{}
 	for _, entry := range bytes.Split(out, []byte{0}) {
 		// With -z, each entry is "key\nvalue".
-		key, _, _ := bytes.Cut(entry, []byte{'\n'})
+		key, value, _ := bytes.Cut(entry, []byte{'\n'})
 		name, ok := strings.CutPrefix(string(key), "branch.")
 		if !ok {
+			continue
+		}
+		if branch, ok := strings.CutSuffix(name, ".pushremote"); ok {
+			pushRemotes[branch] = string(value)
 			continue
 		}
 		if name, ok = strings.CutSuffix(name, ".merge"); ok && !seen[name] {
@@ -281,7 +292,7 @@ func (r *Repo) branchesWithUpstream(ctx context.Context) (names []string, known 
 			names = append(names, name)
 		}
 	}
-	return names, true, nil
+	return names, true, pushRemotes, nil
 }
 
 func (r *Repo) stashes(ctx context.Context) ([]Ref, error) {
