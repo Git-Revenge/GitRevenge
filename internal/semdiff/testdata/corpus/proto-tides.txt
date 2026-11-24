@@ -1,0 +1,6 @@
+engine code, language Protocol Buffers
+
+@@ -4,1 +4,2 @@ change
+-  double height = {f:0x2];
++  double height = {f:2][;]
++  [int64 at = 3];

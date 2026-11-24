@@ -1,0 +1,6 @@
+[package]
+name = 'tides'
+version = "0.2.0"
+keywords = ["tide", "sea"]
+[dependencies]
+serde = "1.0"

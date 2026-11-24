@@ -1,0 +1,11 @@
+engine code, language R
+
+@@ -1,4 +1,4 @@ change
+-max_hours <- [48]
+-forecast <- function(n) {
+-  [out] <- seq_len(n) * [3600]
+-  [out]
++max_hours <- [72]
++forecast <- function(n[, step = 3600]) {
++  [readings] <- seq_len(n) * [step]
++  [readings]

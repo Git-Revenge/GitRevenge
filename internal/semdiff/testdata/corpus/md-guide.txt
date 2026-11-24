@@ -1,0 +1,30 @@
+engine code, language Markdown
+
+@@ -3,2 +3,2 @@ change
+-The forecast reads the tide
+-table for a station and gives {f:*]heights{f:*] for the next [hours].
++The forecast reads the tide table for a station and gives {f:_]heights{f:_] for
++the next [steps].
+
+@@ -6,2 +6,2 @@ format: same text
+-{f:- ]Brest
+-{f:- ]Cherbourg
++{f:* ]Brest
++{f:* ]Cherbourg
+
+@@ -8,0 +8,1 @@ change
++* Saint-Malo
+
+@@ -10,2 +11,2 @@ format: formatting
+-|{f:---]|{f:---:]|
+-| Brest | 6.81 |
++| {f:-------] | {f:-----:] |
++| Brest   |   6.81 |
+
+@@ -14,1 +15,1 @@ format: same value
+-const maxHours = {f:0x30]
++const maxHours = {f:48]
+
+@@ -17,1 +18,1 @@ change
+-Run `go test` before you push.
++Run `go test[ ./...]` before you push.

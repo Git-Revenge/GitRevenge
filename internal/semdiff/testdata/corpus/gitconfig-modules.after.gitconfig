@@ -1,0 +1,3 @@
+[submodule "sea"]
+    path = sea
+    url = https://example.com/ocean.git

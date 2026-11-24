@@ -1,0 +1,22 @@
+engine code, language C++
+rename out -> readings, 3 places
+
+@@ -3,1 +3,1 @@ format: same value
+-const int max = {f:1'000];
++const int max = {f:1000];
+
+@@ -4,1 +4,1 @@ change
+-std::vector<int> forecast(int n) {
++std::vector<int> forecast(int n[, int step]) {
+
+@@ -5,1 +5,1 @@ rename: renamed from out
+-    std::vector<int> {r:out]{1, 2{f:,]};
++    std::vector<int> {r:readings]{1, 2};
+
+@@ -6,1 +6,1 @@ change
+-    for (int i = 0; i < n; i++) {r:out].push_back(i * [3600]);
++    for (int i = 0; i < n; i++) {r:readings].push_back(i * [step]);
+
+@@ -7,1 +7,1 @@ rename: renamed from out
+-    return {r:out];
++    return {r:readings];

@@ -359,10 +359,10 @@ func TestLanguageOfReadsAttributesFirst(t *testing.T) {
 		{"a/b.go", "", "", "go"},
 		{"a/b.TSX", "", "", "tsx"},
 		{"a/b.txt", "Go", "", "go"},
-		{"a/b.go", "Markdown", "", ""},
+		{"a/b.go", "Fortran", "", ""},
 		{"a/b.inc", "", "csharp", "csharp"},
 		{"a/b.go", "", "weird", "go"},
-		{"Makefile", "", "", ""},
+		{"LICENSE", "", "", ""},
 		{"a/app.csproj", "", "", "xml"},
 	} {
 		if got := LanguageOf(c.file, c.linguist, c.driver); got != c.want {

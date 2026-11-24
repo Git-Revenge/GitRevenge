@@ -2,6 +2,7 @@ package semdiff
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -108,7 +109,7 @@ func readVersion(ctx context.Context, l *language, src string, timeout time.Dura
 		}
 	}()
 	r := &reader{src: src, deadline: deadline, flag: &flag}
-	r.read(l, 0, len(src), 0)
+	r.read(l, 0, len(src), 0, false)
 	if r.stop == "" && len(r.toks) > maxTokens {
 		r.stop = FallbackTokens
 	}
@@ -131,7 +132,10 @@ type reader struct {
 }
 
 // read parses src[from:to] in language l and walks it. path is the syntax around it.
-func (r *reader) read(l *language, from, to int, path uint64) {
+// injected is set for code inside another language's file, such as a <script> or a fenced
+// code block: if most of it doesn't parse, it's compared as written, and the rest of the
+// file is still read as code.
+func (r *reader) read(l *language, from, to int, path uint64, injected bool) {
 	lang := l.load()
 	p := ts.NewParser(lang)
 	p.SetMemoryBudgetBytes(parseMemory)
@@ -162,7 +166,12 @@ func (r *reader) read(l *language, from, to int, path uint64) {
 		return
 	}
 	w := walker{r: r, l: l, lang: lang, base: from}
-	w.walk(tree.RootNode(), path, false, false, false)
+	toks, errs := len(r.toks), r.errBytes
+	w.walk(tree.RootNode(), path, false, l.rules.exact, false)
+	if injected && r.stop == "" && float64(r.errBytes-errs) > maxErrorShare*float64(to-from) {
+		r.toks, r.errBytes = r.toks[:toks], errs
+		w.atom(from, to, clsText, path, false, nil)
+	}
 }
 
 // walker reads one tree's tokens.
@@ -180,9 +189,9 @@ func mix(path uint64, name uint64) uint64 {
 	return (path ^ name) * prime
 }
 
-// walk reads n's tokens. inError is set inside a parse error, keep inside markup whose
-// whitespace counts exactly (a <pre>), and optional when n is a parenthesized expression
-// whose parentheses don't count.
+// walk reads n's tokens. inError is set inside a parse error, keep where whitespace counts
+// exactly (a <pre>, a string holding interpolations, a regular expression), and optional when
+// n is a parenthesized expression whose parentheses don't count.
 func (w *walker) walk(n *ts.Node, path uint64, inError, keep, optional bool) {
 	r := w.r
 	if r.stop != "" {
@@ -228,11 +237,23 @@ func (w *walker) walk(n *ts.Node, path uint64, inError, keep, optional bool) {
 			w.atom(from, to, clsString, path, inError, func(s string) (string, bool) { return strKey(w.l.id, typ, s) })
 			return
 		}
+		// A string holding code: its text keeps its whitespace exactly.
+		keep = true
 	case nodeComment:
 		w.atom(from, to, clsComment, path, inError, func(s string) (string, bool) { return "#" + collapse(s), true })
 		return
 	case nodeAtom:
+		if rule.key != nil {
+			w.atom(from, to, clsText, path, inError, func(s string) (string, bool) { return "~" + rule.key(s), true })
+			return
+		}
 		w.atom(from, to, clsText, path, inError, nil)
+		return
+	case nodeInject:
+		w.inject(from, to, rule.inject, inner, inError)
+		return
+	case nodeFence:
+		w.fence(kids, inner, inError, keep)
 		return
 	case nodeText:
 		w.text(from, to, path, inError, keep)
@@ -245,23 +266,37 @@ func (w *walker) walk(n *ts.Node, path uint64, inError, keep, optional bool) {
 		return
 	}
 	if len(kids) == 0 {
-		w.leaf(from, to, rule, inner, inError)
+		w.leaf(from, to, rule, inner, inError, keep)
 		return
 	}
 	if w.l.rules.markup && keepsSpace(n, w.lang, w.r.src[w.base:]) {
 		keep = true
 	}
 	content := w.l.rules.markup && rule.kind != nodeTag
+	// Text between children: prose's words, or whitespace that counts.
+	gap := func(a, b int) {
+		switch {
+		case w.l.rules.prose && !keep:
+			w.text(a, b, inner, inError, false)
+		case content || keep:
+			w.space(a, b, inner, keep)
+		}
+	}
+	whole := w.l.rules.prose || keep
+	if whole {
+		gap(from, w.base+int(kids[0].StartByte()))
+	}
 	for i, k := range kids {
-		if content && i > 0 {
-			w.space(w.base+int(kids[i-1].EndByte()), w.base+int(k.StartByte()), inner, keep)
+		if (content || whole) && i > 0 {
+			gap(w.base+int(kids[i-1].EndByte()), w.base+int(k.StartByte()))
 		}
 		at := len(r.toks)
 		redundant := false
 		if rule.parens > 0 && w.l.rule(k.Symbol()).kind == nodeParens && !k.IsError() {
 			redundant = (rule.parens == 1 || i == lastNamed(kids)) && w.optionalParens(k)
 		}
-		w.walk(k, inner, inError, keep, redundant)
+		// Code inside a string is code again: its spacing doesn't count.
+		w.walk(k, inner, inError, keep && !w.l.rule(k.Symbol()).interp, redundant)
 		if r.stop != "" {
 			return
 		}
@@ -270,6 +305,9 @@ func (w *walker) walk(n *ts.Node, path uint64, inError, keep, optional bool) {
 		if last := len(r.toks) - 1; rule.commas && last >= at && (r.toks[last].key == "," || r.toks[last].key == ";") && w.closesNext(kids, i) {
 			r.toks[last].ignorable = true
 		}
+	}
+	if whole {
+		gap(w.base+int(kids[len(kids)-1].EndByte()), to)
 	}
 	if optional && len(r.toks)-first >= 2 && r.toks[first].key == "(" && r.toks[len(r.toks)-1].key == ")" {
 		r.toks[first].ignorable = true
@@ -334,17 +372,72 @@ func lastNamed(kids []*ts.Node) int {
 	return -1
 }
 
-// leaf reads a token as written. A ; is optional where the language says so.
-func (w *walker) leaf(from, to int, rule nodeRule, path uint64, inError bool) {
+// leaf reads a token as written. A ; is optional where the language says so, and so are its
+// other optional leaves. A whitespace leaf counts only where whitespace does (keep).
+func (w *walker) leaf(from, to int, rule nodeRule, path uint64, inError, keep bool) {
 	s := w.r.src[from:to]
 	if strings.TrimSpace(s) == "" {
+		if keep && s != "" {
+			w.add(tok{from: from, to: to, key: "=" + s, class: clsSpace, path: path, inError: inError})
+		}
 		return
 	}
 	c := clsPunct
 	if rule.kind == nodeIdent {
 		c = clsIdent
 	}
-	w.add(tok{from: from, to: to, key: s, class: c, path: path, inError: inError, ignorable: s == ";" && w.l.rules.semis})
+	key := s
+	// PowerShell's names have no case, but its environment variables can on Linux.
+	if w.l.rules.fold && !strings.HasPrefix(strings.ToLower(s), "$env:") {
+		key = strings.ToLower(s)
+	}
+	optional := s == ";" && w.l.rules.semis || slices.Contains(w.l.rules.optional, s)
+	w.add(tok{from: from, to: to, key: key, class: c, path: path, inError: inError, ignorable: optional})
+}
+
+// inject reads [from, to) in the language with id, or as written when that language isn't
+// known or the text is inside a parse error. Prose is read without the whitespace around it,
+// so a table cell's padding doesn't count.
+func (w *walker) inject(from, to int, id string, path uint64, inError bool) {
+	l := byID(id)
+	if l == nil || inError {
+		w.atom(from, to, clsText, path, inError, nil)
+		return
+	}
+	if l.rules.prose {
+		for from < to && isSpace(w.r.src[from]) {
+			from++
+		}
+		for to > from && isSpace(w.r.src[to-1]) {
+			to--
+		}
+	}
+	if from < to {
+		w.r.read(l, from, to, path, true)
+	}
+}
+
+// fence reads a fenced code block: its code in the language its info string names, or as
+// written.
+func (w *walker) fence(kids []*ts.Node, path uint64, inError, keep bool) {
+	id := ""
+	for _, k := range kids {
+		if k.Type(w.lang) == "info_string" {
+			id = fenceLanguage(w.r.src[w.base+int(k.StartByte()) : w.base+int(k.EndByte())])
+		}
+	}
+	for _, k := range kids {
+		if k.Type(w.lang) != "code_fence_content" {
+			w.walk(k, path, inError, keep, false)
+			continue
+		}
+		from, to := w.base+int(k.StartByte()), w.base+int(k.EndByte())
+		if id == "" {
+			w.atom(from, to, clsText, path, inError, nil)
+			continue
+		}
+		w.inject(from, to, id, path, inError)
+	}
 }
 
 // atom reads [from, to) as one token, keyed by key, or as written when key can't read it.
@@ -420,7 +513,7 @@ func (w *walker) script(n *ts.Node, kids []*ts.Node, path uint64, inError bool) 
 				w.atom(from, to, clsText, path, inError, nil)
 				continue
 			}
-			w.r.read(byID(sub), from, to, path)
+			w.r.read(byID(sub), from, to, path, true)
 		default:
 			w.walk(k, path, inError, false, false)
 		}
@@ -448,15 +541,15 @@ func (w *walker) expr(kids []*ts.Node, path uint64, inError bool) {
 			// The quotes stay tokens of their own.
 			for _, v := range k.Children() {
 				if v != inner {
-					w.leaf(w.base+int(v.StartByte()), w.base+int(v.EndByte()), nodeRule{}, path, inError)
+					w.leaf(w.base+int(v.StartByte()), w.base+int(v.EndByte()), nodeRule{}, path, inError, false)
 					continue
 				}
-				w.r.read(byID("javascript"), w.base+int(v.StartByte()), w.base+int(v.EndByte()), path)
+				w.r.read(byID("javascript"), w.base+int(v.StartByte()), w.base+int(v.EndByte()), path, true)
 			}
 			continue
 		}
 		if inner != nil && !inError {
-			w.r.read(byID("javascript"), w.base+int(inner.StartByte()), w.base+int(inner.EndByte()), path)
+			w.r.read(byID("javascript"), w.base+int(inner.StartByte()), w.base+int(inner.EndByte()), path, true)
 			continue
 		}
 		w.walk(k, path, inError, false, false)

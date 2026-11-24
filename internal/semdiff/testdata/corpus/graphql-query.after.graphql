@@ -1,0 +1,6 @@
+query Tides($station: String!) {
+  readings(station: $station limit: 20) {
+    at
+    height
+  }
+}

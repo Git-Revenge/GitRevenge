@@ -1,0 +1,7 @@
+plugins {
+    id "java"
+}
+dependencies {
+    implementation 'com.example:tides:1.1'
+    testImplementation "junit:junit:4.13"
+}

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/git-revenge/gitrevenge/internal/gittest"
+	"github.com/git-revenge/gitrevenge/internal/semdiff"
 )
 
 func TestFileContentsModes(t *testing.T) {
@@ -236,8 +237,8 @@ func TestFileDiffReadsCodeInTheFilesLanguage(t *testing.T) {
 	}
 
 	p, _ := a.Preferences()
-	if !p.DiffCode || p.DiffHideFormatting || len(p.Languages) != 14 {
-		t.Errorf("preferences %+v, want code on, formatting shown, 14 languages", p)
+	if !p.DiffCode || p.DiffHideFormatting || len(p.Languages) != len(semdiff.Languages()) {
+		t.Errorf("preferences %+v, want code on, formatting shown, every language", p)
 	}
 	p.DiffCode, p.DiffHideFormatting = false, true
 	if err := a.SetPreferences(p); err != nil {
@@ -274,5 +275,24 @@ func TestFormattingOnlyMarksFilesWithNothingElse(t *testing.T) {
 	head := strings.TrimSpace(fx.Git("rev-parse", "HEAD"))
 	if got, _ = a.FormattingOnly(tab.Path, DiffCommit, head, []string{"fmt.go", "real.go"}); strings.Join(got, ",") != "fmt.go" {
 		t.Errorf("in the commit: %q, want fmt.go", got)
+	}
+}
+
+func TestFileDiffReadsAScriptByItsFirstLine(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.CommitFile("deploy", "#!/bin/sh\necho 'a b'\n", "first")
+	tab, err := a.OpenRepo(fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fx.WriteFile("deploy", "#!/bin/sh\necho \"a b\"\n")
+	fd, err := a.FileDiff(tab.Path, DiffUnstaged, "", "deploy", "", false, ReadCode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fd.Diff.Engine != "code" || fd.Diff.Language != "Shell" || len(fd.Diff.Blocks) != 1 || fd.Diff.Blocks[0].Kind != "format" {
+		t.Errorf("%+v, want it read as Shell, formatting only", fd.Diff)
 	}
 }
