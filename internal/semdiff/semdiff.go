@@ -112,6 +112,9 @@ type Span struct {
 	// Kind is KindChange, KindFormat (the same token written differently, or optional
 	// punctuation) or KindRename.
 	Kind string `json:"kind,omitempty"`
+	// Rename is which of the Result's Renames a rename span is, counting from 1, so every
+	// place one name changed can be shown together. 0 for other spans.
+	Rename int `json:"rename,omitempty"`
 }
 
 // Move is a run of lines deleted at [OldStart, OldEnd) and added at [NewStart, NewEnd), the
@@ -123,6 +126,13 @@ type Move struct {
 	NewEnd   int `json:"newEnd"`
 	// Reindented is set when the lines' indentation changed on the way.
 	Reindented bool `json:"reindented"`
+	// Changed is set when the lines were also edited on the way. Edits then compares them
+	// with where they came from: its blocks count lines from OldStart and NewStart.
+	Changed bool    `json:"changed,omitempty"`
+	Edits   []Block `json:"edits,omitempty"`
+	// Into names the new structure code moved into where it was, such as "if statement",
+	// when the trees show it was wrapped in something new rather than taken elsewhere.
+	Into string `json:"into,omitempty"`
 }
 
 // Diff compares before with after. It returns ctx's error if ctx ends first.
@@ -156,6 +166,9 @@ func Diff(ctx context.Context, before, after string, opts Options) (Result, erro
 			return Result{}, err
 		}
 	}
+	if err := compareMoves(ctx, a, b, &res, opts); err != nil {
+		return Result{}, err
+	}
 	if !read {
 		for i := range res.Blocks {
 			if err := ctx.Err(); err != nil {
@@ -187,7 +200,7 @@ func readAsCode(ctx context.Context, res *Result, a, b text, opts Options, moved
 	if timeout == 0 {
 		timeout = QuickRead
 	}
-	ra, rb, err := readCode(ctx, l.id, a.s, b.s, timeout)
+	ra, rb, err := readCode(ctx, l.id, a.s, b.s, timeout, opts.Moves)
 	if err != nil {
 		return false, err
 	}
@@ -205,11 +218,17 @@ func readAsCode(ctx context.Context, res *Result, a, b text, opts Options, moved
 			return false, nil
 		}
 	}
-	blocks, renames, err := refine(ctx, newVersion(a, ra.toks, moved.before), newVersion(b, rb.toks, moved.after), res.Blocks)
+	va, vb := newVersion(a, ra.toks, moved.before), newVersion(b, rb.toks, moved.after)
+	va.nodes, vb.nodes = ra.nodes, rb.nodes
+	blocks, renames, nested, err := refine(ctx, va, vb, res.Blocks)
 	if err != nil {
 		return false, err
 	}
 	res.Blocks, res.Renames = blocks, renames
+	if len(nested) > 0 {
+		res.Moves = append(res.Moves, nested...)
+		slices.SortFunc(res.Moves, func(x, y Move) int { return x.NewStart - y.NewStart })
+	}
 	res.Engine = EngineCode
 	res.Unparsed = ra.errBytes > 0 || rb.errBytes > 0 || ra.missing || rb.missing
 	return true, nil

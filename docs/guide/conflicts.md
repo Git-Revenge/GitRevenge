@@ -42,6 +42,8 @@ Where both sides changed the same token, such as one number to two different val
 
 A string or a comment is one token, so two edits inside the same string are never combined.
 
+**Imports merge as a set.** Their order means nothing, so when both sides add a different import in the same spot, both go in, and one that either side removed stays removed. A list that both sides keep sorted stays sorted. The heading says so: *imports merge as a set: ours added `"log"`; theirs added `"io"`*. This covers Go, JavaScript, TypeScript, Python, Java, Kotlin, Scala, Groovy, C#, Rust, C, C++ and Objective-C includes, PHP, Swift, Dart, Ruby, Haskell and Elixir. A module both sides import in different ways, under two names, say, is still a conflict.
+
 The chip beside the file name says how it was read: **Read as Go**, say, or **Read by lines** when it couldn't be, with the reason in its tooltip. A file that doesn't parse, or isn't in a language the app reads as code, keeps the tool as described above.
 
 ## Merge drivers

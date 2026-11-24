@@ -1,7 +1,7 @@
 <script lang="ts">
   import { SvelteSet } from 'svelte/reactivity'
   import { tick } from 'svelte'
-  import { kindOf, marksByLine, moveNote, movesByLine, notesByLine, viewOps, type Kind, type Mark, type Result, type Stop } from './blocks'
+  import { kindOf, marksByLine, moveNote, movesByLine, moveTone, notesByLine, renameTone, viewOps, type Kind, type Mark, type Result, type Stop } from './blocks'
   import { highlightLines, languageFor, withMarks, type Token } from './highlight'
   import { applyChanges, splitLines, toHunks, type Hunk } from './lineDiff'
   import { wrap } from './wrap.svelte'
@@ -24,6 +24,8 @@
     stops = [],
     current = -1,
     jump = 0,
+    onCompare,
+    onPick,
   }: {
     path: string
     oldText: string
@@ -38,6 +40,10 @@
     current?: number
     /** Counts the requests to scroll to the current stop. */
     jump?: number
+    /** Opens a move that changed against where it came from, by its index. */
+    onCompare?: (move: number) => void
+    /** Makes a stop the one being read, as a click on a move's note does. */
+    onPick?: (stop: number) => void
   } = $props()
 
   let oldLines = $derived(splitLines(oldText))
@@ -57,23 +63,38 @@
     return true
   }
   /** The note a row carries: a move's, or its formatting or rename block's. */
-  function noteOf(i: number, moved: { note?: string } | null): { text: string; kind: string } | null {
-    if (moved?.note) return { text: moved.note, kind: 'move' }
+  function noteOf(i: number, moved: { note?: string; k: number } | null): { text: string; kind: string; move?: number } | null {
+    if (moved?.note) return { text: moved.note, kind: 'move', move: moved.k }
     const op = ops[i]
     const text = op.kind === 'add' ? notes.new.get(op.newIndex) : op.kind === 'del' ? notes.old.get(op.oldIndex) : undefined
     return text ? { text, kind: kindAt(i) ?? 'change' } : null
   }
   let moves = $derived(movesByLine(diff.moves ?? []))
 
-  /** The move a changed row belongs to, if any, and the note on its first line. */
-  function moveOf(i: number): { note?: string } | null {
+  /** The move a changed row belongs to, if any, by index, and the note on its first line. */
+  function moveOf(i: number): { note?: string; k: number } | null {
     const op = ops[i]
     const side = op.kind === 'del' ? 'old' : 'new'
     const line = side === 'old' ? op.oldIndex : op.newIndex
     const k = moves[side].get(line)
     if (k === undefined) return null
     const m = diff.moves[k]
-    return { note: line === (side === 'old' ? m.oldStart : m.newStart) ? moveNote(m, side) : undefined }
+    return { k, note: line === (side === 'old' ? m.oldStart : m.newStart) ? moveNote(m, side) : undefined }
+  }
+
+  /** Goes to a move: its stop becomes the one being read, which scrolls to it. */
+  function goToMove(k: number) {
+    const s = stops.findIndex((st) => st.kind === 'move' && st.move === k)
+    if (s >= 0) onPick?.(s)
+  }
+
+  /** The rename whose places are lit up, from 1, or 0. A click on a rename picks it. */
+  let hot = $state(0)
+  function pickRename(e: MouseEvent) {
+    const r = Number((e.target as HTMLElement).closest<HTMLElement>('[data-rename]')?.dataset.rename ?? 0)
+    if (!r) return
+    e.stopPropagation()
+    hot = hot === r ? 0 : r
   }
 
   /** Whether a row is part of the change being read. */
@@ -168,13 +189,18 @@
 </script>
 
 {#snippet line(tokens: Token[] | undefined, fallback: string, lineMarks: Mark[] | undefined)}
-  {#if tokens}{#each withMarks(tokens, lineMarks) as t, k (k)}<span class={[t.cls, t.changed && 'chg', t.kind]}>{t.text}</span>{/each}{:else}{fallback.replace(
+  {#if tokens}{#each withMarks(tokens, lineMarks) as t, k (k)}<span
+        class={[t.cls, t.changed && 'chg', t.kind, t.rename && `r${renameTone(t.rename)}`, t.rename && t.rename === hot && 'hot']}
+        data-rename={t.rename || undefined}
+        title={t.rename ? 'Show every place of this rename' : undefined}>{t.text}</span
+      >{/each}{:else}{fallback.replace(
       /\r?\n$/,
       '',
     )}{/if}
 {/snippet}
 
-<div class="unified" bind:this={root}>
+<!-- A click on a rename lights up every place of it; the rows' own clicks select lines. -->
+<div class="unified" bind:this={root} onclickcapture={pickRename}>
   {#if hunks.length === 0}
     <Empty note="nothing changed">No changes.</Empty>
   {/if}
@@ -202,7 +228,7 @@
             {@const moved = op.kind === 'eq' ? null : moveOf(i)}
             {@const note = op.kind === 'eq' ? null : noteOf(i, moved)}
             <tr
-              class={[op.kind, op.kind !== 'eq' && !moved && kindAt(i) !== 'change' && kindAt(i)]}
+              class={[op.kind, op.kind !== 'eq' && !moved && kindAt(i) !== 'change' && kindAt(i), moved && `t${moveTone(moved.k)}`]}
               class:moved={!!moved}
               class:current={isCurrent(i)}
               class:sel={selected.has(i)}
@@ -216,7 +242,13 @@
                     newTokens[op.newIndex],
                     newLines[op.newIndex],
                     op.kind === 'add' ? marks.new.get(op.newIndex) : undefined,
-                  )}{/if}{#if note}<span class={note.kind === 'move' ? 'move-note' : `block-note ${note.kind}`}>{note.text}</span>{/if}</td
+                  )}{/if}{#if note?.move !== undefined}<span class="move-note"
+                    >{#if onPick}<button class="note-link" title="Go to this move" onclick={(e) => (e.stopPropagation(), goToMove(note.move!))}>{note.text}</button
+                      >{:else}{note.text}{/if}{#if diff.moves[note.move].changed && onCompare}<button
+                        class="note-link compare"
+                        onclick={(e) => (e.stopPropagation(), onCompare(note.move!))}>Compare with the original</button
+                      >{/if}</span
+                  >{:else if note}<span class="block-note {note.kind}">{note.text}</span>{/if}</td
               >
             </tr>
           {/each}
@@ -333,13 +365,39 @@
     color: var(--danger);
   }
 
-  /* A moved line reads in teal, whichever side it's on; its sign still says which. */
+  /* A moved line reads in its move's colour, whichever side it's on; its sign still says
+     which. Several moves cycle teal, plum, sepia and ochre, never the add or delete colours. */
+  .t0,
+  .r0 {
+    --tone: var(--syn-string);
+  }
+
+  .t1,
+  .r1 {
+    --tone: var(--lane-2);
+  }
+
+  .t2,
+  .r2 {
+    --tone: var(--lane-3);
+  }
+
+  .t3,
+  .r3 {
+    --tone: var(--syn-number);
+  }
+
   tr.moved {
-    background: color-mix(in srgb, var(--syn-string) 12%, transparent);
+    background: color-mix(in srgb, var(--tone, var(--syn-string)) 12%, transparent);
   }
 
   tr.moved .sign {
-    color: var(--syn-string);
+    color: var(--tone, var(--syn-string));
+  }
+
+  /* A token that moved within its change, such as a reordered argument. */
+  tr .chg.move {
+    background: color-mix(in srgb, var(--syn-string) 30%, transparent);
   }
 
   .chg {
@@ -382,8 +440,15 @@
     text-underline-offset: 4px;
   }
 
+  /* Each rename has its colour; a click lights up all its places. */
   tr .chg.rename {
-    background: color-mix(in srgb, var(--syn-number) 34%, transparent);
+    background: color-mix(in srgb, var(--tone, var(--syn-number)) 34%, transparent);
+    cursor: pointer;
+  }
+
+  tr .chg.rename.hot {
+    background: color-mix(in srgb, var(--tone, var(--syn-number)) 62%, transparent);
+    outline: 1px solid var(--tone, var(--syn-number));
   }
 
   .tag {
@@ -409,9 +474,29 @@
     color: var(--syn-number);
   }
 
+  .note-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .note-link:hover {
+    text-decoration: underline;
+  }
+
+  .note-link.compare {
+    margin-left: 10px;
+    font-style: normal;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
   .move-note {
     padding-left: 12px;
-    color: var(--syn-string);
+    color: var(--tone, var(--syn-string));
     font-family: var(--font-serif);
     font-style: italic;
     font-size: 12px;

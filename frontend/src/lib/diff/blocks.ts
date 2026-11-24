@@ -8,7 +8,8 @@ import type { Op } from './lineDiff'
 
 export type Result = semdiff.Result
 export type Block = semdiff.Block
-export type Move = semdiff.Move
+/** A move, as data: the views also build them, so the class's own method isn't needed. */
+export type Move = Omit<semdiff.Move, 'convertValues'>
 
 /** What a block is: a change, or when read as code, formatting only or a rename. */
 export type Kind = 'change' | 'format' | 'rename'
@@ -65,11 +66,20 @@ export function viewOps(blocks: readonly Block[], oldCount: number, newCount: nu
   return ops
 }
 
+/** What a mark is when it isn't a change: formatting (the same token written differently), a
+ * rename, or a token that moved within its change, as reordered arguments do (#947). */
+export type MarkKind = 'format' | 'rename' | 'move'
+
 /**
- * Changed text in a line, in UTF-16 offsets, as [from, to), with its kind when it's
- * formatting (the same token written differently) or a rename rather than a change.
+ * Changed text in a line, in UTF-16 offsets, as [from, to), with its kind when it isn't a
+ * change, and for a rename which of the diff's renames it is, from 1.
  */
-export type Mark = [number, number] | [number, number, 'format' | 'rename']
+export type Mark = [number, number] | [number, number, MarkKind] | [number, number, MarkKind, number]
+
+/** The colour of a move or a rename: one of four accents, cycling (#947). Moves start at
+ * teal, renames at ochre, the colours each had alone. */
+export const moveTone = (k: number) => k % 4
+export const renameTone = (r: number) => (r + 2) % 4
 
 /** The marked text of each side, by line. hideFormatting leaves out formatting. */
 export function marksByLine(blocks: readonly Block[], hideFormatting = false): { old: Map<number, Mark[]>; new: Map<number, Mark[]> } {
@@ -77,7 +87,7 @@ export function marksByLine(blocks: readonly Block[], hideFormatting = false): {
   const nu = new Map<number, Mark[]>()
   const add = (m: Map<number, Mark[]>, s: semdiff.Span) => {
     if (hideFormatting && s.kind === 'format') return
-    const mark: Mark = s.kind === 'format' || s.kind === 'rename' ? [s.from, s.to, s.kind] : [s.from, s.to]
+    const mark: Mark = s.kind === 'rename' && s.rename ? [s.from, s.to, 'rename', s.rename] : s.kind === 'format' || s.kind === 'rename' || s.kind === 'move' ? [s.from, s.to, s.kind] : [s.from, s.to]
     const list = m.get(s.line)
     if (list) list.push(mark)
     else m.set(s.line, [mark])
@@ -113,10 +123,21 @@ export function movesByLine(moves: readonly Move[]): { old: Map<number, number>;
   return { old, new: nu }
 }
 
+/** "a" or "an" before a word. */
+const article = (w: string) => (/^[aeiou]/i.test(w) ? 'an' : 'a')
+
 /** What a moved line says about where it went or came from. Line numbers count from 1. */
 export function moveNote(m: Move, side: 'old' | 'new'): string {
-  if (side === 'old') return `moved to line ${m.newStart + 1}`
-  return `moved from line ${m.oldStart + 1}${m.reindented ? ', indented differently' : ', unchanged'}`
+  // Wrapped in new structure where it was: an if, a loop, a try.
+  if (m.into) return side === 'old' ? `moved into ${article(m.into)} ${m.into} at line ${m.newStart + 1}` : `moved into ${article(m.into)} ${m.into}`
+  if (side === 'old') return `moved to line ${m.newStart + 1}${m.changed ? ', and changed' : ''}`
+  return `moved from line ${m.oldStart + 1}${m.changed ? ', changed' : m.reindented ? ', indented differently' : ', unchanged'}`
+}
+
+/** A changed move's own diff, as a result the views can draw: its edits, its lines counted
+ * from the move's first line on each side. */
+export function moveResult(m: Move, language: string): Result {
+  return { blocks: m.edits ?? [], moves: [], renames: [], algorithm: '', engine: 'code', language, fallback: '', unparsed: false, added: 0, removed: 0 } as unknown as Result
 }
 
 /** A place the views step to: a block, or a move. Ranges are [start, end) lines. */

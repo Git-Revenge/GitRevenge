@@ -4697,6 +4697,7 @@ export namespace semdiff {
 	    from: number;
 	    to: number;
 	    kind?: string;
+	    rename?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Span(source);
@@ -4708,6 +4709,7 @@ export namespace semdiff {
 	        this.from = source["from"];
 	        this.to = source["to"];
 	        this.kind = source["kind"];
+	        this.rename = source["rename"];
 	    }
 	}
 	export class Block {
@@ -4760,6 +4762,9 @@ export namespace semdiff {
 	    newStart: number;
 	    newEnd: number;
 	    reindented: boolean;
+	    changed?: boolean;
+	    edits?: Block[];
+	    into?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Move(source);
@@ -4772,7 +4777,28 @@ export namespace semdiff {
 	        this.newStart = source["newStart"];
 	        this.newEnd = source["newEnd"];
 	        this.reindented = source["reindented"];
+	        this.changed = source["changed"];
+	        this.edits = this.convertValues(source["edits"], Block);
+	        this.into = source["into"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class Origin {
 	    from: number;

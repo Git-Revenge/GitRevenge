@@ -20,6 +20,7 @@
   import Icon from '../ui/Icon.svelte'
   import FileView from './FileView.svelte'
   import ImageDiff from './ImageDiff.svelte'
+  import MoveCompare from './MoveCompare.svelte'
   import { previewerFor } from './previews/registry'
   import SplitDiff from './SplitDiff.svelte'
   import UnifiedDiff, { type Actions } from './UnifiedDiff.svelte'
@@ -180,6 +181,19 @@
     current = current < 0 ? (by > 0 ? 0 : stops.length - 1) : (current + by + stops.length) % stops.length
     jump++
   }
+
+  /** Reads a stop, as clicking a move's note does: it scrolls to it. */
+  function pick(i: number) {
+    current = i
+    jump++
+  }
+
+  /** The changed move open against where it came from, by its index, or -1. */
+  let comparing = $state(-1)
+  $effect(() => {
+    void target
+    comparing = -1
+  })
 
   /** What the two sides are, for the split view's heads. */
   let labels = $derived.by(() => {
@@ -406,12 +420,48 @@
         <FileView path={target.file} {text} />
       {/if}
     {:else if layout === 'split' && diff}
-      <SplitDiff path={target.file} oldText={contents.old.text} newText={contents.new.text} {diff} ribbon={prefs.diffRibbon} hideFormatting={hiding} {stops} {current} {jump} {labels} onStep={step} />
+      <SplitDiff
+        path={target.file}
+        oldText={contents.old.text}
+        newText={contents.new.text}
+        {diff}
+        ribbon={prefs.diffRibbon}
+        hideFormatting={hiding}
+        {stops}
+        {current}
+        {jump}
+        {labels}
+        onStep={step}
+        onPick={pick}
+        onCompare={(k) => (comparing = k)}
+      />
       {#if target.mode !== 'commit'}
         <p class="muted hint">Switch to Unified to stage or discard individual hunks and lines.</p>
       {/if}
     {:else if diff}
-      <UnifiedDiff path={target.file} oldText={contents.old.text} newText={contents.new.text} {diff} {actions} hideFormatting={hiding} {stops} {current} {jump} />
+      <UnifiedDiff
+        path={target.file}
+        oldText={contents.old.text}
+        newText={contents.new.text}
+        {diff}
+        {actions}
+        hideFormatting={hiding}
+        {stops}
+        {current}
+        {jump}
+        onPick={pick}
+        onCompare={(k) => (comparing = k)}
+      />
+    {/if}
+    {#if comparing >= 0 && diff?.moves[comparing] && contents?.kind === 'text'}
+      <MoveCompare
+        path={target.file}
+        move={diff.moves[comparing]}
+        oldText={contents.old.text}
+        newText={contents.new.text}
+        language={diff.language}
+        onClose={() => (comparing = -1)}
+      />
     {/if}
   </div>
 </div>

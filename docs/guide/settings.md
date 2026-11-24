@@ -14,7 +14,7 @@ Open **Settings** with <kbd>Ctrl</kbd>+<kbd>,</kbd> or from the command palette.
 | **Hide formatting-only changes** | Diffs start with formatting hidden. Where you stage, it's never hidden. Each diff has **Hide formatting** to switch. Off by default. |
 | **Line diff** | How [diffs](history.md#diffs) match up lines, for files not read as code and for **Lines**: as git does (the repository's `diff.algorithm`, or Myers), or Myers, Minimal, Patience or Histogram. |
 | **Ribbon between the sides** | In the split diff, bands join old lines to new ones and the sides aren't padded to line up. Off pads them. On by default. |
-| **Find moved code** | A block that moved shows once, as a move, instead of a deletion and an addition. On by default. |
+| **Find moved code** | A block that moved shows once, as a move, instead of a deletion and an addition, including code edited on the way or wrapped in new structure (see [Moved code](history.md#moved-code)). On by default. |
 | **Experimental views** | A checkbox each for [Horizontal and Map](experimental-views.md). A view you switch on joins the graph's view menu, and nothing changes until you pick it there. Switching one off takes the graph back to Timeline or Compact. These can change or go away between versions. |
 | **Git executable** | Which `git` to use. Leave it empty to find it on your `PATH`. A change takes effect after a restart. |
 | **Clone into** | Where new clones go. Empty means the folder of the last repository you opened. |

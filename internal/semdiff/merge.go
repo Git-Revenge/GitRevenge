@@ -49,6 +49,13 @@ type Origin struct {
 func MergePlace(ctx context.Context, id, base, ours, theirs string) Suggestion {
 	b, o, t := pieces(ctx, id, base), pieces(ctx, id, ours), pieces(ctx, id, theirs)
 	s := merge3(b, o, t)
+	// Imports added by both sides in one spot clash as tokens, but their order means
+	// nothing: they merge as a set.
+	if !s.OK {
+		if set, ok := mergeSet(id, base, ours, theirs); ok {
+			s = set
+		}
+	}
 	s.Ours, s.Theirs = changed(o, matches(b, o)), changed(t, matches(b, t))
 	return s
 }
@@ -92,7 +99,7 @@ func changed(side []string, m []int) []Stretch {
 func pieces(ctx context.Context, id, s string) []string {
 	if l := byID(id); l != nil && s != "" {
 		l.load()
-		r := readVersion(ctx, l, s, QuickRead)
+		r := readVersion(ctx, l, s, QuickRead, false)
 		if r.stop == "" {
 			var out []string
 			at := 0

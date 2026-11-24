@@ -42,6 +42,15 @@ type version struct {
 	first []int // the line each token starts on
 	last  []int // the line each token ends on
 	moved map[int]bool
+
+	// Set when the trees were matched (#947): the named nodes read, each token's partner on
+	// the other side or -1, which tokens the token diff left changed, and the tree itself
+	// with each token's leaf in it.
+	nodes   []nodeRec
+	partner []int32
+	changed []bool
+	tree    *gtree
+	leaf    []int32
 }
 
 func newVersion(t text, toks []tok, moved map[int]bool) *version {
@@ -81,6 +90,7 @@ type segment struct {
 	ot, nt         []int
 	chO, chN       []bool
 	whole          bool // too big to compare by tokens; marked by words instead
+	reshape        bool // its unchanged tokens sit in different syntax on the two sides
 	kind           string
 	note           string
 	old, new       []Span
@@ -89,17 +99,27 @@ type segment struct {
 // refine reads the line diff's blocks as code: each block is compared token by token and
 // split where its parts differ in kind, so formatting and renames stand apart from changes.
 // Lines left identical by the split go back to being unchanged.
-func refine(ctx context.Context, a, b *version, blocks []Block) ([]Block, []Rename, error) {
+func refine(ctx context.Context, a, b *version, blocks []Block) ([]Block, []Rename, []Move, error) {
 	var segs []*segment
 	for k, blk := range blocks {
 		if err := ctx.Err(); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		segs = append(segs, splitBlock(a, b, k, blk)...)
 	}
 	renames, confirmed := findRenames(a, b, segs)
 	for _, s := range segs {
+		if !s.whole {
+			s.reshape = s.reshaped(a, b, confirmed)
+		}
+	}
+	matchVersions(ctx, a, b, segs)
+	var nested []Move
+	for _, s := range segs {
 		classify(a, b, s, confirmed)
+		if s.reshape && s.kind == KindChange {
+			nested = append(nested, nestedMoves(a, b, s)...)
+		}
 	}
 	out := make([]Block, 0, len(segs))
 	for i := 0; i < len(segs); i++ {
@@ -124,7 +144,7 @@ func refine(ctx context.Context, a, b *version, blocks []Block) ([]Block, []Rena
 		}
 		out = append(out, blk)
 	}
-	return out, renames, nil
+	return out, renames, joinNested(nested), nil
 }
 
 // splitBlock compares a block's tokens and cuts it into segments at lines where the comparison
@@ -415,7 +435,7 @@ func substitution(a, b *version, c change) (from, to string, ok bool) {
 
 // findRenames finds names changed the same way in at least minRenamePlaces places, with no
 // other change to either name, where the old name is gone and the new one is new.
-func findRenames(a, b *version, segs []*segment) ([]Rename, map[[2]string]bool) {
+func findRenames(a, b *version, segs []*segment) ([]Rename, map[[2]string]int) {
 	count := map[[2]string]int{}
 	from := map[string]map[string]bool{}
 	to := map[string]map[string]bool{}
@@ -457,18 +477,18 @@ func findRenames(a, b *version, segs []*segment) ([]Rename, map[[2]string]bool) 
 	}
 	oldNames, newNames := names(a), names(b)
 	renames := []Rename{}
-	confirmed := map[[2]string]bool{}
+	confirmed := map[[2]string]int{} // each rename's place in renames, from 1
 	for _, k := range order {
 		if count[k] >= minRenamePlaces && len(from[k[0]]) == 1 && len(to[k[1]]) == 1 && !newNames[k[0]] && !oldNames[k[1]] {
 			renames = append(renames, Rename{From: k[0], To: k[1], Count: count[k]})
-			confirmed[k] = true
+			confirmed[k] = len(renames)
 		}
 	}
 	return renames, confirmed
 }
 
 // classify says what a segment is and marks what changed in it.
-func classify(a, b *version, s *segment, renames map[[2]string]bool) {
+func classify(a, b *version, s *segment, renames map[[2]string]int) {
 	if s.whole {
 		blk := Block{OldStart: s.o0, OldEnd: s.o1, NewStart: s.n0, NewEnd: s.n1}
 		markWords(a.t, b.t, &blk, movedLines{before: a.moved, after: b.moved})
@@ -484,7 +504,7 @@ func classify(a, b *version, s *segment, renames map[[2]string]bool) {
 		total += len(b.text(t))
 	}
 	kept := total
-	changes, renamed := 0, 0
+	changes, renamed, movedToks := 0, 0, 0
 	var renamedFrom string
 	values, punct := false, map[string]bool{}
 	s.walk(func(i, j int) {
@@ -499,6 +519,15 @@ func classify(a, b *version, s *segment, renames map[[2]string]bool) {
 			values = true
 		}
 	}, func(c change) {
+		// Tokens the trees say moved here from elsewhere in the change are moves, not edits.
+		was := len(c.old) + len(c.new)
+		c.old, c.new = takeMoved(a, b, c.old, s.nt, &marks.old), takeMoved(b, a, c.new, s.ot, &marks.new)
+		if len(c.old)+len(c.new) < was {
+			movedToks++
+			if len(c.old) == 0 && len(c.new) == 0 {
+				return
+			}
+		}
 		o, n := meaningful(a, c.old), meaningful(b, c.new)
 		if len(o) == 0 && len(n) == 0 {
 			// Only optional punctuation came or went: formatting.
@@ -512,13 +541,14 @@ func classify(a, b *version, s *segment, renames map[[2]string]bool) {
 			}
 			return
 		}
-		if f, t, ok := substitution(a, b, c); ok && renames[[2]string{f, t}] {
+		if f, t, ok := substitution(a, b, c); ok && renames[[2]string{f, t}] > 0 {
 			renamed++
 			if renamedFrom == "" {
 				renamedFrom = f
 			}
-			marks.add(&marks.old, a.toks[o[0]].from, a.toks[o[0]].to, KindRename)
-			marks.add(&marks.new, b.toks[n[0]].from, b.toks[n[0]].to, KindRename)
+			g := renames[[2]string{f, t}]
+			marks.old = append(marks.old, mark{a.toks[o[0]].from, a.toks[o[0]].to, KindRename, g})
+			marks.new = append(marks.new, mark{b.toks[n[0]].from, b.toks[n[0]].to, KindRename, g})
 			return
 		}
 		changes++
@@ -568,7 +598,7 @@ func classify(a, b *version, s *segment, renames map[[2]string]bool) {
 	// What the segment is follows from its tokens, not from how the diff lined them up: equal
 	// tokens in the same syntax are formatting, whatever a tie in the diff marked.
 	switch {
-	case s.moves(a, b) || s.reshaped(a, b, renames):
+	case s.moves(a, b) || s.reshape || movedToks > 0:
 		s.kind = KindChange
 	case renamed > 0:
 		s.kind, s.note = KindRename, "renamed from "+renamedFrom
@@ -598,7 +628,7 @@ func classify(a, b *version, s *segment, renames map[[2]string]bool) {
 // sides, as when Python code is indented into a block, or a CSS selector loses the space
 // that made it a descendant. Tokens read from text the tree left out, or inside a parse
 // error, count only as written. A name a rename changed counts as the same token.
-func (s *segment) reshaped(a, b *version, renames map[[2]string]bool) bool {
+func (s *segment) reshaped(a, b *version, renames map[[2]string]int) bool {
 	o, n := meaningful(a, s.ot), meaningful(b, s.nt)
 	if len(o) != len(n) {
 		return true
@@ -608,7 +638,7 @@ func (s *segment) reshaped(a, b *version, renames map[[2]string]bool) bool {
 		if ta.path != tb.path {
 			return true
 		}
-		if ta.key != tb.key && (ta.class != clsIdent || !renames[[2]string{a.text(o[k]), b.text(n[k])}]) {
+		if ta.key != tb.key && (ta.class != clsIdent || renames[[2]string{a.text(o[k]), b.text(n[k])}] == 0) {
 			return true
 		}
 		if (ta.inError || tb.inError) && a.text(o[k]) != b.text(n[k]) {
@@ -796,11 +826,12 @@ type marker struct {
 type mark struct {
 	from, to int
 	kind     string
+	rename   int // which rename, from 1, for a rename mark
 }
 
 func (m *marker) add(list *[]mark, from, to int, kind string) {
 	if to > from {
-		*list = append(*list, mark{from, to, kind})
+		*list = append(*list, mark{from, to, kind, 0})
 	}
 }
 
@@ -815,6 +846,7 @@ func (m *marker) spans(t text, from, to int, marks []mark) []Span {
 	type run struct {
 		line, from, to int // bytes within the line
 		kind           string
+		rename         int
 	}
 	var runs []run
 	for _, mk := range marks {
@@ -825,8 +857,8 @@ func (m *marker) spans(t text, from, to int, marks []mark) []Span {
 			body := t.body(line)
 			end := min(mk.to, lineStart+len(body))
 			if end > p && line >= from && line < to {
-				r := run{line: line, from: p - lineStart, to: end - lineStart, kind: mk.kind}
-				if n := len(runs); n > 0 && runs[n-1].line == r.line && runs[n-1].kind == r.kind &&
+				r := run{line: line, from: p - lineStart, to: end - lineStart, kind: mk.kind, rename: mk.rename}
+				if n := len(runs); n > 0 && runs[n-1].line == r.line && runs[n-1].kind == r.kind && runs[n-1].rename == r.rename &&
 					strings.TrimSpace(body[runs[n-1].to:max(r.from, runs[n-1].to)]) == "" && r.from >= runs[n-1].from {
 					runs[n-1].to = max(runs[n-1].to, r.to)
 				} else {
@@ -841,7 +873,7 @@ func (m *marker) spans(t text, from, to int, marks []mark) []Span {
 	}
 	for _, r := range runs {
 		body := t.body(r.line)
-		out = append(out, Span{Line: r.line, From: utf16Len(body[:r.from]), To: utf16Len(body[:r.to]), Kind: r.kind})
+		out = append(out, Span{Line: r.line, From: utf16Len(body[:r.from]), To: utf16Len(body[:r.to]), Kind: r.kind, Rename: r.rename})
 	}
 	return out
 }

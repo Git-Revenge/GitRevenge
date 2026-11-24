@@ -3,6 +3,7 @@ package semdiff
 import (
 	"context"
 	"math/rand/v2"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -144,6 +145,31 @@ func TestARenameIsFoundWhereverItHappened(t *testing.T) {
 		t.Fatalf("note %q", res.Blocks[0].Note)
 	}
 	same(t, "marks", newMarks(after, res), "rename:readings", "rename:readings", "rename:readings", "rename:readings")
+}
+
+func TestEachRenameNumbersItsPlaces(t *testing.T) {
+	// Two renames side by side on a line stay apart, each with its own number.
+	before := "package p\n\nfunc f(a, b int) int {\n\tx := a + b\n\ty := a * b\n\treturn x - y + a + b\n}\n"
+	after := "package p\n\nfunc f(lo, hi int) int {\n\tx := lo + hi\n\ty := lo * hi\n\treturn x - y + lo + hi\n}\n"
+	res := readDiff(t, "go", before, after)
+	if len(res.Renames) != 2 {
+		t.Fatalf("renames %+v", res.Renames)
+	}
+	lines := strings.Split(after, "\n")
+	got := map[string][]int{}
+	for _, b := range res.Blocks {
+		for _, s := range b.New {
+			if s.Kind == KindRename {
+				r := []rune(lines[s.Line])
+				got[string(r[s.From:s.To])] = append(got[string(r[s.From:s.To])], s.Rename)
+			}
+		}
+	}
+	for i, rn := range res.Renames {
+		if n := got[rn.To]; len(n) != rn.Count || slices.ContainsFunc(n, func(g int) bool { return g != i+1 }) {
+			t.Errorf("%s: numbered %v, want %d places numbered %d", rn.To, n, rn.Count, i+1)
+		}
+	}
 }
 
 func TestANameChangedInOnePlaceIsAChange(t *testing.T) {

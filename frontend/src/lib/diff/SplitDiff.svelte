@@ -8,9 +8,9 @@
   import { EditorView, lineNumbers } from '@codemirror/view'
   import { syntaxHighlighting } from '@codemirror/language'
   import { classHighlighter } from '@lezer/highlight'
-  import { bandPath, edgePath, mapLine, type Result, type Stop } from './blocks'
+  import { bandPath, edgePath, mapLine, moveTone, type Result, type Stop } from './blocks'
   import { languageFor } from './highlight'
-  import { setCurrent, sideMarks, sideModel } from './sideMarks'
+  import { setCurrent, setHot, sideMarks, sideModel, type SideActions } from './sideMarks'
   import { splitLines } from './lineDiff'
   import { wrap } from './wrap.svelte'
   import Icon from '../ui/Icon.svelte'
@@ -27,6 +27,8 @@
     jump = 0,
     labels,
     onStep,
+    onCompare,
+    onPick,
   }: {
     path: string
     oldText: string
@@ -42,7 +44,24 @@
     jump?: number
     labels: { before: string; after: string }
     onStep: (by: 1 | -1) => void
+    /** Opens a move that changed against where it came from, by its index. */
+    onCompare?: (move: number) => void
+    /** Makes a stop the one being read, as a click on a move's note does. */
+    onPick?: (stop: number) => void
   } = $props()
+
+  /** The rename whose places are lit up on both sides, from 1, or 0. */
+  let hot = 0
+  function toggleHot(r: number) {
+    hot = hot === r ? 0 : r
+    for (const v of [left, right, merge?.a, merge?.b]) v?.dispatch({ effects: setHot.of(hot) })
+  }
+
+  /** Goes to a move: its stop becomes the one being read, which brings both ends into view. */
+  function goToMove(k: number) {
+    const s = stops.findIndex((st) => st.kind === 'move' && st.move === k)
+    if (s >= 0) onPick?.(s)
+  }
 
   /** The ribbon's width; the canvas draws the bands across 74 of its 76 pixels. */
   const W = 74
@@ -58,6 +77,8 @@
   interface Band {
     key: string
     kind: Stop['kind']
+    /** A move's colour, cycling. */
+    tone: string
     d: string
     top: string
     bottom: string
@@ -91,6 +112,8 @@
     const [p, a, b, d, wrapped, withRibbon, hide] = [path, oldText, newText, diff, wrap.on, ribbon, hideFormatting]
     let cancelled = false
     const cleanups: (() => void)[] = []
+    hot = 0
+    const act: SideActions = { rename: toggleHot, pick: goToMove, compare: onCompare }
     void languageFor(p).then((lang) => {
       if (cancelled) return
       const ext = base(lang, wrapped)
@@ -98,8 +121,8 @@
         const redraw = EditorView.updateListener.of((u) => {
           if (u.geometryChanged || u.viewportChanged || u.heightChanged) schedule()
         })
-        left = new EditorView({ doc: a, extensions: [...ext, sideMarks(sideModel(d, 'old', hide)), redraw], parent: leftHost })
-        right = new EditorView({ doc: b, extensions: [...ext, sideMarks(sideModel(d, 'new', hide)), redraw], parent: rightHost })
+        left = new EditorView({ doc: a, extensions: [...ext, sideMarks(sideModel(d, 'old', hide), act), redraw], parent: leftHost })
+        right = new EditorView({ doc: b, extensions: [...ext, sideMarks(sideModel(d, 'new', hide), act), redraw], parent: rightHost })
         cleanups.push(linkScrolling(left, right))
         const resize = new ResizeObserver(() => schedule())
         if (svg) resize.observe(svg)
@@ -112,8 +135,8 @@
         // Hidden formatting still lines the sides up; it just isn't marked.
         const changes = d.blocks.map((blk) => new Change(sa[blk.oldStart], sa[blk.oldEnd], sb[blk.newStart], sb[blk.newEnd]))
         merge = new MergeView({
-          a: { doc: a, extensions: [...ext, sideMarks(sideModel(d, 'old', hide))] },
-          b: { doc: b, extensions: [...ext, sideMarks(sideModel(d, 'new', hide))] },
+          a: { doc: a, extensions: [...ext, sideMarks(sideModel(d, 'old', hide), act)] },
+          b: { doc: b, extensions: [...ext, sideMarks(sideModel(d, 'new', hide), act)] },
           parent: host,
           collapseUnchanged: { margin: 3, minSize: 6 },
           gutter: true,
@@ -240,16 +263,16 @@
     const rt = right.documentTop - box.top
     const stop = stops[current]
     const out: Band[] = []
-    const add = (key: string, kind: Stop['kind'], o0: number, o1: number, n0: number, n1: number, isCurrent: boolean) => {
+    const add = (key: string, kind: Stop['kind'], o0: number, o1: number, n0: number, n1: number, isCurrent: boolean, tone = '') => {
       const ot = lt + docY(left!, o0)
       const ob = o1 > o0 ? lt + docY(left!, o1) : ot
       const nt = rt + docY(right!, n0)
       const nb = n1 > n0 ? rt + docY(right!, n1) : nt
       if (Math.max(ob, nb) < 0 || Math.min(ot, nt) > box.height) return
-      out.push({ key, kind, d: bandPath(ot, ob, nt, nb, W), top: edgePath(ot, nt, W), bottom: edgePath(ob, nb, W), current: isCurrent })
+      out.push({ key, kind, tone, d: bandPath(ot, ob, nt, nb, W), top: edgePath(ot, nt, W), bottom: edgePath(ob, nb, W), current: isCurrent })
     }
     for (const s of stops) {
-      add(`${s.kind}${s.block ?? s.move}`, s.kind, s.oldStart, s.oldEnd, s.newStart, s.newEnd, s === stop)
+      add(`${s.kind}${s.block ?? s.move}`, s.kind, s.oldStart, s.oldEnd, s.newStart, s.newEnd, s === stop, s.kind === 'move' ? `t${moveTone(s.move ?? 0)}` : '')
     }
     // Moves cross the others, so they're drawn last; the band being read goes on top.
     out.sort((x, y) => Number(x.kind === 'move') - Number(y.kind === 'move') || Number(x.current) - Number(y.current))
@@ -281,7 +304,7 @@
           </linearGradient>
         </defs>
         {#each bands as b (b.key)}
-          <g class="band {b.kind}" class:current={b.current} data-band={b.key}>
+          <g class="band {b.kind} {b.tone}" class:current={b.current} data-band={b.key}>
             <path class="fill" d={b.d} style:fill={b.kind === 'change' ? `url(#${gradient})` : undefined}></path>
             <path class="edge" d={b.top}></path>
             <path class="edge" d={b.bottom}></path>
@@ -442,12 +465,34 @@
     stroke-dasharray: 3 3;
   }
 
+  /* Moves cycle teal, plum, sepia and ochre, never the add or delete colours; so do renames,
+     starting from ochre. */
+  .split :global(.t0),
+  .split :global(.r0) {
+    --tone: var(--syn-string);
+  }
+
+  .split :global(.t1),
+  .split :global(.r1) {
+    --tone: var(--lane-2);
+  }
+
+  .split :global(.t2),
+  .split :global(.r2) {
+    --tone: var(--lane-3);
+  }
+
+  .split :global(.t3),
+  .split :global(.r3) {
+    --tone: var(--syn-number);
+  }
+
   .band.move .fill {
-    fill: color-mix(in srgb, var(--syn-string) 26%, transparent);
+    fill: color-mix(in srgb, var(--tone, var(--syn-string)) 26%, transparent);
   }
 
   .band.move .edge {
-    stroke: var(--syn-string);
+    stroke: var(--tone, var(--syn-string));
   }
 
   .band.current .edge {
@@ -489,7 +534,13 @@
   }
 
   .split :global(.cm-moved) {
-    background: color-mix(in srgb, var(--syn-string) 12%, transparent);
+    background: color-mix(in srgb, var(--tone, var(--syn-string)) 12%, transparent);
+  }
+
+  /* A token that moved within its change, such as a reordered argument. */
+  .split :global(.cm-word-move) {
+    background: color-mix(in srgb, var(--syn-string) 30%, transparent);
+    border-radius: 2px;
   }
 
   .split :global(.cm-format) {
@@ -506,8 +557,14 @@
   }
 
   .split :global(.cm-word-rename) {
-    background: color-mix(in srgb, var(--syn-number) 34%, transparent);
+    background: color-mix(in srgb, var(--tone, var(--syn-number)) 34%, transparent);
     border-radius: 2px;
+    cursor: pointer;
+  }
+
+  .split :global(.cm-word-rename.cm-hot) {
+    background: color-mix(in srgb, var(--tone, var(--syn-number)) 62%, transparent);
+    outline: 1px solid var(--tone, var(--syn-number));
   }
 
   .split :global(.cm-block-note) {
@@ -537,9 +594,29 @@
     box-shadow: inset 3px 0 0 var(--syn-keyword);
   }
 
+  .split :global(.cm-note-link) {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .split :global(.cm-note-link:hover) {
+    text-decoration: underline;
+  }
+
+  .split :global(.cm-compare) {
+    margin-left: 10px;
+    font-style: normal;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
   .split :global(.cm-move-note) {
     padding-left: 12px;
-    color: var(--syn-string);
+    color: var(--tone, var(--syn-string));
     font-family: var(--font-serif);
     font-style: italic;
     font-size: 12px;

@@ -91,7 +91,14 @@ func render(before, after string, res Result) string {
 		fmt.Fprintf(&out, "rename %s -> %s, %d places\n", r.From, r.To, r.Count)
 	}
 	for _, m := range res.Moves {
-		fmt.Fprintf(&out, "move %d-%d -> %d-%d\n", m.OldStart+1, m.OldEnd, m.NewStart+1, m.NewEnd)
+		fmt.Fprintf(&out, "move %d-%d -> %d-%d", m.OldStart+1, m.OldEnd, m.NewStart+1, m.NewEnd)
+		if m.Into != "" {
+			fmt.Fprintf(&out, ", into %s", m.Into)
+		}
+		if m.Changed {
+			fmt.Fprintf(&out, ", changed in %d places", len(m.Edits))
+		}
+		out.WriteString("\n")
 	}
 	for _, blk := range res.Blocks {
 		kind := blk.Kind

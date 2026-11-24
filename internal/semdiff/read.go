@@ -73,18 +73,27 @@ type reading struct {
 	stop     string // a Fallback, when the version couldn't be read
 	errBytes int    // bytes inside parse errors
 	missing  bool   // the parser filled in something missing
+	nodes    []nodeRec
+}
+
+// nodeRec is a named syntax node with tokens in it, recorded for matching trees (#947): the
+// bytes its tokens cover and its type. Nodes are recorded children first.
+type nodeRec struct {
+	from, to int
+	name     uint64 // its type, as the paths hash it
+	typ      string // its type's name
 }
 
 // readCode reads both versions in language id, each in its own goroutine. Each parse may
-// take timeout, or as long as it likes when timeout is negative. It returns ctx's error if
-// ctx ends first.
-func readCode(ctx context.Context, id string, before, after string, timeout time.Duration) (ra, rb reading, err error) {
+// take timeout, or as long as it likes when timeout is negative. With trees set, the named
+// nodes are recorded too. It returns ctx's error if ctx ends first.
+func readCode(ctx context.Context, id string, before, after string, timeout time.Duration, trees bool) (ra, rb reading, err error) {
 	l := byID(id)
 	l.load()
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go func() { defer wg.Done(); ra = readVersion(ctx, l, before, timeout) }()
-	go func() { defer wg.Done(); rb = readVersion(ctx, l, after, timeout) }()
+	go func() { defer wg.Done(); ra = readVersion(ctx, l, before, timeout, trees) }()
+	go func() { defer wg.Done(); rb = readVersion(ctx, l, after, timeout, trees) }()
 	wg.Wait()
 	if err := ctx.Err(); err != nil {
 		return reading{}, reading{}, err
@@ -92,8 +101,8 @@ func readCode(ctx context.Context, id string, before, after string, timeout time
 	return ra, rb, nil
 }
 
-// readVersion parses src and reads its tokens.
-func readVersion(ctx context.Context, l *language, src string, timeout time.Duration) reading {
+// readVersion parses src and reads its tokens, and with tree set its named nodes.
+func readVersion(ctx context.Context, l *language, src string, timeout time.Duration, tree bool) reading {
 	var deadline time.Time
 	if timeout > 0 {
 		deadline = time.Now().Add(timeout)
@@ -108,7 +117,7 @@ func readVersion(ctx context.Context, l *language, src string, timeout time.Dura
 		case <-done:
 		}
 	}()
-	r := &reader{src: src, deadline: deadline, flag: &flag}
+	r := &reader{src: src, deadline: deadline, flag: &flag, tree: tree}
 	r.read(l, 0, len(src), 0, false)
 	if r.stop == "" && len(r.toks) > maxTokens {
 		r.stop = FallbackTokens
@@ -116,7 +125,7 @@ func readVersion(ctx context.Context, l *language, src string, timeout time.Dura
 	if r.stop == "" {
 		r.fillGaps()
 	}
-	return reading{toks: r.toks, stop: r.stop, errBytes: r.errBytes, missing: r.missing}
+	return reading{toks: r.toks, stop: r.stop, errBytes: r.errBytes, missing: r.missing, nodes: r.nodes}
 }
 
 // reader walks syntax trees into tokens. One file can hold several trees: a Vue file's
@@ -129,6 +138,8 @@ type reader struct {
 	stop     string
 	errBytes int
 	missing  bool
+	tree     bool // record the named nodes
+	nodes    []nodeRec
 }
 
 // read parses src[from:to] in language l and walks it. path is the syntax around it.
@@ -224,6 +235,9 @@ func (w *walker) walk(n *ts.Node, path uint64, inError, keep, optional bool) {
 		if n.IsNamed() && len(r.toks) > first {
 			r.toks[first].open++
 			r.toks[len(r.toks)-1].close++
+			if r.tree && !n.IsError() {
+				r.nodes = append(r.nodes, nodeRec{from: r.toks[first].from, to: r.toks[len(r.toks)-1].to, name: w.l.nameHash(sym), typ: n.Type(w.lang)})
+			}
 		}
 	}()
 

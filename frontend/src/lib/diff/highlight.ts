@@ -8,15 +8,17 @@ export interface Token {
   cls: string
   /** Set on text the diff marks as changed within the line. */
   changed?: boolean
-  /** The mark's kind, when it's formatting or a rename rather than a change. */
-  kind?: 'format' | 'rename'
+  /** The mark's kind, when it's formatting, a rename or a move rather than a change. */
+  kind?: 'format' | 'rename' | 'move'
+  /** Which rename it is, from 1, for a rename. */
+  rename?: number
 }
 
 /**
  * Splits a line's tokens where changed text starts and ends, and flags the changed pieces.
  * marks are [from, to) offsets into the line, in UTF-16 code units as JavaScript counts.
  */
-export function withMarks(tokens: Token[], marks: readonly ([number, number] | [number, number, 'format' | 'rename'])[] | undefined): Token[] {
+export function withMarks(tokens: Token[], marks: readonly ([number, number] | [number, number, 'format' | 'rename' | 'move'] | [number, number, 'format' | 'rename' | 'move', number])[] | undefined): Token[] {
   if (!marks?.length) return tokens
   const sorted = [...marks].sort((a, b) => a[0] - b[0])
   const out: Token[] = []
@@ -36,6 +38,7 @@ export function withMarks(tokens: Token[], marks: readonly ([number, number] | [
       const piece: Token = { text: t.text.slice(start, end), cls: t.cls }
       if (inside) piece.changed = true
       if (kind) piece.kind = kind
+      if (inside?.[3]) piece.rename = inside[3]
       out.push(piece)
       start = end
     }
