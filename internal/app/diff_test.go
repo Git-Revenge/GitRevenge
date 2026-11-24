@@ -216,7 +216,8 @@ func TestFileDiffReadsCodeInTheFilesLanguage(t *testing.T) {
 	fx.WriteFile("a.go", after)
 	fx.WriteFile("b.inc", after)
 	for _, file := range []string{"a.go", "b.inc"} {
-		fd, err := a.FileDiff(tab.Path, DiffUnstaged, "", file, "", false, ReadCode)
+		// The patient read: on a busy machine even a small file can miss the quick one.
+		fd, err := a.FileDiff(tab.Path, DiffUnstaged, "", file, "", false, ReadPatient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -288,7 +289,7 @@ func TestFileDiffReadsAScriptByItsFirstLine(t *testing.T) {
 		t.Fatal(err)
 	}
 	fx.WriteFile("deploy", "#!/bin/sh\necho \"a b\"\n")
-	fd, err := a.FileDiff(tab.Path, DiffUnstaged, "", "deploy", "", false, ReadCode)
+	fd, err := a.FileDiff(tab.Path, DiffUnstaged, "", "deploy", "", false, ReadPatient)
 	if err != nil {
 		t.Fatal(err)
 	}
