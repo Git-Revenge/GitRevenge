@@ -168,7 +168,7 @@ func merge3(base, ours, theirs []string) Suggestion {
 		case equal(oc, tc):
 			write(oc, "both")
 		default:
-			return Suggestion{Reason: conflictReason(bc, oc, tc), Origins: []Origin{}}
+			return Suggestion{Reason: conflictReason(bc), Origins: []Origin{}}
 		}
 		if s == len(base) {
 			break
@@ -264,7 +264,7 @@ func mergeReason(ours, theirs []string) string {
 }
 
 // conflictReason says why a place can't be combined.
-func conflictReason(base, ours, theirs []string) string {
+func conflictReason(base []string) string {
 	if w := quoted(base); w != "" {
 		return "both sides changed " + w
 	}
