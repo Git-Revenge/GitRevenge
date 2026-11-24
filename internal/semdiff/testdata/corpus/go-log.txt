@@ -1,0 +1,54 @@
+engine code, language Go
+
+@@ -17,2 +17,2 @@ format: spacing
+-	ID          string
+-	Parents     []string
++	ID      string
++	Parents []string
+
+@@ -19,0 +19,3 @@ change
++	// AuthorName and AuthorEmail are the author as the mailmap git reads gives them: the
++	// .mailmap in the work tree, and mailmap.file or mailmap.blob when set. That's what
++	// `git log` shows in a terminal, so the two agree.
+
+@@ -21,0 +24,4 @@ change
++	// WrittenName and WrittenEmail are the author as the commit has them. They're the same
++	// as the two above unless a mailmap line says otherwise.
++	WrittenName  string
++	WrittenEmail string
+
+@@ -44,1 +51,1 @@ change
+-const logFormat = "%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%s"
++const logFormat = "%H%x1f%P%x1f%aN%x1f%aE%x1f%an%x1f%ae%x1f%at%x1f%s"
+
+@@ -183,2 +190,2 @@ change
+-	f := bytes.SplitN(rec, []byte{0x1f}, [6])
+-	if len(f) != [6] {
++	f := bytes.SplitN(rec, []byte{0x1f}, [8])
++	if len(f) != [8] {
+
+@@ -187,1 +194,1 @@ change
+-	t, err := strconv.ParseInt(string(f[[4]]), 10, 64)
++	t, err := strconv.ParseInt(string(f[[6]]), 10, 64)
+
+@@ -196,3 +203,3 @@ format: spacing
+-		ID:          string(f[0]),
+-		Parents:     parents,
+-		AuthorName:  string(f[2]),
++		ID:           string(f[0]),
++		Parents:      parents,
++		AuthorName:   string(f[2]),
+
+@@ -199,1 +206,3 @@ change
+-		AuthorEmail: string(f[3]),
++		AuthorEmail:  string(f[3[]),]
++		[WrittenName:  string(f[4]),]
++		[WrittenEmail: string(f[5]]),
+
+@@ -200,1 +209,1 @@ format: spacing
+-		AuthorTime:  t,
++		AuthorTime:   t,
+
+@@ -201,1 +210,1 @@ change
+-		Subject:     string(f[[5]]),
++		Subject:      string(f[[7]]),

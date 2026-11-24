@@ -12,6 +12,8 @@ export interface Op {
   oldIndex: number
   /** Index into the new lines (eq, add). */
   newIndex: number
+  /** The Go diff's block a change belongs to, when the ops come from one. */
+  block?: number
 }
 
 export interface Hunk {
@@ -138,34 +140,40 @@ function groupChanges(ops: Op[]): Op[] {
   return out
 }
 
-/** Groups changes into hunks with `context` unchanged lines around them, like git. */
-export function toHunks(ops: Op[], context = 3): Hunk[] {
-  const hunks: Hunk[] = []
-  let i = 0
-  while (i < ops.length) {
+/**
+ * Groups changes into hunks with `context` unchanged lines around them, like git: changes
+ * within 2*context unchanged lines of each other share one. group sorts changes into kinds
+ * that never share a hunk, so each can be staged on its own.
+ */
+export function toHunks(ops: Op[], context = 3, group: (i: number) => string = () => ''): Hunk[] {
+  // Runs of changes of one group.
+  const runs: { start: number; end: number; g: string }[] = []
+  for (let i = 0; i < ops.length; ) {
     if (ops[i].kind === 'eq') {
       i++
       continue
     }
-    let start = Math.max(0, i - context)
-    // Extend while the next change is within 2*context unchanged lines.
-    let end = i
-    for (;;) {
-      while (end < ops.length && ops[end].kind !== 'eq') end++
-      let gap = end
-      while (gap < ops.length && ops[gap].kind === 'eq' && gap - end < 2 * context) gap++
-      if (gap < ops.length && ops[gap].kind !== 'eq') {
-        end = gap
-        continue
-      }
-      break
-    }
-    end = Math.min(ops.length, end + context)
-    const prev = hunks[hunks.length - 1]
-    if (prev && start < prev.end) start = prev.end
-    hunks.push(describe(ops, start, end))
-    i = end
+    const g = group(i)
+    let e = i
+    while (e < ops.length && ops[e].kind !== 'eq' && group(e) === g) e++
+    runs.push({ start: i, end: e, g })
+    i = e
   }
+  const groups: { start: number; end: number; g: string }[] = []
+  for (const r of runs) {
+    const last = groups[groups.length - 1]
+    if (last && last.g === r.g && r.start - last.end <= 2 * context) last.end = r.end
+    else groups.push({ ...r })
+  }
+  // Context around each, never reaching into the next one's changes.
+  const hunks: Hunk[] = []
+  let prevEnd = 0
+  groups.forEach((g, k) => {
+    const start = Math.max(g.start - context, prevEnd)
+    const end = Math.min(g.end + context, groups[k + 1]?.start ?? ops.length)
+    hunks.push(describe(ops, start, end))
+    prevEnd = end
+  })
   return hunks
 }
 
@@ -176,11 +184,12 @@ function describe(ops: Op[], start: number, end: number): Hunk {
   let newCount = 0
   for (let i = start; i < end; i++) {
     const op = ops[i]
-    if (op.kind !== 'add') {
+    // Hidden formatting's rows can lack an old line.
+    if (op.kind !== 'add' && op.oldIndex >= 0) {
       if (oldStart < 0) oldStart = op.oldIndex
       oldCount++
     }
-    if (op.kind !== 'del') {
+    if (op.kind !== 'del' && op.newIndex >= 0) {
       if (newStart < 0) newStart = op.newIndex
       newCount++
     }

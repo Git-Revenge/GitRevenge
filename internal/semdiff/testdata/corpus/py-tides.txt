@@ -1,0 +1,33 @@
+engine code, language Python
+
+@@ -5,1 +5,1 @@ format: same value
+-MAX_HOURS = {f:0x30]
++MAX_HOURS = {f:48]
+
+@@ -8,1 +8,1 @@ change
+-def forecast(start, n):
++def forecast(start, n[, step=3600]):
+
+@@ -9,1 +9,1 @@ format: parentheses
+-    if {f:(]n > MAX_HOURS{f:)]:
++    if n > MAX_HOURS:
+
+@@ -10,2 +10,2 @@ change
+-        raise ValueError({f:']at most %d [hours]{f:'] % MAX_HOURS)
+-    out = []
++        raise ValueError({f:"]at most %d [readings]{f:"] % MAX_HOURS)
++    readings = []
+
+@@ -13,2 +13,2 @@ change
+-        [out].append({'at': start + i * [3600], 'height': height(start + i * [3600])})
+-    return [out]
++        [readings].append({'at': start + i * [step], 'height': height(start + i * [step])})
++    return [readings]
+
+@@ -22,1 +22,1 @@ format: trailing comma
+-def station(name, readings{f:,]):
++def station(name, readings):
+
+@@ -25,1 +25,1 @@ change
+-    return {"name": name, "count": len(readings)}
++        return {"name": name, "count": len(readings)}

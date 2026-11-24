@@ -1,0 +1,38 @@
+engine code, language Java
+rename rows -> readings, 6 places
+
+@@ -8,2 +8,2 @@ format: same value
+-    static final int MAX = {f:060];
+-    static final String UNIT = {f:"\u006d"];
++    static final int MAX = {f:48];
++    static final String UNIT = {f:"m"];
+
+@@ -11,1 +11,1 @@ rename: renamed from rows
+-    private final List<Double> {r:rows] = new ArrayList<>();
++    private final List<Double> {r:readings] = new ArrayList<>();
+
+@@ -14,1 +14,1 @@ rename: renamed from rows
+-        if (({r:rows].size() >= MAX{f:)]) {
++        if ({r:readings].size() >= MAX) {
+
+@@ -15,1 +15,1 @@ change
+-            throw new IllegalStateException("full");
++            throw new IllegalStateException("[the table is ]full");
+
+@@ -17,1 +17,1 @@ rename: renamed from rows
+-        {r:rows].add(height);
++        {r:readings].add(height);
+
+@@ -21,2 +21,2 @@ rename: renamed from rows
+-        double[] out = new double[{r:rows].size()];
+-        for (int i = 0; i < {r:rows].size(); i++) out[i] = {r:rows].get(i);
++        double[] out = new double[{r:readings].size()];
++        for (int i = 0; i < {r:readings].size(); i++) out[i] = {r:readings].get(i);
+
+@@ -26,1 +26,5 @@ format: trailing comma
+-    static final int[] TIDES = {1, 2, 3};
++    static final int[] TIDES = {
++        1,
++        2,
++        3{f:,]
++    };

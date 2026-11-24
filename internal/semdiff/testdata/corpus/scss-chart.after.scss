@@ -1,0 +1,11 @@
+// The tide chart.
+$gap: .5rem;
+
+.chart {
+  margin: $gap 0;
+  .bar {
+    height: 12px;
+    background: #1a5b6e;
+  }
+  .label { content: '—'; font-size: 12px; }
+}

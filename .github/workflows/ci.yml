@@ -166,20 +166,23 @@ jobs:
       - name: Install Wails CLI
         if: steps.wails.outputs.cache-hit != 'true'
         run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+      # build/tags picks the grammars the app reads code with, and keeps copyleft grammar
+      # code out of the app (ADR 0015). Every build that ships uses it.
       - name: Wails build (Windows)
         if: runner.os == 'Windows'
-        run: wails build -s
+        shell: bash
+        run: wails build -s -tags "$(cat build/tags)"
       # The universal app is what ships; on pull requests the runner's own architecture is
       # enough to prove it builds, at half the time.
       - name: Wails build (macOS universal)
         if: runner.os == 'macOS' && github.event_name != 'pull_request'
-        run: wails build -s -platform darwin/universal
+        run: wails build -s -platform darwin/universal -tags "$(cat build/tags)"
       - name: Wails build (macOS)
         if: runner.os == 'macOS' && github.event_name == 'pull_request'
-        run: wails build -s
+        run: wails build -s -tags "$(cat build/tags)"
       - name: Wails build (Linux)
         if: runner.os == 'Linux'
-        run: wails build -s -platform linux/amd64 -tags webkit2_41
+        run: wails build -s -platform linux/amd64 -tags "webkit2_41,$(cat build/tags)"
       # frontend/wailsjs is generated from the Go API, and the build has just written it again.
       # If that changed it, what's committed is out of date: the frontend would call methods as
       # they were, and svelte-check, which reads the committed files, wouldn't notice. A pull
@@ -288,7 +291,10 @@ jobs:
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
       - name: Wails build
-        run: wails build -s -platform linux/amd64 -tags "${{ matrix.tags }}"
+        run: |
+          tags="$(cat build/tags)"
+          if [ -n "${{ matrix.tags }}" ]; then tags="${{ matrix.tags }},$tags"; fi
+          wails build -s -platform linux/amd64 -tags "$tags"
 
   # One check that says whether the run passed: every job passed or was skipped as
   # unaffected.

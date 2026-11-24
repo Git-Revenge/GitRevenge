@@ -1,0 +1,35 @@
+engine code, language HTML
+
+@@ -3,6 +3,11 @@ format: formatting
+-<head>
+-  <title>Tides</title>
+-  <style>body { margin: 0 }</style>
+-</head>
+-<body class={f:"page"]>
+-  <p>Tides for <b>Brest</b> today.</p>
++  <head>
++    <title>Tides</title>
++    <style>
++      body {
++        margin: 0{f:;]
++      }
++    </style>
++  </head>
++  <body class={f:'page']>
++    <p>Tides for <b>Brest</b>
++      today.</p>
+
+@@ -9,2 +14,2 @@ change
+-  <pre>HW  04:12  6.81
+-LW  10:30  1.20</pre>
++    <pre>HW  04:12  6.81
++LW  10:31  1.20</pre>
+
+@@ -11,2 +16,5 @@ format: formatting
+-  <script>const station = {f:'Brest']; show(station);</script>
+-</body>
++    <script>
++      const station = {f:"Brest"];
++      show(station);
++    </script>
++  </body>

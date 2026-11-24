@@ -91,6 +91,12 @@ type Settings struct {
 	DiffRibbonOff bool `json:"diffRibbonOff,omitempty"`
 	// DiffMovesOff shows moved lines as a deletion and an addition.
 	DiffMovesOff bool `json:"diffMovesOff,omitempty"`
+	// DiffLinesOnly compares whole lines, as git does, even in languages the app reads as
+	// code.
+	DiffLinesOnly bool `json:"diffLinesOnly,omitempty"`
+	// DiffHideFormatting hides changes that only touch formatting, in the diff views that
+	// don't stage.
+	DiffHideFormatting bool `json:"diffHideFormatting,omitempty"`
 	// FetchAfterPush fetches, after a push to several places, the remotes those places
 	// belong to, so their remote-tracking branches match what was sent.
 	FetchAfterPush bool `json:"fetchAfterPush,omitempty"`

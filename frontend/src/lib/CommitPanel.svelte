@@ -1,6 +1,7 @@
 <script lang="ts">
   import { errorText } from './errors'
-  import { CommitDetail, CommitNotes, CommitSignatures, SetCommitNote, TrailerFilterLines } from '../../wailsjs/go/app/App.js'
+  import { CommitDetail, CommitNotes, CommitSignatures, FormattingOnly, SetCommitNote, TrailerFilterLines } from '../../wailsjs/go/app/App.js'
+  import { prefs } from './prefs.svelte'
   import type { MenuItem } from './ContextMenu.svelte'
   import { commands } from './commands.svelte'
   import { linkTitle, type LinkPart } from './links/links'
@@ -352,6 +353,20 @@
   function showFile(f: git.FileChange) {
     openFile({ mode: 'commit', commit: commitId, file: f.path, oldPath: f.oldPath })
   }
+
+  /** Files whose changes are only formatting, read as code. They're found after the list loads. */
+  let formatOnly = $state(new Set<string>())
+  $effect(() => {
+    const id = commitId
+    const changed = (info?.files ?? []).filter((f) => f.status === 'M' && !f.binary).map((f) => f.path)
+    formatOnly = new Set()
+    if (!changed.length || !prefs.diffCode) return
+    void FormattingOnly(path, 'commit', id, changed)
+      .then((got) => {
+        if (id === commitId) formatOnly = new Set(got)
+      })
+      .catch(() => {})
+  })
   import Empty from './ui/Empty.svelte'
 </script>
 
@@ -423,6 +438,11 @@
               <span class="code s-{STATUS_KINDS[f.status] ?? 'modified'}" title={statusNames[f.status] ?? f.status}><Icon name={STATUS_ICONS[f.status] ?? 'st-modified'} size={14} /><span class="visually-hidden">{statusNames[f.status] ?? f.status}</span></span>
               <span class="file">{fileName(f.path)}</span>
               {#if f.oldPath}<span class="from">from {f.oldPath}</span>{/if}
+              {#if formatOnly.has(f.path)}
+                <span class="fmt-only" class:hidden={prefs.diffHideFormatting} title={prefs.diffHideFormatting ? 'Nothing left once formatting is hidden' : 'Only how the code is written changed'}
+                  >{prefs.diffHideFormatting ? 'nothing once formatting is hidden' : 'formatting only'}</span
+                >
+              {/if}
               {#if f.binary}
                 <span class="binary">binary</span>
               {:else if f.added || f.deleted}
@@ -991,6 +1011,23 @@
     font-family: var(--font-mono);
     font-size: 12px;
     color: var(--ink-mute);
+  }
+
+
+  /* A file whose changes are only formatting, read as code. */
+  .fmt-only {
+    flex: none;
+    padding: 0 6px;
+    border: 1px dotted var(--ink-faint);
+    border-radius: 4px;
+    color: var(--ink-mute);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .fmt-only.hidden {
+    font-style: italic;
+    border-color: transparent;
   }
 
   .added,

@@ -1,0 +1,10 @@
+<Project Sdk='Microsoft.NET.Sdk'>
+    <!-- The tide reader. -->
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="System.Text.Json" Version="9.0.0"/>
+    </ItemGroup>
+</Project>

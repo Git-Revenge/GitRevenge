@@ -156,6 +156,8 @@
       prefs.diffRibbon = p.diffRibbon
       prefs.diffAlgorithm = p.diffAlgorithm
       prefs.diffMoves = p.diffMoves
+      prefs.diffCode = p.diffCode
+      prefs.diffHideFormatting = p.diffHideFormatting
       prefs.apply()
       if (p.gitPath !== initialGit) {
         restartNote = true
@@ -213,6 +215,24 @@
 
       <fieldset>
         <legend class="meta">Diffs</legend>
+        <label class="check">
+          <input type="checkbox" bind:checked={p.diffCode} />
+          Read code to compare it
+        </label>
+        <p class="hint">
+          {p.diffCode
+            ? 'Changes are found token by token, with formatting and renames told apart. Off compares whole lines, as git does.'
+            : 'Off: every diff compares whole lines, as git does.'}
+        </p>
+        <label class="check">
+          <input type="checkbox" bind:checked={p.diffHideFormatting} disabled={!p.diffCode} />
+          Hide formatting-only changes
+        </label>
+        <p class="hint">Whitespace, line breaks and how a value is written. Diffs you stage from show them anyway.</p>
+        <div class="langs" aria-label="Languages read as code">
+          {#each p.languages ?? [] as l (l)}<span class="lang">{l}</span>{/each}
+        </div>
+        <p class="hint">Read as code, with nothing to download. Other files get the line diff.</p>
         <label class="form-field">
           <span>Line diff</span>
           <select bind:value={p.diffAlgorithm}>
@@ -223,7 +243,7 @@
           </select>
         </label>
         <p class="hint">
-          How lines are matched up. Follows <code>diff.algorithm</code> in git config{repoPath ? `, which ${repoName} sets to ${gitAlgorithm || 'nothing, so Myers'}` : ''}, unless you pick one here.
+          How lines are matched up, for files not read as code and for the Lines view. Follows <code>diff.algorithm</code> in git config{repoPath ? `, which ${repoName} sets to ${gitAlgorithm || 'nothing, so Myers'}` : ''}, unless you pick one here.
         </p>
         <label class="check">
           <input type="checkbox" bind:checked={p.diffRibbon} />
@@ -446,6 +466,21 @@
 
   .check {
     font-size: 14px;
+  }
+
+  .langs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .lang {
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--accent-a) 10%, transparent);
+    color: var(--accent-a);
+    font-family: var(--font-mono);
+    font-size: 12px;
   }
 
   .kind-label {

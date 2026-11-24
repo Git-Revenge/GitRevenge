@@ -5,6 +5,7 @@ go 1.27.4
 ignore ./frontend/node_modules
 
 require (
+	github.com/odvcencio/gotreesitter v0.58.0
 	github.com/syncthing/notify v0.0.0-20250528144937-c7027d4f7465
 	github.com/wailsapp/wails/v2 v2.17.0
 	golang.org/x/sys v0.48.0

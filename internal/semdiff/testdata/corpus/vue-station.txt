@@ -1,0 +1,26 @@
+engine code, language Vue
+
+@@ -3,3 +3,2 @@ format: formatting
+-    <h2>{{ name }}</h2>
+-    <p>The next   high tide
+-       is at {{ next }}.</p>
++    <h2>{{name}}</h2>
++    <p>The next high tide is at {{ next }}.</p>
+
+@@ -6,1 +5,1 @@ change
+-    <button @click="refresh([1])">Refresh</button>
++    <button @click="refresh([2])">Refresh[ now]</button>
+
+@@ -11,1 +10,1 @@ format: semicolons
+-const props = defineProps<{ name: string; next: string }>()
++const props = defineProps<{ name: string; next: string }>(){f:;]
+
+@@ -13,1 +12,1 @@ format: same value
+-  return n * {f:0x10]
++  return n * {f:16;]
+
+@@ -18,1 +17,3 @@ format: same value
+-.station { margin: {f:0.5em] }
++.station {
++  margin: {f:.5em;]
++}

@@ -10,6 +10,10 @@ export type Result = semdiff.Result
 export type Block = semdiff.Block
 export type Move = semdiff.Move
 
+/** What a block is: a change, or when read as code, formatting only or a rename. */
+export type Kind = 'change' | 'format' | 'rename'
+export const kindOf = (b: Block): Kind => (b.kind === 'format' ? 'format' : b.kind === 'rename' ? 'rename' : 'change')
+
 /**
  * The ops for a result, as diffLines makes them: every line once, deletions before additions
  * within a block. Staging rebuilds a file from these.
@@ -31,21 +35,69 @@ export function opsFromBlocks(blocks: readonly Block[], oldCount: number, newCou
   return ops
 }
 
-/** Changed text in a line, in UTF-16 offsets, as [from, to). */
-export type Mark = [number, number]
+/**
+ * The ops a view draws: opsFromBlocks's, each change carrying its block's index. With
+ * hideFormatting, a formatting block reads as unchanged: its new lines, numbered on both
+ * sides as far as the old side goes. Only views that don't stage hide anything.
+ */
+export function viewOps(blocks: readonly Block[], oldCount: number, newCount: number, hideFormatting = false): Op[] {
+  const ops: Op[] = []
+  let i = 0
+  let j = 0
+  const same = (to: number) => {
+    while (i < to) ops.push({ kind: 'eq', oldIndex: i++, newIndex: j++ })
+  }
+  ;(blocks ?? []).forEach((b, k) => {
+    same(b.oldStart)
+    if (hideFormatting && b.kind === 'format') {
+      for (let n = 0; n < b.newEnd - b.newStart; n++) {
+        ops.push({ kind: 'eq', oldIndex: b.oldStart + n < b.oldEnd ? b.oldStart + n : -1, newIndex: b.newStart + n })
+      }
+      i = b.oldEnd
+      j = b.newEnd
+      return
+    }
+    for (; i < b.oldEnd; i++) ops.push({ kind: 'del', oldIndex: i, newIndex: -1, block: k })
+    for (; j < b.newEnd; j++) ops.push({ kind: 'add', oldIndex: -1, newIndex: j, block: k })
+  })
+  same(oldCount)
+  if (j !== newCount) throw new Error(`diff covers ${j} of ${newCount} new lines`)
+  return ops
+}
 
-/** The marked words of each side, by line. */
-export function marksByLine(blocks: readonly Block[]): { old: Map<number, Mark[]>; new: Map<number, Mark[]> } {
+/**
+ * Changed text in a line, in UTF-16 offsets, as [from, to), with its kind when it's
+ * formatting (the same token written differently) or a rename rather than a change.
+ */
+export type Mark = [number, number] | [number, number, 'format' | 'rename']
+
+/** The marked text of each side, by line. hideFormatting leaves out formatting. */
+export function marksByLine(blocks: readonly Block[], hideFormatting = false): { old: Map<number, Mark[]>; new: Map<number, Mark[]> } {
   const old = new Map<number, Mark[]>()
   const nu = new Map<number, Mark[]>()
   const add = (m: Map<number, Mark[]>, s: semdiff.Span) => {
+    if (hideFormatting && s.kind === 'format') return
+    const mark: Mark = s.kind === 'format' || s.kind === 'rename' ? [s.from, s.to, s.kind] : [s.from, s.to]
     const list = m.get(s.line)
-    if (list) list.push([s.from, s.to])
-    else m.set(s.line, [[s.from, s.to]])
+    if (list) list.push(mark)
+    else m.set(s.line, [mark])
   }
   for (const b of blocks ?? []) {
+    if (hideFormatting && b.kind === 'format') continue
     for (const s of b.old ?? []) add(old, s)
     for (const s of b.new ?? []) add(nu, s)
+  }
+  return { old, new: nu }
+}
+
+/** A formatting or rename block's note, such as "same value", by the line it goes on. */
+export function notesByLine(blocks: readonly Block[], hideFormatting = false): { old: Map<number, string>; new: Map<number, string> } {
+  const old = new Map<number, string>()
+  const nu = new Map<number, string>()
+  for (const b of blocks ?? []) {
+    if (!b.note || (hideFormatting && b.kind === 'format')) continue
+    if (b.newEnd > b.newStart) nu.set(b.newStart, b.note)
+    else old.set(b.oldStart, b.note)
   }
   return { old, new: nu }
 }
@@ -69,7 +121,7 @@ export function moveNote(m: Move, side: 'old' | 'new'): string {
 
 /** A place the views step to: a block, or a move. Ranges are [start, end) lines. */
 export interface Stop {
-  kind: 'change' | 'add' | 'del' | 'move'
+  kind: 'change' | 'add' | 'del' | 'move' | 'format' | 'rename'
   oldStart: number
   oldEnd: number
   newStart: number
@@ -82,9 +134,10 @@ export interface Stop {
 
 /**
  * The stops, in reading order. A block's stop leaves out the moved lines at its edges, which
- * its moves cover; a block whose lines all moved isn't a stop of its own.
+ * its moves cover; a block whose lines all moved isn't a stop of its own. hideFormatting
+ * leaves out formatting blocks.
  */
-export function stops(result: Result): Stop[] {
+export function stops(result: Result, hideFormatting = false): Stop[] {
   const moved = movesByLine(result.moves ?? [])
   const trim = (start: number, end: number, m: Map<number, number>): [number, number] => {
     while (start < end && m.has(start)) start++
@@ -96,7 +149,8 @@ export function stops(result: Result): Stop[] {
     const [os, oe] = trim(b.oldStart, b.oldEnd, moved.old)
     const [ns, ne] = trim(b.newStart, b.newEnd, moved.new)
     if (os === oe && ns === ne) return
-    const kind = os === oe ? 'add' : ns === ne ? 'del' : 'change'
+    if (hideFormatting && b.kind === 'format') return
+    const kind = b.kind === 'format' || b.kind === 'rename' ? b.kind : os === oe ? 'add' : ns === ne ? 'del' : 'change'
     out.push({ kind, oldStart: os, oldEnd: oe, newStart: ns, newEnd: ne, block: k })
   })
   ;(result.moves ?? []).forEach((m, k) => out.push({ kind: 'move', oldStart: m.oldStart, oldEnd: m.oldEnd, newStart: m.newStart, newEnd: m.newEnd, move: k }))

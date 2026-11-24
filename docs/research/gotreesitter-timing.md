@@ -198,6 +198,8 @@ TypeScript, Python, CSS, JSON and Rust get code diffs on effectively every file,
 
 **Open for #945:** when a parse hits the timeout, should the view show the line diff at once and then switch to the code diff once a longer parse finishes in the background, say within 2 s? That would rescue those C# files, at the cost of a view that changes under the reader.
 
+**Answered on 2026-11-24:** yes. The user ruled that 2 to 3 seconds is acceptable for large files. #945 shows the line diff at once, reads again with 3 seconds to parse, and switches when that finishes (ADR 0015).
+
 ## Not measured
 
 - macOS and Linux desktops. On WSL the C and Go sweep totals were within 10% of Windows, though single files varied more (`kernel/bpf/verifier.c` took 46 ms on Windows and 63 ms on WSL).

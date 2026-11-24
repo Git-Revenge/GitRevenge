@@ -1,0 +1,33 @@
+engine code, language TypeScript
+rename EventsOn -> onBackend, 3 places
+
+@@ -15,1 +15,0 @@ change
+-import { EventsOn } from '../../wailsjs/runtime/runtime.js'
+
+@@ -17,0 +16,1 @@ change
++import { onBackend, type BackendEvents } from './events'
+
+@@ -19,7 +19,0 @@ change
+-/** Payload of the "repo:changed" event (RepoChange in Go). Events aren't bindings, so
+- * Wails doesn't generate this type. */
+-interface RepoChange {
+-  path: string
+-  kinds: Array<'head' | 'refs' | 'index' | 'state' | 'config' | 'worktree'>
+-}
+-
+
+@@ -66,1 +59,1 @@ change
+-    {r:EventsOn]('repo:changed', (c[: RepoChange]) => void this.onChange(c))
++    {r:onBackend]('repo:changed', (c) => void this.onChange(c))
+
+@@ -69,1 +62,1 @@ change
+-    {r:EventsOn]('undo:changed', (c[: { path: string }]) => {
++    {r:onBackend]('undo:changed', (c) => {
+
+@@ -74,1 +67,1 @@ rename: renamed from EventsOn
+-    {r:EventsOn]('gitconfig:changed', () => {
++    {r:onBackend]('gitconfig:changed', () => {
+
+@@ -171,1 +164,1 @@ change
+-  private async onChange(c: [RepoChange]) {
++  private async onChange(c: [BackendEvents['repo:changed']]) {

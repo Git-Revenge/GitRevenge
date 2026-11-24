@@ -1,0 +1,51 @@
+{
+  "name": "gitrevenge-frontend",
+  "private": true,
+  "version": "1.0.2",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run --passWithNoTests --dir src",
+    "test:browser": "playwright test --project=chromium",
+    "test:browser:webkit": "playwright test --project=webkit",
+    "bundle-budget": "node scripts/bundle-budget.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "1.65.1",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@tsconfig/svelte": "^5.0.9",
+    "eslint": "^10.15.0",
+    "eslint-plugin-svelte": "^3.24.1",
+    "globals": "^17.14.0",
+    "svelte": "^5.57.3",
+    "svelte-check": "^4.7.8",
+    "tslib": "^2.9.1",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.72.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/language-data": "^6.5.2",
+    "@codemirror/merge": "^6.12.3",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
+    "@fontsource-variable/caveat": "5.3.0",
+    "@fontsource-variable/fraunces": "5.3.0",
+    "@fontsource-variable/jetbrains-mono": "5.3.0",
+    "@lezer/highlight": "^1.2.5",
+    "katex": "0.19.1",
+    "marked": "18.2.0",
+    "mermaid": "12.3.0",
+    "pdfjs-dist": "6.5.438",
+    "smol-toml": "1.9.1",
+    "yaml": "2.9.1"
+  }
+}

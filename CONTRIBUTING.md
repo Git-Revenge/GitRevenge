@@ -31,7 +31,9 @@ Also run `golangci-lint run` and, with `npx playwright install webkit`, `npm run
 
 The browser tests use Edge on Windows. On macOS and Linux they use Playwright's own Chromium: run `npx playwright install chromium` once.
 
-On Linux, the app needs GTK and WebKitGTK to build (on Ubuntu or Debian: `sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev`), and `wails build` needs `-tags webkit2_41`.
+On Linux, the app needs GTK and WebKitGTK to build (on Ubuntu or Debian: `sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev`), and `wails build` needs `webkit2_41` among its tags: `-tags "webkit2_41,$(cat build/tags)"`.
+
+A build to hand to anyone takes the tags in `build/tags`, which pick the grammars diffs read code with and keep copyleft grammar code out. Adding a language means adding its `grammar_subset_` tag there; a test in `internal/semdiff` checks the two agree.
 
 ## Guidelines
 

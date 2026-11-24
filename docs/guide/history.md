@@ -14,6 +14,22 @@ In **Split**, a **ribbon** runs between the sides. The sides aren't padded to li
 
 Lines are matched up as git does: by the `diff.algorithm` in your git config (Myers when it says nothing), unless you pick Myers, Minimal, Patience or Histogram in [Settings](settings.md).
 
+### Reading the code
+
+Files in fourteen languages are read as code: Go, JavaScript, TypeScript, Python, C#, Java, CSS, SCSS, JSON, Rust, Vue, HTML, Lua and XML. A chip after the file's name says **Read as Go** (or whichever it is), and changes are found token by token:
+
+- **What changed** is marked by token, so an added argument is marked as `, step time.Duration` and nothing else on the line.
+- **Formatting** is told apart from changes, and marked with a dotted underline and a note such as "same value". It covers whitespace and line breaks, a number written another way (`0x30` and `48`), a string written another way (`'a'` and `"a"`, or an escape and the character it stands for), and optional punctuation: a trailing comma, a semicolon, or parentheses that change nothing. A change that only moves code into another block, such as indenting Python into an `if`, is a change, not formatting.
+- **Renames** are told apart too. A name changed the same way in more than one place, where the old name is gone from the file, is a rename. It's ochre, with "renamed from out" beside it, and the row above the diff says "rename: out → readings, 4 places". In the split view's ribbon, a rename's band is ochre and formatting's is dashed.
+
+**Hide formatting** beside the layout buttons takes formatting out of the view: the lines read as unchanged, in their new form, and the row above the diff says how many changes it hid, with a link to show them. Settings can make it the starting point. Where you stage, unstage or discard, nothing is hidden: you see exactly what will be written, and formatting stands in hunks of its own, tagged **formatting only**, so it can be staged or left on its own. A file whose changes are all formatting says **formatting only** in the commit's file list and in your uncommitted changes.
+
+**Code** and **Lines** switch the view between reading the code and comparing whole lines as git does. Settings sets which a diff starts with.
+
+A file over 1 MB, one that more than a quarter of doesn't parse, or one too long to compare token by token shows the line diff, with one quiet line saying why. A file that takes longer than 150 ms to read shows its line diff at once and **Reading as Go** in the chip; the view switches to the code when a longer read finishes, within 3 seconds. If that misses too, **Read it as code anyway** gives it up to a minute. A file with a small parse error is still read as code, and a line says part of it didn't parse.
+
+To read a file as another language, set its `linguist-language` attribute in `.gitattributes` (`*.inc linguist-language=Go`). git's own diff drivers count too, so a file with `diff=golang` is read as Go. A file whose `linguist-language` names a language not read here gets the line diff.
+
 Code is syntax highlighted. Images (PNG, JPEG, GIF, WebP, AVIF, BMP, ICO and SVG) are shown as pictures and compared side by side, fitted to the view or at actual size. <kbd>Alt</kbd>+<kbd>Z</kbd> turns word wrap on and off. Press <kbd>Escape</kbd> to go back to the graph.
 
 ## Rendered previews

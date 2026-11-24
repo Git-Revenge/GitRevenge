@@ -1,0 +1,1063 @@
+/* Ink and Agency tokens: Ink Paper (light) and Ink Parchment (dark). Values come from the
+   design system's tokens.json; every text token passes 4.5:1 on paper in its theme. */
+@import '@fontsource-variable/fraunces/full.css';
+@import '@fontsource-variable/fraunces/full-italic.css';
+@import '@fontsource-variable/caveat/index.css';
+@import '@fontsource-variable/jetbrains-mono/index.css';
+
+:root {
+  --font-serif: 'Fraunces Variable', 'Crimson Pro', Georgia, serif;
+  --font-hand: 'Caveat Variable', 'Segoe Script', cursive;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  --ease-ink: cubic-bezier(0.2, 0.6, 0.2, 1);
+
+  /* Corners. Three radii and the pill cover the app: sm for things inside a row (fields,
+     tags, labels, inline code), md for things you press or that float (buttons, menus, the
+     palette, cards), lg for dialogs, and 999px for chips and counts. Ink blobs keep their own
+     asymmetric radii. */
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 12px;
+
+  /* Button sizes: height, side padding, label size, radius, icon size. Size alone sets
+     these; no component overrides them. md is the default. Every size shares one radius: at
+     28, 32 and 40px tall the difference between 7, 8 and 10 wasn't one you could see. */
+  --btn-h-sm: 28px;
+  --btn-h-md: 32px;
+  --btn-h-lg: 40px;
+  --btn-px-sm: 12px;
+  --btn-px-md: 14px;
+  --btn-px-lg: 20px;
+  --btn-fs-sm: 13px;
+  --btn-fs-md: 14px;
+  --btn-fs-lg: 15px;
+  --btn-r-sm: var(--r-md);
+  --btn-r-md: var(--r-md);
+  --btn-r-lg: var(--r-md);
+  --btn-ic-sm: 14px;
+  --btn-ic-md: 16px;
+  --btn-ic-lg: 18px;
+
+  /* Motion. Four durations and two curves cover the app: things arrive with --ease-ink and
+     leave with --ease-exit at about 0.7x the time. Reduced motion zeroes them all. */
+  --dur-quick: 120ms;
+  --dur-base: 200ms;
+  --dur-move: 280ms;
+  --dur-enter: 420ms;
+  --ease-exit: cubic-bezier(0.4, 0, 0.6, 1);
+
+  /* Raw inks, the same in both themes. Fills and marks; text uses the themed tokens. */
+  --ink-rose: #cb0162;
+  --ink-rose-soft: #e24a8a;
+  --ink-rose-deep: #8f0044;
+  --ink-teal: #1a5b6e;
+  --ink-teal-soft: #3d8a9f;
+  --ink-plum: #6b3a6e;
+  --ink-sepia: #8a5a3c;
+  --ink-ochre: #c48a1e;
+
+  /* Code grounds stay parchment-dark in both themes. */
+  --code-text: #f0e6d2;
+  --code-comment: #a49a8e;
+  --code-keyword: #e8659a;
+  --code-function: #b183b5;
+  --code-string: #5ba3b8;
+  --code-number: #c48a1e;
+  --code-type: #b8875f;
+  --code-punctuation: #c8b89a;
+}
+
+:root,
+:root[data-theme='light'] {
+  --paper: #faf6ef;
+  --paper-warm: #f4ecdd;
+  --paper-deep: #ede3cf;
+  --paper-edge: #d8c9ad;
+  --ink: #1a1614;
+  --ink-soft: #3a322c;
+  --ink-mute: #6b625a;
+  --ink-faint: #776e65;
+  --accent: #cb0162;
+  --on-accent: #faf6ef;
+  --link: #cb0162;
+  --link-hover: #8f0044;
+  --accent-a: #1a5b6e;
+  --accent-b: #6b3a6e;
+  --accent-c: #8a5a3c;
+  --hairline: rgba(26, 22, 20, 0.1);
+  --wash-hover: rgba(26, 22, 20, 0.05);
+  --selected: rgba(203, 1, 98, 0.12);
+  --selection: rgba(203, 1, 98, 0.22);
+  --highlight: rgba(196, 138, 30, 0.28);
+  --success: #4d7c43;
+  --warning: #8a5c00;
+  --danger: #8f0044;
+  --code-bg: #2a2220;
+  --scrim: rgba(26, 22, 20, 0.35);
+  --shadow: 0 10px 36px rgba(26, 22, 20, 0.18);
+
+  /* Graph lanes, cycled by colour index. Graphics only, so 3:1 on paper is the bar. */
+  --lane-0: #cb0162;
+  --lane-1: #1a5b6e;
+  --lane-2: #6b3a6e;
+  --lane-3: #8a5a3c;
+  --lane-4: #8a5c00;
+  --lane-5: #3d8a9f;
+
+  /* Syntax on paper, as in the Ink Paper editor theme. */
+  --syn-keyword: #cb0162;
+  --syn-string: #1a5b6e;
+  --syn-number: #8a5c00;
+  --syn-comment: #776e65;
+  --syn-type: #8a5a3c;
+  --syn-function: #6b3a6e;
+  --syn-tag: #8f0044;
+  --syn-invalid: #8f0044;
+
+  color-scheme: light;
+}
+
+:root[data-theme='dark'],
+.code-ground {
+  --paper: #1a1614;
+  --paper-warm: #241c19;
+  --paper-deep: #2a211c;
+  --paper-edge: #3a2d26;
+  --ink: #f4ecdd;
+  --ink-soft: #ddd1bb;
+  --ink-mute: #a89e8f;
+  --ink-faint: #948b7d;
+  --accent: #e24a8a;
+  --on-accent: #1a1614;
+  --link: #e24a8a;
+  --link-hover: #ef7fac;
+  --accent-a: #5ba3b8;
+  --accent-b: #b183b5;
+  --accent-c: #b8875f;
+  --hairline: rgba(244, 236, 221, 0.12);
+  --wash-hover: rgba(244, 236, 221, 0.05);
+  --selected: rgba(226, 74, 138, 0.16);
+  --selection: rgba(226, 74, 138, 0.28);
+  --highlight: rgba(196, 138, 30, 0.32);
+  --success: #7fae6a;
+  --warning: #d9a13f;
+  --danger: #e8659a;
+  --code-bg: #1a1210;
+  --scrim: rgba(0, 0, 0, 0.5);
+  --shadow: 0 10px 36px rgba(0, 0, 0, 0.5);
+
+  --lane-0: #e24a8a;
+  --lane-1: #5ba3b8;
+  --lane-2: #b183b5;
+  --lane-3: #b8875f;
+  --lane-4: #d9a13f;
+  --lane-5: #ef7fac;
+
+  --syn-keyword: #e8659a;
+  --syn-string: #5ba3b8;
+  --syn-number: #d9a13f;
+  --syn-comment: #a49a8e;
+  --syn-type: #b8875f;
+  --syn-function: #b183b5;
+  --syn-tag: #ef7fac;
+  --syn-invalid: #e8659a;
+
+  color-scheme: dark;
+}
+
+/* Code is parchment-dark in both themes, the brand's signature move: .code-ground takes
+   the dark tokens above (so syntax, diff washes, gutters and selection follow) on the
+   code background. */
+.code-ground {
+  --paper: #2a2220;
+  --paper-warm: #322825;
+  --paper-deep: #3a2e2a;
+  --paper-edge: #45362f;
+  background: var(--paper);
+  color: var(--ink);
+  color-scheme: dark;
+}
+
+:root[data-theme='dark'] .code-ground {
+  --paper: #1a1210;
+  --paper-warm: #231a17;
+  --paper-deep: #2b201c;
+  --paper-edge: #3a2d26;
+}
+
+/* Washes derived from the status tokens, for diff lines and banners. Redeclared on
+   .code-ground so they mix its own colours. */
+:root,
+.code-ground {
+  --success-wash: color-mix(in srgb, var(--success) 16%, transparent);
+  --danger-wash: color-mix(in srgb, var(--danger) 16%, transparent);
+  --warning-wash: color-mix(in srgb, var(--warning) 18%, transparent);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-optical-sizing: auto;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  color: var(--ink);
+}
+
+/* Baselines so nothing falls back to the OS palette; components refine them. */
+button {
+  padding: 2px 10px;
+  background: var(--paper-warm);
+  border: 1px solid var(--paper-edge);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--paper-deep);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Links, wherever they turn up: rose, never the browser's blue. A commit's subject, a trailer
+   and a message body all read the same; components only add to this. */
+a {
+  color: var(--link);
+}
+
+a:hover {
+  color: var(--link-hover);
+}
+
+input,
+select,
+textarea {
+  background: var(--paper);
+  border: 1px solid var(--paper-edge);
+  border-radius: var(--r-sm);
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* Text for screen readers only, such as the word behind a status icon. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+* {
+  scrollbar-color: var(--paper-edge) transparent;
+}
+
+/* Mono meta text: dates, counts, labels. Uppercase in CSS, normal case in source. */
+.meta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+/* A handwritten margin note. One or two per view. */
+.hand {
+  font-family: var(--font-hand);
+  font-size: 22px;
+  line-height: 1.1;
+  color: var(--accent-a);
+  display: inline-block;
+  transform: rotate(-2deg);
+}
+
+/* The button family: one shape in three sizes (sm, md, lg) and five variants (primary,
+   secondary, quiet, text, danger). InkButton renders these classes; a plain <button> can
+   use them too. Primary and danger draw their body in ::after and a small ink bleed in
+   ::before, both behind the label inside the button's own stacking context. */
+.btn {
+  --h: var(--btn-h-md);
+  --px: var(--btn-px-md);
+  --fs: var(--btn-fs-md);
+  --r: var(--btn-r-md);
+  --ic: var(--btn-ic-md);
+  position: relative;
+  z-index: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: var(--h);
+  min-width: 72px;
+  padding: 0 var(--px);
+  background: none;
+  border: none;
+  border-radius: var(--r);
+  font-family: var(--font-serif);
+  font-size: var(--fs);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    transform var(--dur-base) var(--ease-ink),
+    background-color var(--dur-quick),
+    color var(--dur-quick),
+    box-shadow var(--dur-base) var(--ease-ink),
+    opacity var(--dur-quick);
+}
+
+.btn.sm {
+  --h: var(--btn-h-sm);
+  --px: var(--btn-px-sm);
+  --fs: var(--btn-fs-sm);
+  --r: var(--btn-r-sm);
+  --ic: var(--btn-ic-sm);
+}
+
+.btn.lg {
+  --h: var(--btn-h-lg);
+  --px: var(--btn-px-lg);
+  --fs: var(--btn-fs-lg);
+  --r: var(--btn-r-lg);
+  --ic: var(--btn-ic-lg);
+}
+
+.btn svg {
+  width: var(--ic);
+  height: var(--ic);
+  flex-shrink: 0;
+}
+
+/* Icon-only: a square of the size's height. Needs an aria-label. */
+.btn.icon {
+  min-width: 0;
+  width: var(--h);
+  padding: 0;
+}
+
+.btn:focus-visible {
+  outline-offset: 3px;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+  transition-duration: var(--dur-quick);
+}
+
+/* Primary and danger: a clean body with an ink bleed behind it. */
+.btn.primary,
+.btn.danger {
+  --fill: var(--accent);
+  color: var(--on-accent);
+  background: none;
+}
+
+.btn.danger {
+  --fill: var(--danger);
+}
+
+.btn.primary::before,
+.btn.primary::after,
+.btn.danger::before,
+.btn.danger::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  background: var(--fill);
+  pointer-events: none;
+}
+
+.btn.primary::after,
+.btn.danger::after {
+  inset: 0;
+  border-radius: var(--r);
+}
+
+.btn.primary::before,
+.btn.danger::before {
+  inset: 3px -4px -5px 4px;
+  border-radius: 45% 55% 50% 50% / 55% 45%;
+  filter: url(#ink-bleed);
+  opacity: 0.28;
+  mix-blend-mode: multiply;
+  transition:
+    transform var(--dur-move) var(--ease-ink),
+    opacity var(--dur-base);
+}
+
+:root[data-theme='dark'] .btn.primary::before,
+:root[data-theme='dark'] .btn.danger::before {
+  mix-blend-mode: screen;
+}
+
+.btn.primary:hover:not(:disabled)::before,
+.btn.danger:hover:not(:disabled)::before {
+  transform: translate(1px, 2px) scale(1.06);
+  opacity: 0.4;
+}
+
+.btn.primary:active:not(:disabled)::before,
+.btn.danger:active:not(:disabled)::before {
+  transform: scale(0.96);
+  opacity: 0.18;
+}
+
+.btn.primary:disabled::before,
+.btn.danger:disabled::before {
+  opacity: 0;
+}
+
+/* Success: a plain filled body for a "this is good" answer, beside a danger one. */
+.btn.success {
+  --fill: var(--success);
+  color: var(--on-accent);
+  background: none;
+}
+
+.btn.success::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: var(--r);
+  background: var(--fill);
+  pointer-events: none;
+}
+
+/* Secondary: an ink outline, beside a primary. */
+.btn.secondary {
+  box-shadow: inset 0 0 0 1.25px var(--ink);
+}
+
+.btn.secondary:hover:not(:disabled) {
+  background: var(--wash-hover);
+}
+
+/* Quiet: toolbars, rows and icon-only buttons. A wash on hover. */
+.btn.quiet {
+  color: var(--ink-soft);
+}
+
+.btn.quiet:hover:not(:disabled) {
+  background: var(--wash-hover);
+  color: var(--ink);
+}
+
+.btn.quiet[aria-pressed='true'] {
+  background: var(--selected);
+  color: var(--link);
+}
+
+/* Text: an italic link with a painterly bar under the label. */
+.btn.text {
+  min-width: 0;
+  padding: 0 4px;
+  color: var(--link);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.btn.text::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 2px;
+  right: 2px;
+  bottom: calc(50% - 0.75em);
+  height: 0.4em;
+  border-radius: 3px 6px 4px 5px;
+  background: var(--accent);
+  opacity: 0.18;
+  pointer-events: none;
+  transition: opacity var(--dur-base);
+}
+
+.btn.text:hover:not(:disabled) {
+  background: none;
+  color: var(--link-hover);
+}
+
+.btn.text:hover:not(:disabled)::after,
+.btn.text:focus-visible::after {
+  opacity: 0.4;
+}
+
+/* Text that destroys something: the same italic link in the danger colour, with the bar to
+   match, so Discard all never looks like Stage all. Outranks .btn.danger's filled body. */
+.btn.text.danger {
+  color: var(--danger);
+  background: none;
+}
+
+.btn.text.danger::before {
+  content: none;
+}
+
+.btn.text.danger::after {
+  inset: auto 2px calc(50% - 0.75em) 2px;
+  height: 0.4em;
+  border-radius: 3px 6px 4px 5px;
+  background: var(--danger);
+  opacity: 0.18;
+  filter: none;
+  mix-blend-mode: normal;
+  transform: none;
+}
+
+.btn.text.danger:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+.btn.text.danger:hover:not(:disabled)::after,
+.btn.text.danger:focus-visible::after {
+  opacity: 0.4;
+  transform: none;
+}
+
+/* The Caveat arrow on an lg primary that leads somewhere. */
+.btn .arrow {
+  font-family: var(--font-hand);
+  font-size: 1.45em;
+  font-style: normal;
+  line-height: 0;
+  transition: transform var(--dur-base) var(--ease-ink);
+}
+
+.btn:hover:not(:disabled) .arrow {
+  transform: translateX(3px);
+}
+
+/* A click is waiting on a read, such as a menu reading what it needs (busy.ts). */
+html.busy,
+html.busy * {
+  cursor: progress !important;
+}
+
+/* Busy: the label and width stay; three ink dots pulse before it. */
+.btn[aria-busy='true'] {
+  cursor: progress;
+}
+
+.btn .busy {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.btn .busy i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: btn-busy 1.2s var(--ease-ink) infinite;
+}
+
+.btn .busy i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.btn .busy i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes btn-busy {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  40% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .btn::before,
+  .btn::after,
+  .btn .arrow {
+    transition: none;
+  }
+
+  .btn:hover:not(:disabled),
+  .btn:active:not(:disabled),
+  .btn:hover:not(:disabled)::before,
+  .btn:active:not(:disabled)::before,
+  .btn:hover:not(:disabled) .arrow {
+    transform: none;
+  }
+
+  .btn .busy i {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+/* The header strip over a file view: back, mono path, badges, actions. */
+.view-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-height: 44px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--paper-edge);
+}
+
+.view-file {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.view-badge {
+  padding: 1px 7px;
+  border-radius: var(--r-sm);
+  background: var(--wash-hover);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  white-space: nowrap;
+}
+
+.view-badge.danger {
+  background: var(--danger-wash);
+  color: var(--danger);
+}
+
+/* A few options in a row, one pressed: a md-height track (32px) holding 28px options, the
+   pressed one raised on paper. One form for every picker. */
+.segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: var(--btn-h-md);
+  padding: 2px;
+  border-radius: var(--r-md);
+  background: var(--paper-deep);
+}
+
+.segmented button {
+  height: var(--btn-h-sm);
+  padding: 0 12px;
+  background: none;
+  border: none;
+  border-radius: var(--btn-r-sm);
+  font-family: var(--font-serif);
+  font-size: var(--btn-fs-sm);
+  color: var(--ink-mute);
+  transition:
+    background-color var(--dur-base) var(--ease-ink),
+    color var(--dur-quick),
+    box-shadow var(--dur-base) var(--ease-ink);
+}
+
+.segmented button:hover:not(:disabled) {
+  background: none;
+  color: var(--ink);
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--paper-edge);
+}
+
+/* Icon-only options: a square of the option's height. Each needs an aria-label. */
+.segmented button.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-h-sm);
+  padding: 0;
+}
+
+.segmented button.icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segmented button {
+    transition: none;
+  }
+}
+
+/* An on/off switch: a real checkbox inside, the track drawn after it. */
+.switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switch .track {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+  border: 1px solid var(--paper-edge);
+  border-radius: 999px;
+  background: var(--paper-deep);
+  transition: background-color var(--dur-base) var(--ease-ink);
+}
+
+.switch .track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--ink-mute);
+  transition: transform var(--dur-move) var(--ease-ink);
+}
+
+.switch input:checked + .track {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.switch input:checked + .track::after {
+  transform: translateX(18px);
+  background: var(--on-accent);
+}
+
+.switch input:focus-visible + .track {
+  outline: 2px solid var(--link);
+  outline-offset: 3px;
+}
+
+.switch input:disabled + .track {
+  opacity: 0.5;
+}
+
+/* A mono text field for values: paths, URLs, commands. */
+.field {
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  transition: border-color var(--dur-base);
+}
+
+.field:focus {
+  border-color: var(--link);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--selection);
+}
+
+/* A small uppercase mono label on an accent wash: a scope, a kind. */
+.tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-a) 14%, transparent);
+  color: var(--accent-a);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tag.rose {
+  background: color-mix(in srgb, var(--link) 13%, transparent);
+  color: var(--link-hover);
+}
+
+.tag.green {
+  background: var(--success-wash);
+  color: var(--success);
+}
+
+.tag.sepia {
+  background: color-mix(in srgb, var(--accent-c) 15%, transparent);
+  color: var(--accent-c);
+}
+
+.tag.plum {
+  background: color-mix(in srgb, var(--accent-b) 14%, transparent);
+  color: var(--accent-b);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch .track,
+  .switch .track::after {
+    transition: none;
+  }
+}
+
+/* Dialog and panel forms. */
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.form-field input:not([type='checkbox']),
+.form-field select,
+.form-field textarea {
+  padding: 7px 10px;
+  font-size: 14px;
+  border-radius: var(--r-sm);
+  transition: border-color var(--dur-base);
+}
+
+.form-field textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  border-color: var(--link);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--selection);
+}
+
+.form-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.form-check input {
+  accent-color: var(--accent);
+}
+
+.form-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-mute);
+}
+
+.form-error,
+.form-warning {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  background: var(--danger-wash);
+  color: var(--ink);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.form-warning {
+  background: var(--warning-wash);
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+/* Shared motion. Arrivals: ink-in (fade, 6px blur to sharp, 6px rise) for dialogs, toasts
+   and the palette; fade-up (4px) for panels and list rows; drop-in (3px down) for menus;
+   row-land for a row that moved here, a rose wash that fades so the eye follows it. */
+@keyframes ink-in {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(6px);
+  }
+}
+
+@keyframes ink-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes row-land {
+  0% {
+    opacity: 0;
+    transform: translateX(-6px);
+    background-color: var(--selected);
+  }
+
+  40% {
+    opacity: 1;
+    transform: none;
+    background-color: var(--selected);
+  }
+}
+
+/* A list that cascades in when it first appears: each of the first six children fades up
+   40ms after the one before; later ones arrive with the sixth. */
+.cascade > * {
+  animation: fade-up var(--dur-move) var(--ease-ink) backwards;
+}
+
+.cascade > :nth-child(2) {
+  animation-delay: 40ms;
+}
+
+.cascade > :nth-child(3) {
+  animation-delay: 80ms;
+}
+
+.cascade > :nth-child(4) {
+  animation-delay: 120ms;
+}
+
+.cascade > :nth-child(5) {
+  animation-delay: 160ms;
+}
+
+.cascade > :nth-child(n + 6) {
+  animation-delay: 200ms;
+}
+
+/* Switching themes cross-fades the window (theme.svelte.ts starts the view transition); the
+   old and new pictures just fade, with no slide, over --dur-base. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur-base);
+  animation-timing-function: var(--ease-ink);
+  mix-blend-mode: normal;
+}
+
+/* Reduced motion: every token goes to zero, so nothing moves, blurs or lingers. Loops
+   (spinners, busy dots) switch themselves off where they're defined. */
+@media (prefers-reduced-motion: reduce) {
+  .cascade > * {
+    animation: none;
+  }
+
+  :root {
+    --dur-quick: 0ms;
+    --dur-base: 0ms;
+    --dur-move: 0ms;
+    --dur-enter: 0ms;
+  }
+}
+
+/* Syntax colors for @lezer/highlight's classHighlighter, used by both diff views. */
+.tok-keyword,
+.tok-operatorKeyword,
+.tok-modifier {
+  color: var(--syn-keyword);
+}
+.tok-string,
+.tok-string2,
+.tok-regexp {
+  color: var(--syn-string);
+}
+.tok-number,
+.tok-bool,
+.tok-atom,
+.tok-literal {
+  color: var(--syn-number);
+}
+.tok-comment {
+  color: var(--syn-comment);
+  font-style: italic;
+}
+.tok-typeName,
+.tok-className,
+.tok-namespace {
+  color: var(--syn-type);
+}
+.tok-definition,
+.tok-function,
+.tok-propertyName {
+  color: var(--syn-function);
+}
+.tok-variableName.tok-definition {
+  color: var(--ink);
+}
+.tok-tagName,
+.tok-heading {
+  color: var(--syn-tag);
+}
+.tok-attributeName,
+.tok-meta {
+  color: var(--syn-type);
+}
+.tok-invalid {
+  color: var(--syn-invalid);
+}

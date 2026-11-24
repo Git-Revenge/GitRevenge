@@ -1,0 +1,32 @@
+engine code, language C#
+rename buffer -> readings, 4 places
+
+@@ -9,1 +9,1 @@ format: same value
+-        private const int MaxHours = {f:0x30];
++        private const int MaxHours = {f:48];
+
+@@ -10,1 +10,1 @@ rename: renamed from buffer
+-        private readonly List<double> {r:buffer] = new List<double>();
++        private readonly List<double> {r:readings] = new List<double>();
+
+@@ -16,1 +16,1 @@ format: parentheses
+-                if ({f:(]line.Length == 0{f:)]) continue;
++                if (line.Length == 0) continue;
+
+@@ -17,1 +17,1 @@ rename: renamed from buffer
+-                {r:buffer].Add(double.Parse(line));
++                {r:readings].Add(double.Parse(line));
+
+@@ -19,1 +19,1 @@ change
+-            if ({r:buffer].Count > MaxHours) throw new ArgumentException("at most 48 [hours]");
++            if ({r:readings].Count > MaxHours) throw new ArgumentException("at most 48 [readings]");
+
+@@ -20,1 +20,1 @@ rename: renamed from buffer
+-            return {r:buffer];
++            return {r:readings];
+
+@@ -23,2 +23,2 @@ format: same value
+-        public string Path = {f:@"C:\tides\table.txt"];
+-        public long Seed = {f:10L];
++        public string Path = {f:"C:\\tides\\table.txt"];
++        public long Seed = {f:10l];

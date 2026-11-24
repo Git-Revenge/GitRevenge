@@ -29,7 +29,8 @@ func apply(before, after string, blocks []Block) string {
 	return out.String()
 }
 
-// checkBlocks fails unless the blocks are in order, don't touch, and turn before into after.
+// checkBlocks fails unless the blocks are in order, don't overlap, and turn before into
+// after. Read as code, blocks of different kinds can touch.
 func checkBlocks(t *testing.T, before, after string, blocks []Block) {
 	t.Helper()
 	for k, blk := range blocks {
@@ -38,8 +39,11 @@ func checkBlocks(t *testing.T, before, after string, blocks []Block) {
 		}
 		if k > 0 {
 			prev := blocks[k-1]
-			if blk.OldStart <= prev.OldEnd || blk.NewStart <= prev.NewEnd {
-				t.Fatalf("blocks %d and %d touch or overlap: %+v, %+v", k-1, k, prev, blk)
+			if blk.OldStart < prev.OldEnd || blk.NewStart < prev.NewEnd {
+				t.Fatalf("blocks %d and %d overlap: %+v, %+v", k-1, k, prev, blk)
+			}
+			if blk.OldStart == prev.OldEnd && blk.NewStart == prev.NewEnd && blk.Kind == prev.Kind {
+				t.Fatalf("blocks %d and %d of one kind touch: %+v, %+v", k-1, k, prev, blk)
 			}
 			// What lies between them is unchanged, so it's as long on both sides.
 			if blk.OldStart-prev.OldEnd != blk.NewStart-prev.NewEnd {

@@ -30,6 +30,8 @@ The research, with sources, is in [`docs/research/semantic-diff-merge.md`](../re
   - optional parentheses and trailing commas can be ignored
 
   The sequences are diffed with [znkr.io/diff](https://github.com/znkr/diff) (Apache-2.0). Moves and renames are found in passes afterwards. Full tree matching, GumTree style, comes later if it's needed.
+
+  (Added on 2026-11-24 by #945.) The token diff runs inside each block of the line diff, and splits a block where its parts differ in kind: a change, formatting only, or a rename. So blocks stay git's, and staging keeps working on lines. Formatting only means the two sides' tokens are equal and sit in the same syntax, so code indented into a Python block, or a CSS selector losing the space that made it a descendant, is a change.
 - **Hiding formatting-only changes is an option the user turns on.** It is off by default, so a diff shows every change until the user asks otherwise.
 - **Staging always shows the end result.** Any view that stages, unstages or discards shows every change that would be written, whatever the formatting option says. Formatting-only changes there can be marked as such, but are never hidden. Staging, unstaging and discarding keep working on lines.
 - **Merging stays git's.** git's line merge decides what conflicts, at every merge, rebase, cherry-pick and revert stop. Inside each conflicted place, the tool runs a three-way merge over the syntax tokens of base, ours and theirs. Where the two sides changed different tokens, the combined result is **pre-filled** into the place and marked **suggested**. The user can keep it, change it or choose a side. Until they act, it is not counted as decided. P4Merge-style colouring of where each change came from, and a base column, join the existing views.
@@ -42,6 +44,8 @@ The research, with sources, is in [`docs/research/semantic-diff-merge.md`](../re
 
   A quiet note says which happened. A smaller parse error doesn't fall back: the tokens around it are still diffed, and the note says part of the file didn't parse. A parser bug can cost the nicer view, never a wrong one. (Changed on 2026-11-23 by #943, which measured the budgets. The first draft fell back on any parse error, which would have hit two-thirds of kernel C files.)
 
+  A file that misses the 150 ms limit shows its line diff at once, and is read again in the background with 3 seconds to parse. The view switches to the code when that finishes. If it misses too, **Read it as code anyway** gives it up to a minute, so no file keeps a core busy for good. (Changed on 2026-11-24 by #945. The user ruled that 2 to 3 seconds is acceptable for large files. It rescues the large C# files #943 found missing the limit, at the cost of a view that changes while it's read.)
+
 ## Consequences
 
 - The Windows app grows by 10.8 MB (25.95 to 36.76 MB) and its installer by 4.8 MB (11.69 to 16.46 MB), with gotreesitter and the 15 first-pass grammar packages (the list above plus TSX). The full figures are in [`docs/research/gotreesitter-timing.md`](../research/gotreesitter-timing.md).
@@ -51,6 +55,7 @@ The research, with sources, is in [`docs/research/semantic-diff-merge.md`](../re
   - **Older-engine grammars:** Go, JavaScript, TSX, C#, Java, SCSS, Vue, HTML, Lua and XML mostly read 0.7–4 MB a second. Go is about 3 times slower than cgo, and their trees take 0.3–2 KB of memory per source byte while parsing.
   - **Cost:** the timeout keeps the app responsive. Some files in those languages get the line diff instead: 5 of 400 C# files sampled (46–317 KB), and bundled or minified JavaScript. They speed up as upstream certifies more grammars.
 - **Kernel C trips the C grammar often.** 67% of kernel C files have an ERROR node, from macros, but in the median such file it covers 0.2% of the bytes. The official runtime gives the same counts.
-- **How the parser is used:** trees are walked with `Node.Children()`, two to three times faster on ccore trees than the cursor. Each file uses a plain `Parser` from a `ParserPool` per language, since a `Parser` isn't safe for concurrent use. Trees are released straight after the walk, and only tokens are cached.
+- **How the parser is used:** trees are walked with `Node.Children()`, two to three times faster on ccore trees than the cursor. Each parse uses a new `Parser`, since a `Parser` isn't safe for concurrent use. A new one costs no more than one from a `ParserPool` (measured in #945), and it can carry its own time limit and a cancellation flag that stops it when its repository closes, which a pool's parsers can't. Trees are released straight after the walk, and only results are cached.
+- **Every build that ships uses the tags in `build/tags`** (#945). Without `gotreesitter_no_copyleft`, gotreesitter links the copyleft Nim scanner's code even though no Nim grammar is imported. A test checks the tags list every grammar the app reads.
 - `lineDiff.ts` stops being the diff engine. Its job of rebuilding a file from a chosen set of changes, for staging, has to work from the Go result.
 - Highlighting stays with Lezer in the frontend, so the app parses some files twice, once for colour and once for structure.

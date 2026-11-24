@@ -86,6 +86,41 @@ func (r *Repo) ReadString(ctx context.Context, args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), err
 }
 
+// Attributes returns the gitattributes the work tree sets on path, by name, for the names
+// asked for. An attribute that isn't set, or is unspecified, is missing from the result; one
+// set without a value is "set", and one unset is "unset", as git check-attr says them.
+func (r *Repo) Attributes(ctx context.Context, path string, names ...string) (map[string]string, error) {
+	all, err := r.AttributesOf(ctx, []string{path}, names...)
+	return all[path], err
+}
+
+// AttributesOf is Attributes for several paths at once, by path. Every path has a map, empty
+// when nothing is set on it.
+func (r *Repo) AttributesOf(ctx context.Context, paths []string, names ...string) (map[string]map[string]string, error) {
+	all := make(map[string]map[string]string, len(paths))
+	var in strings.Builder
+	for _, p := range paths {
+		all[p] = map[string]string{}
+		in.WriteString(p)
+		in.WriteByte(0)
+	}
+	if len(paths) == 0 {
+		return all, nil
+	}
+	out, err := r.readCmd(ctx, Cmd{Args: append([]string{"check-attr", "-z", "--stdin"}, names...), Stdin: strings.NewReader(in.String())})
+	if err != nil {
+		return all, err
+	}
+	// -z writes path, attribute and value, each ended by NUL.
+	f := strings.Split(string(out), "\x00")
+	for i := 0; i+2 < len(f); i += 3 {
+		if m, ok := all[f[i]]; ok && f[i+2] != "unspecified" {
+			m[f[i+1]] = f[i+2]
+		}
+	}
+	return all, nil
+}
+
 // Stream runs a read-only git command and passes its stdout to consume as it arrives.
 func (r *Repo) Stream(ctx context.Context, consume func(io.Reader) error, args ...string) error {
 	return r.streamCmd(ctx, Cmd{Args: args}, consume)

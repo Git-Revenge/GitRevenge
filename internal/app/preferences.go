@@ -41,6 +41,14 @@ type Preferences struct {
 	DiffRibbon bool `json:"diffRibbon"`
 	// DiffMoves shows lines that moved as moves.
 	DiffMoves bool `json:"diffMoves"`
+	// DiffCode reads files as code in the languages the app knows (semdiff.Languages), so
+	// changes are counted by token. Off compares whole lines, as git does.
+	DiffCode bool `json:"diffCode"`
+	// DiffHideFormatting starts the diff views with formatting-only changes hidden. Views
+	// that stage show every change whatever it says.
+	DiffHideFormatting bool `json:"diffHideFormatting"`
+	// Languages are the languages read as code, for the settings to list.
+	Languages []string `json:"languages"`
 }
 
 // Zoom limits, as percentages.
@@ -74,18 +82,21 @@ func (a *App) Preferences() (Preferences, error) {
 		zoom = 100
 	}
 	return Preferences{
-		Theme:             s.Theme,
-		GraphDensity:      s.GraphDensity,
-		ExperimentalViews: enabledViews(s),
-		UpdateChecks:      !s.UpdateChecksOff,
-		GitPath:           s.GitPath,
-		GitInUse:          a.Environment().GitPath,
-		CloneDir:          s.CloneDir,
-		Zoom:              zoom,
-		ForgeColors:       s.ForgeColors,
-		DiffAlgorithm:     s.DiffAlgorithm,
-		DiffRibbon:        !s.DiffRibbonOff,
-		DiffMoves:         !s.DiffMovesOff,
+		Theme:              s.Theme,
+		GraphDensity:       s.GraphDensity,
+		ExperimentalViews:  enabledViews(s),
+		UpdateChecks:       !s.UpdateChecksOff,
+		GitPath:            s.GitPath,
+		GitInUse:           a.Environment().GitPath,
+		CloneDir:           s.CloneDir,
+		Zoom:               zoom,
+		ForgeColors:        s.ForgeColors,
+		DiffAlgorithm:      s.DiffAlgorithm,
+		DiffRibbon:         !s.DiffRibbonOff,
+		DiffMoves:          !s.DiffMovesOff,
+		DiffCode:           !s.DiffLinesOnly,
+		DiffHideFormatting: s.DiffHideFormatting,
+		Languages:          semdiff.Languages(),
 	}, nil
 }
 
@@ -160,6 +171,8 @@ func (a *App) SetPreferences(p Preferences) error {
 		s.DiffAlgorithm = p.DiffAlgorithm
 		s.DiffRibbonOff = !p.DiffRibbon
 		s.DiffMovesOff = !p.DiffMoves
+		s.DiffLinesOnly = !p.DiffCode
+		s.DiffHideFormatting = p.DiffHideFormatting
 	})
 }
 

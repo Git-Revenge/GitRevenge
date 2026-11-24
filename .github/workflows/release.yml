@@ -139,7 +139,10 @@ jobs:
         run: |
           args=(-clean -platform "${{ matrix.platform }}" -ldflags "-X github.com/git-revenge/gitrevenge/internal/version.Version=${{ steps.version.outputs.version }}")
           if [ "$RUNNER_OS" = "Windows" ]; then args+=(-nsis); fi
-          if [ -n "${{ matrix.tags }}" ]; then args+=(-tags "${{ matrix.tags }}"); fi
+          # build/tags picks the grammars and keeps copyleft grammar code out (ADR 0015).
+          tags="$(cat build/tags)"
+          if [ -n "${{ matrix.tags }}" ]; then tags="${{ matrix.tags }},$tags"; fi
+          args+=(-tags "$tags")
           wails build "${args[@]}"
 
       # The digest of the app as built, kept to compare with what the installer puts on disk
