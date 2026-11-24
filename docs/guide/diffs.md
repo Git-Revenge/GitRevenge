@@ -56,7 +56,7 @@ Moves are found three ways:
 
 - **Lines moved unchanged**, apart from their indentation: "moved from line 3, unchanged", or "indented differently".
 - **Lines moved and edited on the way.** A function moved to the end of the file with one line changed is still a move: "moved from line 3, changed". Its note offers **Compare with the original**, which opens the moved lines against the lines they came from, so the edit shows as an edit.
-- **Code wrapped in new structure**, when the file is read as code. Statements wrapped in an `if`, a loop or a `try` stay where they were but sit inside something new. Their lines show as a move, "moved into an if statement", and only the new `if` line and its closing brace are added.
+- **Code wrapped in new structure**, when the file is read as code. Statements wrapped in an `if`, a loop or a `try` stay where they were but sit inside something new. Their lines show as a move, "moved into an if statement", and only the new `if` line and its closing brace are added. If one of them was edited as well, the note says "moved into an if statement, changed" and offers **Compare with the original**.
 
 [Settings](settings.md) can turn finding moves off.
 

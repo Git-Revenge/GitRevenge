@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"strings"
+	"unicode"
 )
 
 // What matching the trees adds to the token diff (#947): tokens that moved, and lines that
@@ -204,6 +205,74 @@ func nestedMoves(a, b *version, s *segment) []Move {
 		mv.Into = structureAround(b, mv.NewStart, mv.NewEnd)
 	}
 	return out
+}
+
+// nameWrapped names the new structure moves went into where they were: a move whose two
+// ends sit in one block of the line diff, and whose lines now sit in every structure they
+// sat in before and one more, such as an if put around them. findMoves takes wrapped lines
+// as a move whenever they're heavy enough, before nestedMoves can name what they went into
+// (#971).
+func nameWrapped(a, b *version, blocks []Block, moves []Move) {
+	for k := range moves {
+		mv := &moves[k]
+		// Wrapped lines are indented anew; lines that weren't stayed put or came from
+		// elsewhere.
+		if mv.Into == "" && mv.Reindented && inOneBlock(blocks, *mv) {
+			mv.Into = movedInto(a, b, *mv)
+		}
+	}
+}
+
+// inOneBlock reports whether both ends of mv sit in the same block.
+func inOneBlock(blocks []Block, mv Move) bool {
+	for _, blk := range blocks {
+		if blk.OldStart <= mv.OldStart && mv.OldEnd <= blk.OldEnd && blk.NewStart <= mv.NewStart && mv.NewEnd <= blk.NewEnd {
+			return true
+		}
+	}
+	return false
+}
+
+// movedInto names the structure mv's lines went into: the innermost around them on the new
+// side, when the ones around them before are all still around them, outside it. It's ""
+// when they kept their structure or left some of it.
+func movedInto(a, b *version, mv Move) string {
+	before, after := containers(a, mv.OldStart, mv.OldEnd), containers(b, mv.NewStart, mv.NewEnd)
+	if len(after) <= len(before) || !slices.Equal(before, after[:len(before)]) {
+		return ""
+	}
+	return strings.ReplaceAll(after[len(after)-1], "_", " ")
+}
+
+// containers names the structures lines [from, to) of v sit in, outermost first: the
+// recorded nodes that hold all of the lines' code and more, passing over plain blocks and
+// lists as structureAround does. It's nil for blank lines, or a version read without nodes.
+func containers(v *version, from, to int) []string {
+	lo, hi := -1, -1
+	for i := from; i < to; i++ {
+		body := v.t.body(i)
+		if j := strings.IndexFunc(body, func(r rune) bool { return !unicode.IsSpace(r) }); j >= 0 {
+			if lo < 0 {
+				lo = v.t.start[i] + j
+			}
+			hi = v.t.start[i] + len(strings.TrimRightFunc(body, unicode.IsSpace))
+		}
+	}
+	if lo < 0 {
+		return nil
+	}
+	var around []nodeRec
+	for _, n := range v.nodes {
+		if n.from <= lo && n.to >= hi && (n.from < lo || n.to > hi) && n.typ != "" && !generic(n.typ) {
+			around = append(around, n)
+		}
+	}
+	slices.SortStableFunc(around, func(x, y nodeRec) int { return (y.to - y.from) - (x.to - x.from) })
+	names := make([]string, len(around))
+	for i, n := range around {
+		names[i] = n.typ
+	}
+	return names
 }
 
 // structureAround names the structure that lines [from, to) on the new side now sit in: the

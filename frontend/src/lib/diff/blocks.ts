@@ -128,8 +128,11 @@ const article = (w: string) => (/^[aeiou]/i.test(w) ? 'an' : 'a')
 
 /** What a moved line says about where it went or came from. Line numbers count from 1. */
 export function moveNote(m: Move, side: 'old' | 'new'): string {
-  // Wrapped in new structure where it was: an if, a loop, a try.
-  if (m.into) return side === 'old' ? `moved into ${article(m.into)} ${m.into} at line ${m.newStart + 1}` : `moved into ${article(m.into)} ${m.into}`
+  // Wrapped in new structure where it was: an if, a loop, a try. It may have changed too.
+  if (m.into) {
+    const into = `moved into ${article(m.into)} ${m.into}`
+    return side === 'old' ? `${into} at line ${m.newStart + 1}${m.changed ? ', and changed' : ''}` : `${into}${m.changed ? ', changed' : ''}`
+  }
   if (side === 'old') return `moved to line ${m.newStart + 1}${m.changed ? ', and changed' : ''}`
   return `moved from line ${m.oldStart + 1}${m.changed ? ', changed' : m.reindented ? ', indented differently' : ', unchanged'}`
 }

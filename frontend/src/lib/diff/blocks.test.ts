@@ -124,6 +124,11 @@ describe('moves and renames in full (#947)', () => {
     expect(moveNote({ ...mv, into: 'for statement' }, 'old')).toBe('moved into a for statement at line 11')
   })
 
+  it('says code wrapped in new structure changed too, when it did (#971)', () => {
+    expect(moveNote({ ...mv, into: 'try statement', changed: true }, 'new')).toBe('moved into a try statement, changed')
+    expect(moveNote({ ...mv, into: 'try statement', changed: true }, 'old')).toBe('moved into a try statement at line 11, and changed')
+  })
+
   it('cycles four colours for moves from teal, and for renames from ochre', () => {
     expect([0, 1, 2, 3, 4].map(moveTone)).toEqual([0, 1, 2, 3, 0])
     expect([1, 2, 3, 4, 5].map(renameTone)).toEqual([3, 0, 1, 2, 3])
