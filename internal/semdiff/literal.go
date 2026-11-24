@@ -246,11 +246,11 @@ func cssString(s string) (string, bool) {
 				j++
 			}
 			if j > i {
-				v, _ := strconv.ParseUint(body[i:j], 16, 32)
-				if v == 0 || v > utf8.MaxRune || (v >= 0xd800 && v <= 0xdfff) {
+				v, ok := codePoint(body[i:j], 16)
+				if !ok || v == 0 || (v >= 0xd800 && v <= 0xdfff) {
 					v = utf8.RuneError
 				}
-				b.WriteRune(rune(v))
+				b.WriteRune(v)
 				if j < len(body) && (body[j] == ' ' || body[j] == '\t' || body[j] == '\n') {
 					j++
 				}
@@ -370,26 +370,26 @@ func unescape(s string, e escapes) (string, bool) {
 			for j < len(s) && j-i < e.octal && s[j] >= '0' && s[j] <= '7' {
 				j++
 			}
-			v, _ := strconv.ParseUint(s[i:j], 8, 32)
-			if e.octalMax > 0 && int(v) > e.octalMax {
+			v, ok := byteValue(s[i:j], 8)
+			if e.octalMax > 0 && (!ok || int(v) > e.octalMax) {
 				j--
-				v, _ = strconv.ParseUint(s[i:j], 8, 32)
+				v, ok = byteValue(s[i:j], 8)
 			}
-			if v > 0xff {
+			if !ok {
 				return "", false
 			}
-			b.WriteByte(byte(v))
+			b.WriteByte(v)
 			i = j
 		case c >= '0' && c <= '9' && e.decimal > 0:
 			j := i
 			for j < len(s) && j-i < e.decimal && s[j] >= '0' && s[j] <= '9' {
 				j++
 			}
-			v, _ := strconv.Atoi(s[i:j])
-			if v > 255 {
+			v, ok := byteValue(s[i:j], 10)
+			if !ok {
 				return "", false
 			}
-			b.WriteByte(byte(v))
+			b.WriteByte(v)
 			i = j
 		case c == 'x' && (e.hex > 0 || e.hexVar > 0):
 			j := i + 1
@@ -403,11 +403,18 @@ func unescape(s string, e escapes) (string, bool) {
 			if j == i+1 || (e.hex > 0 && j-i-1 != e.hex) {
 				return "", false
 			}
-			v, _ := strconv.ParseUint(s[i+1:j], 16, 32)
 			if e.hexVar > 0 {
-				b.WriteRune(rune(v))
+				v, ok := codePoint(s[i+1:j], 16)
+				if !ok {
+					return "", false
+				}
+				b.WriteRune(v)
 			} else {
-				b.WriteByte(byte(v))
+				v, ok := byteValue(s[i+1:j], 16)
+				if !ok {
+					return "", false
+				}
+				b.WriteByte(v)
 			}
 			i = j
 		case c == 'u' && e.uBrace && i+1 < len(s) && s[i+1] == '{':
@@ -415,11 +422,11 @@ func unescape(s string, e escapes) (string, bool) {
 			if end < 0 {
 				return "", false
 			}
-			v, err := strconv.ParseUint(strings.ReplaceAll(s[i+2:i+end], "_", ""), 16, 32)
-			if err != nil || v > utf8.MaxRune {
+			v, ok := codePoint(strings.ReplaceAll(s[i+2:i+end], "_", ""), 16)
+			if !ok {
 				return "", false
 			}
-			b.WriteRune(rune(v))
+			b.WriteRune(v)
 			i += end + 1
 		case c == 'u' && e.u4:
 			j := i + 1
@@ -431,25 +438,22 @@ func unescape(s string, e escapes) (string, bool) {
 			if j+4 > len(s) {
 				return "", false
 			}
-			v, err := strconv.ParseUint(s[j:j+4], 16, 32)
-			if err != nil {
-				return "", false
-			}
+			v, ok := codePoint(s[j:j+4], 16)
 			// Surrogate pairs stay as written: they only make sense together.
-			if v >= 0xd800 && v <= 0xdfff {
+			if !ok || v >= 0xd800 && v <= 0xdfff {
 				return "", false
 			}
-			b.WriteRune(rune(v))
+			b.WriteRune(v)
 			i = j + 4
 		case c == 'U' && e.u8:
 			if i+9 > len(s) {
 				return "", false
 			}
-			v, err := strconv.ParseUint(s[i+1:i+9], 16, 32)
-			if err != nil || v > utf8.MaxRune {
+			v, ok := codePoint(s[i+1:i+9], 16)
+			if !ok {
 				return "", false
 			}
-			b.WriteRune(rune(v))
+			b.WriteRune(v)
 			i += 9
 		case strings.IndexByte(e.simple, c) >= 0:
 			b.WriteString(simpleValue[c])
@@ -465,6 +469,24 @@ func unescape(s string, e escapes) (string, bool) {
 		}
 	}
 	return b.String(), true
+}
+
+// codePoint reads digits in base as a character's number, or false when they aren't one.
+func codePoint(digits string, base int) (rune, bool) {
+	v, err := strconv.ParseInt(digits, base, 32)
+	if err != nil || v < 0 || v > utf8.MaxRune {
+		return 0, false
+	}
+	return rune(v), true
+}
+
+// byteValue reads digits in base as a byte, or false past 255.
+func byteValue(digits string, base int) (byte, bool) {
+	v, err := strconv.ParseUint(digits, base, 8)
+	if err != nil {
+		return 0, false
+	}
+	return byte(v), true
 }
 
 func isHex(c byte) bool {

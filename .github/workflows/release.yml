@@ -334,7 +334,10 @@ jobs:
           mkdir -p dist staging
           cp -R build/bin/*.app "staging/Git Revenge.app"
           ln -s /Applications staging/Applications
-          hdiutil create -volname "Git Revenge" -srcfolder staging -ov -format UDZO \
+          # hdiutil sizes the image from the folder and can come up short ("No space left on
+          # device"), so it's given the folder's size and room to spare.
+          size=$(( $(du -sm staging | cut -f1) + 64 ))
+          hdiutil create -volname "Git Revenge" -srcfolder staging -ov -format UDZO -size "${size}m" \
             "dist/GitRevenge-${{ steps.version.outputs.version }}-macos-universal.dmg"
 
       - name: Notarize disk image
