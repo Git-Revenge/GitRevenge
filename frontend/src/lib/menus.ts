@@ -1,6 +1,7 @@
 import { FetchBranch, SetBranchPushRemote, DeleteBranchAndWorktree, DeleteStack, PushStack, RebaseStack, RestoreStack, StackDeletePlan, StackPushPlan, Unstack, UpdateStack, BranchAction, BranchCaseTwin, BranchMergeState, HideBranch, Integrate, MarkBranchKind, Pull, PullBranch, PushBranch, PushRef, Refs, Restack, SetGraphFocus, SetStackParent, StashAction, Worktrees } from '../../wailsjs/go/app/App.js'
 import { CONFIRM_DELETE, CONFIRM_FORCE_PUSH, KINDS, kindWarning } from './branchKinds'
 import type { MenuItem } from './ContextMenu.svelte'
+import type { git } from '../../wailsjs/go/models'
 import type { DialogSpec } from './Dialog.svelte'
 import type { Ref, Row } from './graph/rowCache'
 import { errorText } from './errors'
@@ -154,7 +155,13 @@ export function deleteWorktreeBranchDialog(path: string, ref: Ref, tree: BranchW
 
 /** The Push item's label. Without an upstream the backend chooses the remote, so it isn't named here.
  * An upstream with no slash is a local branch, which Push doesn't go to. */
-function pushLabel(ref: Ref): string {
+/** Where Push sends a branch, in its label. With the push plan (#927), that's where git's
+ * rules and the Pushing settings send it; without one, its upstream. */
+function pushLabel(ref: Ref, plan?: git.PushPlan): string {
+  if (plan && !plan.refusal && !plan.ask && plan.remote) {
+    return `Push ${ref.short} to ${plan.ref === ref.short ? plan.remote : `${plan.remote}/${plan.ref}`}`
+  }
+  if (plan?.ask) return `Push ${ref.short}…`
   const slash = ref.upstream.indexOf('/')
   if (slash < 0) return `Push ${ref.short}`
   const sameName = ref.upstream.slice(slash + 1) === ref.short
@@ -307,7 +314,7 @@ export function pushRemoteItem(path: string, ref: Ref, remotes: string[]): MenuI
   const to = (remote: string) => () => session.run(() => SetBranchPushRemote(path, ref.short, remote))
   return [
     {
-      label: `Push ${ref.short} to`,
+      label: `Always push ${ref.short} to`,
       icon: 'push',
       hint: ref.pushRemote ? `${ref.pushRemote}, for this branch alone` : 'Where the rest go',
       items: [
@@ -341,7 +348,7 @@ export function refItems(ref: Ref, ctx: MenuContext, extras?: RefExtras): MenuIt
           ...(ref.worktree || !ref.upstream || ref.gone
             ? []
             : [{ label: `Pull ${ref.short}`, icon: 'pull' as const, run: () => session.run(() => (ref.head ? Pull(path, '') : PullBranch(path, ref.short))) }]),
-          { label: pushLabel(ref), icon: 'push', run: () => session.run(() => PushBranch(path, ref.short)) },
+          { label: pushLabel(ref, extras?.plan), icon: 'push', hint: extras?.plan?.refusal || undefined, run: () => session.run(() => PushBranch(path, ref.short)) },
           ...pushRemoteItem(path, ref, extras?.remotes ?? []),
         ],
         [
