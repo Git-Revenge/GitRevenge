@@ -126,6 +126,10 @@ type Move struct {
 	NewEnd   int `json:"newEnd"`
 	// Reindented is set when the lines' indentation changed on the way.
 	Reindented bool `json:"reindented"`
+	// Changed is set when the lines were also edited on the way. Edits then compares them
+	// with where they came from: its blocks count lines from OldStart and NewStart.
+	Changed bool    `json:"changed,omitempty"`
+	Edits   []Block `json:"edits,omitempty"`
 }
 
 // Diff compares before with after. It returns ctx's error if ctx ends first.
@@ -158,6 +162,9 @@ func Diff(ctx context.Context, before, after string, opts Options) (Result, erro
 		if read, err = readAsCode(ctx, &res, a, b, opts, moved); err != nil {
 			return Result{}, err
 		}
+	}
+	if err := compareMoves(ctx, a, b, &res, opts); err != nil {
+		return Result{}, err
 	}
 	if !read {
 		for i := range res.Blocks {

@@ -81,6 +81,12 @@ func findMoves(ctx context.Context, a, b text, blocks []Block) ([]Move, error) {
 			i += bestLen
 		}
 	}
+	moves = joinMoves(moves, deleted, added)
+	changed, err := changedMoves(ctx, a, b, blocks, deleted, added)
+	if err != nil {
+		return nil, err
+	}
+	moves = append(moves, changed...)
 	slices.SortFunc(moves, func(x, y Move) int { return x.NewStart - y.NewStart })
 	if moves == nil {
 		moves = []Move{}

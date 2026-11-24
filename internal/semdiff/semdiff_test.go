@@ -130,7 +130,8 @@ func TestEveryAlgorithmRebuildsTheNewText(t *testing.T) {
 			}
 			checkBlocks(t, before, after, res.Blocks)
 			for _, mv := range res.Moves {
-				if mv.OldEnd-mv.OldStart != mv.NewEnd-mv.NewStart || mv.OldStart == mv.OldEnd {
+				// An exact move keeps its length; one that changed on the way needn't.
+				if (!mv.Changed && mv.OldEnd-mv.OldStart != mv.NewEnd-mv.NewStart) || mv.OldStart == mv.OldEnd || mv.NewStart == mv.NewEnd {
 					t.Fatalf("%s: malformed move %+v", alg, mv)
 				}
 			}
