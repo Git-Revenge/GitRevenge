@@ -1,0 +1,54 @@
+engine code, language TypeScript
+
+@@ -2,1 +2,1 @@ change
+-import { DUR, STAGGER_MAX, STAGGER_STEP, cubicBezier, easeExit, easeInk, fadeUp, inkIn, inkOut, rowLand, stagger } from './motion'
++import { DUR, STAGGER_MAX, STAGGER_STEP, cubicBezier, easeExit, easeInk, fadeUp, inkIn, inkOut[, menuOut, reveal], rowLand[, scrim], stagger } from './motion'
+
+@@ -58,1 +58,1 @@ change
+-    expect(inkOut().duration).toBe(DUR.base)
++    expect(inkOut([node]).duration).toBe(DUR.base)
+
+@@ -59,1 +59,4 @@ format: trailing comma
+-    expect(fadeUp(node, { delay: 80 })).toMatchObject({ duration: DUR.move, delay: 80 })
++    expect(fadeUp(node, { delay: 80 })).toMatchObject({
++      duration: DUR.move,
++      delay: 80{f:,]
++    })
+
+@@ -64,1 +67,1 @@ change
+-    for (const t of [inkIn(node, { delay: 120 }), inkOut(), fadeUp(node, { delay: 80 }), rowLand()]) {
++    for (const t of [inkIn(node, { delay: 120 }), inkOut([node]), fadeUp(node, { delay: 80 }), rowLand([node])]) {
+
+@@ -73,1 +76,31 @@ change
+-    expect(rowLand().css?.(1, 0)).toContain('var(--selected) 0%')
++    expect(rowLand(node).css?.(1, 0)).toContain('var(--selected) 0%')
++  })
++})
++
++describe('exits and reveals', () => {
++  const box = { height: '40px', paddingTop: '8px', paddingBottom: '4px' }
++
++  it('leave faster than they arrive and stop taking clicks', () => {
++    reduce(false)
++    vi.stubGlobal('getComputedStyle', () => box)
++    expect(scrim(node).duration).toBe(DUR.base)
++    expect(scrim(node, { out: true }).duration).toBeLessThan(DUR.base)
++    expect(menuOut(node).duration).toBe(DUR.quick)
++    expect(reveal(node, { out: true }).duration).toBeLessThan(reveal(node).duration ?? 0)
++    for (const t of [inkOut(node), menuOut(node), scrim(node, { out: true }), reveal(node, { out: true })]) {
++      expect(t.css?.(0.5, 0.5)).toContain('pointer-events: none')
++    }
++    expect(scrim(node).css?.(0.5, 0.5)).not.toContain('pointer-events')
++  })
++
++  it('reveal grows height and padding from nothing', () => {
++    reduce(false)
++    vi.stubGlobal('getComputedStyle', () => box)
++    expect(reveal(node).css?.(0, 1)).toContain('height: 0px; padding-top: 0px; padding-bottom: 0px')
++    expect(reveal(node).css?.(1, 0)).toContain('height: 40px; padding-top: 8px; padding-bottom: 4px')
++  })
++
++  it('collapse to nothing under reduced motion', () => {
++    reduce(true)
++    vi.stubGlobal('getComputedStyle', () => box)
++    for (const t of [scrim(node), menuOut(node), reveal(node), reveal(node, { out: true })]) expect(t.duration).toBe(0)

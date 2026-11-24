@@ -59,9 +59,11 @@ go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
 ```
 
 ```sh
-wails dev        # run with hot reload
-wails build      # build build/bin/gitrevenge(.exe)
+wails dev                            # run with hot reload
+wails build -tags "$(cat build/tags)"  # build build/bin/gitrevenge(.exe)
 ```
+
+`build/tags` names the grammars the app reads code with, and keeps copyleft grammar code out of the build ([ADR 0015](docs/adr/0015-diffs-and-merges-read-the-code.md)). Builds that ship always use it.
 
 The Go binary embeds `frontend/dist`, so on a fresh clone build the frontend once before running Go tools directly:
 

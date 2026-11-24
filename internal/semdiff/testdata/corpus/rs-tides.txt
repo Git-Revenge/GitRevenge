@@ -1,0 +1,33 @@
+engine code, language Rust
+rename out -> readings, 3 places
+
+@@ -3,1 +3,1 @@ format: same value
+-const MAX_HOURS: u32 = {f:0x30];
++const MAX_HOURS: u32 = {f:48];
+
+@@ -11,1 +11,1 @@ change
+-pub fn forecast(start: u64, n: u32) -> Vec<Reading> {
++pub fn forecast(start: u64, n: u32[, step: u64]) -> Vec<Reading> {
+
+@@ -12,1 +12,1 @@ rename: renamed from out
+-    let mut {r:out] = Vec::new();
++    let mut {r:readings] = Vec::new();
+
+@@ -14,1 +14,4 @@ change
+-        {r:out].push(Reading { at: start + (i as u64) * [3600], height: height(start) });
++        {r:readings].push(Reading {
++            at: start + (i as u64) * [step],
++            height: height(start){f:,]
++        });
+
+@@ -16,1 +19,1 @@ rename: renamed from out
+-    {r:out]
++    {r:readings]
+
+@@ -20,1 +23,1 @@ format: same value
+-    let phase = (at % {f:44_712]) as f64 / 44712.0;
++    let phase = (at % {f:44712]) as f64 / 44712.0;
+
+@@ -24,1 +27,1 @@ format: same value
+-pub const NAME: &str = {f:"Brest\x21"];
++pub const NAME: &str = {f:r"Brest!"];

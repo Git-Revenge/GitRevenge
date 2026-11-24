@@ -52,6 +52,7 @@ function checkMethods(what: string, names: string[]) {
 checkMethods('responses', Object.keys(scenario.responses ?? {}))
 checkMethods('failures', Object.keys(scenario.failures ?? {}))
 checkMethods('delays', Object.keys(scenario.delays ?? {}))
+checkMethods('byArg', Object.keys(scenario.byArg ?? {}))
 
 const responses: Record<string, unknown> = { ...scenario.responses }
 win.__calls = []
@@ -167,6 +168,9 @@ win.go = {
             const failure = scenario.failures?.[method]
             if (failure) throw new Error(failure)
             if (behaviours[method]) return (behaviours[method] as (...a: unknown[]) => unknown)(...args)
+            const by = scenario.byArg?.[method]
+            const key = by ? String(args[by.index]) : ''
+            if (by && key in by.answers) return structuredClone(by.answers[key])
             // A copy, as the real backend would send, so a component can't edit the stub's state.
             return method in responses ? structuredClone(responses[method]) : null
           },

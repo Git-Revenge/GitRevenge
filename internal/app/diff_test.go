@@ -135,7 +135,7 @@ func TestFileDiffComparesTheVersions(t *testing.T) {
 		t.Fatal(err)
 	}
 	fx.WriteFile("a.txt", "keep\nnew line\nkeep\n")
-	fd, err := a.FileDiff(tab.Path, DiffUnstaged, "", "a.txt", "", false)
+	fd, err := a.FileDiff(tab.Path, DiffUnstaged, "", "a.txt", "", false, ReadCode)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +164,7 @@ func TestFileDiffFollowsGitsAlgorithmUnlessOneIsChosen(t *testing.T) {
 	if got, _ := a.GitDiffAlgorithm(tab.Path); got != "histogram" {
 		t.Errorf("git's algorithm = %q, want histogram", got)
 	}
-	fd, err := a.FileDiff(tab.Path, DiffUnstaged, "", "a.txt", "", false)
+	fd, err := a.FileDiff(tab.Path, DiffUnstaged, "", "a.txt", "", false, ReadCode)
 	if err != nil || fd.Diff.Algorithm != "histogram" {
 		t.Fatalf("algorithm %v, %v; want histogram, from git", fd.Diff, err)
 	}
@@ -174,7 +174,7 @@ func TestFileDiffFollowsGitsAlgorithmUnlessOneIsChosen(t *testing.T) {
 	if err := a.SetPreferences(p); err != nil {
 		t.Fatal(err)
 	}
-	if fd, _ = a.FileDiff(tab.Path, DiffUnstaged, "", "a.txt", "", false); fd.Diff.Algorithm != "patience" {
+	if fd, _ = a.FileDiff(tab.Path, DiffUnstaged, "", "a.txt", "", false, ReadCode); fd.Diff.Algorithm != "patience" {
 		t.Errorf("algorithm %s, want patience, as chosen", fd.Diff.Algorithm)
 	}
 	if p, _ = a.Preferences(); p.DiffAlgorithm != "patience" || p.DiffMoves || !p.DiffRibbon {
@@ -193,8 +193,86 @@ func TestFileDiffLeavesBinaryFilesUncompared(t *testing.T) {
 	fx.CommitFile("b.bin", "a\x00b", "first")
 	tab, _ := a.OpenRepo(fx.Dir)
 	fx.WriteFile("b.bin", "a\x00c")
-	fd, err := a.FileDiff(tab.Path, DiffUnstaged, "", "b.bin", "", false)
+	fd, err := a.FileDiff(tab.Path, DiffUnstaged, "", "b.bin", "", false, ReadCode)
 	if err != nil || fd.Contents.Kind != "binary" || fd.Diff != nil {
 		t.Errorf("got %+v, %v; want a binary file with no diff", fd, err)
+	}
+}
+
+func TestFileDiffReadsCodeInTheFilesLanguage(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	src := "package p\n\nconst maxHours = 0x30\n"
+	fx.CommitFile("a.go", src, "first")
+	fx.CommitFile("b.inc", src, "an include")
+	fx.CommitFile(".gitattributes", "*.inc linguist-language=Go\n", "attributes")
+	tab, err := a.OpenRepo(fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after := strings.Replace(src, "0x30", "48", 1)
+	fx.WriteFile("a.go", after)
+	fx.WriteFile("b.inc", after)
+	for _, file := range []string{"a.go", "b.inc"} {
+		fd, err := a.FileDiff(tab.Path, DiffUnstaged, "", file, "", false, ReadCode)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fd.Diff.Engine != "code" || fd.Diff.Language != "Go" || len(fd.Diff.Blocks) != 1 || fd.Diff.Blocks[0].Kind != "format" {
+			t.Errorf("%s: %+v, want it read as Go, formatting only", file, fd.Diff)
+		}
+		// Lines still say what the file is, so the view can offer reading it as code.
+		fd, err = a.FileDiff(tab.Path, DiffUnstaged, "", file, "", false, ReadLines)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fd.Diff.Engine != "lines" || fd.Diff.Language != "Go" || fd.Diff.Blocks[0].Kind != "" {
+			t.Errorf("%s by lines: %+v", file, fd.Diff)
+		}
+	}
+	if _, err := a.FileDiff(tab.Path, DiffUnstaged, "", "a.go", "", false, "sideways"); err == nil {
+		t.Error("took an unknown way to read")
+	}
+
+	p, _ := a.Preferences()
+	if !p.DiffCode || p.DiffHideFormatting || len(p.Languages) != 14 {
+		t.Errorf("preferences %+v, want code on, formatting shown, 14 languages", p)
+	}
+	p.DiffCode, p.DiffHideFormatting = false, true
+	if err := a.SetPreferences(p); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ = a.Preferences(); p.DiffCode || !p.DiffHideFormatting {
+		t.Errorf("preferences %+v, want lines only, formatting hidden", p)
+	}
+}
+
+func TestFormattingOnlyMarksFilesWithNothingElse(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.CommitFile("fmt.go", "package p\n\nconst a = 0x30\n", "first")
+	fx.CommitFile("real.go", "package p\n\nconst a = 1\n", "second")
+	fx.CommitFile("notes.txt", "a\n", "third")
+	tab, err := a.OpenRepo(fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fx.WriteFile("fmt.go", "package p\n\nconst a = 48\n")
+	fx.WriteFile("real.go", "package p\n\nconst a = 2\n")
+	fx.WriteFile("notes.txt", "b\n")
+	got, err := a.FormattingOnly(tab.Path, DiffUnstaged, "", []string{"fmt.go", "real.go", "notes.txt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(got, ",") != "fmt.go" {
+		t.Errorf("formatting only: %q, want fmt.go", got)
+	}
+	fx.Git("add", "-A")
+	fx.Git("commit", "-qm", "edits")
+	head := strings.TrimSpace(fx.Git("rev-parse", "HEAD"))
+	if got, _ = a.FormattingOnly(tab.Path, DiffCommit, head, []string{"fmt.go", "real.go"}); strings.Join(got, ",") != "fmt.go" {
+		t.Errorf("in the commit: %q, want fmt.go", got)
 	}
 }

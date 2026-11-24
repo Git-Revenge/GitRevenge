@@ -1,7 +1,7 @@
 <script lang="ts">
   import { SvelteSet } from 'svelte/reactivity'
   import { tick } from 'svelte'
-  import { marksByLine, moveNote, movesByLine, opsFromBlocks, type Result, type Stop } from './blocks'
+  import { kindOf, marksByLine, moveNote, movesByLine, notesByLine, viewOps, type Kind, type Mark, type Result, type Stop } from './blocks'
   import { highlightLines, languageFor, withMarks, type Token } from './highlight'
   import { applyChanges, splitLines, toHunks, type Hunk } from './lineDiff'
   import { wrap } from './wrap.svelte'
@@ -20,6 +20,7 @@
     newText,
     diff,
     actions = {},
+    hideFormatting = false,
     stops = [],
     current = -1,
     jump = 0,
@@ -30,6 +31,8 @@
     /** The Go diff of the two texts (internal/semdiff). */
     diff: Result
     actions?: Actions
+    /** Shows formatting-only blocks as unchanged lines. Views that stage never do. */
+    hideFormatting?: boolean
     stops?: Stop[]
     /** The stop being read, or -1. */
     current?: number
@@ -39,9 +42,27 @@
 
   let oldLines = $derived(splitLines(oldText))
   let newLines = $derived(splitLines(newText))
-  let ops = $derived(opsFromBlocks(diff.blocks, oldLines.length, newLines.length))
-  let hunks = $derived(toHunks(ops))
-  let marks = $derived(marksByLine(diff.blocks))
+  let ops = $derived(viewOps(diff.blocks, oldLines.length, newLines.length, hideFormatting))
+  /** A change's block kind; formatting never shares a hunk with a change, so it stages alone. */
+  const kindAt = (i: number): Kind | null => {
+    const b = ops[i]?.block
+    return b === undefined ? null : kindOf(diff.blocks[b])
+  }
+  let hunks = $derived(toHunks(ops, 3, (i) => (kindAt(i) === 'format' ? 'format' : 'change')))
+  let marks = $derived(marksByLine(diff.blocks, hideFormatting))
+  let notes = $derived(notesByLine(diff.blocks, hideFormatting))
+  /** Whether a hunk changes formatting alone. */
+  const formattingOnly = (h: Hunk) => {
+    for (let i = h.start; i < h.end; i++) if (ops[i].kind !== 'eq' && kindAt(i) !== 'format') return false
+    return true
+  }
+  /** The note a row carries: a move's, or its formatting or rename block's. */
+  function noteOf(i: number, moved: { note?: string } | null): { text: string; kind: string } | null {
+    if (moved?.note) return { text: moved.note, kind: 'move' }
+    const op = ops[i]
+    const text = op.kind === 'add' ? notes.new.get(op.newIndex) : op.kind === 'del' ? notes.old.get(op.oldIndex) : undefined
+    return text ? { text, kind: kindAt(i) ?? 'change' } : null
+  }
   let moves = $derived(movesByLine(diff.moves ?? []))
 
   /** The move a changed row belongs to, if any, and the note on its first line. */
@@ -146,8 +167,8 @@
   import Empty from '../ui/Empty.svelte'
 </script>
 
-{#snippet line(tokens: Token[] | undefined, fallback: string, lineMarks: [number, number][] | undefined)}
-  {#if tokens}{#each withMarks(tokens, lineMarks) as t, k (k)}<span class={[t.cls, t.changed && 'chg']}>{t.text}</span>{/each}{:else}{fallback.replace(
+{#snippet line(tokens: Token[] | undefined, fallback: string, lineMarks: Mark[] | undefined)}
+  {#if tokens}{#each withMarks(tokens, lineMarks) as t, k (k)}<span class={[t.cls, t.changed && 'chg', t.kind]}>{t.text}</span>{/each}{:else}{fallback.replace(
       /\r?\n$/,
       '',
     )}{/if}
@@ -161,6 +182,7 @@
     <section class="hunk">
       <header>
         <span class="mono">{header(h)}</span>
+        {#if formattingOnly(h)}<span class="tag" title="Only how the code is written changed here">formatting only</span>{/if}
         {#if actions.apply}
           <button class="btn sm secondary" disabled={busy} onclick={() => run('apply', inHunk(h), 'h' + h.start)}>{actions.apply.label} hunk</button>
         {/if}
@@ -178,7 +200,14 @@
           {#each opIndexes(h) as i (i)}
             {@const op = ops[i]}
             {@const moved = op.kind === 'eq' ? null : moveOf(i)}
-            <tr class={op.kind} class:moved={!!moved} class:current={isCurrent(i)} class:sel={selected.has(i)} onclick={(e) => op.kind !== 'eq' && toggle(i, e)}>
+            {@const note = op.kind === 'eq' ? null : noteOf(i, moved)}
+            <tr
+              class={[op.kind, op.kind !== 'eq' && !moved && kindAt(i) !== 'change' && kindAt(i)]}
+              class:moved={!!moved}
+              class:current={isCurrent(i)}
+              class:sel={selected.has(i)}
+              onclick={(e) => op.kind !== 'eq' && toggle(i, e)}
+            >
               <td class="num">{op.oldIndex >= 0 ? op.oldIndex + 1 : ''}</td>
               <td class="num">{op.newIndex >= 0 ? op.newIndex + 1 : ''}</td>
               <td class="sign">{op.kind === 'add' ? '+' : op.kind === 'del' ? '-' : ' '}</td>
@@ -187,7 +216,7 @@
                     newTokens[op.newIndex],
                     newLines[op.newIndex],
                     op.kind === 'add' ? marks.new.get(op.newIndex) : undefined,
-                  )}{/if}{#if moved?.note}<span class="move-note">{moved.note}</span>{/if}</td
+                  )}{/if}{#if note}<span class={note.kind === 'move' ? 'move-note' : `block-note ${note.kind}`}>{note.text}</span>{/if}</td
               >
             </tr>
           {/each}
@@ -327,6 +356,57 @@
 
   tr.current .num:first-child {
     box-shadow: inset 3px 0 0 var(--syn-keyword);
+  }
+
+  /* Formatting is grey, with its text underlined in dots; a rename is ochre. */
+  tr.format {
+    background: color-mix(in srgb, var(--code-punctuation) 7%, transparent);
+  }
+
+  tr.format .sign {
+    color: var(--code-punctuation);
+  }
+
+  tr.rename {
+    background: color-mix(in srgb, var(--syn-number) 9%, transparent);
+  }
+
+  tr.rename .sign {
+    color: var(--syn-number);
+  }
+
+  /* As specific as the added and removed rows' own marks, which they replace. */
+  tr .chg.format {
+    background: none;
+    text-decoration: underline dotted var(--code-punctuation);
+    text-underline-offset: 4px;
+  }
+
+  tr .chg.rename {
+    background: color-mix(in srgb, var(--syn-number) 34%, transparent);
+  }
+
+  .tag {
+    flex: none;
+    padding: 0 7px;
+    border: 1px dotted var(--ink-faint);
+    border-radius: 4px;
+    color: var(--ink-soft);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .block-note {
+    padding-left: 12px;
+    color: var(--ink-mute);
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 12px;
+    user-select: none;
+  }
+
+  .block-note.rename {
+    color: var(--syn-number);
   }
 
   .move-note {

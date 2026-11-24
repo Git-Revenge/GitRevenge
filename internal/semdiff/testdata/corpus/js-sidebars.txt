@@ -1,0 +1,8 @@
+engine code, language JavaScript
+
+@@ -88,1 +88,4 @@ change
+-          items: [{ type: 'doc', id: 'research/semantic-diff-merge', label: 'Semantic diff and merge' }],
++          items: [
++            { type: 'doc', id: 'research/semantic-diff-merge', label: 'Semantic diff and merge' }[,]
++            [{ type: 'doc', id: 'research/gotreesitter-timing', label: 'gotreesitter timings' },]
++          ],

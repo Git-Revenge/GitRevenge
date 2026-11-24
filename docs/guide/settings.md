@@ -10,7 +10,9 @@ Open **Settings** with <kbd>Ctrl</kbd>+<kbd>,</kbd> or from the command palette.
 | **Theme** | System, Light or Dark. Switching cross-fades the window. |
 | **Commit graph** | Timeline (a line for each day, and authors beside their commits) or Compact (one commit per line). |
 | **Zoom** | Scales the whole app, from 80% to 150%. |
-| **Line diff** | How [diffs](history.md#diffs) match up lines: as git does (the repository's `diff.algorithm`, or Myers), or Myers, Minimal, Patience or Histogram. |
+| **Read code to compare it** | [Diffs](history.md#reading-the-code) of files in the fourteen languages read as code find changes token by token, with formatting and renames told apart. Off compares whole lines, as git does. Each diff has **Code** and **Lines** to switch. On by default. |
+| **Hide formatting-only changes** | Diffs start with formatting hidden. Where you stage, it's never hidden. Each diff has **Hide formatting** to switch. Off by default. |
+| **Line diff** | How [diffs](history.md#diffs) match up lines, for files not read as code and for **Lines**: as git does (the repository's `diff.algorithm`, or Myers), or Myers, Minimal, Patience or Histogram. |
 | **Ribbon between the sides** | In the split diff, bands join old lines to new ones and the sides aren't padded to line up. Off pads them. On by default. |
 | **Find moved code** | A block that moved shows once, as a move, instead of a deletion and an addition. On by default. |
 | **Experimental views** | A checkbox each for [Horizontal and Map](experimental-views.md). A view you switch on joins the graph's view menu, and nothing changes until you pick it there. Switching one off takes the graph back to Timeline or Compact. These can change or go away between versions. |

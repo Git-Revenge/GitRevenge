@@ -1648,6 +1648,9 @@ export namespace app {
 	    diffAlgorithm: string;
 	    diffRibbon: boolean;
 	    diffMoves: boolean;
+	    diffCode: boolean;
+	    diffHideFormatting: boolean;
+	    languages: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Preferences(source);
@@ -1667,6 +1670,9 @@ export namespace app {
 	        this.diffAlgorithm = source["diffAlgorithm"];
 	        this.diffRibbon = source["diffRibbon"];
 	        this.diffMoves = source["diffMoves"];
+	        this.diffCode = source["diffCode"];
+	        this.diffHideFormatting = source["diffHideFormatting"];
+	        this.languages = source["languages"];
 	    }
 	}
 	export class ProblemAction {
@@ -4547,6 +4553,7 @@ export namespace semdiff {
 	    line: number;
 	    from: number;
 	    to: number;
+	    kind?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Span(source);
@@ -4557,6 +4564,7 @@ export namespace semdiff {
 	        this.line = source["line"];
 	        this.from = source["from"];
 	        this.to = source["to"];
+	        this.kind = source["kind"];
 	    }
 	}
 	export class Block {
@@ -4564,6 +4572,8 @@ export namespace semdiff {
 	    oldEnd: number;
 	    newStart: number;
 	    newEnd: number;
+	    kind?: string;
+	    note?: string;
 	    old?: Span[];
 	    new?: Span[];
 	
@@ -4577,6 +4587,8 @@ export namespace semdiff {
 	        this.oldEnd = source["oldEnd"];
 	        this.newStart = source["newStart"];
 	        this.newEnd = source["newEnd"];
+	        this.kind = source["kind"];
+	        this.note = source["note"];
 	        this.old = this.convertValues(source["old"], Span);
 	        this.new = this.convertValues(source["new"], Span);
 	    }
@@ -4619,10 +4631,31 @@ export namespace semdiff {
 	        this.reindented = source["reindented"];
 	    }
 	}
+	export class Rename {
+	    from: string;
+	    to: string;
+	    count: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Rename(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.from = source["from"];
+	        this.to = source["to"];
+	        this.count = source["count"];
+	    }
+	}
 	export class Result {
 	    blocks: Block[];
 	    moves: Move[];
+	    renames: Rename[];
 	    algorithm: string;
+	    engine: string;
+	    language: string;
+	    fallback: string;
+	    unparsed: boolean;
 	    added: number;
 	    removed: number;
 	
@@ -4634,7 +4667,12 @@ export namespace semdiff {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.blocks = this.convertValues(source["blocks"], Block);
 	        this.moves = this.convertValues(source["moves"], Move);
+	        this.renames = this.convertValues(source["renames"], Rename);
 	        this.algorithm = source["algorithm"];
+	        this.engine = source["engine"];
+	        this.language = source["language"];
+	        this.fallback = source["fallback"];
+	        this.unparsed = source["unparsed"];
 	        this.added = source["added"];
 	        this.removed = source["removed"];
 	    }

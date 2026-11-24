@@ -34,7 +34,9 @@
     TrailerHints,
     Undo,
     UndoState,
+    FormattingOnly,
   } from '../../wailsjs/go/app/App.js'
+  import { prefs } from './prefs.svelte'
   import { repoReads } from './repoReads'
   import { ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
   import type { app, git } from '../../wailsjs/go/models'
@@ -117,6 +119,29 @@
   })
 
   let files = $derived(wt?.status.files ?? [])
+
+  /**
+   * Files whose changes, staged and not, are only formatting, read as code. Found after the
+   * list loads, for a list short enough to read quickly.
+   */
+  let formatOnly = $state(new Set<string>())
+  $effect(() => {
+    const list = files
+    const p = path
+    formatOnly = new Set()
+    if (!prefs.diffCode || !list.length || list.length > 25) return
+    const inWorkTree = list.filter((f) => f.workTree === 'M' && !f.binary).map((f) => f.path)
+    const inIndex = list.filter((f) => f.index === 'M' && !f.binary).map((f) => f.path)
+    void Promise.all([inWorkTree.length ? FormattingOnly(p, 'unstaged', '', inWorkTree) : [], inIndex.length ? FormattingOnly(p, 'staged', '', inIndex) : []])
+      .then(([w, i]) => {
+        if (list !== files) return
+        const ws = new Set(w)
+        const is = new Set(i)
+        // Every change the file has must be formatting.
+        formatOnly = new Set(list.filter((f) => (ws.has(f.path) || is.has(f.path)) && (f.workTree !== 'M' || ws.has(f.path)) && (f.index !== 'M' || is.has(f.path))).map((f) => f.path))
+      })
+      .catch(() => {})
+  })
   let conflicted = $derived(files.filter((f) => f.conflicted))
   let unstaged = $derived(files.filter((f) => !f.conflicted && (f.untracked || f.workTree !== '.')))
   let staged = $derived(files.filter((f) => !f.untracked && !f.conflicted && f.index !== '.'))
@@ -616,6 +641,7 @@
       <span class="path">{fileName(f.path)}</span>
       {#if f.origPath}<span class="from">from {f.origPath}</span>{/if}
       {#if tick === 'part'}<span class="partly">partly staged</span>{/if}
+      {#if formatOnly.has(f.path)}<span class="fmt-only" title="Only how the code is written changed">formatting only</span>{/if}
       {#if f.caseClash}<span class="partly" title="Another file has the same name in different letter case">case clash</span>{/if}
       {#if f.caseTwin}<span class="partly" title="Another file has the same name in different letter case. Windows and macOS can keep only one.">case twin</span>{/if}
       {#if f.binary}
@@ -1045,6 +1071,17 @@
     font-family: var(--font-mono);
     font-size: 12px;
     color: var(--ink-mute);
+  }
+
+  /* A file whose changes are only formatting, read as code. */
+  .fmt-only {
+    flex: none;
+    padding: 0 6px;
+    border: 1px dotted var(--ink-faint);
+    border-radius: 4px;
+    color: var(--ink-mute);
+    font-family: var(--font-mono);
+    font-size: 12px;
   }
 
   .from {

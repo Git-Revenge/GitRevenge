@@ -21,20 +21,22 @@ const maxMoveCandidates = 64
 func findMoves(ctx context.Context, a, b text, blocks []Block) ([]Move, error) {
 	deleted := make([]bool, a.n())
 	added := make([]bool, b.n())
+	addedIn := make([]int, b.n()) // the block each added line is in
 	addedAt := map[string][]int{}
-	for _, blk := range blocks {
+	for bi, blk := range blocks {
 		for i := blk.OldStart; i < blk.OldEnd; i++ {
 			deleted[i] = true
 		}
 		for j := blk.NewStart; j < blk.NewEnd; j++ {
 			added[j] = true
+			addedIn[j] = bi
 			if k := key(b, j); k != "" {
 				addedAt[k] = append(addedAt[k], j)
 			}
 		}
 	}
 	var moves []Move
-	for _, blk := range blocks {
+	for bi, blk := range blocks {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
@@ -47,6 +49,11 @@ func findMoves(ctx context.Context, a, b text, blocks []Block) ([]Move, error) {
 			bestJ, bestLen := -1, 0
 			candidates := addedAt[k]
 			for _, j := range candidates[:min(len(candidates), maxMoveCandidates)] {
+				// Lines taken out and put back where they were were edited, or indented,
+				// not moved.
+				if addedIn[j] == bi && i-blk.OldStart == j-blk.NewStart {
+					continue
+				}
 				n := 0
 				for i+n < a.n() && j+n < b.n() && deleted[i+n] && added[j+n] && key(a, i+n) == key(b, j+n) {
 					n++

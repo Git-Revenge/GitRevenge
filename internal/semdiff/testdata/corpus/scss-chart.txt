@@ -1,0 +1,16 @@
+engine code, language SCSS
+
+@@ -2,1 +2,1 @@ format: same value
+-$gap: {f:0.5rem];
++$gap: {f:.5rem];
+
+@@ -6,1 +6,4 @@ change
+-  .bar { height: [10px]; background: #1a5b6e }
++  .bar {
++    height: [12px];
++    background: #1a5b6e{f:;]
++  }
+
+@@ -7,1 +10,1 @@ format: same value
+-  .label { content: {f:"\2014"]; font-size: 12px; }
++  .label { content: {f:'—']; font-size: 12px; }

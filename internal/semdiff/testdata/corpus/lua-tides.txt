@@ -1,0 +1,30 @@
+engine code, language Lua
+rename out -> readings, 4 places
+
+@@ -4,1 +4,1 @@ format: same value
+-local MAX = {f:0x30]
++local MAX = {f:48]
+
+@@ -6,1 +6,1 @@ change
+-function M.forecast(start, n)
++function M.forecast(start, n[, step])
+
+@@ -7,1 +7,1 @@ rename: renamed from out
+-  local {r:out] = {}
++  local {r:readings] = {}
+
+@@ -9,1 +9,1 @@ change
+-    {r:out][#{r:out] + 1] = { at = start + i * [3600], height = M.height(start) }
++    {r:readings][#{r:readings] + 1] = { at = start + i * [step], height = M.height(start){f:,] }
+
+@@ -11,1 +11,1 @@ rename: renamed from out
+-  return {r:out]
++  return {r:readings]
+
+@@ -15,1 +15,1 @@ change
+-  return [(]math.sin(at[)])
++  return math.sin(at)
+
+@@ -18,1 +18,1 @@ format: same value
+-M.name = {f:'Brest']
++M.name = {f:"Brest"]

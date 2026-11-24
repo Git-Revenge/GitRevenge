@@ -12,6 +12,10 @@ class Prefs {
   diffAlgorithm = $state('')
   /** Moved lines show as moves; the open diff compares again when it changes. */
   diffMoves = $state(true)
+  /** Diffs read code in the languages the app knows; off compares lines, as git does. */
+  diffCode = $state(true)
+  /** Diffs start with formatting-only changes hidden, except where they stage. */
+  diffHideFormatting = $state(false)
 
   /** Loads the saved settings and applies the zoom. Until then, and if they can't be read,
    * the defaults stand. */
@@ -24,6 +28,8 @@ class Prefs {
       this.diffRibbon = p.diffRibbon
       this.diffAlgorithm = p.diffAlgorithm
       this.diffMoves = p.diffMoves
+      this.diffCode = p.diffCode
+      this.diffHideFormatting = p.diffHideFormatting
     } catch {
       // Keep the defaults.
     }

@@ -4,6 +4,11 @@ import { expect, type Page } from '@playwright/test'
 export interface Scenario {
   /** Answers by App method name. Anything else answers null. */
   responses?: Record<string, unknown>
+  /**
+   * Answers that depend on an argument, by App method name: the argument at index, and the
+   * answer for each of its values. They come before responses.
+   */
+  byArg?: Record<string, { index: number; answers: Record<string, unknown> }>
   /** Methods that fail, with their error message. */
   failures?: Record<string, string>
   /** Methods that take this long to answer, in milliseconds. */

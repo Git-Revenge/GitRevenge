@@ -139,7 +139,10 @@ jobs:
         run: |
           args=(-clean -platform "${{ matrix.platform }}" -ldflags "-X github.com/git-revenge/gitrevenge/internal/version.Version=${{ steps.version.outputs.version }}")
           if [ "$RUNNER_OS" = "Windows" ]; then args+=(-nsis); fi
-          if [ -n "${{ matrix.tags }}" ]; then args+=(-tags "${{ matrix.tags }}"); fi
+          # build/tags picks the grammars and keeps copyleft grammar code out (ADR 0015).
+          tags="$(cat build/tags)"
+          if [ -n "${{ matrix.tags }}" ]; then tags="${{ matrix.tags }},$tags"; fi
+          args+=(-tags "$tags")
           wails build "${args[@]}"
 
       # The digest of the app as built, kept to compare with what the installer puts on disk
@@ -331,7 +334,10 @@ jobs:
           mkdir -p dist staging
           cp -R build/bin/*.app "staging/Git Revenge.app"
           ln -s /Applications staging/Applications
-          hdiutil create -volname "Git Revenge" -srcfolder staging -ov -format UDZO \
+          # hdiutil sizes the image from the folder and can come up short ("No space left on
+          # device"), so it's given the folder's size and room to spare.
+          size=$(( $(du -sm staging | cut -f1) + 64 ))
+          hdiutil create -volname "Git Revenge" -srcfolder staging -ov -format UDZO -size "${size}m" \
             "dist/GitRevenge-${{ steps.version.outputs.version }}-macos-universal.dmg"
 
       - name: Notarize disk image

@@ -1,0 +1,9 @@
+engine code, language CSS
+
+@@ -571,0 +571,6 @@ change
++/* A click is waiting on a read, such as a menu reading what it needs (busy.ts). */
++html.busy,
++html.busy * {
++  cursor: progress !important;
++}
++

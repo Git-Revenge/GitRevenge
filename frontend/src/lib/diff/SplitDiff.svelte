@@ -21,6 +21,7 @@
     newText,
     diff,
     ribbon = true,
+    hideFormatting = false,
     stops = [],
     current = -1,
     jump = 0,
@@ -32,6 +33,8 @@
     newText: string
     diff: Result
     ribbon?: boolean
+    /** Draws formatting-only blocks as unchanged. */
+    hideFormatting?: boolean
     stops?: Stop[]
     /** The stop being read, or -1. */
     current?: number
@@ -85,7 +88,7 @@
 
   // Build the views whenever the inputs, the layout or word wrap change.
   $effect(() => {
-    const [p, a, b, d, wrapped, withRibbon] = [path, oldText, newText, diff, wrap.on, ribbon]
+    const [p, a, b, d, wrapped, withRibbon, hide] = [path, oldText, newText, diff, wrap.on, ribbon, hideFormatting]
     let cancelled = false
     const cleanups: (() => void)[] = []
     void languageFor(p).then((lang) => {
@@ -95,8 +98,8 @@
         const redraw = EditorView.updateListener.of((u) => {
           if (u.geometryChanged || u.viewportChanged || u.heightChanged) schedule()
         })
-        left = new EditorView({ doc: a, extensions: [...ext, sideMarks(sideModel(d, 'old')), redraw], parent: leftHost })
-        right = new EditorView({ doc: b, extensions: [...ext, sideMarks(sideModel(d, 'new')), redraw], parent: rightHost })
+        left = new EditorView({ doc: a, extensions: [...ext, sideMarks(sideModel(d, 'old', hide)), redraw], parent: leftHost })
+        right = new EditorView({ doc: b, extensions: [...ext, sideMarks(sideModel(d, 'new', hide)), redraw], parent: rightHost })
         cleanups.push(linkScrolling(left, right))
         const resize = new ResizeObserver(() => schedule())
         if (svg) resize.observe(svg)
@@ -106,10 +109,11 @@
       } else if (!withRibbon && host) {
         const sa = starts(a)
         const sb = starts(b)
+        // Hidden formatting still lines the sides up; it just isn't marked.
         const changes = d.blocks.map((blk) => new Change(sa[blk.oldStart], sa[blk.oldEnd], sb[blk.newStart], sb[blk.newEnd]))
         merge = new MergeView({
-          a: { doc: a, extensions: [...ext, sideMarks(sideModel(d, 'old'))] },
-          b: { doc: b, extensions: [...ext, sideMarks(sideModel(d, 'new'))] },
+          a: { doc: a, extensions: [...ext, sideMarks(sideModel(d, 'old', hide))] },
+          b: { doc: b, extensions: [...ext, sideMarks(sideModel(d, 'new', hide))] },
           parent: host,
           collapseUnchanged: { margin: 3, minSize: 6 },
           gutter: true,
@@ -420,6 +424,24 @@
     stroke: color-mix(in srgb, var(--danger) 85%, transparent);
   }
 
+  /* A rename is ochre; formatting is barely there, outlined in dashes. */
+  .band.rename .fill {
+    fill: color-mix(in srgb, var(--syn-number) 28%, transparent);
+  }
+
+  .band.rename .edge {
+    stroke: color-mix(in srgb, var(--syn-number) 85%, transparent);
+  }
+
+  .band.format .fill {
+    fill: color-mix(in srgb, var(--code-punctuation) 8%, transparent);
+  }
+
+  .band.format .edge {
+    stroke: color-mix(in srgb, var(--code-punctuation) 65%, transparent);
+    stroke-dasharray: 3 3;
+  }
+
   .band.move .fill {
     fill: color-mix(in srgb, var(--syn-string) 26%, transparent);
   }
@@ -468,6 +490,37 @@
 
   .split :global(.cm-moved) {
     background: color-mix(in srgb, var(--syn-string) 12%, transparent);
+  }
+
+  .split :global(.cm-format) {
+    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--code-punctuation) 50%, transparent);
+  }
+
+  .split :global(.cm-rename) {
+    background: color-mix(in srgb, var(--syn-number) 9%, transparent);
+  }
+
+  .split :global(.cm-word-format) {
+    text-decoration: underline dotted var(--code-punctuation);
+    text-underline-offset: 4px;
+  }
+
+  .split :global(.cm-word-rename) {
+    background: color-mix(in srgb, var(--syn-number) 34%, transparent);
+    border-radius: 2px;
+  }
+
+  .split :global(.cm-block-note) {
+    padding-left: 12px;
+    color: var(--ink-mute);
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 12px;
+    user-select: none;
+  }
+
+  .split :global(.cm-block-note-rename) {
+    color: var(--syn-number);
   }
 
   .split :global(.cm-word-del) {
