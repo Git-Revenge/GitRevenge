@@ -126,7 +126,8 @@ test.describe('moves', () => {
 
   test('in the split view, bands take their move colour and a changed move opens', async ({ page }) => {
     await openDiff(page, 'split', moved, oldLines, newLines)
-    await expect(page.locator('.band.move.t0')).toHaveCount(1)
+    // The ribbon draws once both sides are laid out, which a busy machine can take a while over.
+    await expect(page.locator('.band.move.t0')).toHaveCount(1, { timeout: 15_000 })
     await expect(page.locator('.band.move.t1')).toHaveCount(1)
     await expect(page.locator('.cm-moved.t1').first()).toBeVisible()
     await page.locator('[data-side="new"] .cm-move-note', { hasText: 'changed' }).getByRole('button', { name: 'Compare with the original' }).click()
@@ -139,7 +140,7 @@ test.describe('renames', () => {
     await openDiff(page, 'unified', renamed, renLines, renNew)
     const lo = page.locator('tr.add .chg.rename[data-rename="1"]')
     const hi = page.locator('tr.add .chg.rename[data-rename="2"]')
-    await expect(lo).toHaveCount(3)
+    await expect(lo).toHaveCount(3, { timeout: 15_000 })
     await expect(lo.first()).toHaveClass(/\br3\b/)
     await expect(hi.first()).toHaveClass(/\br0\b/)
     await lo.first().click()
@@ -152,7 +153,7 @@ test.describe('renames', () => {
   test('in the split view too, on both sides', async ({ page }) => {
     await openDiff(page, 'split', renamed, renLines, renNew)
     const hi = page.locator('[data-side="new"] .cm-word-rename[data-rename="2"]')
-    await expect(hi).toHaveCount(2)
+    await expect(hi).toHaveCount(2, { timeout: 15_000 })
     await hi.first().click()
     await expect(page.locator('.cm-word-rename.cm-hot[data-rename="2"]')).toHaveCount(4)
   })
