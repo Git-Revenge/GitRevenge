@@ -34,12 +34,23 @@ The research, with sources, is in [`docs/research/semantic-diff-merge.md`](../re
 - **Staging always shows the end result.** Any view that stages, unstages or discards shows every change that would be written, whatever the formatting option says. Formatting-only changes there can be marked as such, but are never hidden. Staging, unstaging and discarding keep working on lines.
 - **Merging stays git's.** git's line merge decides what conflicts, at every merge, rebase, cherry-pick and revert stop. Inside each conflicted place, the tool runs a three-way merge over the syntax tokens of base, ours and theirs. Where the two sides changed different tokens, the combined result is **pre-filled** into the place and marked **suggested**. The user can keep it, change it or choose a side. Until they act, it is not counted as decided. P4Merge-style colouring of where each change came from, and a base column, join the existing views.
 - **mergiraf is supported, not bundled.** If the user has set up [mergiraf](https://mergiraf.org/) (GPLv3) as a git merge driver, git runs it as it would any driver, and the conflict tool works on whatever is left. The app never ships it.
-- **When something goes wrong, the app falls back to the line diff and says so.** It falls back when a file is over 1 MB, when either version doesn't parse, or when the work runs past its time or size budget. A quiet note says which happened. A parser bug can cost the nicer view, never a wrong one.
+- **When something goes wrong, the app falls back to the line diff and says so.** It falls back when:
+  - either version is over 1 MB, which is checked before parsing;
+  - a parse stops at its 150 ms timeout or its 256 MB memory budget, both set on the parser;
+  - more than a quarter of either version's bytes sit inside ERROR nodes;
+  - either version has more than 200,000 tokens.
+
+  A quiet note says which happened. A smaller parse error doesn't fall back: the tokens around it are still diffed, and the note says part of the file didn't parse. A parser bug can cost the nicer view, never a wrong one. (Changed on 2026-11-23 by #943, which measured the budgets. The first draft fell back on any parse error, which would have hit two-thirds of kernel C files.)
 
 ## Consequences
 
-- The app binary grows by about 10 MB for the runtime and about 5 MB for 22 major grammars (measured stripped, windows/amd64). The figure for the first-pass list still has to be measured. Installers grow less, since they're compressed.
+- The Windows app grows by 10.8 MB (25.95 to 36.76 MB) and its installer by 4.8 MB (11.69 to 16.46 MB), with gotreesitter and the 15 first-pass grammar packages (the list above plus TSX). The full figures are in [`docs/research/gotreesitter-timing.md`](../research/gotreesitter-timing.md).
 - gotreesitter is pre-1.0 and has one main upstream. Pinning the version and testing against the fixed corpus contain that risk. If it fails us, the fallback is the official cgo bindings plus a Windows C toolchain, which would mean revisiting ADR 0002.
-- Parse speed on our own files hasn't been measured yet. Timing kernel files comes first, before the budgets above are final.
+- **Speed depends on the grammar's engine** (#943).
+  - **ccore grammars:** C, TypeScript, Python, CSS, JSON and Rust run on gotreesitter's certified C-faithful engine. They read 6–22 MB a second, and C parses at 2.3 times the speed of the official cgo bindings. `kernel/sched/core.c` (296 KB) parses in 21 ms, and the largest kernel files under 1 MB in about 100 ms.
+  - **Older-engine grammars:** Go, JavaScript, TSX, C#, Java, SCSS, Vue, HTML, Lua and XML mostly read 0.7–4 MB a second. Go is about 3 times slower than cgo, and their trees take 0.3–2 KB of memory per source byte while parsing.
+  - **Cost:** the timeout keeps the app responsive. Some files in those languages get the line diff instead: 5 of 400 C# files sampled (46–317 KB), and bundled or minified JavaScript. They speed up as upstream certifies more grammars.
+- **Kernel C trips the C grammar often.** 67% of kernel C files have an ERROR node, from macros, but in the median such file it covers 0.2% of the bytes. The official runtime gives the same counts.
+- **How the parser is used:** trees are walked with `Node.Children()`, two to three times faster on ccore trees than the cursor. Each file uses a plain `Parser` from a `ParserPool` per language, since a `Parser` isn't safe for concurrent use. Trees are released straight after the walk, and only tokens are cached.
 - `lineDiff.ts` stops being the diff engine. Its job of rebuilding a file from a chosen set of changes, for staging, has to work from the Go result.
 - Highlighting stays with Lezer in the frontend, so the app parses some files twice, once for colour and once for structure.

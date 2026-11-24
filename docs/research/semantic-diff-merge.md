@@ -95,7 +95,13 @@ These are worth exposing, since we drive the git CLI anyway ([git diff](https://
 
 So the runtime costs about 10 MB and the major grammars about 5 MB more. For comparison, the v1.1.0 Windows installer is 11.6 MB and the macOS universal DMG is 20.4 MB (`gh release view v1.1.0`). Installers are compressed, so their growth will be smaller than the raw numbers, but I didn't measure it. The `grammar_blobs_external` tag can load grammars from a folder at run time, which allows "download languages on first use" if size matters.
 
-I didn't time parses locally: running the freshly built benchmark binary was blocked by this session's permission checks. The speed column therefore rests on the project's own figures. A parse benchmark on kernel files (`kernel/sched/core.c` is 302 KB) should be the first task of any spike.
+I didn't time parses locally: running the freshly built benchmark binary was blocked by this session's permission checks. The speed column therefore rests on the project's own figures.
+
+**Measured since, in #943:** see [`gotreesitter-timing.md`](gotreesitter-timing.md). In brief:
+
+- **ccore grammars** (C, TypeScript, Python, CSS, JSON, Rust) are fast, and C beats the cgo bindings 2.3 to 1.
+- **Older-engine grammars** (Go, JavaScript, C#, Java and the rest of the first-pass list) are 3 or more times slower than cgo.
+- **Size:** the first-pass grammars add 10.8 MB to the app and 4.8 MB to the Windows installer.
 
 ### 2. Diff algorithm
 
@@ -159,7 +165,7 @@ A new Go package, say `internal/semdiff`, reached through new bound methods on `
 
 1. **Inputs** are blob ids where they exist, read through the existing `cat-file --batch` process, plus the working-tree text. Cache results by `(old id, new id, language, engine version)` in an LRU. The working tree is keyed by a content hash.
 2. **Language detection.** Use `linguist-language` or a `diff=` driver from `git check-attr` first, then gotreesitter's `grammars.DetectLanguage` by file name. Unknown files go straight to the line diff.
-3. **Parsing.** Parse the old and new versions in two goroutines, each with its own parser. I haven't checked whether gotreesitter parsers are safe to share; [bonsai](https://pkg.go.dev/github.com/msuozzo/bonsai) warns its parsers are not. Stop if `context` is cancelled: the tab closed (the #778 lesson) or the budget ran out.
+3. **Parsing.** Parse the old and new versions in two goroutines, each with its own parser. A gotreesitter `Parser` "is not safe for concurrent use", but a `ParserPool` is (checked in #943). Stop if `context` is cancelled: the tab closed (the #778 lesson) or the budget ran out.
 4. **Tokens.** Walk the leaves into a slice of `{kind, text, normalised, span}`. Comments are their own tokens and can be ignored on request. Per-language normalisers start with the SemanticDiff list for our top languages.
 5. **Diff.** Use `znkr.io/diff.EditsFunc` over the token slices, comparing normalised text. Then:
    - align change edges to node boundaries;
@@ -168,13 +174,13 @@ A new Go package, say `internal/semdiff`, reached through new bound methods on `
 6. **Output.** Byte ranges for each side: changed, moved (with an id), renamed (with an id) and hidden. Also a line map, which the unified view and `MergeView.override` both use. A field records which engine produced it (`structure` or `lines`) and why it fell back.
 7. **Conflicts.** For each place from `parsePlaces`, take the base, ours and theirs slices and tokenise them in the context of each whole-file parse. Run a three-way merge over the tokens (diff3 on tokens), and return a suggestion or per-side token changes.
 
-**Budget and fallbacks.** These are proposed numbers; check them on the kernel bench.
+**Budget and fallbacks.** These were proposed numbers. #943 checked them on the kernel bench and changed the parse-error rule ([timings](gotreesitter-timing.md#the-budgets-confirmed-or-changed)).
 
 | Condition | Action | Precedent |
 |---|---|---|
 | Either side over 1 MB | Line diff | difftastic `DEFAULT_BYTE_LIMIT = 1_000_000`; our `MAX_HIGHLIGHT` is 1 MiB |
-| Any parse error in either version | Line diff, with a note saying why | difftastic `DEFAULT_PARSE_ERROR_LIMIT = 0`; SemanticDiff's fallback warning |
-| More than 200,000 tokens per side, or 150 ms wall time | Line diff, with a note | GumTree mean 20–74 ms per file pair; znkr usually under 1 ms |
+| More than 25% of either version's bytes inside ERROR nodes (was: any parse error) | Line diff, with a note saying why. A smaller error only adds a note | difftastic `DEFAULT_PARSE_ERROR_LIMIT = 0`; SemanticDiff's fallback warning. 67% of kernel C files have some ERROR node |
+| More than 200,000 tokens per side, or a parse stopped by its 150 ms timeout or 256 MB budget | Line diff, with a note | GumTree mean 20–74 ms per file pair; znkr usually under 1 ms |
 | Line diff over 4000 edits | Replace-all, as today | `MAX_EDIT_DISTANCE` |
 | Many files in a commit | Diff a file when it is opened, not the whole commit at once; prefetch the next file | — |
 
@@ -206,8 +212,8 @@ None of the first-pass grammars is copyleft. gotreesitter's copyleft grammars ar
 
 ## Not verified
 
-- **Parse speed on our files.** Running the benchmark binary was blocked, so speed figures are gotreesitter's own.
-- **gotreesitter's concurrency rules, and which grammars are certified.** Only 12 of the 34 certified grammars are named in the README.
+- ~~**Parse speed on our files.**~~ Measured in #943: [`gotreesitter-timing.md`](gotreesitter-timing.md).
+- ~~**gotreesitter's concurrency rules, and which grammars are certified.**~~ Checked in #943. A `Parser` isn't safe to share and a `ParserPool` is. Of the first-pass list, TypeScript, Python, CSS, JSON and Rust are certified; Go, JavaScript, TSX, C#, Java, SCSS, Vue, HTML, Lua and XML aren't.
 - **P4Merge layout.** The manual doesn't say which side shows theirs and which shows yours. The 2-way page says both "purple bands" and "blue and green".
 - **CodeMirror reference details** beyond the installed `.d.ts`. The online reference was read as a summary.
 - **GPL FAQ.** gnu.org returned HTTP 429 three times, so this note gives no quoted licence guidance on bundling mergiraf.

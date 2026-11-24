@@ -85,7 +85,10 @@ const sidebars = {
           type: 'category',
           label: 'Research',
           collapsed: true,
-          items: [{ type: 'doc', id: 'research/semantic-diff-merge', label: 'Semantic diff and merge' }],
+          items: [
+            { type: 'doc', id: 'research/semantic-diff-merge', label: 'Semantic diff and merge' },
+            { type: 'doc', id: 'research/gotreesitter-timing', label: 'gotreesitter timings' },
+          ],
         },
       ],
     },
