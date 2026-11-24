@@ -303,15 +303,15 @@ func init() {
 	} {
 		linguistNames[name] = id
 	}
+	// The first languages' programs, for #! lines.
+	programs := map[string][]string{
+		"python":     {"python", "pypy"},
+		"javascript": {"node", "nodejs"},
+		"typescript": {"ts-node", "deno"},
+		"lua":        {"lua", "luajit"},
+	}
 	for _, l := range languages {
-		for _, prog := range map[string][]string{
-			"python":     {"python", "pypy"},
-			"javascript": {"node", "nodejs"},
-			"typescript": {"ts-node", "deno"},
-			"lua":        {"lua", "luajit"},
-		}[l.id] {
-			l.interps = append(l.interps, prog)
-		}
+		l.interps = append(l.interps, programs[l.id]...)
 	}
 }
 
