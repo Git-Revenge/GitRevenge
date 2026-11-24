@@ -415,7 +415,7 @@ func substitution(a, b *version, c change) (from, to string, ok bool) {
 
 // findRenames finds names changed the same way in at least minRenamePlaces places, with no
 // other change to either name, where the old name is gone and the new one is new.
-func findRenames(a, b *version, segs []*segment) ([]Rename, map[[2]string]bool) {
+func findRenames(a, b *version, segs []*segment) ([]Rename, map[[2]string]int) {
 	count := map[[2]string]int{}
 	from := map[string]map[string]bool{}
 	to := map[string]map[string]bool{}
@@ -457,18 +457,18 @@ func findRenames(a, b *version, segs []*segment) ([]Rename, map[[2]string]bool) 
 	}
 	oldNames, newNames := names(a), names(b)
 	renames := []Rename{}
-	confirmed := map[[2]string]bool{}
+	confirmed := map[[2]string]int{} // each rename's place in renames, from 1
 	for _, k := range order {
 		if count[k] >= minRenamePlaces && len(from[k[0]]) == 1 && len(to[k[1]]) == 1 && !newNames[k[0]] && !oldNames[k[1]] {
 			renames = append(renames, Rename{From: k[0], To: k[1], Count: count[k]})
-			confirmed[k] = true
+			confirmed[k] = len(renames)
 		}
 	}
 	return renames, confirmed
 }
 
 // classify says what a segment is and marks what changed in it.
-func classify(a, b *version, s *segment, renames map[[2]string]bool) {
+func classify(a, b *version, s *segment, renames map[[2]string]int) {
 	if s.whole {
 		blk := Block{OldStart: s.o0, OldEnd: s.o1, NewStart: s.n0, NewEnd: s.n1}
 		markWords(a.t, b.t, &blk, movedLines{before: a.moved, after: b.moved})
@@ -512,13 +512,14 @@ func classify(a, b *version, s *segment, renames map[[2]string]bool) {
 			}
 			return
 		}
-		if f, t, ok := substitution(a, b, c); ok && renames[[2]string{f, t}] {
+		if f, t, ok := substitution(a, b, c); ok && renames[[2]string{f, t}] > 0 {
 			renamed++
 			if renamedFrom == "" {
 				renamedFrom = f
 			}
-			marks.add(&marks.old, a.toks[o[0]].from, a.toks[o[0]].to, KindRename)
-			marks.add(&marks.new, b.toks[n[0]].from, b.toks[n[0]].to, KindRename)
+			g := renames[[2]string{f, t}]
+			marks.old = append(marks.old, mark{a.toks[o[0]].from, a.toks[o[0]].to, KindRename, g})
+			marks.new = append(marks.new, mark{b.toks[n[0]].from, b.toks[n[0]].to, KindRename, g})
 			return
 		}
 		changes++
@@ -598,7 +599,7 @@ func classify(a, b *version, s *segment, renames map[[2]string]bool) {
 // sides, as when Python code is indented into a block, or a CSS selector loses the space
 // that made it a descendant. Tokens read from text the tree left out, or inside a parse
 // error, count only as written. A name a rename changed counts as the same token.
-func (s *segment) reshaped(a, b *version, renames map[[2]string]bool) bool {
+func (s *segment) reshaped(a, b *version, renames map[[2]string]int) bool {
 	o, n := meaningful(a, s.ot), meaningful(b, s.nt)
 	if len(o) != len(n) {
 		return true
@@ -608,7 +609,7 @@ func (s *segment) reshaped(a, b *version, renames map[[2]string]bool) bool {
 		if ta.path != tb.path {
 			return true
 		}
-		if ta.key != tb.key && (ta.class != clsIdent || !renames[[2]string{a.text(o[k]), b.text(n[k])}]) {
+		if ta.key != tb.key && (ta.class != clsIdent || renames[[2]string{a.text(o[k]), b.text(n[k])}] == 0) {
 			return true
 		}
 		if (ta.inError || tb.inError) && a.text(o[k]) != b.text(n[k]) {
@@ -796,11 +797,12 @@ type marker struct {
 type mark struct {
 	from, to int
 	kind     string
+	rename   int // which rename, from 1, for a rename mark
 }
 
 func (m *marker) add(list *[]mark, from, to int, kind string) {
 	if to > from {
-		*list = append(*list, mark{from, to, kind})
+		*list = append(*list, mark{from, to, kind, 0})
 	}
 }
 
@@ -815,6 +817,7 @@ func (m *marker) spans(t text, from, to int, marks []mark) []Span {
 	type run struct {
 		line, from, to int // bytes within the line
 		kind           string
+		rename         int
 	}
 	var runs []run
 	for _, mk := range marks {
@@ -825,8 +828,8 @@ func (m *marker) spans(t text, from, to int, marks []mark) []Span {
 			body := t.body(line)
 			end := min(mk.to, lineStart+len(body))
 			if end > p && line >= from && line < to {
-				r := run{line: line, from: p - lineStart, to: end - lineStart, kind: mk.kind}
-				if n := len(runs); n > 0 && runs[n-1].line == r.line && runs[n-1].kind == r.kind &&
+				r := run{line: line, from: p - lineStart, to: end - lineStart, kind: mk.kind, rename: mk.rename}
+				if n := len(runs); n > 0 && runs[n-1].line == r.line && runs[n-1].kind == r.kind && runs[n-1].rename == r.rename &&
 					strings.TrimSpace(body[runs[n-1].to:max(r.from, runs[n-1].to)]) == "" && r.from >= runs[n-1].from {
 					runs[n-1].to = max(runs[n-1].to, r.to)
 				} else {
@@ -841,7 +844,7 @@ func (m *marker) spans(t text, from, to int, marks []mark) []Span {
 	}
 	for _, r := range runs {
 		body := t.body(r.line)
-		out = append(out, Span{Line: r.line, From: utf16Len(body[:r.from]), To: utf16Len(body[:r.to]), Kind: r.kind})
+		out = append(out, Span{Line: r.line, From: utf16Len(body[:r.from]), To: utf16Len(body[:r.to]), Kind: r.kind, Rename: r.rename})
 	}
 	return out
 }

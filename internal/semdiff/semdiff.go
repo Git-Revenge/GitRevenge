@@ -112,6 +112,9 @@ type Span struct {
 	// Kind is KindChange, KindFormat (the same token written differently, or optional
 	// punctuation) or KindRename.
 	Kind string `json:"kind,omitempty"`
+	// Rename is which of the Result's Renames a rename span is, counting from 1, so every
+	// place one name changed can be shown together. 0 for other spans.
+	Rename int `json:"rename,omitempty"`
 }
 
 // Move is a run of lines deleted at [OldStart, OldEnd) and added at [NewStart, NewEnd), the
