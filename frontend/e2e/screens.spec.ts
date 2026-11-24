@@ -2696,7 +2696,8 @@ test.describe('before the first load has answered', () => {
 // #391: staging finished after the diff closed, and reloading it showed a null error.
 test('closing a diff while staging a hunk shows no error', async ({ page }) => {
   const side = (text: string) => ({ text, exists: true, binary: false, tooBig: false, size: text.length })
-  await open(page, 'closingDiff', { delays: { SetStagedContent: 400 }, responses: { FileContents: { old: side('one\n'), new: side('one\ntwo\n') } } })
+  const diff = { blocks: [{ oldStart: 1, oldEnd: 1, newStart: 1, newEnd: 2 }], moves: [], algorithm: 'myers', added: 1, removed: 0 }
+  await open(page, 'closingDiff', { delays: { SetStagedContent: 400 }, responses: { FileDiff: { contents: { kind: 'text', old: side('one\n'), new: side('one\ntwo\n') }, diff } } })
   await page.getByRole('button', { name: 'Stage hunk' }).click()
   await page.evaluate(() => Object.assign(window, { __diffTarget: null }))
   await expect.poll(() => calls(page, 'SetStagedContent').then((c) => c.length)).toBe(1)

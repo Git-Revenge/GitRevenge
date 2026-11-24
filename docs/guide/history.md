@@ -8,6 +8,12 @@ Click a file in a commit, or in your uncommitted changes, to see its diff. Pick 
 - **Split:** the old and new versions side by side.
 - **File:** the whole file as of that version.
 
+Inside a changed line, the words that changed are marked, so a renamed variable doesn't read as a rewritten line. A block of lines that moved shows once, in teal, as a move: "moved to line 9" where it left, and "moved from line 3" where it arrived. A row above the diff counts the lines added and removed and the moves. <kbd>F7</kbd> and <kbd>Shift</kbd>+<kbd>F7</kbd> step through the changes, as the arrows beside the count do, and the change you're on is marked at its left edge.
+
+In **Split**, a **ribbon** runs between the sides. The sides aren't padded to line up: each reads as a plain file, the two scroll together, and a curved band joins each change's old lines to its new ones. A change is rose fading to green, lines only added or only removed are a green or rose wedge, and a move is teal, drawn over the others. The change you're on is outlined. To pad the sides instead, turn the ribbon off in [Settings](settings.md).
+
+Lines are matched up as git does: by the `diff.algorithm` in your git config (Myers when it says nothing), unless you pick Myers, Minimal, Patience or Histogram in [Settings](settings.md).
+
 Code is syntax highlighted. Images (PNG, JPEG, GIF, WebP, AVIF, BMP, ICO and SVG) are shown as pictures and compared side by side, fitted to the view or at actual size. <kbd>Alt</kbd>+<kbd>Z</kbd> turns word wrap on and off. Press <kbd>Escape</kbd> to go back to the graph.
 
 ## Rendered previews

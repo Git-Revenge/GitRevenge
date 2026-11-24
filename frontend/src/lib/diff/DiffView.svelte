@@ -11,8 +11,10 @@
 
 <script lang="ts">
   import Loading from '../ui/Loading.svelte'
-  import { FileContents, FileData, FileImage, SetStagedContent, SetWorkTreeContent } from '../../../wailsjs/go/app/App.js'
-  import type { git } from '../../../wailsjs/go/models'
+  import { FileData, FileDiff, FileImage, SetStagedContent, SetWorkTreeContent } from '../../../wailsjs/go/app/App.js'
+  import type { app } from '../../../wailsjs/go/models'
+  import { prefs } from '../prefs.svelte'
+  import { stops as stopsOf } from './blocks'
   import { formatShortcut, provideCommands } from '../commands.svelte'
   import { session } from '../session.svelte'
   import Icon from '../ui/Icon.svelte'
@@ -36,7 +38,19 @@
     onOpen?: (t: DiffTarget) => void
   } = $props()
 
-  provideCommands(() => (contents?.kind === 'text' ? [wrapCommand()] : []))
+  provideCommands(() =>
+    contents?.kind === 'text'
+      ? [
+          wrapCommand(),
+          ...(layout !== 'file' && stops.length
+            ? [
+                { id: 'diff.nextChange', group: 'View', title: 'Next change', keywords: 'diff hunk', shortcut: 'F7', run: () => step(1) },
+                { id: 'diff.prevChange', group: 'View', title: 'Previous change', keywords: 'diff hunk', shortcut: 'Shift+F7', run: () => step(-1) },
+              ]
+            : []),
+        ]
+      : [],
+  )
 
   type Layout = 'unified' | 'split' | 'file'
   const LAYOUT_KEY = 'gitrevenge.diffLayout'
@@ -87,26 +101,57 @@
       ? Promise.resolve('')
       : FileData(path, target.mode, target.commit ?? '', target.file)
 
-  let contents = $state<git.FileContents | null>(null)
+  let loaded = $state<app.FileDiff | null>(null)
+  let contents = $derived(loaded?.contents ?? null)
+  let diff = $derived(loaded?.diff ?? null)
   let force = $state(false)
 
   async function load() {
     const t = target as DiffTarget | null
     // A write that finishes after the diff has closed lands here with nothing left to show.
     if (!t) return
-    const res = await session.run(() =>
-      FileContents(path, t.mode, t.commit ?? '', t.file, t.oldPath ?? '', force),
-    )
-    if (res && t === target) contents = res
+    const res = await session.run(() => FileDiff(path, t.mode, t.commit ?? '', t.file, t.oldPath ?? '', force))
+    if (res && t === target) loaded = res
   }
 
-  // Reload when the target changes, and when the repo changes on disk (for work tree diffs).
+  // Reload when the target changes, when the repo changes on disk (for work tree diffs), and
+  // when the diff settings change.
   $effect(() => {
     void target
     void force
+    void prefs.diffAlgorithm
+    void prefs.diffMoves
     if (target.mode !== 'commit') void session.revision[path]
     void load()
   })
+
+  // The changes to step through. Opening another file starts again from none.
+  let stops = $derived(diff ? stopsOf(diff) : [])
+  let current = $state(-1)
+  let jump = $state(0)
+  $effect(() => {
+    void target
+    current = -1
+  })
+  $effect(() => {
+    // A reload with fewer changes keeps the place in range.
+    if (current >= stops.length) current = stops.length - 1
+  })
+  function step(by: 1 | -1) {
+    if (!stops.length) return
+    current = current < 0 ? (by > 0 ? 0 : stops.length - 1) : (current + by + stops.length) % stops.length
+    jump++
+  }
+
+  /** What the two sides are, for the split view's heads. */
+  let labels = $derived.by(() => {
+    const short = (target.commit ?? '').slice(0, 7)
+    if (target.mode === 'staged') return { before: 'Before · HEAD', after: 'After · staged' }
+    if (target.mode === 'unstaged') return { before: 'Before · staged', after: 'After · working tree' }
+    return { before: `Before · ${short}^`, after: `After · ${short}` }
+  })
+
+  const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
   // Reset per-file state when switching files.
   $effect(() => {
@@ -174,7 +219,25 @@
     {/if}
   </header>
 
-  <div class="body code-ground">
+  {#if contents?.kind === 'text' && diff && layout !== 'file'}
+    <div class="summary" role="group" aria-label="What changed">
+      {#if diff.added}<span class="sum"><span class="swatch add" aria-hidden="true"></span>{count(diff.added, 'line added', 'lines added')}</span>{/if}
+      {#if diff.removed}<span class="sum"><span class="swatch del" aria-hidden="true"></span>{count(diff.removed, 'line removed', 'lines removed')}</span>{/if}
+      {#if diff.moves?.length}<span class="sum"><span class="swatch move" aria-hidden="true"></span>{count(diff.moves.length, 'move', 'moves')}</span>{/if}
+      <span class="spacer"></span>
+      {#if stops.length}
+        <span class="where" title="Lines matched by {diff.algorithm}">{current >= 0 ? `${current + 1} of ${stops.length}` : count(stops.length, 'change', 'changes')}</span>
+        {#if layout === 'unified'}
+          <button class="step" aria-label="Previous change" title="Previous change (Shift+F7)" onclick={() => step(-1)}
+            ><span class="flip"><Icon name="chevron" size={14} /></span></button
+          >
+          <button class="step" aria-label="Next change" title="Next change (F7)" onclick={() => step(1)}><Icon name="chevron" size={14} /></button>
+        {/if}
+      {/if}
+    </div>
+  {/if}
+
+  <div class="body code-ground" class:fill={layout === 'split' && contents?.kind === 'text'}>
     {#if !contents}
       <Loading />
     {:else if contents.kind === 'large' && previewer?.binary && previewer.large && contents.new.exists}
@@ -207,13 +270,13 @@
       {:else}
         <FileView path={target.file} {text} />
       {/if}
-    {:else if layout === 'split'}
-      <SplitDiff path={target.file} oldText={contents.old.text} newText={contents.new.text} />
+    {:else if layout === 'split' && diff}
+      <SplitDiff path={target.file} oldText={contents.old.text} newText={contents.new.text} {diff} ribbon={prefs.diffRibbon} {stops} {current} {jump} {labels} onStep={step} />
       {#if target.mode !== 'commit'}
         <p class="muted hint">Switch to Unified to stage or discard individual hunks and lines.</p>
       {/if}
-    {:else}
-      <UnifiedDiff path={target.file} oldText={contents.old.text} newText={contents.new.text} {actions} />
+    {:else if diff}
+      <UnifiedDiff path={target.file} oldText={contents.old.text} newText={contents.new.text} {diff} {actions} {stops} {current} {jump} />
     {/if}
   </div>
 </div>
@@ -234,6 +297,87 @@
     flex: 1;
     min-height: 0;
     overflow: auto;
+  }
+
+  /* The split view scrolls its own sides. */
+  .body.fill {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .body.fill > :global(*:first-child) {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--paper-edge);
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  .sum {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .swatch {
+    width: 14px;
+    height: 10px;
+    border-radius: 2px;
+  }
+
+  .swatch.add {
+    background: color-mix(in srgb, var(--success) 45%, transparent);
+  }
+
+  .swatch.del {
+    background: color-mix(in srgb, var(--danger) 35%, transparent);
+  }
+
+  .swatch.move {
+    background: color-mix(in srgb, var(--syn-string) 35%, transparent);
+  }
+
+  .where {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-mute);
+  }
+
+  .step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 26px;
+    margin-left: -8px;
+    border: 1px solid var(--paper-edge);
+    border-radius: 8px;
+    background: var(--paper);
+    color: var(--ink-soft);
+    cursor: pointer;
+  }
+
+  .step:first-of-type {
+    margin-left: 0;
+  }
+
+  .step:hover {
+    color: var(--ink);
+    border-color: var(--ink-faint);
+  }
+
+  .flip {
+    display: inline-flex;
+    transform: rotate(180deg);
   }
 
   .notice {

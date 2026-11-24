@@ -1,7 +1,9 @@
 <script lang="ts">
   import { SvelteSet } from 'svelte/reactivity'
-  import { highlightLines, languageFor, type Token } from './highlight'
-  import { applyChanges, diffLines, splitLines, toHunks, type Hunk } from './lineDiff'
+  import { tick } from 'svelte'
+  import { marksByLine, moveNote, movesByLine, opsFromBlocks, type Result, type Stop } from './blocks'
+  import { highlightLines, languageFor, withMarks, type Token } from './highlight'
+  import { applyChanges, splitLines, toHunks, type Hunk } from './lineDiff'
   import { wrap } from './wrap.svelte'
 
   /** What the hunk and line buttons do, and how the result is written. */
@@ -16,13 +18,66 @@
     path,
     oldText,
     newText,
+    diff,
     actions = {},
-  }: { path: string; oldText: string; newText: string; actions?: Actions } = $props()
+    stops = [],
+    current = -1,
+    jump = 0,
+  }: {
+    path: string
+    oldText: string
+    newText: string
+    /** The Go diff of the two texts (internal/semdiff). */
+    diff: Result
+    actions?: Actions
+    stops?: Stop[]
+    /** The stop being read, or -1. */
+    current?: number
+    /** Counts the requests to scroll to the current stop. */
+    jump?: number
+  } = $props()
 
   let oldLines = $derived(splitLines(oldText))
   let newLines = $derived(splitLines(newText))
-  let ops = $derived(diffLines(oldLines, newLines))
+  let ops = $derived(opsFromBlocks(diff.blocks, oldLines.length, newLines.length))
   let hunks = $derived(toHunks(ops))
+  let marks = $derived(marksByLine(diff.blocks))
+  let moves = $derived(movesByLine(diff.moves ?? []))
+
+  /** The move a changed row belongs to, if any, and the note on its first line. */
+  function moveOf(i: number): { note?: string } | null {
+    const op = ops[i]
+    const side = op.kind === 'del' ? 'old' : 'new'
+    const line = side === 'old' ? op.oldIndex : op.newIndex
+    const k = moves[side].get(line)
+    if (k === undefined) return null
+    const m = diff.moves[k]
+    return { note: line === (side === 'old' ? m.oldStart : m.newStart) ? moveNote(m, side) : undefined }
+  }
+
+  /** Whether a row is part of the change being read. */
+  function isCurrent(i: number): boolean {
+    const s = stops[current]
+    const op = ops[i]
+    if (!s || op.kind === 'eq') return false
+    const [side, line, from, to] = op.kind === 'del' ? (['old', op.oldIndex, s.oldStart, s.oldEnd] as const) : (['new', op.newIndex, s.newStart, s.newEnd] as const)
+    // A change's moved lines belong to their move, and a move's to it alone.
+    return line >= from && line < to && moves[side].has(line) === (s.kind === 'move')
+  }
+
+  // Scroll to the change being read when asked.
+  let root = $state<HTMLDivElement>()
+  let lastJump = 0
+  $effect(() => {
+    if (jump === lastJump) return
+    lastJump = jump
+    const s = stops[current]
+    if (!s) return
+    void tick().then(() => {
+      const row = root?.querySelector('tr.current')
+      row?.scrollIntoView({ block: 'center' })
+    })
+  })
 
   let oldTokens = $state<Token[][]>([])
   let newTokens = $state<Token[][]>([])
@@ -91,14 +146,14 @@
   import Empty from '../ui/Empty.svelte'
 </script>
 
-{#snippet line(tokens: Token[] | undefined, fallback: string)}
-  {#if tokens}{#each tokens as t, k (k)}<span class={t.cls}>{t.text}</span>{/each}{:else}{fallback.replace(
+{#snippet line(tokens: Token[] | undefined, fallback: string, lineMarks: [number, number][] | undefined)}
+  {#if tokens}{#each withMarks(tokens, lineMarks) as t, k (k)}<span class={[t.cls, t.changed && 'chg']}>{t.text}</span>{/each}{:else}{fallback.replace(
       /\r?\n$/,
       '',
     )}{/if}
 {/snippet}
 
-<div class="unified">
+<div class="unified" bind:this={root}>
   {#if hunks.length === 0}
     <Empty note="nothing changed">No changes.</Empty>
   {/if}
@@ -122,15 +177,17 @@
         <tbody>
           {#each opIndexes(h) as i (i)}
             {@const op = ops[i]}
-            <tr class={op.kind} class:sel={selected.has(i)} onclick={(e) => op.kind !== 'eq' && toggle(i, e)}>
+            {@const moved = op.kind === 'eq' ? null : moveOf(i)}
+            <tr class={op.kind} class:moved={!!moved} class:current={isCurrent(i)} class:sel={selected.has(i)} onclick={(e) => op.kind !== 'eq' && toggle(i, e)}>
               <td class="num">{op.oldIndex >= 0 ? op.oldIndex + 1 : ''}</td>
               <td class="num">{op.newIndex >= 0 ? op.newIndex + 1 : ''}</td>
               <td class="sign">{op.kind === 'add' ? '+' : op.kind === 'del' ? '-' : ' '}</td>
               <td class="code"
-                >{#if op.kind === 'del'}{@render line(oldTokens[op.oldIndex], oldLines[op.oldIndex])}{:else}{@render line(
+                >{#if op.kind === 'del'}{@render line(oldTokens[op.oldIndex], oldLines[op.oldIndex], marks.old.get(op.oldIndex))}{:else}{@render line(
                     newTokens[op.newIndex],
                     newLines[op.newIndex],
-                  )}{/if}</td
+                    op.kind === 'add' ? marks.new.get(op.newIndex) : undefined,
+                  )}{/if}{#if moved?.note}<span class="move-note">{moved.note}</span>{/if}</td
               >
             </tr>
           {/each}
@@ -245,6 +302,40 @@
 
   tr.del .sign {
     color: var(--danger);
+  }
+
+  /* A moved line reads in teal, whichever side it's on; its sign still says which. */
+  tr.moved {
+    background: color-mix(in srgb, var(--syn-string) 12%, transparent);
+  }
+
+  tr.moved .sign {
+    color: var(--syn-string);
+  }
+
+  .chg {
+    border-radius: 2px;
+  }
+
+  tr.del .chg {
+    background: color-mix(in srgb, var(--danger) 35%, transparent);
+  }
+
+  tr.add .chg {
+    background: color-mix(in srgb, var(--success) 35%, transparent);
+  }
+
+  tr.current .num:first-child {
+    box-shadow: inset 3px 0 0 var(--syn-keyword);
+  }
+
+  .move-note {
+    padding-left: 12px;
+    color: var(--syn-string);
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 12px;
+    user-select: none;
   }
 
   tr.sel {

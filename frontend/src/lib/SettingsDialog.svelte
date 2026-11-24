@@ -1,7 +1,7 @@
 <script lang="ts">
   // The settings panel: appearance, git, repositories and updates, saved to the local
   // settings file (ADR 0005).
-  import { ChooseFile, ChooseFolder, Preferences, RepoPreferences, SetPreferences, SetRepoPreferences } from '../../wailsjs/go/app/App.js'
+  import { ChooseFile, ChooseFolder, GitDiffAlgorithm, Preferences, RepoPreferences, SetPreferences, SetRepoPreferences } from '../../wailsjs/go/app/App.js'
   import { commands } from './commands.svelte'
   import { app } from '../../wailsjs/go/models'
   import { errorText } from './errors'
@@ -102,6 +102,21 @@
     })
   }
 
+  /** The line diff the active repository's git config names, for "As git does". */
+  let gitAlgorithm = $state('')
+  $effect(() => {
+    if (!repoPath) return
+    void GitDiffAlgorithm(repoPath)
+      .then((a) => (gitAlgorithm = a))
+      .catch(() => {})
+  })
+  const ALGORITHMS = [
+    { value: 'myers', label: 'Myers' },
+    { value: 'minimal', label: 'Minimal' },
+    { value: 'patience', label: 'Patience' },
+    { value: 'histogram', label: 'Histogram' },
+  ]
+
   $effect(() => {
     void Preferences()
       .then((res) => {
@@ -138,6 +153,9 @@
       prefs.zoom = p.zoom
       prefs.cloneDir = p.cloneDir
       prefs.forgeColors = p.forgeColors
+      prefs.diffRibbon = p.diffRibbon
+      prefs.diffAlgorithm = p.diffAlgorithm
+      prefs.diffMoves = p.diffMoves
       prefs.apply()
       if (p.gitPath !== initialGit) {
         restartNote = true
@@ -191,6 +209,32 @@
           <input type="checkbox" bind:checked={p.forgeColors} />
           <span>Forge marks in their brands' colours (GitHub, GitLab and the like, on the Remotes panel)</span>
         </label>
+      </fieldset>
+
+      <fieldset>
+        <legend class="meta">Diffs</legend>
+        <label class="form-field">
+          <span>Line diff</span>
+          <select bind:value={p.diffAlgorithm}>
+            <option value="">As git does ({gitAlgorithm || 'myers'})</option>
+            {#each ALGORITHMS as a (a.value)}
+              <option value={a.value}>{a.label}</option>
+            {/each}
+          </select>
+        </label>
+        <p class="hint">
+          How lines are matched up. Follows <code>diff.algorithm</code> in git config{repoPath ? `, which ${repoName} sets to ${gitAlgorithm || 'nothing, so Myers'}` : ''}, unless you pick one here.
+        </p>
+        <label class="check">
+          <input type="checkbox" bind:checked={p.diffRibbon} />
+          Ribbon between the sides
+        </label>
+        <p class="hint">In the split view, bands join old lines to new ones, and the sides aren’t padded to line up.</p>
+        <label class="check">
+          <input type="checkbox" bind:checked={p.diffMoves} />
+          Find moved code
+        </label>
+        <p class="hint">A block that moved shows once, as a move, instead of a deletion and an addition.</p>
       </fieldset>
 
       <fieldset>

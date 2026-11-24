@@ -10,6 +10,9 @@ Open **Settings** with <kbd>Ctrl</kbd>+<kbd>,</kbd> or from the command palette.
 | **Theme** | System, Light or Dark. Switching cross-fades the window. |
 | **Commit graph** | Timeline (a line for each day, and authors beside their commits) or Compact (one commit per line). |
 | **Zoom** | Scales the whole app, from 80% to 150%. |
+| **Line diff** | How [diffs](history.md#diffs) match up lines: as git does (the repository's `diff.algorithm`, or Myers), or Myers, Minimal, Patience or Histogram. |
+| **Ribbon between the sides** | In the split diff, bands join old lines to new ones and the sides aren't padded to line up. Off pads them. On by default. |
+| **Find moved code** | A block that moved shows once, as a move, instead of a deletion and an addition. On by default. |
 | **Experimental views** | A checkbox each for [Horizontal and Map](experimental-views.md). A view you switch on joins the graph's view menu, and nothing changes until you pick it there. Switching one off takes the graph back to Timeline or Compact. These can change or go away between versions. |
 | **Git executable** | Which `git` to use. Leave it empty to find it on your `PATH`. A change takes effect after a restart. |
 | **Clone into** | Where new clones go. Empty means the folder of the last repository you opened. |
@@ -128,6 +131,7 @@ On macOS, read <kbd>⌘</kbd> wherever this page says <kbd>Ctrl</kbd>. Press <kb
 | Push the current branch | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>U</kbd> |
 | Undo / redo | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> |
 | Word wrap in diffs | <kbd>Alt</kbd>+<kbd>Z</kbd> |
+| Next or previous change, in a diff | <kbd>F7</kbd> / <kbd>Shift</kbd>+<kbd>F7</kbd> |
 | Next or previous place, in the conflict tool | <kbd>F7</kbd> / <kbd>Shift</kbd>+<kbd>F7</kbd> |
 | Good, bad or can't tell, during a bisect | <kbd>G</kbd> / <kbd>B</kbd> / <kbd>S</kbd> |
 | Back to the graph | <kbd>Escape</kbd> |
