@@ -32,7 +32,7 @@ You can also drag. Drop a branch or commit onto the checked-out branch to merge,
 
 Merge and rebase first show what they would do. Nothing has happened yet: **Cancel** leaves everything as it was, and <kbd>Enter</kbd> goes ahead.
 
-The preview says whether files will conflict, and names them with how many places in each. For a file in a language it [reads as code](history.md#reading-the-code), it also says how many of those places look combinable: the conflict tool will [suggest them](conflicts.md#suggestions) when you get there. It works this out in memory, without touching your files, your index or any branch. It's a forecast: the operation itself still has the last word. If the conflicts can't be checked, the preview says so and you can still go ahead.
+The preview says whether files will conflict, and names them with how many places in each. For a file in a language it [reads as code](diffs.md#reading-the-code), it also says how many of those places look combinable: the conflict tool will [suggest them](conflicts.md#suggestions) when you get there. It works this out in memory, without touching your files, your index or any branch. It's a forecast: the operation itself still has the last word. If the conflicts can't be checked, the preview says so and you can still go ahead.
 
 A merge preview also lists the commits and the number of files coming in, and asks **how** to merge:
 

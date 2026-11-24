@@ -32,6 +32,8 @@ Emily switched the dashboard's wind readings to knots on `main`. Meanwhile Tyler
 ## Good to know
 
 - **Not ready to decide?** **Abort…** in the strip says what it undoes, then puts everything back as it was before the merge.
+- **A place may already be filled in.** When both sides changed the same line in different spots, one adding an argument at the start and the other at the end, say, the tool reads the code and suggests the two combined. The place is marked **Suggested** and says what each side did. It still counts as undecided until you keep it: see [Suggestions](../guide/conflicts.md#suggestions). In this walkthrough both sides changed the same words, so there's nothing to combine.
+- **Using a merge driver?** If your `.gitattributes` sends files to one, such as mergiraf, git runs it first and the tool says so. See [Merge drivers](../guide/conflicts.md#merge-drivers).
 - **Rebases and cherry-picks stop the same way.** The strip says which operation is in progress and which commit it stopped on, and the steps are the same. A rebase may stop more than once, once for each commit that conflicts.
 - **Started the merge in a terminal?** Git Revenge notices, and shows the same strip and conflict list.
 - **Merged and regretted it?** <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes the merge back. See [Undo a mistake](undo-a-mistake.md).
