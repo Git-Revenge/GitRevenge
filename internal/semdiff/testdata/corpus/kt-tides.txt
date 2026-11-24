@@ -1,0 +1,22 @@
+engine code, language Kotlin
+rename out -> readings, 3 places
+
+@@ -2,1 +2,1 @@ format: same value
+-const val MAX = {f:0x30]
++const val MAX = {f:48]
+
+@@ -3,1 +3,1 @@ change
+-fun forecast(n: Int): List<Int> {
++fun forecast(n: Int[, step: Int = 3600]): List<Int> {
+
+@@ -4,1 +4,1 @@ rename: renamed from out
+-    val {r:out] = mutableListOf<Int>()
++    val {r:readings] = mutableListOf<Int>()
+
+@@ -5,1 +5,1 @@ change
+-    for (i in 0 until n) {r:out].add(i * [3600])[;]
++    for (i in 0 until n) {r:readings].add(i * [step])
+
+@@ -6,1 +6,1 @@ rename: renamed from out
+-    return {r:out]
++    return {r:readings]

@@ -114,6 +114,13 @@ func (a *App) FileDiff(path, mode, commit, file, oldPath string, force bool, rea
 	if err != nil || contents.Kind != "text" {
 		return FileDiff{Contents: contents}, err
 	}
+	// A script without a name the app knows says what it is on its #! line.
+	if lang == "" {
+		lang = scriptLanguage(contents.New.Text)
+		if lang == "" {
+			lang = scriptLanguage(contents.Old.Text)
+		}
+	}
 	if read != ReadLines {
 		opts.Language = lang
 	}
@@ -132,6 +139,12 @@ func (a *App) FileDiff(path, mode, commit, file, oldPath string, force bool, rea
 // attribute decides, or else its name (semdiff.LanguageOf).
 func fileLanguage(g *git.Repo, file string) string {
 	return fileLanguages(g, []string{file})[file]
+}
+
+// scriptLanguage is the language text's #! line names, or "".
+func scriptLanguage(text string) string {
+	line, _, _ := strings.Cut(text, "\n")
+	return semdiff.LanguageOfScript(line)
 }
 
 // fileLanguages is fileLanguage for several files, with one git call.

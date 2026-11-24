@@ -33,6 +33,9 @@ type language struct {
 	name    string // what the views call it
 	grammar func() *ts.Language
 	exts    []string
+	files   []string // file names read in this language, such as Makefile
+	interps []string // programs a #! line names, such as bash
+	hidden  bool     // read only inside other languages, never a file's own
 	rules   rules
 
 	once  sync.Once
@@ -63,6 +66,16 @@ type rules struct {
 
 	scripts []string // elements whose raw text is code in another language
 	exprs   []string // markup nodes holding a JavaScript expression (Vue's {{ }} and v- values)
+
+	injects        map[string]string              // nodes whose text is read in another language, by its id
+	fences         []string                       // code blocks read in the language their info string names
+	keys           map[string]func(string) string // nodes read as one token, keyed by what these say
+	optional       []string                       // leaves that are always optional, such as GraphQL's commas
+	trailingCommas bool                           // a comma before any closing bracket is optional, except in a tuple
+	commasExcept   []string                       // with trailingCommas, nodes whose trailing comma counts
+	exact          bool                           // whitespace is content everywhere, as in a regular expression
+	prose          bool                           // the text between tokens is words, its whitespace counting by presence
+	fold           bool                           // names are compared without case, as PowerShell's are
 }
 
 // nodeKind says how the token reader treats a node.
@@ -80,6 +93,8 @@ const (
 	nodeParens
 	nodeScript
 	nodeExpr
+	nodeInject
+	nodeFence
 )
 
 type nodeRule struct {
@@ -88,13 +103,16 @@ type nodeRule struct {
 	commas     bool  // its trailing comma is optional
 	parens     uint8 // 1: any parenthesized child can lose its parentheses; 2: only its last
 	keepParens bool
+	inject     string              // for nodeInject, the language its text is read in
+	key        func(string) string // for an atom keyed by meaning, what it means
 }
 
 var langJS = rules{
 	numbers:        []string{"number"},
 	strings:        []string{"string", "template_string"},
 	comments:       []string{"comment", "html_comment"},
-	atoms:          []string{"regex", "jsx_text", "hash_bang_line"},
+	atoms:          []string{"jsx_text", "hash_bang_line"},
+	injects:        map[string]string{"regex_pattern": "regex"},
 	idents:         []string{"identifier", "property_identifier", "shorthand_property_identifier", "shorthand_property_identifier_pattern", "private_property_identifier", "type_identifier", "statement_identifier"},
 	interps:        []string{"template_substitution"},
 	parens:         "parenthesized_expression",
@@ -235,7 +253,7 @@ func byID(id string) *language {
 func Languages() []string {
 	var out []string
 	for _, l := range languages {
-		if !slices.Contains(out, l.name) {
+		if !l.hidden && !slices.Contains(out, l.name) {
 			out = append(out, l.name)
 		}
 	}
@@ -276,12 +294,53 @@ func LanguageOf(file, linguist, driver string) string {
 	if linguist != "" {
 		return linguistNames[strings.ToLower(linguist)]
 	}
-	if id, ok := linguistNames[strings.ToLower(driver)]; ok {
+	// git's cpp driver serves C as well as C++, so the name decides between them.
+	if id, ok := linguistNames[strings.ToLower(driver)]; ok && driver != "cpp" {
 		return id
 	}
+	base := path.Base(file)
 	ext := strings.ToLower(path.Ext(file))
 	for _, l := range languages {
-		if slices.Contains(l.exts, ext) {
+		if l.hidden {
+			continue
+		}
+		for _, f := range l.files {
+			// Dockerfile.* is Dockerfile.dev and its kind.
+			if base == f || strings.HasSuffix(f, ".*") && strings.HasPrefix(base, strings.TrimSuffix(f, "*")) {
+				return l.id
+			}
+		}
+	}
+	for _, l := range languages {
+		if !l.hidden && slices.Contains(l.exts, ext) {
+			return l.id
+		}
+	}
+	return ""
+}
+
+// LanguageOfScript is the language a script's first line names with #!, such as
+// "#!/usr/bin/env bash", or "".
+func LanguageOfScript(firstLine string) string {
+	line, ok := strings.CutPrefix(strings.TrimSpace(firstLine), "#!")
+	if !ok {
+		return ""
+	}
+	f := strings.Fields(line)
+	if len(f) == 0 {
+		return ""
+	}
+	prog := path.Base(strings.ReplaceAll(f[0], "\\", "/"))
+	// env names the program after itself, and maybe after -S.
+	for i := 1; prog == "env" && i < len(f); i++ {
+		if !strings.HasPrefix(f[i], "-") && !strings.Contains(f[i], "=") {
+			prog = f[i]
+		}
+	}
+	// python3.12 is python.
+	prog = strings.TrimRight(strings.ToLower(prog), "0123456789.")
+	for _, l := range languages {
+		if !l.hidden && slices.Contains(l.interps, prog) {
 			return l.id
 		}
 	}
@@ -314,13 +373,20 @@ func (l *language) load() *ts.Language {
 				nr.kind = nodeScript
 			case slices.Contains(r.exprs, name):
 				nr.kind = nodeExpr
+			case r.injects[name] != "":
+				nr.kind, nr.inject = nodeInject, r.injects[name]
+			case slices.Contains(r.fences, name):
+				nr.kind = nodeFence
+			case r.keys[name] != nil:
+				nr.kind, nr.key = nodeAtom, r.keys[name]
 			case r.parens != "" && name == r.parens:
 				nr.kind = nodeParens
 			case slices.Contains(r.idents, name):
 				nr.kind = nodeIdent
 			}
 			nr.interp = slices.Contains(r.interps, name)
-			nr.commas = slices.Contains(r.commas, name)
+			nr.commas = slices.Contains(r.commas, name) ||
+				r.trailingCommas && !strings.Contains(name, "tuple") && !slices.Contains(r.commasExcept, name)
 			switch {
 			case slices.Contains(r.parensAnywhere, name):
 				nr.parens = 1

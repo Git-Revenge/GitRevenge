@@ -13,6 +13,13 @@ var grammarPackages = map[string]string{
 	"go": "go", "javascript": "javascript", "typescript": "typescript", "tsx": "tsx",
 	"python": "python", "csharp": "c_sharp", "java": "java", "css": "css", "scss": "scss",
 	"json": "json", "rust": "rust", "vue": "vue", "html": "html", "lua": "lua", "xml": "xml",
+	"yaml": "yaml", "bash": "bash", "powershell": "powershell", "markdown": "markdown",
+	"markdown_inline": "markdown_inline", "regex": "regex", "c": "c", "cpp": "cpp", "objc": "objc",
+	"php": "php", "ruby": "ruby", "kotlin": "kotlin", "swift": "swift", "dart": "dart", "scala": "scala",
+	"perl": "perl", "r": "r", "elixir": "elixir", "haskell": "haskell", "zig": "zig", "groovy": "groovy",
+	"sql": "sql", "toml": "toml", "ini": "ini", "dockerfile": "dockerfile", "make": "make", "cmake": "cmake",
+	"hcl": "hcl", "nix": "nix", "proto": "proto", "graphql": "graphql", "less": "less", "svelte": "svelte",
+	"gomod": "gomod", "gitconfig": "git_config",
 }
 
 // TestBuildTagsMatchTheLanguages checks build/tags, which every build that ships uses: it

@@ -42,8 +42,18 @@ func strKey(id, typ, s string) (string, bool) {
 		return javaString(typ, s)
 	case "rust":
 		return rustString(typ, s)
-	case "css", "scss":
+	case "css", "scss", "less":
 		return cssString(s)
+	case "gomod":
+		return strKey("go", typ, s)
+	case "toml":
+		return tomlString(s)
+	case "yaml":
+		return yamlString(s)
+	case "bash":
+		return bashString(typ, s)
+	case "powershell":
+		return psString(s)
 	case "lua":
 		return luaString(s)
 	case "html", "vue", "xml":

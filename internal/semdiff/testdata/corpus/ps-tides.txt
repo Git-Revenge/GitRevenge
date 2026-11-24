@@ -1,0 +1,28 @@
+engine code, language PowerShell
+rename $out -> $readings, 3 places
+
+@@ -2,1 +2,1 @@ format: same value
+-{f:$Max] = {f:0x30]
++{f:$max] = {f:48]
+
+@@ -3,2 +3,2 @@ change
+-function Get-Tide([int]$n) {
+-    if ($n {f:-GT $Max]) { throw 'too many' }
++function Get-Tide([int]$n[, [int]$step]) {
++    if ($n {f:-gt $max]) { throw 'too many[ readings]' }
+
+@@ -5,1 +5,1 @@ rename: renamed from $out
+-    {r:$out] = @()
++    {r:$readings] = @()
+
+@@ -6,1 +6,1 @@ change
+-    foreach ($i in 1..$n) { {r:$out] += $i * [3600] }
++    foreach ($i in 1..$n) { {r:$readings] += $i * [$step] }
+
+@@ -7,1 +7,1 @@ rename: renamed from $out
+-    return {r:$out]
++    return {r:$readings]
+
+@@ -9,1 +9,1 @@ format: same text
+-{f:Get-ChildItem -Path] $env:TEMP | {f:Where-Object] { $_.Length -gt 10 }
++{f:get-childitem -path] $env:TEMP | {f:where-object] { $_.Length -gt 10 }

@@ -1,0 +1,8 @@
+engine code, language Nix
+
+@@ -3,1 +3,4 @@ change
+-  buildInputs = [ pkgs.go pkgs.[nodejs] ];
++  buildInputs = [
++    pkgs.go
++    pkgs.[nodejs_22]
++  ];

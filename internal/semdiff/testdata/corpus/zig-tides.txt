@@ -1,0 +1,16 @@
+engine code, language Zig
+rename out -> readings, 2 places
+
+@@ -1,1 +1,1 @@ format: same value
+-const max_hours = {f:0x30];
++const max_hours = {f:48];
+
+@@ -2,2 +2,2 @@ change
+-fn forecast(n: u32) u32 {
+-    const {r:out] = n * [3600];
++fn forecast(n[: u32, step]: u32) u32 {
++    const {r:readings] = n * [step];
+
+@@ -4,1 +4,1 @@ rename: renamed from out
+-    return {r:out];
++    return {r:readings];

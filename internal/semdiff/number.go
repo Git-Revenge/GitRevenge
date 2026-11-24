@@ -31,12 +31,55 @@ func numKey(id, s string) (string, bool) {
 			return "", false
 		}
 		return value(s, false)
-	case "json":
+	case "json", "graphql":
 		return jsonNumber(s)
-	case "css", "scss":
+	case "css", "scss", "less":
 		return cssNumber(s)
+	case "c", "cpp", "objc":
+		// C++ and C23 separate digits with ', and a leading 0 is octal.
+		return suffixed(strings.ReplaceAll(s, "'", ""), true, []string{"ull", "llu", "ul", "lu", "ll", "u", "l", "f"})
+	case "kotlin":
+		return suffixed(s, false, []string{"ul", "u", "l", "f"})
+	case "scala":
+		return suffixed(s, false, []string{"l", "f", "d"})
+	case "swift", "dart", "elixir", "haskell", "zig", "nix":
+		return value(s, false)
+	case "ruby", "php", "perl", "proto":
+		// 3r, 2i and the like aren't read, so they're compared as written.
+		return value(s, true)
+	case "toml":
+		return tomlNumber(s)
+	case "powershell":
+		// A suffix such as kb, l or d changes what the number is; those are compared as written.
+		if strings.IndexFunc(strings.TrimPrefix(strings.ToLower(s), "0x"), func(r rune) bool { return r >= 'g' && r <= 'z' }) >= 0 {
+			return "", false
+		}
+		return value(s, false)
 	}
 	return "", false
+}
+
+// tomlNumber reads a TOML integer or float, signed or not. inf and nan are compared as
+// written.
+func tomlNumber(s string) (string, bool) {
+	sign := ""
+	if strings.HasPrefix(s, "+") || strings.HasPrefix(s, "-") {
+		if s[0] == '-' {
+			sign = "-"
+		}
+		s = s[1:]
+	}
+	if s == "" || strings.Contains(s, "inf") || strings.Contains(s, "nan") {
+		return "", false
+	}
+	k, ok := value(s, false)
+	if !ok {
+		return "", false
+	}
+	if sign == "-" && k[2:] != "0" {
+		k = k[:2] + "-" + k[2:]
+	}
+	return k, true
 }
 
 // jsNumber reads JavaScript numbers, which are all one type, and BigInts.

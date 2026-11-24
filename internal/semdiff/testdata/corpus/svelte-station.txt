@@ -1,0 +1,9 @@
+engine code, language Svelte
+
+@@ -2,1 +2,1 @@ format: same value
+-  let name = {f:'Brest'];
++  let name = {f:"Brest"];
+
+@@ -5,1 +5,1 @@ change
+-<p>The next  high tide is at {name}.</p>
++<p>The next high tide is at {name[.toUpperCase()]}.</p>

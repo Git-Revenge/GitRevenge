@@ -1,0 +1,22 @@
+engine code, language Ruby
+rename out -> readings, 3 places
+
+@@ -2,1 +2,1 @@ format: same value
+-MAX = {f:0x30]
++MAX = {f:48]
+
+@@ -3,1 +3,1 @@ change
+-def forecast(n)
++def forecast(n[, step = 3600])
+
+@@ -4,1 +4,1 @@ rename: renamed from out
+-  {r:out] = []
++  {r:readings] = []
+
+@@ -5,1 +5,1 @@ change
+-  n.times { |i| {r:out] << i * [3600] }
++  n.times { |i| {r:readings] << i * [step] }
+
+@@ -6,1 +6,1 @@ rename: renamed from out
+-  { max: MAX, list: {r:out], }
++  { max: MAX, list: {r:readings] }

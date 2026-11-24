@@ -1,0 +1,9 @@
+engine code, language Dockerfile
+
+@@ -2,1 +2,1 @@ change
+-RUN go build -o /out/app .
++RUN go build -trimpath -o /out/app .
+
+@@ -4,1 +4,1 @@ format: spacing
+-CMD ["/out/app"]
++CMD [ "/out/app" ]

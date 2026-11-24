@@ -1,0 +1,12 @@
+engine code, language LESS
+
+@@ -1,1 +1,1 @@ format: same value
+-@gap: {f:0.5rem];
++@gap: {f:.5rem];
+
+@@ -2,1 +2,4 @@ change
+-.chart { margin: @gap 0; .bar { height: [10px] } }
++.chart {
++  margin: @gap 0;
++  .bar { height: [12px;] }
++}

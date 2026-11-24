@@ -1,0 +1,16 @@
+engine code, language Elixir
+rename out -> readings, 2 places
+
+@@ -2,1 +2,1 @@ format: same value
+-  @max {f:0x30]
++  @max {f:48]
+
+@@ -3,2 +3,2 @@ change
+-  def forecast(n) do
+-    {r:out] = Enum.map(1..n, fn i -> i * [3600] end)
++  def forecast(n[, step \\ 3600]) do
++    {r:readings] = Enum.map(1..n, fn i -> i * [step] end)
+
+@@ -5,1 +5,1 @@ rename: renamed from out
+-    {r:out]
++    {r:readings]

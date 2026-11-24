@@ -1,0 +1,21 @@
+engine code, language Shell
+rename out -> dest, 4 places
+
+@@ -3,2 +3,2 @@ rename: renamed from out
+-{r:out]="build"
+-mkdir -p "${r:out]"
++{r:dest]="build"
++mkdir -p "${r:dest]"
+
+@@ -5,1 +5,1 @@ format: same value
+-for f in *.go; do echo {f:'building']  "$f"; done
++for f in *.go; do echo {f:"building"] "$f"; done
+
+@@ -6,1 +6,2 @@ rename: renamed from out
+-cp app "${r:out]/app"{f:;] echo "done in ${r:out]"
++cp app "${r:dest]/app"
++echo "done in ${r:dest]"
+
+@@ -8,1 +9,1 @@ change
+-  version: 1
++  version: 2

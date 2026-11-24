@@ -1,0 +1,16 @@
+engine code, language Perl
+rename out -> readings, 2 places
+
+@@ -2,1 +2,1 @@ format: same value
+-my $max = {f:0x30];
++my $max = {f:48];
+
+@@ -4,2 +4,2 @@ change
+-    my ($n) = @_;
+-    my @{r:out] = map { $_ * [3600] } (1 .. $n);
++    my ($n[, $step]) = @_;
++    my @{r:readings] = map { $_ * [$step] } (1 .. $n);
+
+@@ -6,1 +6,1 @@ rename: renamed from out
+-    return @{r:out];
++    return @{r:readings];

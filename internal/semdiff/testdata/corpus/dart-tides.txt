@@ -1,0 +1,22 @@
+engine code, language Dart
+rename out -> readings, 3 places
+
+@@ -1,1 +1,1 @@ format: same value
+-const maxHours = {f:0x30];
++const maxHours = {f:48];
+
+@@ -2,1 +2,1 @@ change
+-List<int> forecast(int n) {
++List<int> forecast(int n[, {int step = 3600,}]) {
+
+@@ -3,1 +3,1 @@ rename: renamed from out
+-  var {r:out] = <int>[];
++  var {r:readings] = <int>[];
+
+@@ -4,1 +4,1 @@ change
+-  for (var i = 0; i < n; i++) {r:out].add(i * [3600]);
++  for (var i = 0; i < n; i++) {r:readings].add(i * [step]);
+
+@@ -5,1 +5,1 @@ rename: renamed from out
+-  return {r:out];
++  return {r:readings];

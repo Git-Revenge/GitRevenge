@@ -1,0 +1,14 @@
+engine code, language Objective-C
+rename out -> value, 3 places
+
+@@ -4,1 +4,1 @@ rename: renamed from out
+-    int {r:out] = at % {f:0x30];
++    int {r:value] = at % {f:48];
+
+@@ -5,1 +5,1 @@ change
+-    NSLog(@"height %d", {r:out]);
++    NSLog(@"height [now ]%d", {r:value]);
+
+@@ -6,1 +6,1 @@ rename: renamed from out
+-    return {r:out];
++    return {r:value];

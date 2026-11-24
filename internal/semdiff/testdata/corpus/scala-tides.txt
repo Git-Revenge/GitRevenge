@@ -1,0 +1,16 @@
+engine code, language Scala
+rename out -> readings, 2 places
+
+@@ -2,1 +2,1 @@ format: same value
+-  val MaxHours = {f:0x30]
++  val MaxHours = {f:48]
+
+@@ -3,2 +3,2 @@ change
+-  def forecast(n: Int): List[Int] = {
+-    val {r:out] = (0 until n).map(i => i * [3600]).toList
++  def forecast(n: Int[, step: Int = 3600]): List[Int] = {
++    val {r:readings] = (0 until n).map(i => i * [step]).toList
+
+@@ -5,1 +5,1 @@ rename: renamed from out
+-    {r:out]
++    {r:readings]

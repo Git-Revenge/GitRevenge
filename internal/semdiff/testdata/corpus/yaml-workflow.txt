@@ -1,0 +1,17 @@
+engine code, language YAML
+
+@@ -4,1 +4,1 @@ format: same value
+-    branches: [main,{f:'release/*']]
++    branches: [ main, {f:"release/*"] ]
+
+@@ -7,1 +7,1 @@ change
+-    runs-on: ubuntu-latest
++    runs-on: ubuntu-24.04
+
+@@ -11,1 +11,1 @@ change
+-          go test ./...
++          go test -race ./...
+
+@@ -14,1 +14,1 @@ format: same value
+-      LEVEL: {f:"debug"]
++      LEVEL: {f:'debug']

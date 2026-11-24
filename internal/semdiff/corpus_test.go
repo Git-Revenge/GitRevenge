@@ -29,7 +29,8 @@ func TestCorpus(t *testing.T) {
 	for _, before := range befores {
 		name := strings.SplitN(filepath.Base(before), ".", 2)[0]
 		after := strings.Replace(before, ".before.", ".after.", 1)
-		id := LanguageOf(after, "", "")
+		// The language comes from the pair's name without .after: go.after.mod is go.mod.
+		id := LanguageOf(strings.Replace(filepath.Base(after), ".after.", ".", 1), "", "")
 		if id == "" {
 			t.Fatalf("%s isn't in a language read as code", after)
 		}
@@ -67,7 +68,7 @@ func TestCorpus(t *testing.T) {
 		})
 	}
 	for _, l := range languages {
-		if !seen[l.id] && l.id != "tsx" && l.id != "javascript" {
+		if !seen[l.id] && !l.hidden && l.id != "tsx" && l.id != "javascript" {
 			t.Errorf("the corpus has no %s pair", l.name)
 		}
 	}

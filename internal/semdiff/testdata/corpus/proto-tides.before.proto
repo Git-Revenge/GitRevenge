@@ -1,0 +1,5 @@
+syntax = "proto3";
+message Reading {
+  string station = 1;
+  double height = 0x2;
+}

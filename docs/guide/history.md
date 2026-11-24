@@ -16,10 +16,19 @@ Lines are matched up as git does: by the `diff.algorithm` in your git config (My
 
 ### Reading the code
 
-Files in fourteen languages are read as code: Go, JavaScript, TypeScript, Python, C#, Java, CSS, SCSS, JSON, Rust, Vue, HTML, Lua and XML. A chip after the file's name says **Read as Go** (or whichever it is), and changes are found token by token:
+Files in these languages are read as code:
+
+- **Programming:** Go, JavaScript, TypeScript, Python, C#, Java, C, C++, Objective-C, Rust, PHP, Ruby, Kotlin, Swift, Dart, Scala, Perl, R, Elixir, Haskell, Zig, Groovy and Lua.
+- **Scripts:** shell (sh, bash, zsh and ksh) and PowerShell.
+- **Markup and styles:** HTML, Vue, Svelte, XML, Markdown, CSS, SCSS and LESS.
+- **Data and config:** JSON, YAML, TOML, INI, SQL, GraphQL, Protocol Buffers, HCL (Terraform) and Nix.
+- **Build files:** Dockerfile, Makefile, CMake, `go.mod` and git config files.
+
+A script with no file extension is known by its `#!` line. A chip after the file's name says **Read as Go** (or whichever it is), and changes are found token by token:
 
 - **What changed** is marked by token, so an added argument is marked as `, step time.Duration` and nothing else on the line.
 - **Formatting** is told apart from changes, and marked with a dotted underline and a note such as "same value". It covers whitespace and line breaks, a number written another way (`0x30` and `48`), a string written another way (`'a'` and `"a"`, or an escape and the character it stands for), and optional punctuation: a trailing comma, a semicolon, or parentheses that change nothing. A change that only moves code into another block, such as indenting Python into an `if`, is a change, not formatting.
+- **Each language's own rules** apply. In Markdown, a rewrapped paragraph, a realigned table, `*` and `_` for emphasis, and `-` and `*` for bullets are formatting. A hard break, a table column's alignment, and anything inside a code span are not. A fenced code block is read in the language its info string names, so a Go block reads as Go. In YAML, `'a'` and `"a"` are the same, but `yes` and `'yes'` aren't, and indentation is structure. In shell, quotes and spacing between words are formatting, but spacing inside a string or a heredoc is not. PowerShell ignores case, so `Get-ChildItem` and `get-childitem` are the same, except in `$env:` variables. A regular expression in JavaScript or TypeScript is read token by token, and every space in it counts.
 - **Renames** are told apart too. A name changed the same way in more than one place, where the old name is gone from the file, is a rename. It's ochre, with "renamed from out" beside it, and the row above the diff says "rename: out → readings, 4 places". In the split view's ribbon, a rename's band is ochre and formatting's is dashed.
 
 **Hide formatting** beside the layout buttons takes formatting out of the view: the lines read as unchanged, in their new form, and the row above the diff says how many changes it hid, with a link to show them. Settings can make it the starting point. Where you stage, unstage or discard, nothing is hidden: you see exactly what will be written, and formatting stands in hunks of its own, tagged **formatting only**, so it can be staged or left on its own. A file whose changes are all formatting says **formatting only** in the commit's file list and in your uncommitted changes.
