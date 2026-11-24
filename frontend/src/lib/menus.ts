@@ -1,4 +1,4 @@
-import { FetchBranch, DeleteBranchAndWorktree, DeleteStack, PushStack, RebaseStack, RestoreStack, StackDeletePlan, StackPushPlan, Unstack, UpdateStack, BranchAction, BranchCaseTwin, BranchMergeState, HideBranch, Integrate, MarkBranchKind, Pull, PullBranch, PushBranch, PushRef, Refs, Restack, SetGraphFocus, SetStackParent, StashAction, Worktrees } from '../../wailsjs/go/app/App.js'
+import { FetchBranch, SetBranchPushRemote, DeleteBranchAndWorktree, DeleteStack, PushStack, RebaseStack, RestoreStack, StackDeletePlan, StackPushPlan, Unstack, UpdateStack, BranchAction, BranchCaseTwin, BranchMergeState, HideBranch, Integrate, MarkBranchKind, Pull, PullBranch, PushBranch, PushRef, Refs, Restack, SetGraphFocus, SetStackParent, StashAction, Worktrees } from '../../wailsjs/go/app/App.js'
 import { CONFIRM_DELETE, CONFIRM_FORCE_PUSH, KINDS, kindWarning } from './branchKinds'
 import type { MenuItem } from './ContextMenu.svelte'
 import type { DialogSpec } from './Dialog.svelte'
@@ -300,6 +300,24 @@ export function webItems(short: string, e: RefExtras | undefined): MenuItem[] {
   return items
 }
 
+/** Push this branch to ▸ (#927): one branch pushing to another remote than the rest
+ * (branch.<name>.pushRemote), or back to where the rest go. */
+export function pushRemoteItem(path: string, ref: Ref, remotes: string[]): MenuItem[] {
+  if (ref.kind !== 'local' || remotes.length === 0) return []
+  const to = (remote: string) => () => session.run(() => SetBranchPushRemote(path, ref.short, remote))
+  return [
+    {
+      label: `Push ${ref.short} to`,
+      icon: 'push',
+      hint: ref.pushRemote ? `${ref.pushRemote}, for this branch alone` : 'Where the rest go',
+      items: [
+        ...remotes.map((r) => ({ label: r, icon: ref.pushRemote === r ? ('check' as const) : undefined, run: to(r) })),
+        { label: 'Where the rest go', separator: true, icon: ref.pushRemote ? undefined : ('check' as const), run: to('') },
+      ],
+    },
+  ]
+}
+
 /** Menu items for one ref (branch, remote branch, tag or stash). extras are what its menu
  * reads as it opens (branchWeb.ts): its pages on the forge, and for a remote branch, how far it
  * is from the default branch and who tracks it. */
@@ -324,6 +342,7 @@ export function refItems(ref: Ref, ctx: MenuContext, extras?: RefExtras): MenuIt
             ? []
             : [{ label: `Pull ${ref.short}`, icon: 'pull' as const, run: () => session.run(() => (ref.head ? Pull(path, '') : PullBranch(path, ref.short))) }]),
           { label: pushLabel(ref), icon: 'push', run: () => session.run(() => PushBranch(path, ref.short)) },
+          ...pushRemoteItem(path, ref, extras?.remotes ?? []),
         ],
         [
           {

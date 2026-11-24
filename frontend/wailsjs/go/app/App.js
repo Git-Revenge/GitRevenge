@@ -482,12 +482,24 @@ export function PushBranch(arg1, arg2) {
   return window['go']['app']['App']['PushBranch'](arg1, arg2);
 }
 
+export function PushBranchTo(arg1, arg2, arg3) {
+  return window['go']['app']['App']['PushBranchTo'](arg1, arg2, arg3);
+}
+
 export function PushCurrent(arg1, arg2) {
   return window['go']['app']['App']['PushCurrent'](arg1, arg2);
 }
 
+export function PushPlan(arg1, arg2) {
+  return window['go']['app']['App']['PushPlan'](arg1, arg2);
+}
+
 export function PushRef(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['PushRef'](arg1, arg2, arg3, arg4);
+}
+
+export function PushSettingsFor(arg1, arg2) {
+  return window['go']['app']['App']['PushSettingsFor'](arg1, arg2);
 }
 
 export function PushStack(arg1, arg2) {
@@ -686,8 +698,16 @@ export function SetActiveRepo(arg1) {
   return window['go']['app']['App']['SetActiveRepo'](arg1);
 }
 
+export function SetBranchPushRemote(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SetBranchPushRemote'](arg1, arg2, arg3);
+}
+
 export function SetCommitNote(arg1, arg2, arg3) {
   return window['go']['app']['App']['SetCommitNote'](arg1, arg2, arg3);
+}
+
+export function SetFetchAfterPush(arg1) {
+  return window['go']['app']['App']['SetFetchAfterPush'](arg1);
 }
 
 export function SetGitConfig(arg1, arg2, arg3) {
@@ -744,6 +764,10 @@ export function SetPreferences(arg1) {
 
 export function SetPushDefault(arg1, arg2) {
   return window['go']['app']['App']['SetPushDefault'](arg1, arg2);
+}
+
+export function SetPushSetting(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['SetPushSetting'](arg1, arg2, arg3, arg4);
 }
 
 export function SetQuietDays(arg1, arg2) {

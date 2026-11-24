@@ -249,9 +249,15 @@ export function PullBranch(arg1:string,arg2:string):Promise<void>;
 
 export function PushBranch(arg1:string,arg2:string):Promise<void>;
 
+export function PushBranchTo(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function PushCurrent(arg1:string,arg2:boolean):Promise<void>;
 
+export function PushPlan(arg1:string,arg2:string):Promise<git.PushPlan>;
+
 export function PushRef(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
+export function PushSettingsFor(arg1:string,arg2:string):Promise<app.PushSettings>;
 
 export function PushStack(arg1:string,arg2:Array<string>):Promise<void>;
 
@@ -351,7 +357,11 @@ export function SearchGraph(arg1:string,arg2:string):Promise<graph.SearchResult>
 
 export function SetActiveRepo(arg1:string):Promise<void>;
 
+export function SetBranchPushRemote(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function SetCommitNote(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function SetFetchAfterPush(arg1:boolean):Promise<void>;
 
 export function SetGitConfig(arg1:string,arg2:string,arg3:string):Promise<app.ConfigDoc>;
 
@@ -380,6 +390,8 @@ export function SetPeopleTab(arg1:string):Promise<void>;
 export function SetPreferences(arg1:app.Preferences):Promise<void>;
 
 export function SetPushDefault(arg1:string,arg2:string):Promise<void>;
+
+export function SetPushSetting(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function SetQuietDays(arg1:string,arg2:number):Promise<void>;
 

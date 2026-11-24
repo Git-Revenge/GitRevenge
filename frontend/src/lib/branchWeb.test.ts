@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { remoteBranchHint, remoteBranchOf, splitRemote, type RefExtras } from './branchWeb'
 
-const e = (over: Partial<RefExtras> = {}): RefExtras => ({ remote: 'origin', branch: 'fix', host: '', trackedBy: [], localExists: false, ...over })
+const e = (over: Partial<RefExtras> = {}): RefExtras => ({ remote: 'origin', branch: 'fix', host: '', trackedBy: [], localExists: false, remotes: ['origin'], ...over })
 
 describe('branchWeb', () => {
   it('splits a remote branch at its remote, the longest name first', () => {

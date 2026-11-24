@@ -485,3 +485,18 @@ describe("a remote branch's menu with what it reads as it opens", () => {
     expect(labels(sub?.items ?? [])).toContain('Open origin/fix/harbor')
   })
 })
+
+// #927
+describe('Push this branch to', () => {
+  it('lists every remote, checks the one it pushes to, and goes back to where the rest go', () => {
+    const local = { ...ref('feature', 'local'), pushRemote: 'fork' }
+    const items = refItems(local, ctx('main'), { remote: '', branch: 'feature', host: '', trackedBy: [], localExists: true, remotes: ['origin', 'fork'] } as never)
+    const item = items.find((i) => i.label === 'Push feature to')
+    expect(item?.hint).toBe('fork, for this branch alone')
+    expect(item?.items?.map((i) => (i.icon === 'check' ? '✓ ' : '') + i.label)).toEqual(['origin', '✓ fork', 'Where the rest go'])
+  })
+
+  it('is left out with no remotes, or without what the menu reads', () => {
+    expect(labels(refItems(ref('feature', 'local'), ctx('main')))).not.toContain('Push feature to')
+  })
+})
