@@ -217,7 +217,14 @@ None of the first-pass grammars is copyleft. gotreesitter's copyleft grammars ar
 - **P4Merge layout.** The manual doesn't say which side shows theirs and which shows yours. The 2-way page says both "purple bands" and "blue and green".
 - **CodeMirror reference details** beyond the installed `.d.ts`. The online reference was read as a summary.
 - **GPL FAQ.** gnu.org returned HTTP 429 three times, so this note gives no quoted licence guidance on bundling mergiraf.
-- **GumTree's later paper.** The ICSE 2024 scalability paper ([DOI](https://doi.org/10.1145/3597503.3639148)) wasn't read; it may change the cost picture for phase 4.
+- ~~**GumTree's later paper.**~~ Read for #947 from the authors' ICSE 2024 slides ([PDF](https://www.labri.fr/perso/falleri/img/slides/icse24.pdf)); the paper itself ([DOI](https://doi.org/10.1145/3597503.3639148)) was behind the ACM site, and arXiv 2403.05939 turned out to be a different paper (Alikhanifard and Tsantalis's RefactoringMiner AST diff). What the slides say:
+  - **The cost was in recovery.** The 2014 algorithm's third phase, an optimal edit script on small unmatched subtrees, is O(n³), which is why it needed `max_size` (slide 9).
+  - **"GumTree simple"** replaces it with a fast heuristic, applied under each pair of matched ancestors (slides 12–19):
+    1. *isomorphism*: unmatched subtrees that are identical are matched;
+    2. *iso-structure*: subtrees with the same shape whose labels differ are matched;
+    3. *uni-type*: when only one unmatched child of a type is left on each side, the two are matched and the heuristic runs again inside them.
+  - **Results** on Defects4J, BugsInPy and GitHub Java and Python samples (slides 20–22): faster than the 2014 algorithm on 89–94% of file pairs, "between 50% and 300% matching speedup"; edit scripts smaller on 37–74% and bigger on 5–14%, "around 50% smaller median edit-script size"; of the smaller scripts, participants judged 91 of 100 better.
+  - **What #947 takes from it:** top-down matching of identical subtrees, bottom-up matching of containers by the dice of their matched descendants, then the simple recovery, with no `max_size` and no optimal edit script. Moves are matched subtrees the token diff left as deleted and added.
 
 ## Sources
 

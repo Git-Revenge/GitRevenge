@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { bandPath, mapLine, marksByLine, moveNote, opsFromBlocks, stops, type Block, type Result } from './blocks'
+import { bandPath, mapLine, marksByLine, moveNote, moveTone, opsFromBlocks, renameTone, stops, type Block, type Move, type Result } from './blocks'
 import { withMarks } from './highlight'
 import { applyChanges, diffLines, splitLines } from './lineDiff'
 
 const block = (oldStart: number, oldEnd: number, newStart: number, newEnd: number, extra: Partial<Block> = {}): Block =>
   ({ oldStart, oldEnd, newStart, newEnd, ...extra }) as Block
-const result = (blocks: Block[], moves: Result['moves'] = []): Result => ({ blocks, moves, algorithm: 'myers', added: 0, removed: 0 }) as Result
+const result = (blocks: Block[], moves: Move[] = []): Result => ({ blocks, moves, algorithm: 'myers', added: 0, removed: 0 }) as unknown as Result
 
 describe('opsFromBlocks', () => {
   it('makes the ops diffLines makes, so staging rebuilds the same file', () => {
@@ -112,5 +112,27 @@ describe('withMarks', () => {
       { text: 'c', cls: 'b', changed: true },
       { text: 'd', cls: 'b' },
     ])
+  })
+})
+
+describe('moves and renames in full (#947)', () => {
+  const mv = { oldStart: 23, oldEnd: 27, newStart: 10, newEnd: 14, reindented: false }
+  it('says a move changed on the way, or what it moved into', () => {
+    expect(moveNote({ ...mv, changed: true }, 'old')).toBe('moved to line 11, and changed')
+    expect(moveNote({ ...mv, changed: true }, 'new')).toBe('moved from line 24, changed')
+    expect(moveNote({ ...mv, into: 'if statement' }, 'new')).toBe('moved into an if statement')
+    expect(moveNote({ ...mv, into: 'for statement' }, 'old')).toBe('moved into a for statement at line 11')
+  })
+
+  it('cycles four colours for moves from teal, and for renames from ochre', () => {
+    expect([0, 1, 2, 3, 4].map(moveTone)).toEqual([0, 1, 2, 3, 0])
+    expect([1, 2, 3, 4, 5].map(renameTone)).toEqual([3, 0, 1, 2, 3])
+  })
+
+  it('carries a rename by its number, and a moved token by its kind', () => {
+    const b = { ...block(0, 1, 0, 1), old: [{ line: 0, from: 0, to: 3, kind: 'rename', rename: 2 }], new: [{ line: 0, from: 4, to: 5, kind: 'move' }] } as unknown as Block
+    const m = marksByLine([b])
+    expect(m.old.get(0)).toEqual([[0, 3, 'rename', 2]])
+    expect(m.new.get(0)).toEqual([[4, 5, 'move']])
   })
 })
