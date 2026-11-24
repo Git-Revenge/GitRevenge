@@ -409,15 +409,6 @@ func sameCommit(ctx context.Context, g *git.Repo, a, b string) bool {
 	return err == nil && first == second
 }
 
-func hasRemote(rs []git.Remote, name string) bool {
-	for _, r := range rs {
-		if r.Name == name {
-			return true
-		}
-	}
-	return false
-}
-
 // PushRef pushes a tag, or deletes a ref from a remote: kind is "tag", "delete-branch" or
 // "delete-tag". PushBranch pushes branches.
 func (a *App) PushRef(path, remote, kind, name string) error {
