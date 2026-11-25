@@ -1,5 +1,6 @@
 import type { app } from '../../wailsjs/go/models'
 import { EventsOn } from '../../wailsjs/runtime/runtime.js'
+import type { FoundLine } from './find/find'
 import type { GraphProgress } from './graph/rowCache'
 import type { ConflictInfo } from './insights/model'
 import type { Prompt } from './promptOrigin'
@@ -14,6 +15,9 @@ export type ChangeKind = 'head' | 'refs' | 'index' | 'state' | 'config' | 'workt
  * and each is named after the Go type that's sent (see its a.emit call).
  */
 export interface BackendEvents {
+  /** FindLines: lines a Find in files search found, sent as it goes and tagged with the
+   * token the search was started with (#979, #980). */
+  'find:lines': { path: string; token: string; commit: string; lines: FoundLine[] }
   /** PushResult: what a push to a remote with several push URLs did at each (#926). */
   'push:result': { path: string; remote: string; refspec: string; dests: { url: string; state: string; detail?: string; name: string }[] }
   /** RepoChange: a repository on screen changed on disk, or came on screen and wants reading again. */

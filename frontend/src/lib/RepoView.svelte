@@ -19,6 +19,7 @@
   import CommitPanel from './CommitPanel.svelte'
   import type { DiffTarget } from './diff/DiffView.svelte'
   import Lazy from './ui/Lazy.svelte'
+  import { findAsk } from './find/findAsk.svelte'
   import GraphView from './graph/GraphView.svelte'
   import type { RefLabel } from './graph/draw'
   import type { Ref, Row } from './graph/rowCache'
@@ -411,6 +412,8 @@
     onMenu={openMenu}
     onManageWorktrees={() => (worktreesOpen = true)}
     openDialog={ctx.openDialog}
+    diffShown={diff}
+    onOpenFile={(t) => (diff = t)}
   />
   <div class="main">
     <div class="bar" bind:clientWidth={barWidth}>
@@ -426,7 +429,7 @@
       <FilterStrip {filter} {only} {onlyOffered} onRemove={(p) => setFilter(togglePick(filter.picks, p.key, p.value))} onAdd={() => sidebar?.show('filters')} onMode={setMode} onClear={() => setFilter([])} onStep={step} />
     {/if}
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filter.picks.length > 0} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFilterDrop={() => filter.picks.length && setFilter(filter.picks.slice(0, -1))} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filter.picks.length > 0} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFindInFiles={(text) => findAsk.show(path, text)} onFilterDrop={() => filter.picks.length && setFilter(filter.picks.slice(0, -1))} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           void whileBusy(loadRefExtras(path, refs)).then((e) => openMenu(commitMenuItems(row, refs, ctx, e), x, y))}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
@@ -479,11 +482,14 @@
               {path}
               file={diff.file}
               rev={diff.commit ?? ''}
+              line={diff.line ?? 0}
               onClose={() => (diff = null)}
               onOpen={(t: DiffTarget) => (diff = t)}
               onReveal={revealCommit}
             />
           {/key}
+        {:else if diff.mode === 'found'}
+          <Lazy load={() => import('./diff/FoundFileView.svelte')} {path} target={diff} onClose={() => (diff = null)} onOpen={(t: DiffTarget) => (diff = t)} />
         {:else}
           <Lazy load={() => import('./diff/DiffView.svelte')} {path} target={diff} onClose={() => (diff = null)} onOpen={(t: DiffTarget) => (diff = t)} />
         {/if}

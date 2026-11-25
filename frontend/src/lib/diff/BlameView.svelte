@@ -14,6 +14,7 @@
     path,
     file,
     rev = '',
+    line = 0,
     onClose,
     onOpen,
     onReveal,
@@ -21,6 +22,8 @@
     path: string
     file: string
     rev?: string
+    /** A line (1-based) to wash and bring into view, as Find in files opens one (#980). */
+    line?: number
     onClose: () => void
     onOpen: (t: DiffTarget) => void
     /** Shows a commit in the graph. */
@@ -54,6 +57,9 @@
   provideCommands(() => [wrapCommand()])
 
   const uncommitted = (c: string) => /^0+$/.test(c)
+
+  /** Brings the line asked for into view once it's drawn. */
+  const scrollHere = (row: HTMLElement) => row.scrollIntoView({ block: 'center' })
 </script>
 
 <div class="blame">
@@ -76,7 +82,7 @@
         <tbody>
           {#each lines as l, i (i)}
             {@const start = i === 0 || lines[i - 1].commit !== l.commit}
-            <tr class:start>
+            <tr class:start class:at={i + 1 === line} {@attach i + 1 === line ? scrollHere : undefined}>
               <td class="gutter" style:border-left-color={uncommitted(l.commit) ? 'transparent' : laneVar(colorOf[l.commit] ?? 0)}>
                 {#if start}
                   {#if uncommitted(l.commit)}
@@ -128,6 +134,10 @@
 
   tr.start td {
     border-top: 1px dotted var(--paper-edge);
+  }
+
+  tr.at td {
+    background: var(--highlight);
   }
 
   td {

@@ -22,6 +22,8 @@
   import type { MenuItem } from './ContextMenu.svelte'
   import { trailerCare } from './filters/careDialog.svelte'
   import RepoPanel from './RepoPanel.svelte'
+  import type { DiffTarget } from './diff/DiffView.svelte'
+  import { findAsk } from './find/findAsk.svelte'
   import Lazy from './ui/Lazy.svelte'
   import { session } from './session.svelte'
   import Icon from './ui/Icon.svelte'
@@ -50,6 +52,8 @@
     pinnedKeys = [],
     onPin,
     onSearch,
+    diffShown = null,
+    onOpenFile,
   }: {
     path: string
     /** The values the graph is filtered by, and how to add one or take it out. */
@@ -60,6 +64,9 @@
     onPin?: (key: string, on: boolean) => void
     /** Searches the graph for text. */
     onSearch?: (query: string) => void
+    /** What the diff area shows, and how to show a file there: Find in files opens them. */
+    diffShown?: DiffTarget | null
+    onOpenFile?: (t: DiffTarget) => void
     /** The commit selected in the graph; refs pointing at it show as selected. */
     selectedCommit?: string
     onPick: (ref: Ref) => void
@@ -81,6 +88,7 @@
     { key: 'filters', label: 'Smart filters', icon: 'filter', empty: '' },
     { key: 'stashes', label: 'Stashes', icon: 'stash', empty: 'No stashes.' },
     { key: 'repo', label: 'Repository', icon: 'submodule', empty: '' },
+    { key: 'find', label: 'Find in files', icon: 'search', empty: '' },
   ]
 
   const uid = $props.id()
@@ -106,6 +114,36 @@
   $effect(() => {
     if (ui.panel === 'filters' || filter.trim()) filtersWanted = true
   })
+  // Find in files (#980) is made the first time it's shown, and stays, with its results.
+  let findWanted = $state(false)
+  $effect(() => {
+    if (ui.panel === 'find') findWanted = true
+  })
+  // Ctrl+Alt+F, or the search box's row, asks for it with text to find.
+  let askSeen = 0
+  $effect(() => {
+    const a = findAsk.ask
+    if (!a || a.path !== path || a.seq === askSeen) return
+    askSeen = a.seq
+    ui.panel = 'find'
+    ui.collapsed = false
+    findWanted = true
+  })
+
+  /** What Ctrl+Alt+F searches for: the text selected, in a field or on the page, or what a
+   * field holds, such as the graph's search box. Nothing when it runs over lines. */
+  function textToFind(): string {
+    const el = document.activeElement
+    let t: string
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      const [a, b] = [el.selectionStart ?? 0, el.selectionEnd ?? 0]
+      t = a < b ? el.value.slice(a, b) : el.value
+    } else {
+      t = window.getSelection()?.toString() ?? ''
+    }
+    t = t.trim()
+    return t.includes('\n') ? '' : t
+  }
 
   // Each remote's details and where its URLs point, for the Remotes panel's folder headers.
   // They're read with the refs, and again when git config changes.
@@ -261,7 +299,7 @@
   })
 
   let panels = $derived(buildPanels(refs, { showHidden: showingHidden, sort: ui.sort, remoteGrouping: ui.remoteGrouping, hostOf }))
-  let current = $derived(ui.panel === 'repo' || ui.panel === 'filters' ? null : panels[ui.panel])
+  let current = $derived(ui.panel === 'repo' || ui.panel === 'filters' || ui.panel === 'find' ? null : panels[ui.panel])
   let careOn = $derived(care && ui.panel === 'branches')
   let merged = $derived(session.merged[path] ?? {})
   let deletable = $state<string[]>([])
@@ -273,7 +311,7 @@
   })
   let filtering = $derived(filter.trim().length > 0)
   let needCare = $derived(careCount(panels.branches))
-  let matches = $derived(!filtering ? 0 : current ? panelMatches(current, filter) : ui.panel === 'filters' ? filterMatches : repoMatches)
+  let matches = $derived(!filtering ? 0 : current ? panelMatches(current, filter) : ui.panel === 'filters' ? filterMatches : ui.panel === 'find' ? 0 : repoMatches)
   // An empty panel names one with matches, the Repository panel last.
   let elsewhere = $derived.by(() => {
     if (rows.length > 0 || !filtering) return null
@@ -388,6 +426,8 @@
   /** The rail badge: a count while filtering or for stashes, a dot for things that need
    * attention, and what it means for screen readers. */
   function badge(key: SidebarPanel): { count: number; text: string; dot?: boolean } {
+    // Find has its own box: the sidebar's filter doesn't reach it.
+    if (key === 'find') return { count: 0, text: '' }
     if (filtering) {
       const count = key === 'repo' ? repoMatches : key === 'filters' ? filterMatches : panelMatches(panels[key], filter)
       return { count, text: count === 1 ? '1 match' : `${count} matches` }
@@ -464,6 +504,15 @@
       shortcut: 'Mod+Shift+B',
       whenTyping: true,
       run: () => void focusFilter(),
+    },
+    {
+      id: 'view.findInFiles',
+      group: 'View',
+      title: 'Find in files…',
+      keywords: 'search grep text content code',
+      shortcut: 'Mod+Alt+F',
+      whenTyping: true,
+      run: () => findAsk.show(path, textToFind()),
     },
     {
       id: 'view.sidebar',
@@ -580,7 +629,7 @@
           {/if}
         {/if}
       </div>
-      <label class="filter">
+      <label class="filter" hidden={ui.panel === 'find'}>
           <Icon name="search" size={14} />
           <input type="search" placeholder="Filter all panels" aria-label="Filter everything in the sidebar" bind:value={filter} bind:this={filterInput} onkeydown={filterKey} />
           {#if filtering}
@@ -602,7 +651,7 @@
       {/if}
     </header>
 
-    <div class="scroll" class:narrowed={filtering || careOn} bind:this={list} bind:clientHeight={viewHeight} onscroll={(e) => (scrollTop = e.currentTarget.scrollTop)} hidden={ui.panel === 'repo' || ui.panel === 'filters'}>
+    <div class="scroll" class:narrowed={filtering || careOn} bind:this={list} bind:clientHeight={viewHeight} onscroll={(e) => (scrollTop = e.currentTarget.scrollTop)} hidden={ui.panel === 'repo' || ui.panel === 'filters' || ui.panel === 'find'}>
       <ul
         bind:this={tree}
         role="tree"
@@ -656,6 +705,12 @@
     {#if filtersWanted}
       <div class="scroll" hidden={ui.panel !== 'filters'}>
         <Lazy load={() => import('./filters/SmartFiltersPanel.svelte')} {path} {filter} picks={filterPicks} pins={pinnedKeys} {onPin} {onMenu} onCare={() => trailerCare.show(path)} open={ui.open} onPick={(key: string, value: string) => onFilterPick?.(key, value)} onSearch={(q: string) => onSearch?.(q)} onStatus={(s: { matches: number }) => (filterMatches = s.matches)} />
+      </div>
+    {/if}
+
+    {#if findWanted}
+      <div class="find-host" hidden={ui.panel !== 'find'}>
+        <Lazy load={() => import('./find/FindPanel.svelte')} {path} current={diffShown} onOpen={(t: DiffTarget) => onOpenFile?.(t)} {onMenu} />
       </div>
     {/if}
 
@@ -782,6 +837,10 @@
     color: var(--ink-mute);
   }
 
+  .filter[hidden] {
+    display: none;
+  }
+
   .filter:focus-within {
     outline: 2px solid var(--link);
     outline-offset: 1px;
@@ -874,6 +933,18 @@
   }
 
   .scroll[hidden] {
+    display: none;
+  }
+
+  /* Find in files scrolls its own results, under its box. */
+  .find-host {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .find-host[hidden] {
     display: none;
   }
 
