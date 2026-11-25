@@ -29,7 +29,7 @@ func windTab(t *testing.T, a *App) string {
 func TestFindInFilesSendsItsLinesAndSaysHowItEnded(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
-	path := windTab(t, a)
+	// The hook is set before the repository opens: its watcher emits from then on.
 	var mu sync.Mutex
 	var batches []FindLines
 	a.emitHook = func(name string, data any) {
@@ -39,6 +39,7 @@ func TestFindInFilesSendsItsLinesAndSaysHowItEnded(t *testing.T) {
 			mu.Unlock()
 		}
 	}
+	path := windTab(t, a)
 	res, err := a.FindInFiles(path, "search-1", git.GrepOptions{Text: "km/h"})
 	if err != nil {
 		t.Fatal(err)
@@ -69,10 +70,6 @@ func TestFindAtABranchSaysWhichCommitItSearched(t *testing.T) {
 	fx.Git("branch", "old")
 	then := fx.Head()
 	fx.CommitFile("units.txt", "knots\n", "knots")
-	tab, err := a.OpenRepo(fx.Dir)
-	if err != nil {
-		t.Fatal(err)
-	}
 	var mu sync.Mutex
 	var commits []string
 	a.emitHook = func(name string, data any) {
@@ -81,6 +78,10 @@ func TestFindAtABranchSaysWhichCommitItSearched(t *testing.T) {
 			commits = append(commits, b.Commit)
 			mu.Unlock()
 		}
+	}
+	tab, err := a.OpenRepo(fx.Dir)
+	if err != nil {
+		t.Fatal(err)
 	}
 	res, err := a.FindInFiles(tab.Path, "t", git.GrepOptions{Text: "km/h", Rev: "old"})
 	if err != nil || res.Commit != then || res.Lines != 1 {
@@ -100,13 +101,13 @@ func TestFindAtABranchSaysWhichCommitItSearched(t *testing.T) {
 func TestFindCountCountsWithoutSendingLines(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
-	path := windTab(t, a)
 	var sent atomic.Bool
 	a.emitHook = func(name string, _ any) {
 		if name == "find:lines" {
 			sent.Store(true)
 		}
 	}
+	path := windTab(t, a)
 	got, err := a.FindCount(path, git.GrepOptions{Text: "KM/H"})
 	if err != nil || got != (FindCounted{Lines: 2, Files: 2}) {
 		t.Fatalf("count = %+v, %v", got, err)
