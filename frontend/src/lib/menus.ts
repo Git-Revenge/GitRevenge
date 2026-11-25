@@ -307,7 +307,7 @@ export function webItems(short: string, e: RefExtras | undefined): MenuItem[] {
   return items
 }
 
-/** Push this branch to ▸ (#927): one branch pushing to another remote than the rest
+/** Always push … to ▸ (#927): one branch pushing to another remote than the rest
  * (branch.<name>.pushRemote), or back to where the rest go. */
 export function pushRemoteItem(path: string, ref: Ref, remotes: string[]): MenuItem[] {
   if (ref.kind !== 'local' || remotes.length === 0) return []

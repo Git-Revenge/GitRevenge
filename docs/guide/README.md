@@ -12,7 +12,7 @@ Git Revenge is a free desktop git client for Windows, macOS and Linux. It's buil
 - **It's fast on big repositories.** The graph loads history just ahead of where you're looking, so a repository with a million commits still opens and scrolls quickly.
 - **It's your git.** Anything you do in a terminal shows up in the app within a second, and anything you do in the app is an ordinary git command you could have typed.
 
-What it leaves out: it knows nothing about the site your repository is hosted on, so there are no pull requests, reviews or tickets in it. [Smart links](settings.md#links) can turn a ticket key into a link that opens in your browser.
+What it leaves out: it never talks to the site your repository is hosted on, so there are no pull requests, reviews or tickets in it. A remote on GitHub, GitLab and the like can [open its pages](remotes.md#forges-and-web-pages) in your browser, and [smart links](settings.md#links) can turn a ticket key into a link.
 
 ## Where to start
 
@@ -34,7 +34,7 @@ After that, the guide covers each part of the app in turn:
 | [Branch care](branch-care.md) | Branch kinds, hiding, cleaning up merged branches, and stacks. |
 | [Reading a diff](diffs.md) | Layouts and the ribbon, code read token by token, formatting, renames and moved code. |
 | [Previews and history](history.md) | Rendered previews, file history and blame, the reflog, bisect, notes and signatures. |
-| [Remotes, LFS and submodules](remotes.md) | Fetch, pull and push, signing in, and what to do when one fails. |
+| [Remotes, LFS and submodules](remotes.md) | Fetch, pull and push, where pushes go, the Remotes panel, tidying, pushing to several places, and forges. |
 | [Git config](git-config.md) | Editing git's own settings files. |
 | [People and the mailmap](people.md) | Who a history names, joining the names that are one person, and the `.mailmap`. |
 | [Smart filters](smart-filters.md) | Filtering the graph by the trailers a history already has, pinning a key to rows, and Trailer care. |
