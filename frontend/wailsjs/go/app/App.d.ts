@@ -113,6 +113,10 @@ export function FileHistory(arg1:string,arg2:string):Promise<Array<git.FileCommi
 
 export function FileImage(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
 
+export function FindCount(arg1:string,arg2:git.GrepOptions):Promise<app.FindCounted>;
+
+export function FindInFiles(arg1:string,arg2:string,arg3:git.GrepOptions):Promise<app.FindResult>;
+
 export function ForcePushLoss(arg1:string):Promise<app.SharedCommits>;
 
 export function FormattingOnly(arg1:string,arg2:string,arg3:string,arg4:Array<string>):Promise<Array<string>>;
