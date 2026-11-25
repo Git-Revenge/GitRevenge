@@ -220,6 +220,7 @@ func readAsCode(ctx context.Context, res *Result, a, b text, opts Options, moved
 	}
 	va, vb := newVersion(a, ra.toks, moved.before), newVersion(b, rb.toks, moved.after)
 	va.nodes, vb.nodes = ra.nodes, rb.nodes
+	nameWrapped(va, vb, res.Blocks, res.Moves)
 	blocks, renames, nested, err := refine(ctx, va, vb, res.Blocks)
 	if err != nil {
 		return false, err
