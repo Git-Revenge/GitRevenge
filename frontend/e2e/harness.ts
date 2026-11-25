@@ -4,6 +4,7 @@
 import { mount } from 'svelte'
 import '../src/style.css'
 import type { Scenario } from './support'
+import type { DiffTarget } from '../src/lib/diff/DiffView.svelte'
 import { guardLinks } from '../src/lib/linkGuard'
 import * as bindings from '../wailsjs/go/app/App.js'
 
@@ -227,6 +228,10 @@ const mounts = {
   },
   async sidebar() {
     const { default: Sidebar } = await import('../src/lib/Sidebar.svelte')
+    if (scenario.commandKeys) {
+      const { commands } = await import('../src/lib/commands.svelte')
+      window.addEventListener('keydown', (e) => commands.dispatch(e))
+    }
     mount(Sidebar, {
       target: host,
       props: {
@@ -245,8 +250,19 @@ const mounts = {
         pinnedKeys: scenario.pinnedKeys ?? [],
         onPin: record('pin'),
         onSearch: record('search'),
+        diffShown: (scenario.diffShown ?? null) as DiffTarget | null,
+        onOpenFile: record('open-file'),
       },
     })
+  },
+  // A file Find in files found something in (#980).
+  async foundFile() {
+    if (scenario.commandKeys) {
+      const { commands } = await import('../src/lib/commands.svelte')
+      window.addEventListener('keydown', (e) => commands.dispatch(e))
+    }
+    const { default: FoundFileView } = await import('../src/lib/diff/FoundFileView.svelte')
+    mount(FoundFileView, { target: host, props: { path: '/repo', target: scenario.foundTarget as DiffTarget, onClose: record('close'), onOpen: record('open') } })
   },
   async start() {
     host.style.cssText = 'display:block'
@@ -259,7 +275,7 @@ const mounts = {
     // A test about the saved view has the app read it first, as the app does when it starts.
     if (scenario.responses?.GraphViews) await (await import('../src/lib/theme.svelte')).theme.load()
     const wip = scenario.wip ? { changes: scenario.wip.changes, active: false, open: record('wip') } : undefined
-    mount(GraphView, { target: host, props: { path: '/repo', wip, onSelect: record('select'), onNote: (row: { index: number }) => win.__events.push(['note', row.index]), onContext: (row: { index: number }) => win.__events.push(['context-row', row.index]), onDrop: record('drop'), ...(scenario.suggests ? { onFilterAdd: record('filter-add'), onFilterDrop: record('filter-drop') } : {}), sparse: scenario.sparse ?? false, highlight: scenario.highlight ?? null, filterPicks: scenario.filterPicks ?? [], pins: scenario.pins ?? [], ...(scenario.graphChips ? { onFilterPick: record('filter-pick') } : {}), trailersUnread: scenario.trailersUnread ?? 0 } })
+    mount(GraphView, { target: host, props: { path: '/repo', wip, onSelect: record('select'), onNote: (row: { index: number }) => win.__events.push(['note', row.index]), onContext: (row: { index: number }) => win.__events.push(['context-row', row.index]), onDrop: record('drop'), ...(scenario.suggests ? { onFilterAdd: record('filter-add'), onFilterDrop: record('filter-drop') } : {}), ...(scenario.finds ? { onFindInFiles: record('find-in-files') } : {}), sparse: scenario.sparse ?? false, highlight: scenario.highlight ?? null, filterPicks: scenario.filterPicks ?? [], pins: scenario.pins ?? [], ...(scenario.graphChips ? { onFilterPick: record('filter-pick') } : {}), trailersUnread: scenario.trailersUnread ?? 0 } })
   },
   async commitMenu() {
     const { default: ContextMenu } = await import('../src/lib/ContextMenu.svelte')
@@ -541,6 +557,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'sidebar':
     await mounts.sidebar()
+    break
+  case 'foundFile':
+    await mounts.foundFile()
     break
   case 'start':
     await mounts.start()

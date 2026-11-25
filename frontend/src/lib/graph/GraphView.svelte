@@ -4,7 +4,8 @@
   import { errorText } from '../errors'
   import { onMount, tick, untrack, type Snippet } from 'svelte'
   import { ALONE_STEPS, searchPlaceholder, SQUEEZE, squeezeFor } from '../barSqueeze'
-  import { ArrivedCommits, CommitNotes, CommitRow, CommitSignatures, GraphFocus, HeadCommit, OwnMoveAge, GraphRows, NotedCommits, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView, TrailerFilterDays, TrailerSuggest } from '../../../wailsjs/go/app/App.js'
+  import { ArrivedCommits, CommitNotes, CommitRow, CommitSignatures, FindCount, GraphFocus, HeadCommit, OwnMoveAge, GraphRows, NotedCommits, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView, TrailerFilterDays, TrailerSuggest } from '../../../wailsjs/go/app/App.js'
+  import { findSummary } from '../find/find'
   import { session } from '../session.svelte'
   import { ClipboardSetText } from '../../../wailsjs/runtime/runtime.js'
   import { onBackend } from '../events'
@@ -47,6 +48,7 @@
     pins = [],
     onFilterAdd,
     onFilterDrop,
+    onFindInFiles,
     lead,
     wip,
     toolsHost,
@@ -98,6 +100,9 @@
     onFilterAdd?: (key: string, value: string) => void
     /** Takes the last value out of the smart filter: Backspace in an empty search box. */
     onFilterDrop?: () => void
+    /** Looks for the text in the files (#980). With it, the search box offers that second,
+     * with how many lines it would find. */
+    onFindInFiles?: (text: string) => void
     /** A click on a row's author, or Enter on the selected row: asks for the author's card.
      * x and y are where in the window to put it, under the row, and above is the row's top. */
     onAuthor?: (row: Row, x: number, y: number, above: number) => void
@@ -491,6 +496,8 @@
   // Enter keeps moving between matches until an arrow key says otherwise.
   const suggestId = `suggest-${Math.random().toString(36).slice(2, 8)}`
   let suggested = $state<Suggestions | null>(null)
+  // The list is up: asked for by typing or focus, until the box lets go of it.
+  let suggestOpen = $state(false)
   let suggestAt = $state(0)
   let suggestedFor = ''
   let keepSuggestions = false
@@ -501,27 +508,48 @@
     clearTimeout(suggestTimer)
     suggestSeq++
     suggested = null
+    suggestOpen = false
     suggestedFor = ''
     suggestAt = 0
   }
 
   function suggestSoon() {
     clearTimeout(suggestTimer)
-    if (!onFilterAdd) return
+    if (!onFilterAdd && !onFindInFiles) return
     if (!query.trim()) return hideSuggestions()
     suggestTimer = setTimeout(() => void suggest(), 120)
+  }
+
+  // Find in files' row says how many lines it would find: counted for the text as typed, a
+  // newer count stopping the one before.
+  let findCount = $state<string | undefined>()
+  async function countFind(seq: number, q: string) {
+    findCount = undefined
+    const got = await FindCount(path, { text: q.trim(), matchCase: false, wholeWord: false, regex: false, untracked: false, rev: '', paths: [] }).catch(() => null)
+    if (seq !== suggestSeq || q !== query || !got || got.superseded) return
+    findCount = got.lines ? findSummary(got.lines, got.files) : 'nothing'
+  }
+
+  /** The text goes to Find in files, and the search box steps aside. */
+  function findInFiles() {
+    const q = query.trim()
+    if (!q || !onFindInFiles) return
+    hideSuggestions()
+    onFindInFiles(q)
   }
 
   async function suggest() {
     const seq = ++suggestSeq
     const q = query
-    const got = await TrailerSuggest(path, q, 0).catch(() => null)
+    if (onFindInFiles) void countFind(seq, q)
+    const got = onFilterAdd ? await TrailerSuggest(path, q, 0).catch(() => null) : null
     if (seq !== suggestSeq || q !== query) return
     // The same text asked about again, as when the box gets the focus back, keeps the row
     // the keys are on.
-    suggestAt = q === suggestedFor ? Math.min(suggestAt, got?.items.length ?? 0) : 0
+    suggestAt = q === suggestedFor ? Math.min(suggestAt, (got?.items.length ?? 0) + findRows) : 0
     suggestedFor = q
     suggested = got
+    suggestOpen = true
   }
 
   /** A value joins the filter and the box empties for the next one; a key is written in the
@@ -1168,7 +1196,9 @@
   // Search state. matchSet is only used for dimming when every match fits in the result.
   let searchInput: HTMLInputElement
   let query = $state('')
-  let suggestShown = $derived(!!suggested?.items.length && !!query.trim())
+  let suggestShown = $derived(suggestOpen && !!query.trim() && (!!suggested?.items.length || !!onFindInFiles))
+  // Rows after the text search's: Find's, then the trailer suggestions.
+  let findRows = $derived(onFindInFiles ? 1 : 0)
   let matches = $state<number[]>([])
   let matchTotal = $state(0)
   let matchSet: Set<number> | null = null
@@ -1896,10 +1926,15 @@
 
   function onSearchKey(e: KeyboardEvent) {
     const items = suggestShown ? (suggested?.items ?? []) : []
+    // Find's row, when it's offered, comes before the suggestions.
+    const extra = suggestShown ? findRows : 0
+    const rows = items.length + 1 + extra
     if (e.key === 'Enter') {
       e.preventDefault()
+      if (extra && suggestAt === 1) return findInFiles()
       // On a suggestion, Enter picks it.
-      if (suggestAt > 0 && items[suggestAt - 1]) return pickSuggestion(items[suggestAt - 1])
+      const item = items[suggestAt - 1 - extra]
+      if (suggestAt > extra && item) return pickSuggestion(item)
       const dir = e.shiftKey ? -1 : 1
       // Enter right after typing waits for that search rather than using the last one.
       if (searchPending) void runSearch().then(() => jump(dir))
@@ -1910,13 +1945,13 @@
         e.preventDefault()
         suggestAt = 0
       } else closeSearch()
-    } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && items.length) {
+    } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && rows > 1) {
       e.preventDefault()
-      suggestAt = stepRow(suggestAt, e.key === 'ArrowDown' ? 1 : -1, items.length + 1)
+      suggestAt = stepRow(suggestAt, e.key === 'ArrowDown' ? 1 : -1, rows)
     } else if (e.key === 'Tab' && !e.shiftKey && items.length) {
       // Tab completes with the row the keys are on, or the first one offered.
       e.preventDefault()
-      completeWith(items[Math.max(0, suggestAt - 1)])
+      completeWith(items[Math.max(0, suggestAt - 1 - extra)])
     } else if (e.key === 'Backspace' && !query && onFilterDrop) {
       e.preventDefault()
       onFilterDrop()
@@ -2117,8 +2152,19 @@
       {#if searchIconOnly}
         <button class="btn sm quiet icon" onclick={closeSearch} aria-label="Close search" title="Close search (Escape)"><Icon name="close" size={13} /></button>
       {/if}
-      {#if suggestShown && suggested}
-        <SearchSuggest id={suggestId} {query} items={suggested.items} match={suggested.match} active={suggestAt} soFar={!suggested.status.done} onPick={pickSuggestion} onSearch={() => jump(1)} />
+      {#if suggestShown}
+        <SearchSuggest
+          id={suggestId}
+          {query}
+          items={suggested?.items ?? []}
+          match={suggested?.match ?? ''}
+          active={suggestAt}
+          soFar={!!suggested && !suggested.status.done}
+          find={onFindInFiles ? { count: findCount } : undefined}
+          onFind={findInFiles}
+          onPick={pickSuggestion}
+          onSearch={() => jump(1)}
+        />
       {/if}
     </span>
   </div>

@@ -13,8 +13,10 @@
     match,
     active,
     soFar = false,
+    find,
     onPick,
     onSearch,
+    onFind,
   }: {
     /** The list's id, which the box names as what it controls; rows are `${id}-${n}`. */
     id: string
@@ -30,7 +32,14 @@
     onPick: (item: Suggestion) => void
     /** The first row was clicked: search for the text as it is. */
     onSearch: () => void
+    /** Find in files' row, second (#980), with what it counted, or undefined while counting.
+     * Without it the trailer suggestions follow the first row. */
+    find?: { count?: string }
+    onFind?: () => void
   } = $props()
+
+  // The trailer suggestions' rows come after the text search's and Find's.
+  let first = $derived(find ? 2 : 1)
 </script>
 
 <!-- A click must not take the focus from the box: the list closes when the box loses it. -->
@@ -40,8 +49,15 @@
     <span class="value">“{query.trim()}”</span>
     <span class="count">Enter: next match</span>
   </div>
+  {#if find}
+    <div class="row text find" id="{id}-1" role="option" tabindex="-1" aria-selected={active === 1} class:active={active === 1} onclick={() => onFind?.()} onkeydown={() => {}}>
+      <span class="what">Find</span>
+      <span class="value">“{query.trim()}” in the files</span>
+      <span class="count">{find.count ?? '…'}</span>
+    </div>
+  {/if}
   {#each items as item, n (item.key + '\n' + item.value)}
-    <div class="row" id="{id}-{n + 1}" role="option" tabindex="-1" aria-selected={active === n + 1} aria-label={suggestionLabel(item)} class:active={active === n + 1} onclick={() => onPick(item)} onkeydown={() => {}}>
+    <div class="row" id="{id}-{n + first}" role="option" tabindex="-1" aria-selected={active === n + first} aria-label={suggestionLabel(item)} class:active={active === n + first} onclick={() => onPick(item)} onkeydown={() => {}}>
       {#if isKey(item)}
         <span class="key own"
           >{#each markParts(item.keyLabel, match) as p, i (i)}{#if p.hit}<mark>{p.text}</mark>{:else}{p.text}{/if}{/each}:</span

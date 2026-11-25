@@ -1,11 +1,18 @@
 <script lang="ts" module>
+  import type { FindOptions } from '../find/find'
+
   /** What to compare. Opened from the commit panel or the working tree panel. */
   export interface DiffTarget {
-    /** 'conflict' opens the conflict tool instead of a diff. */
-    mode: 'commit' | 'staged' | 'unstaged' | 'conflict' | 'history' | 'blame'
+    /** 'conflict' opens the conflict tool instead of a diff; 'found' a file Find in files found
+     * something in, whole (#980). */
+    mode: 'commit' | 'staged' | 'unstaged' | 'conflict' | 'history' | 'blame' | 'found'
     file: string
     oldPath?: string
     commit?: string
+    /** The line to open at (1-based): a found line, or a blame's line. */
+    line?: number
+    /** The search that found it, for its matches to be marked. */
+    find?: FindOptions
   }
 </script>
 
@@ -279,7 +286,7 @@
     return {}
   })
 
-  const modeLabel = { commit: '', staged: 'Staged', unstaged: 'Unstaged', conflict: 'Conflict', history: '', blame: '' }
+  const modeLabel = { commit: '', staged: 'Staged', unstaged: 'Unstaged', conflict: 'Conflict', history: '', blame: '', found: '' }
 </script>
 
 <div class="diffview">

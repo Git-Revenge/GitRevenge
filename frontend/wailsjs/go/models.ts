@@ -1123,6 +1123,7 @@ export namespace app {
 	    }
 	}
 	export class FindResult {
+	    commit: string;
 	    lines: number;
 	    files: number;
 	    truncated: boolean;
@@ -1135,6 +1136,7 @@ export namespace app {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.commit = source["commit"];
 	        this.lines = source["lines"];
 	        this.files = source["files"];
 	        this.truncated = source["truncated"];

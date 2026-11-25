@@ -47,6 +47,12 @@ export interface Scenario {
   trailersUnread?: number
   /** The graph is given a smart filter to add to, so its search box suggests. */
   suggests?: boolean
+  /** The graph is given Find in files, so its search box offers it (#980). */
+  finds?: boolean
+  /** What the sidebar is told the diff area shows. */
+  diffShown?: unknown
+  /** The file the found-file view opens: a DiffTarget with mode 'found'. */
+  foundTarget?: unknown
   /** The values the graph is filtered by, as the sidebar is told. */
   filterPicks?: { key: string; value: string }[]
   /** What the filter strip is given: the filter, the mode in force, and whether Only these is on offer. */

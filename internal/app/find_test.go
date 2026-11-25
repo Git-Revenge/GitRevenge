@@ -61,6 +61,42 @@ func TestFindInFilesSendsItsLinesAndSaysHowItEnded(t *testing.T) {
 	}
 }
 
+func TestFindAtABranchSaysWhichCommitItSearched(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.CommitFile("units.txt", "km/h\n", "km/h")
+	fx.Git("branch", "old")
+	then := fx.Head()
+	fx.CommitFile("units.txt", "knots\n", "knots")
+	tab, err := a.OpenRepo(fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var commits []string
+	a.emitHook = func(name string, data any) {
+		if b, ok := data.(FindLines); ok && name == "find:lines" {
+			mu.Lock()
+			commits = append(commits, b.Commit)
+			mu.Unlock()
+		}
+	}
+	res, err := a.FindInFiles(tab.Path, "t", git.GrepOptions{Text: "km/h", Rev: "old"})
+	if err != nil || res.Commit != then || res.Lines != 1 {
+		t.Fatalf("result = %+v, %v; want the commit old named", res, err)
+	}
+	mu.Lock()
+	got := commits
+	mu.Unlock() // the next search sends its lines through the hook, which takes mu
+	if len(got) != 1 || got[0] != then {
+		t.Fatalf("the lines said they were found in %v", got)
+	}
+	if res, _ := a.FindInFiles(tab.Path, "t", git.GrepOptions{Text: "knots"}); res.Commit != "" || res.Lines != 1 {
+		t.Fatalf("working tree = %+v", res)
+	}
+}
+
 func TestFindCountCountsWithoutSendingLines(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)

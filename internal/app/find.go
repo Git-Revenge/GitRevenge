@@ -18,14 +18,20 @@ import (
 type FindLines struct {
 	Path string `json:"path"`
 	// Token is the one the window gave the search, so it can drop a stopped search's lines.
-	Token string         `json:"token"`
-	Lines []git.GrepLine `json:"lines"`
+	Token string `json:"token"`
+	// Commit is the commit searched, as a full ID, or "" for the working tree.
+	Commit string         `json:"commit"`
+	Lines  []git.GrepLine `json:"lines"`
 }
 
 // FindResult is how a search ended.
 type FindResult struct {
-	Lines int `json:"lines"`
-	Files int `json:"files"`
+	// Commit is the commit searched, as a full ID, or "" for the working tree: a branch named
+	// in the search is read once, so a line opens the file it was found in even after the
+	// branch moves.
+	Commit string `json:"commit"`
+	Lines  int    `json:"lines"`
+	Files  int    `json:"files"`
 	// Truncated says it stopped at git.GrepLimit lines, with more to find.
 	Truncated bool `json:"truncated"`
 	// Ms is how long it took.
@@ -57,6 +63,17 @@ func (a *App) FindInFiles(path, token string, o git.GrepOptions) (FindResult, er
 	ctx, done := a.latest.start("find", r.Path)
 	defer done()
 	start := time.Now()
+	named := o.Rev
+	if named != "" {
+		sha, err := r.Git.ReadString(ctx, "rev-parse", "--verify", "--quiet", "--end-of-options", named+"^{commit}")
+		if errors.Is(err, context.Canceled) {
+			return FindResult{Superseded: true}, nil
+		}
+		if err != nil || sha == "" {
+			return FindResult{}, findError(git.ErrUnknownRevision, named)
+		}
+		o.Rev = sha
+	}
 
 	var mu sync.Mutex
 	var pending []git.GrepLine
@@ -66,7 +83,7 @@ func (a *App) FindInFiles(path, token string, o git.GrepOptions) (FindResult, er
 		pending = nil
 		mu.Unlock()
 		if len(lines) > 0 {
-			a.emit("find:lines", FindLines{Path: r.Path, Token: token, Lines: lines})
+			a.emit("find:lines", FindLines{Path: r.Path, Token: token, Commit: o.Rev, Lines: lines})
 		}
 	}
 	tick := time.NewTicker(findEvery)
@@ -92,12 +109,12 @@ func (a *App) FindInFiles(path, token string, o git.GrepOptions) (FindResult, er
 	sender.Wait() // so the last lines go after every batch before them
 	send()
 
-	res := FindResult{Lines: sum.Lines, Files: sum.Files, Truncated: sum.Truncated, Ms: time.Since(start).Milliseconds()}
+	res := FindResult{Commit: o.Rev, Lines: sum.Lines, Files: sum.Files, Truncated: sum.Truncated, Ms: time.Since(start).Milliseconds()}
 	if errors.Is(err, context.Canceled) {
 		res.Superseded = true
 		return res, nil
 	}
-	return res, findError(err, o.Rev)
+	return res, findError(err, named)
 }
 
 // FindCount counts what FindInFiles would find, without the lines. A newer count in the same
