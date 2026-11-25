@@ -40,5 +40,6 @@ Commit or stash what you're working on. A bisect checks out other commits, and g
 - **Writing it up?** **Copy the log** copies your answers as text, ready to paste into an issue.
 - **Too many "Can't tell"?** If the commits you skipped hide the answer, Git Revenge tells you which commits it could be instead of guessing.
 - **It's git's own bisect.** One started with `git bisect` in a terminal shows up in the app, and one started here carries on in a terminal.
+- **When the bug is a word on the screen**, a [history search](../guide/searching-code.md#the-history-search) can be quicker. Search for `km/h` and choose **Commits that add or remove "km/h"**: the graph filters to the seven commits that brought it in or took it out, and *Show wind in knots* is marked **−1 feed.js**, the one that took it out of the feed and left it on the map.
 
 The guide has the rest: [Finding the commit that broke something](../guide/history.md#finding-the-commit-that-broke-something).

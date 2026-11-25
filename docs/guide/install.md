@@ -177,6 +177,7 @@ Everything else stays on your machine, including the parts that could easily hav
 
 - **Rendered previews** fetch nothing. A Markdown or notebook image from the web is shown as a link, an HTML page runs in a sandbox with no network, a GeoJSON file is drawn without map tiles, and audio, video and PDFs are read from the repository.
 - **The Map and Insights** are worked out from the repository alone, with no hosting service's API.
+- **Find in files and the history search** run your own `git` over the repository on your disk. In a partial clone, where git would otherwise download the files it's missing, they download nothing and say where what's on your machine runs out (see [partial clones](searching-code.md#partial-clones)).
 - **Forge marks and web pages** come from a remote's address and your [forge rules](settings.md#forges). No forge's API is called.
 - **No telemetry.** The app keeps no usage statistics and sends no crash reports.
 - **The docs site** loads its fonts from itself, not from a font service.

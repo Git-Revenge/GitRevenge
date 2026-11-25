@@ -37,6 +37,7 @@ const sidebars = {
       items: [
         { type: 'doc', id: 'guide/repositories', label: 'Repositories and tabs' },
         { type: 'doc', id: 'guide/graph', label: 'The commit graph' },
+        { type: 'doc', id: 'guide/searching-code', label: 'Searching the code' },
         { type: 'doc', id: 'guide/experimental-views', label: 'Experimental views' },
         { type: 'doc', id: 'guide/changes', label: 'Changes and commits' },
         { type: 'doc', id: 'guide/diffs', label: 'Reading a diff' },

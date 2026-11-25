@@ -1806,6 +1806,163 @@ scenes.changelogAnim = (page) =>
     },
   )
 
+// ── Searching the code ────────────────────────────────────────────────────────────────
+// Tidewater's map still labels the wind km/h, though the feed sends knots: the text these
+// searches look for.
+
+/** Find in files: km/h in the working tree, and public/map.js opened at the map's pin. */
+scenes.findInFiles = (page) =>
+  stills(page, 'find-in-files', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await p.keyboard.down('Control')
+    await p.keyboard.down('Alt')
+    await p.keyboard.press('f')
+    await p.keyboard.up('Alt')
+    await p.keyboard.up('Control')
+    await p.waitForSelector('input[aria-label="Text to find"]', { visible: true })
+    await type(p, 'km/h')
+    await waiting(() => p.waitForFunction(() => / in \d+ files? · /.test(document.querySelector('.find .status')?.textContent ?? ''), { timeout: 30000 }))
+    await click(p, '.find .row.line[title^="pin.title"]', { pause: 1200 })
+    await hidePanel(p)
+    await p.evaluate(() => document.activeElement?.blur())
+    await park(p)
+  })
+
+const HISTORY_CHIP = 'button.open[aria-haspopup=dialog][aria-label^="Commits that"]'
+const HISTORY_OPTIONS = '[role=dialog][aria-label="Change the history search"]'
+
+/** Waits for the history search's line under the chips to read like re. */
+const untilHistory = (p, re) =>
+  waiting(() =>
+    p.waitForFunction((src) => new RegExp(src).test(document.querySelector('.history-state')?.textContent?.trim() ?? ''), { timeout: 90000 }, re.source),
+  )
+
+/** Starts the history search for km/h from the search box's third row, and waits until its
+ * line reads like until: by default, until it has searched the whole history and the graph,
+ * which swaps in a filter's commits once they're loaded, shows what it found. */
+async function historySearch(p, { until = /^Searched/ } = {}) {
+  await click(p, '::-p-aria(Search commits)', { pause: 300 })
+  await type(p, 'km/h')
+  await click(p, '[aria-label="Search suggestions"] .row.history', { pause: 300 })
+  // The box has emptied, and Escape folds it away.
+  await p.keyboard.press('Escape')
+  await untilHistory(p, until)
+  if (until.source === '^Searched') {
+    await untilSettled(p)
+    await sleep(1500)
+  }
+}
+
+/** Only these: the seven commits that brought km/h in or took it out, each with its mark, and
+ * Show wind in knots selected, its Files list leading with where km/h changed. */
+scenes.historySearchOnly = (page) =>
+  stills(page, 'history-search-only', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await historySearch(p)
+    await selectCommit(p, 'Show wind in knots')
+    await showFiles(p)
+    await waiting(() => p.waitForSelector('ul.changed-here li', { timeout: 30000 }))
+    await sleep(800)
+    await park(p)
+  })
+
+/** Highlight: everything, with the seven in ink, from the first of them down. */
+scenes.historySearchHighlight = (page) =>
+  stills(page, 'history-search-highlight', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await historySearch(p)
+    await click(p, filterMode('Highlight'), { pause: 500 })
+    // The whole history is loaded again.
+    await sleep(2500)
+    await untilSettled(p)
+    await click(p, `${FILTER_STRIP} [aria-label="Next match"]`, { pause: 1200 })
+    await untilSettled(p)
+    // With the focus in the graph, the selected row shows its actions over the subject.
+    await p.evaluate(() => document.activeElement?.blur())
+    await park(p)
+  })
+
+/** The chip's options, with a count beside each way a commit can count: each shows once a
+ * search that way has finished, so it's searched with -G, then with -S again. */
+scenes.historySearchOptions = (page) =>
+  stills(
+    page,
+    'history-search-options',
+    async (p) => {
+      await reset(p, ['tidewater'], { clean: true })
+      await historySearch(p)
+      for (const [way, kept] of [[1, '8 '], [0, '7 ']]) {
+        await click(p, HISTORY_CHIP, { pause: 400 })
+        const radios = await p.$$(`${HISTORY_OPTIONS} input[type=radio]`)
+        await radios[way].click()
+        await click(p, `${HISTORY_OPTIONS} button[type=submit]`, { pause: 400 })
+        await waiting(() =>
+          p.waitForFunction(
+            (kept) =>
+              document.querySelector('.history-state')?.textContent?.trim().startsWith('Searched') &&
+              document.querySelector('[role=group][aria-label="Smart filter"] [role=status]')?.textContent?.trim().startsWith(kept),
+            { timeout: 60000 },
+            kept,
+          ),
+        )
+      }
+      await untilSettled(p)
+      await sleep(1000)
+      await click(p, HISTORY_CHIP, { pause: 600 })
+      await p.waitForSelector(HISTORY_OPTIONS, { visible: true })
+      await park(p)
+    },
+    (p) =>
+      p.evaluate(
+        (options) => {
+          const strip = document.querySelector('[role=group][aria-label="Smart filter"]').getBoundingClientRect()
+          const box = document.querySelector(options).getBoundingClientRect()
+          const x = Math.max(0, Math.min(strip.left, box.left) - 12)
+          const y = Math.max(0, strip.top - 10)
+          return { x, y, width: Math.max(box.right, strip.left + 420) + 24 - x, height: box.bottom + 20 - y }
+        },
+        HISTORY_OPTIONS,
+      ),
+  )
+
+/** A history search under way, with how far back it has got and Stop: the graph's column. */
+scenes.historySearchRunning = (page) =>
+  stills(
+    page,
+    'history-search-running',
+    async (p) => {
+      await reset(p, ['tidewater'], { clean: true })
+      // Tidewater's 1,500 commits take under half a second, too quick to catch. A textconv that
+      // only copies a file (cat) changes nothing a search finds, but git starts it for each
+      // version of a file under src/ it reads, which makes the search take about 12 seconds.
+      // The newest 250 commits are done in about 5 and hold all seven, and the next 500 take
+      // about 4 more: the shot is of that moment, seven found, how far back that is, and the
+      // older history still being searched.
+      run('git', ['-C', REPO, 'config', 'diff.slow.textconv', 'cat'])
+      mkdirSync(path.join(REPO, '.git', 'info'), { recursive: true })
+      writeFileSync(path.join(REPO, '.git', 'info', 'attributes'), 'src/** diff=slow\n')
+      await historySearch(p, { until: /^Searching… .*back to/ })
+      // What it has found so far is in the graph once its reload swaps in.
+      await waiting(() =>
+        p.waitForFunction(
+          () => {
+            const rows = Number(document.querySelector('.scroller')?.getAttribute('aria-rowcount'))
+            return rows >= 7 && rows < 20
+          },
+          { timeout: 30000 },
+        ),
+      )
+      await sleep(400)
+      await park(p)
+      const line = await p.evaluate(() => document.querySelector('.history-state')?.textContent?.trim() ?? '')
+      if (!line.startsWith('Searching…')) throw new Error(`the search ended before the shot: ${line}`)
+    },
+    async (p) => {
+      const g = await (await p.$('.scroller')).boundingBox()
+      return { x: g.x, y: 40, width: g.width, height: 430 }
+    },
+  )
+
 scenes.about = (page) =>
   stills(page, 'about', async (p) => {
     await reset(p, ['tidewater'], { clean: true })
