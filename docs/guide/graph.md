@@ -116,6 +116,8 @@ Press <kbd>Ctrl</kbd>+<kbd>F</kbd> to search. You can search by commit message, 
 
 <kbd>Enter</kbd> goes to the next match and <kbd>Shift</kbd>+<kbd>Enter</kbd> to the previous one. Matches further back than what's loaded are found too; the graph loads up to them. Each match has a tick on the [ruler](#the-ruler). [Find a commit](../walkthroughs/find-a-commit.md) shows it in action.
 
+The box also reaches into the files. Under it, as you type, the second row is **Find "…" in the files**, with how many lines that finds, and the third is **Commits that add or remove "…"**, which filters the graph to the commits that brought the text in or took it out. [Searching the code](searching-code.md) covers both.
+
 ### Searching by a trailer
 
 A [trailer](smart-filters.md) is a line such as `Reviewed-by: Jessica Nguyen` or `Closes: #12` at the end of a commit message, and search finds commits by any trailer key the history uses:

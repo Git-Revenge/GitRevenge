@@ -119,6 +119,11 @@ const features = [
     to: '/docs/guide/diffs',
   },
   {
+    title: 'Search the code and its history',
+    body: 'Find a text in the files, now or at any commit, and open each file at the line. Ask the history which commits brought it in or took it out, and the graph filters to them, marked with what each one did.',
+    to: '/docs/guide/searching-code',
+  },
+  {
     title: 'Previews, not only diffs',
     body: 'Markdown, images, CSV, JSON, YAML, TOML, LaTeX, Mermaid and PDF files can be shown rendered, beside the usual unified or split diff.',
     to: '/docs/guide/history',

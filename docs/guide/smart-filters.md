@@ -60,7 +60,7 @@ Several values work together:
 - values of **one key** are either-or: `Changelog: fixed` and `Changelog: added` keeps commits with either;
 - values of **different keys** must all hold: `Changelog: fixed` and `Reviewed-by: Jessica` keeps the fixes she reviewed.
 
-While a filter is on, a **strip** above the graph says how many commits it keeps ("23 of 1,493 commits"), with a chip for each value, **+ Filter** to pick another, and **Clear**.
+While a filter is on, a **strip** above the graph says how many commits it keeps ("23 of 1,493 commits"), with a chip for each value, **+ Filter** to pick another, and **Clear**. A [history search](searching-code.md#the-history-search), for the commits that brought a text in or took it out, is a chip on the same strip, and filters with the values.
 
 A filter has two modes, switched in the strip and remembered for each repository:
 

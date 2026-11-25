@@ -37,3 +37,4 @@ Marcus remembers the tide-prediction work closed issue 14, but not when it lande
 
 - **A trailer search has a few more forms.** `has:reviewed-by` finds every commit with a key, and a leading `-` finds the ones that don't match: `-has:reviewed-by`. [The commit graph](../guide/graph.md#searching-by-a-trailer) lists them.
 - **For branches and tags**, type in the box at the top of the sidebar.
+- **For a text in the code**, rather than in a message, the box's next two rows are **Find in the files** and **Commits that add or remove** it. See [searching the code](../guide/searching-code.md).

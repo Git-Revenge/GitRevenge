@@ -154,6 +154,9 @@ On macOS, read <kbd>⌘</kbd> wherever this page says <kbd>Ctrl</kbd>. Press <kb
 | New branch | <kbd>Ctrl</kbd>+<kbd>B</kbd> |
 | Search commits | <kbd>Ctrl</kbd>+<kbd>F</kbd> |
 | Next or previous search match | <kbd>Enter</kbd> / <kbd>Shift</kbd>+<kbd>Enter</kbd> |
+| Find in files | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>F</kbd> |
+| Next or previous match, in a file Find in files opened | <kbd>F7</kbd> / <kbd>Shift</kbd>+<kbd>F7</kbd> |
+| Next or previous file Find in files found | <kbd>Alt</kbd>+<kbd>↓</kbd> / <kbd>Alt</kbd>+<kbd>↑</kbd> |
 | About the selected commit's author | <kbd>Enter</kbd>, in the graph |
 | Move the selection | <kbd>↑</kbd> / <kbd>↓</kbd> |
 | Move a page | <kbd>Page Up</kbd> / <kbd>Page Down</kbd> |
