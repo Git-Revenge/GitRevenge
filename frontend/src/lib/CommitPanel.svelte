@@ -1,6 +1,8 @@
 <script lang="ts">
   import { errorText } from './errors'
-  import { CommitDetail, CommitNotes, CommitSignatures, FormattingOnly, SetCommitNote, TrailerFilterLines } from '../../wailsjs/go/app/App.js'
+  import { CommitDetail, CommitNotes, CommitSignatures, FormattingOnly, HistoryChanges, SetCommitNote, TrailerFilterLines } from '../../wailsjs/go/app/App.js'
+  import { fileMark, type HistoryChange, type HistoryOptions } from './filters/history'
+  import type { FindOptions } from './find/find'
   import { prefs } from './prefs.svelte'
   import type { MenuItem } from './ContextMenu.svelte'
   import { commands } from './commands.svelte'
@@ -40,7 +42,11 @@
     filterSig = '',
     pinnedKeys = [],
     onPin,
+    history = null,
   }: {
+    /** The history search in the smart filter (#982): the files where its text changed lead
+     * the Files list, and a file opened here marks the text. key names its options. */
+    history?: { key: string; found?: number; options: HistoryOptions } | null
     /** Goes up each time the graph's note mark is clicked: the notes come into view. */
     showNotes?: number
     /** Opens a menu at this position, such as a smart link's. */
@@ -351,8 +357,33 @@
   })
 
   function showFile(f: git.FileChange) {
-    openFile({ mode: 'commit', commit: commitId, file: f.path, oldPath: f.oldPath })
+    openFile({ mode: 'commit', commit: commitId, file: f.path, oldPath: f.oldPath, find: historyFind })
   }
+
+  // The files where the history search's text changed in this commit, and by how much.
+  // The answer is kept with the commit and search it's for, so another commit's list never
+  // shows while this one's is asked for.
+  let historyAnswer = $state<{ id: string; key: string; changes: HistoryChange[] } | null>(null)
+  let historyChanges = $derived(historyAnswer && historyAnswer.id === commitId && historyAnswer.key === history?.key ? historyAnswer.changes : [])
+  // Asked again as the search finds more: the commit may not have been found when selected.
+  let historyAt = $derived(history ? `${history.key}\n${history.found ?? -1}` : '')
+  $effect(() => {
+    const id = commitId
+    const key = history?.key
+    void historyAt
+    if (!key) return
+    void HistoryChanges(path, [id])
+      .then((got) => {
+        if (id === commitId && key === history?.key) historyAnswer = { id, key, changes: ((got as Record<string, HistoryChange[]> | null)?.[id] ?? []) as HistoryChange[] }
+      })
+      .catch(() => {})
+  })
+  /** The history search as the diff marks its text: what a file opened here shows. */
+  let historyFind = $derived<FindOptions | undefined>(
+    history ? { text: history.options.text, matchCase: history.options.matchCase, regex: history.options.regex, wholeWord: false, untracked: false, rev: '', paths: [] } : undefined,
+  )
+  /** A file in the list by its path, to open the one where the text changed. */
+  const fileAt = (file: string) => info?.files.find((f) => f.path === file)
 
   /** Files whose changes are only formatting, read as code. They're found after the list loads. */
   let formatOnly = $state(new Set<string>())
@@ -406,6 +437,30 @@
 {/snippet}
 
 {#snippet fileList()}
+  {#if history && historyChanges.length}
+    <!-- The files where the history search's text came or went lead the list (#982). -->
+    <div class="files-head">
+      <span class="meta label">Where <span class="found-text">{history.options.text}</span> changed</span>
+    </div>
+    <ul class="changed-here" aria-label="Where {history.options.text} changed">
+      {#each historyChanges as c (c.file)}
+        {@const m = fileMark(c)}
+        {@const f = fileAt(c.file)}
+        <li>
+          <button
+            class="file-row"
+            class:active={current?.mode === 'commit' && current.commit === commitId && current.file === c.file}
+            disabled={!f}
+            title={c.file}
+            onclick={() => f && showFile(f)}
+          >
+            <span class="file">{fileName(c.file)}</span>
+            <span class="change {m.tone}">{m.label}<span class="visually-hidden">: {m.tone === 'plus' ? 'brings it in' : m.tone === 'minus' ? 'takes it out' : 'changes a line with it'}</span></span>
+          </button>
+        </li>
+      {/each}
+    </ul>
+  {/if}
   <div class="files-head">
     <span class="meta label">Files changed</span>
     {#if info && info.commit.parents.length > 1}<span class="merge-note" title="Changes are shown against the first parent">First parent</span>{/if}
@@ -885,6 +940,71 @@
 
   .merge-note {
     font-size: 13px;
+    color: var(--ink-mute);
+  }
+
+  /* The files where a history search's text changed, ahead of the whole list: the same rows,
+     with what each did with the text where the counts of lines go. */
+  .found-text {
+    font-family: var(--font-mono);
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--ink);
+  }
+
+  .changed-here {
+    list-style: none;
+    margin: 0 0 12px;
+    padding: 0;
+  }
+
+  .side-files .changed-here {
+    margin-left: 20px;
+    margin-right: 12px;
+  }
+
+  .changed-here button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 28px;
+    padding: 2px 4px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    text-align: left;
+  }
+
+  .changed-here button:hover:not(:disabled) {
+    background: var(--wash-hover);
+  }
+
+  .changed-here button.active {
+    background: var(--selected);
+  }
+
+  .change {
+    margin-left: auto;
+    padding: 0 6px;
+    border-radius: var(--r-sm);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .change.plus {
+    background: color-mix(in srgb, var(--success) 14%, transparent);
+    color: var(--success);
+  }
+
+  .change.minus {
+    background: color-mix(in srgb, var(--danger) 14%, transparent);
+    color: var(--danger);
+  }
+
+  .change.even {
+    border: 1px solid var(--paper-edge);
     color: var(--ink-mute);
   }
 

@@ -49,6 +49,10 @@ export interface Scenario {
   suggests?: boolean
   /** The graph is given Find in files, so its search box offers it (#980). */
   finds?: boolean
+  /** The graph is given the history search, so its search box offers it (#982). */
+  histories?: boolean
+  /** The history search in the graph's filter, whose marks its rows show (#982). */
+  graphHistory?: { key: string; found?: number; options: object }
   /** What the sidebar is told the diff area shows. */
   diffShown?: unknown
   /** The file the found-file view opens: a DiffTarget with mode 'found'. */

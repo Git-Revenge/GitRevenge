@@ -5,7 +5,8 @@
   // Without it, MergeView pads them so changed lines sit level.
   import { Change, MergeView } from '@codemirror/merge'
   import { EditorState, type Extension } from '@codemirror/state'
-  import { EditorView, lineNumbers } from '@codemirror/view'
+  import { Decoration, EditorView, lineNumbers, MatchDecorator, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view'
+  import { findPattern, type FindOptions } from '../find/find'
   import { syntaxHighlighting } from '@codemirror/language'
   import { classHighlighter } from '@lezer/highlight'
   import { bandPath, edgePath, mapLine, moveTone, type Result, type Stop } from './blocks'
@@ -29,11 +30,15 @@
     onStep,
     onCompare,
     onPick,
+    find,
   }: {
     path: string
     oldText: string
     newText: string
     diff: Result
+    /** A search whose text is marked on both sides: a history search's, in a commit's diff
+     * (#982). */
+    find?: FindOptions
     ribbon?: boolean
     /** Draws formatting-only blocks as unchanged. */
     hideFormatting?: boolean
@@ -95,7 +100,7 @@
     return out
   }
 
-  function base(lang: Extension | null, wrapped: boolean): Extension[] {
+  function base(lang: Extension | null, wrapped: boolean, search: FindOptions | undefined): Extension[] {
     return [
       EditorView.editable.of(false),
       EditorState.readOnly.of(true),
@@ -104,19 +109,39 @@
       EditorView.theme({}, { dark: true }),
       ...(wrapped ? [EditorView.lineWrapping] : []),
       ...(lang ? [lang] : []),
+      ...(search ? [foundMarks(search)] : []),
     ]
+  }
+
+  /** Marks what a search finds wherever it's drawn, as Find marks it in a file. */
+  function foundMarks(search: FindOptions): Extension {
+    const re = findPattern(search)
+    if (!re || !search.text) return []
+    const decorator = new MatchDecorator({ regexp: re, decoration: Decoration.mark({ class: 'found' }), maxLength: 2000 })
+    return ViewPlugin.fromClass(
+      class {
+        marks: DecorationSet
+        constructor(view: EditorView) {
+          this.marks = decorator.createDeco(view)
+        }
+        update(u: ViewUpdate) {
+          this.marks = decorator.updateDeco(u, this.marks)
+        }
+      },
+      { decorations: (v) => v.marks },
+    )
   }
 
   // Build the views whenever the inputs, the layout or word wrap change.
   $effect(() => {
-    const [p, a, b, d, wrapped, withRibbon, hide] = [path, oldText, newText, diff, wrap.on, ribbon, hideFormatting]
+    const [p, a, b, d, wrapped, withRibbon, hide, search] = [path, oldText, newText, diff, wrap.on, ribbon, hideFormatting, find]
     let cancelled = false
     const cleanups: (() => void)[] = []
     hot = 0
     const act: SideActions = { rename: toggleHot, pick: goToMove, compare: onCompare }
     void languageFor(p).then((lang) => {
       if (cancelled) return
-      const ext = base(lang, wrapped)
+      const ext = base(lang, wrapped, search)
       if (withRibbon && leftHost && rightHost) {
         const redraw = EditorView.updateListener.of((u) => {
           if (u.geometryChanged || u.viewportChanged || u.heightChanged) schedule()
@@ -502,6 +527,13 @@
 
   .merge :global(.cm-mergeView) {
     height: 100%;
+  }
+
+  /* A history search's text, marked as Find marks it in a file: over whatever else it is. */
+  .split :global(.found) {
+    border-radius: 2px;
+    box-shadow: 0 0 0 1px var(--highlight);
+    background: var(--highlight);
   }
 
   .split :global(.cm-editor) {

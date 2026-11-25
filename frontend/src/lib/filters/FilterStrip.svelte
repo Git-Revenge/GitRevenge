@@ -1,12 +1,15 @@
 <script lang="ts">
   // The strip above the graph while a smart filter is on: how many commits it keeps, a chip
-  // for each value picked, the way to pick another, the two modes, and Clear.
+  // for the history search and for each value picked, the way to pick another, the two
+  // modes, and Clear. A history search (#982) says under the chips how it's getting on.
   //
   // Search moves between matches; a filter changes what the graph shows. Only these takes
   // the other commits out. Highlight leaves them and lets the matches stand out.
   import type { app } from '../../../wailsjs/go/models'
   import Icon from '../ui/Icon.svelte'
   import { chipText, keptText } from './filters'
+  import HistoryChip from './HistoryChip.svelte'
+  import { historyKey, historyStatus, lastYear, narrowText, offersNarrowing, type HistoryOptions } from './history'
 
   let {
     filter,
@@ -17,6 +20,10 @@
     onMode,
     onClear,
     onStep,
+    onHistorySearch,
+    onHistoryStop,
+    onHistoryCarryOn,
+    onHistoryRemove,
   }: {
     filter: app.TrailerFilterState
     /** Whether only the kept commits show: the mode in force, which may not be the one asked
@@ -32,11 +39,32 @@
     /** Under Highlight, goes to the next commit the filter keeps, or with -1 the one before.
      * Enter on the graph stays the author's card, so stepping has its own buttons (#866). */
     onStep?: (dir: 1 | -1) => void
+    /** The history search with other options, from its chip or the offer to narrow it. */
+    onHistorySearch?: (o: HistoryOptions) => void
+    onHistoryStop?: () => void
+    onHistoryCarryOn?: () => void
+    onHistoryRemove?: () => void
   } = $props()
+
+  let history = $derived(filter.history ?? null)
+  let status = $derived(history ? historyStatus(history) : null)
+  let chip = $state<HistoryChip>()
+
+  // How many commits each way of matching found, once a search that way finished, so the
+  // options can say so beside each. A search that changes the text or where starts afresh.
+  let found = $state<Record<string, number>>({})
+  $effect(() => {
+    const h = history
+    if (h && !h.running && !h.stopped && !h.problem) found[historyKey(h.options)] = h.found
+  })
+  let counts = $derived(history ? { S: found[historyKey({ ...history.options, lines: false })], G: found[historyKey({ ...history.options, lines: true })] } : {})
 </script>
 
 <div class="strip" role="group" aria-label="Smart filter">
   <span class="meta count" role="status">{keptText(filter.kept, filter.total)}</span>
+  {#if history && onHistorySearch && onHistoryRemove}
+    <HistoryChip bind:this={chip} options={history.options} {counts} onSearch={onHistorySearch} onRemove={onHistoryRemove} />
+  {/if}
   {#each filter.picks as p (p.key + '\n' + p.value)}
     <span class="chip">
       <span class="key">{p.keyLabel}</span>
@@ -58,6 +86,24 @@
     </div>
   {/if}
   <button class="btn sm text" onclick={onClear}>Clear</button>
+  {#if history && status}
+    <div class="history-state {status.tone}" aria-live="polite">
+      {#if status.tone === 'done'}<Icon name="check" size={12} />{/if}
+      <span class="says">{status.text}</span>
+      {#if history.running && onHistoryStop}
+        <button class="btn sm" onclick={onHistoryStop}>Stop</button>
+      {:else if history.stopped && onHistoryCarryOn}
+        <button class="btn sm" onclick={onHistoryCarryOn}>Carry on</button>
+      {/if}
+    </div>
+    {#if offersNarrowing(history) && onHistorySearch}
+      <div class="narrow" role="note">
+        <span class="says">{narrowText(history)}</span>
+        <button class="btn sm" onclick={() => onHistorySearch({ ...history.options, since: lastYear() })}>The last year</button>
+        <button class="btn sm" onclick={() => chip?.show('paths')}>Only in a folder…</button>
+      </div>
+    {/if}
+  {/if}
 </div>
 
 <style>
@@ -172,5 +218,42 @@
   .seg button:disabled {
     cursor: default;
     opacity: 0.5;
+  }
+
+  /* The history search's own line, under the chips: the whole width, in mono like the count. */
+  .history-state,
+  .narrow {
+    flex: 1 0 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-mute);
+  }
+
+  .says {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .history-state.done {
+    color: var(--success);
+  }
+
+  .history-state.problem {
+    color: var(--danger);
+  }
+
+  .history-state.partial {
+    color: var(--ink-teal);
+  }
+
+  .narrow {
+    padding: 4px 8px;
+    border-radius: var(--r-sm);
+    background: color-mix(in srgb, var(--ink-ochre) 16%, transparent);
+    color: var(--ink);
   }
 </style>

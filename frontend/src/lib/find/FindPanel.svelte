@@ -13,6 +13,7 @@
   import { onBackend } from '../events'
   import { toasts } from '../toasts.svelte'
   import Empty from '../ui/Empty.svelte'
+  import { historyOptions, type HistoryOptions } from '../filters/history'
   import { filePatterns, findRows, findSummary, inView, markedParts, splitPath, type FindOptions, type FindRow, type FoundLine } from './find'
   import { findAsk } from './findAsk.svelte'
 
@@ -21,13 +22,21 @@
     current = null,
     onOpen,
     onMenu,
+    onHistory,
   }: {
     path: string
     /** What the diff area shows, so the line open in it is marked here. */
     current?: DiffTarget | null
     onOpen: (t: DiffTarget) => void
     onMenu?: (items: MenuItem[], x: number, y: number) => void
+    /** Starts a history search on the graph for what was searched (#982): when it was in
+     * the history, or when a file gained or lost it. */
+    onHistory?: (o: HistoryOptions) => void
   } = $props()
+
+  /** The history search for what was searched here, in the given files. Whole word isn't a
+   * thing git log -S can do, so it's left behind. */
+  const historyFor = (o: FindOptions, paths: string[]) => historyOptions(o.text, { matchCase: o.matchCase, regex: o.regex, paths })
 
   /** The rows' height, fixed so only those in view need drawing: a search can find 10,000. */
   const ROW = 26
@@ -184,6 +193,9 @@
       r.type === 'file'
         ? [
             { label: 'History', icon: 'history', run: () => onOpen({ mode: 'history', file: r.file }) },
+            ...(onHistory && searched
+              ? [{ label: `Commits that add or remove “${searched.text}” here`, icon: 'history' as const, run: () => onHistory(historyFor(searched!, [r.file])) }]
+              : []),
             { label: 'Blame', icon: 'blame', run: () => onOpen({ mode: 'blame', file: r.file, commit: at }) },
             {
               label: 'Copy the path',
@@ -261,7 +273,11 @@
   {/if}
 
   {#if searched && !running && result && result.lines === 0}
-    <Empty note="not found" compact>“{searched.text}” isn't in any file of {whereSaid}.</Empty>
+    {@const asked = searched}
+    <Empty note="not found" compact
+      >“{asked.text}” isn't in any file of {whereSaid}.{#if onHistory}
+        <button class="btn sm text" onclick={() => onHistory(historyFor(asked, asked.paths))}>When was it in the history?</button>{/if}</Empty
+    >
   {:else if !searched}
     <p class="hint">Type to search the files, as <code>git grep</code> does. A line opens its file there.</p>
   {/if}

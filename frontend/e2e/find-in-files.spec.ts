@@ -119,7 +119,8 @@ test.describe('the Find panel', () => {
     await expect.poll(() => lastEvent(page, 'open-file')).toMatchObject({ file: 'notebooks/wind.ipynb', line: 10 })
 
     await rows(page).nth(0).click({ button: 'right' })
-    await expect.poll(() => menuLabels(page)).toEqual(['History', 'Blame', 'Copy the path'])
+    // With a history search to start (#982): when this file gained or lost the text.
+    await expect.poll(() => menuLabels(page)).toEqual(['History', 'Commits that add or remove “km/h” here', 'Blame', 'Copy the path'])
     await rows(page).nth(1).click({ button: 'right' })
     await expect.poll(() => menuLabels(page)).toEqual(['Blame at this line'])
   })

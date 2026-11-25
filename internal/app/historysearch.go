@@ -352,7 +352,17 @@ func (a *App) historyChanged(r *session.Repo, h *historyRun, final bool) {
 	if f := a.trailerFilters.get(r.Path); f == nil || f.history != h {
 		return
 	}
-	st := a.applyTrailerFilter(r)
+	// Under Only these, each new set of commits found reloads the graph, and under a filter
+	// that keeps few a reload walks the whole history before it shows: on a big one, longer
+	// than a second. A reload started before the last one ends would stop it, and the graph
+	// would never narrow, so while one is under way the graph keeps what it was last given
+	// and only the strip hears. The end of the search always reaches the graph.
+	graph := final
+	if !graph {
+		_, loading := r.Graph()
+		graph = !loading
+	}
+	st := a.applyFilter(r, graph)
 	a.emit("history:progress", HistoryProgress{Path: r.Path, Filter: st})
 }
 
@@ -469,9 +479,10 @@ func (a *App) HistoryChanges(path string, ids []string) (map[string][]git.Histor
 	if len(ask) == 0 {
 		return out, nil
 	}
-	ctx, done := a.latest.start("historychanges", r.Path)
-	defer done()
-	got, err := r.Git.HistoryChanges(ctx, h.opts, ask)
+	// Not stopped by a newer call: each asks about its own commits (the graph's rows in view,
+	// the commit panel's one), and an answer cut short would read as no change. Closing the
+	// repository stops it.
+	got, err := r.Git.HistoryChanges(r.Git.Context(), h.opts, ask)
 	if errors.Is(err, context.Canceled) {
 		return out, nil
 	}

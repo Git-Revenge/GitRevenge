@@ -12,6 +12,8 @@ export interface Token {
   kind?: 'format' | 'rename' | 'move'
   /** Which rename it is, from 1, for a rename. */
   rename?: number
+  /** Set on text a search found: a history search's text, in a commit's diff (#982). */
+  found?: boolean
 }
 
 /**
@@ -39,6 +41,34 @@ export function withMarks(tokens: Token[], marks: readonly ([number, number] | [
       if (inside) piece.changed = true
       if (kind) piece.kind = kind
       if (inside?.[3]) piece.rename = inside[3]
+      out.push(piece)
+      start = end
+    }
+    at += t.text.length
+  }
+  return out
+}
+
+/**
+ * Splits a line's tokens where text a search found starts and ends, and flags the found
+ * pieces, keeping whatever else each piece was. found is [from, to) offsets into the line.
+ */
+export function withFound(tokens: Token[], found: readonly { from: number; to: number }[]): Token[] {
+  if (!found.length) return tokens
+  const out: Token[] = []
+  let at = 0
+  for (const t of tokens) {
+    let start = 0
+    while (start < t.text.length) {
+      const pos = at + start
+      const inside = found.some((f) => pos >= f.from && pos < f.to)
+      let end = t.text.length
+      for (const f of found) {
+        if (f.from > pos && f.from - at < end) end = f.from - at
+        if (f.to > pos && f.to - at < end) end = f.to - at
+      }
+      const piece: Token = { ...t, text: t.text.slice(start, end) }
+      if (inside) piece.found = true
       out.push(piece)
       start = end
     }

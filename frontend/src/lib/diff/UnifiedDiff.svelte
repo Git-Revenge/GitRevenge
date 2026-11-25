@@ -2,7 +2,8 @@
   import { SvelteSet } from 'svelte/reactivity'
   import { tick } from 'svelte'
   import { kindOf, marksByLine, moveNote, movesByLine, moveTone, notesByLine, renameTone, viewOps, type Kind, type Mark, type Result, type Stop } from './blocks'
-  import { highlightLines, languageFor, withMarks, type Token } from './highlight'
+  import { highlightLines, languageFor, withFound, withMarks, type Token } from './highlight'
+  import { matchesIn, type FindOptions } from '../find/find'
   import { applyChanges, splitLines, toHunks, type Hunk } from './lineDiff'
   import { wrap } from './wrap.svelte'
 
@@ -26,7 +27,11 @@
     jump = 0,
     onCompare,
     onPick,
+    find,
   }: {
+    /** A search whose text is marked wherever it is on a line: a history search's, in a
+     * commit's diff (#982). */
+    find?: FindOptions
     path: string
     oldText: string
     newText: string
@@ -183,14 +188,21 @@
     }
   }
 
+  /** A line's tokens with what the search finds on it flagged, or as they are without one. */
+  function foundIn(tokens: Token[]): Token[] {
+    if (!find?.text) return tokens
+    return withFound(tokens, matchesIn(tokens.map((t) => t.text).join(''), find, 50))
+  }
+
   const opIndexes = (h: Hunk) => Array.from({ length: h.end - h.start }, (_, k) => h.start + k)
   const header = (h: Hunk) => `@@ -${h.oldStart},${h.oldCount} +${h.newStart},${h.newCount} @@`
   import Empty from '../ui/Empty.svelte'
 </script>
 
 {#snippet line(tokens: Token[] | undefined, fallback: string, lineMarks: Mark[] | undefined)}
-  {#if tokens}{#each withMarks(tokens, lineMarks) as t, k (k)}<span
-        class={[t.cls, t.changed && 'chg', t.kind, t.rename && `r${renameTone(t.rename)}`, t.rename && t.rename === hot && 'hot']}
+  {@const shown = find?.text && !tokens ? [{ text: fallback.replace(/\r?\n$/, ''), cls: '' }] : tokens}
+  {#if shown}{#each foundIn(withMarks(shown, lineMarks)) as t, k (k)}<span
+        class={[t.cls, t.changed && 'chg', t.kind, t.rename && `r${renameTone(t.rename)}`, t.rename && t.rename === hot && 'hot', t.found && 'found']}
         data-rename={t.rename || undefined}
         title={t.rename ? 'Show every place of this rename' : undefined}>{t.text}</span
       >{/each}{:else}{fallback.replace(
@@ -410,6 +422,13 @@
 
   tr.add .chg {
     background: color-mix(in srgb, var(--success) 35%, transparent);
+  }
+
+  /* A history search's text, marked as Find marks it in a file: over whatever else it is. */
+  .found {
+    border-radius: 2px;
+    box-shadow: 0 0 0 1px var(--highlight);
+    background: var(--highlight);
   }
 
   tr.current .num:first-child {

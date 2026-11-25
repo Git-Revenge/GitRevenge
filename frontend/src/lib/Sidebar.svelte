@@ -23,6 +23,7 @@
   import { trailerCare } from './filters/careDialog.svelte'
   import RepoPanel from './RepoPanel.svelte'
   import type { DiffTarget } from './diff/DiffView.svelte'
+  import type { HistoryOptions } from './filters/history'
   import { findAsk } from './find/findAsk.svelte'
   import Lazy from './ui/Lazy.svelte'
   import { session } from './session.svelte'
@@ -54,6 +55,7 @@
     onSearch,
     diffShown = null,
     onOpenFile,
+    onHistorySearch,
   }: {
     path: string
     /** The values the graph is filtered by, and how to add one or take it out. */
@@ -67,6 +69,8 @@
     /** What the diff area shows, and how to show a file there: Find in files opens them. */
     diffShown?: DiffTarget | null
     onOpenFile?: (t: DiffTarget) => void
+    /** Starts a history search on the graph from Find in files: for a file, or everywhere. */
+    onHistorySearch?: (o: HistoryOptions) => void
     /** The commit selected in the graph; refs pointing at it show as selected. */
     selectedCommit?: string
     onPick: (ref: Ref) => void
@@ -710,7 +714,7 @@
 
     {#if findWanted}
       <div class="find-host" hidden={ui.panel !== 'find'}>
-        <Lazy load={() => import('./find/FindPanel.svelte')} {path} current={diffShown} onOpen={(t: DiffTarget) => onOpenFile?.(t)} {onMenu} />
+        <Lazy load={() => import('./find/FindPanel.svelte')} {path} current={diffShown} onOpen={(t: DiffTarget) => onOpenFile?.(t)} {onMenu} onHistory={onHistorySearch} />
       </div>
     {/if}
 

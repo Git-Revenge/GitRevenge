@@ -17,6 +17,8 @@
     onPick,
     onSearch,
     onFind,
+    history = false,
+    onHistory,
   }: {
     /** The list's id, which the box names as what it controls; rows are `${id}-${n}`. */
     id: string
@@ -36,10 +38,15 @@
      * Without it the trailer suggestions follow the first row. */
     find?: { count?: string }
     onFind?: () => void
+    /** The history search's row, after Find's (#982): the commits that add or remove the
+     * text, as a filter on the graph. */
+    history?: boolean
+    onHistory?: () => void
   } = $props()
 
-  // The trailer suggestions' rows come after the text search's and Find's.
-  let first = $derived(find ? 2 : 1)
+  // The trailer suggestions' rows come after the text search's, Find's and the history search's.
+  let historyAt = $derived(find ? 2 : 1)
+  let first = $derived(historyAt + (history ? 1 : 0))
 </script>
 
 <!-- A click must not take the focus from the box: the list closes when the box loses it. -->
@@ -54,6 +61,13 @@
       <span class="what">Find</span>
       <span class="value">“{query.trim()}” in the files</span>
       <span class="count">{find.count ?? '…'}</span>
+    </div>
+  {/if}
+  {#if history}
+    <div class="row text history" id="{id}-{historyAt}" role="option" tabindex="-1" aria-selected={active === historyAt} class:active={active === historyAt} onclick={() => onHistory?.()} onkeydown={() => {}}>
+      <span class="what">Commits</span>
+      <span class="value">that add or remove “{query.trim()}”</span>
+      <span class="count">filter</span>
     </div>
   {/if}
   {#each items as item, n (item.key + '\n' + item.value)}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { bandPath, mapLine, marksByLine, moveNote, moveTone, opsFromBlocks, renameTone, stops, type Block, type Move, type Result } from './blocks'
-import { withMarks } from './highlight'
+import { withFound, withMarks } from './highlight'
 import { applyChanges, diffLines, splitLines } from './lineDiff'
 
 const block = (oldStart: number, oldEnd: number, newStart: number, newEnd: number, extra: Partial<Block> = {}): Block =>
@@ -83,6 +83,32 @@ describe('mapLine', () => {
 describe('bandPath', () => {
   it('curves from the old lines to the new and back', () => {
     expect(bandPath(0, 21, 42, 84, 74)).toBe('M0 0 C37 0 37 42 74 42 L74 84 C37 84 37 21 0 21 Z')
+  })
+})
+
+describe('withFound', () => {
+  it('flags what a search found, keeping what each piece was', () => {
+    const tokens = [
+      { text: '// Wind in ', cls: 'tok-comment' },
+      { text: 'km/h', cls: 'tok-comment', changed: true },
+      { text: ', temperature', cls: 'tok-comment' },
+    ]
+    expect(withFound(tokens, [{ from: 11, to: 15 }])).toEqual([
+      { text: '// Wind in ', cls: 'tok-comment' },
+      { text: 'km/h', cls: 'tok-comment', changed: true, found: true },
+      { text: ', temperature', cls: 'tok-comment' },
+    ])
+  })
+
+  it('splits across token edges, and leaves a line with nothing found alone', () => {
+    expect(withFound([{ text: 'xkm', cls: 'a' }, { text: '/hy', cls: 'b' }], [{ from: 1, to: 5 }])).toEqual([
+      { text: 'x', cls: 'a' },
+      { text: 'km', cls: 'a', found: true },
+      { text: '/h', cls: 'b', found: true },
+      { text: 'y', cls: 'b' },
+    ])
+    const tokens = [{ text: 'x', cls: '' }]
+    expect(withFound(tokens, [])).toBe(tokens)
   })
 })
 

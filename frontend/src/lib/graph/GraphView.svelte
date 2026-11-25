@@ -4,8 +4,9 @@
   import { errorText } from '../errors'
   import { onMount, tick, untrack, type Snippet } from 'svelte'
   import { ALONE_STEPS, searchPlaceholder, SQUEEZE, squeezeFor } from '../barSqueeze'
-  import { ArrivedCommits, CommitNotes, CommitRow, CommitSignatures, FindCount, GraphFocus, HeadCommit, OwnMoveAge, GraphRows, NotedCommits, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView, TrailerFilterDays, TrailerSuggest } from '../../../wailsjs/go/app/App.js'
+  import { ArrivedCommits, CommitNotes, CommitRow, CommitSignatures, FindCount, GraphFocus, HeadCommit, HistoryChanges, OwnMoveAge, GraphRows, NotedCommits, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView, TrailerFilterDays, TrailerSuggest } from '../../../wailsjs/go/app/App.js'
   import { findSummary } from '../find/find'
+  import { changeMark, type ChangeMark, type HistoryChange, type HistoryOptions } from '../filters/history'
   import { session } from '../session.svelte'
   import { ClipboardSetText } from '../../../wailsjs/runtime/runtime.js'
   import { onBackend } from '../events'
@@ -49,6 +50,8 @@
     onFilterAdd,
     onFilterDrop,
     onFindInFiles,
+    onHistorySearch,
+    history = null,
     lead,
     wip,
     toolsHost,
@@ -103,6 +106,12 @@
     /** Looks for the text in the files (#980). With it, the search box offers that second,
      * with how many lines it would find. */
     onFindInFiles?: (text: string) => void
+    /** Looks for the commits that add or remove the text (#982). With it, the search box
+     * offers that after Find's row. */
+    onHistorySearch?: (text: string) => void
+    /** The history search in the smart filter, if there's one: each commit it found says what
+     * it did with the text, "+1 map.js", beside its subject. key names its options. */
+    history?: { key: string; found?: number; options: HistoryOptions } | null
     /** A click on a row's author, or Enter on the selected row: asks for the author's card.
      * x and y are where in the window to put it, under the row, and above is the row's top. */
     onAuthor?: (row: Row, x: number, y: number, above: number) => void
@@ -515,7 +524,7 @@
 
   function suggestSoon() {
     clearTimeout(suggestTimer)
-    if (!onFilterAdd && !onFindInFiles) return
+    if (!onFilterAdd && !onFindInFiles && !onHistorySearch) return
     if (!query.trim()) return hideSuggestions()
     suggestTimer = setTimeout(() => void suggest(), 120)
   }
@@ -538,6 +547,16 @@
     onFindInFiles(q)
   }
 
+  /** The text goes to a history search, which filters the graph, and the box empties. */
+  function historySearch() {
+    const q = query.trim()
+    if (!q || !onHistorySearch) return
+    query = ''
+    hideSuggestions()
+    void runSearch()
+    onHistorySearch(q)
+  }
+
   async function suggest() {
     const seq = ++suggestSeq
     const q = query
@@ -546,7 +565,7 @@
     if (seq !== suggestSeq || q !== query) return
     // The same text asked about again, as when the box gets the focus back, keeps the row
     // the keys are on.
-    suggestAt = q === suggestedFor ? Math.min(suggestAt, (got?.items.length ?? 0) + findRows) : 0
+    suggestAt = q === suggestedFor ? Math.min(suggestAt, (got?.items.length ?? 0) + extraRows) : 0
     suggestedFor = q
     suggested = got
     suggestOpen = true
@@ -1196,9 +1215,12 @@
   // Search state. matchSet is only used for dimming when every match fits in the result.
   let searchInput: HTMLInputElement
   let query = $state('')
-  let suggestShown = $derived(suggestOpen && !!query.trim() && (!!suggested?.items.length || !!onFindInFiles))
-  // Rows after the text search's: Find's, then the trailer suggestions.
+  let suggestShown = $derived(suggestOpen && !!query.trim() && (!!suggested?.items.length || !!onFindInFiles || !!onHistorySearch))
+  // Rows after the text search's: Find's, the history search's, then the trailer suggestions.
   let findRows = $derived(onFindInFiles ? 1 : 0)
+  let extraRows = $derived(findRows + (onHistorySearch ? 1 : 0))
+  /** The history search's row, after Find's, or -1 without one. */
+  let historyRow = $derived(onHistorySearch ? 1 + findRows : -1)
   let matches = $state<number[]>([])
   let matchTotal = $state(0)
   let matchSet: Set<number> | null = null
@@ -1345,6 +1367,68 @@
   // click on one puts its value in the smart filter.
   // eslint-disable-next-line svelte/prefer-svelte-reactivity
   const chipSpans = new Map<number, ChipSpan[]>()
+
+  // What each commit the history search found did with its text (#982), by commit: asked for
+  // the rows as they're drawn, a few at a time, and kept for the search `history.key` names.
+  // A commit with no answer (not found yet, or a merge, whose diff isn't read) is noted with
+  // how far the search had got, `history.found`, and asked again once it has got further.
+  // Plain maps on purpose: drawing reads them, and asks again with schedule().
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  let changes = new Map<string, ChangeMark>()
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  let unanswered = new Map<string, number>()
+  let changesKey = ''
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const changesWanted = new Set<string>()
+  let changesTimer: ReturnType<typeof setTimeout> | undefined
+  /** Where each row's change mark was last painted, and what it says in full. */
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const changeSpans = new Map<number, { x0: number; x1: number; y0: number; y1: number; says: string }>()
+  /** The tooltip of the change mark the pointer is on, or "". */
+  let hoveredChange = ''
+
+  /** Commit id's mark, if it's known; asks for it if it isn't. */
+  function changeFor(id: string): ChangeMark | undefined {
+    if (!history) return undefined
+    if (history.key !== changesKey) {
+      changes = new Map()
+      unanswered = new Map()
+      changesKey = history.key
+      changesWanted.clear()
+    }
+    const got = changes.get(id)
+    if (!got && !changesWanted.has(id) && unanswered.get(id) !== (history.found ?? -1)) {
+      changesWanted.add(id)
+      changesTimer ??= setTimeout(() => void askChanges(), 60)
+    }
+    return got
+  }
+
+  async function askChanges() {
+    changesTimer = undefined
+    const key = changesKey
+    const text = history?.options.text ?? ''
+    const at = history?.found ?? -1
+    const ids = [...changesWanted]
+    if (!ids.length || !history) return
+    const got = (await HistoryChanges(path, ids).catch(() => null)) as Record<string, HistoryChange[]> | null
+    if (key !== changesKey) return
+    for (const id of ids) {
+      changesWanted.delete(id)
+      // A call that failed isn't an answer: the commits are asked about again when next drawn.
+      if (!got) continue
+      const mark = changeMark(got[id], text)
+      if (mark) changes.set(id, mark)
+      else unanswered.set(id, at)
+    }
+    schedule()
+  }
+
+  /** The change mark of row i at a point in the view, if one was drawn there. */
+  function changeAt(i: number, x: number, y: number) {
+    const s = changeSpans.get(i)
+    return s && x >= s.x0 && x <= s.x1 && y >= s.y0 && y <= s.y1 ? s : undefined
+  }
   /** The chip the pointer is on, as chipId names it, or "". */
   let hoveredChip = ''
   const chipPicked = (chip: { key: string; value: string }) => filterPicks.some((p) => p.key === chip.key && p.value === chip.value)
@@ -1365,6 +1449,13 @@
   // A chip is filled while its value is in the filter.
   $effect(() => {
     void filterPicks
+    untrack(schedule)
+  })
+  // A history search started, changed or taken out, or found more: the marks are another
+  // search's, or none, or commits without one yet may have one now.
+  $effect(() => {
+    void history?.key
+    void history?.found
     untrack(schedule)
   })
   // The backend says when the chips may have changed: a key pinned or unpinned, or trailers read.
@@ -1550,6 +1641,7 @@
     const now = Date.now() / 1000
     labelSpans.clear()
     chipSpans.clear()
+    changeSpans.clear()
     const still = reducedMotion()
     let arrivals = 0
     for (let i = first; i < last; i++) {
@@ -1585,14 +1677,18 @@
       const isArrived = arrived.has(row.id)
       const follows = isFollower(i)
       const spans: ChipSpan[] | undefined = row.chips?.length ? [] : undefined
+      // A commit the history search found says what it did with the text: every row under
+      // Only these, and the ones in ink under Highlight.
+      const change = history && (sparse || row.match) ? changeFor(row.id) : undefined
       const extra =
-        isNoted || isArrived || follows || sparse || spans
-          ? { ...place?.extra, noted: isNoted, arrived: isArrived, follower: follows, sparse, chips: row.chips, pinKeys, chipPicked, chipHover: hoveredChip, chipSpans: spans }
+        isNoted || isArrived || follows || sparse || spans || change
+          ? { ...place?.extra, noted: isNoted, arrived: isArrived, follower: follows, sparse, chips: row.chips, pinKeys, chipPicked, chipHover: hoveredChip, chipSpans: spans, change }
           : place?.extra
       if (spans) chipSpans.set(i, spans)
       const span = drawRow(ctx, row, cache.refsFor(row.id), y, lay, th, sel, hov, dim, now, sealOf(sigs.get(row.id)), { prev: cache.get(i - 1), prev2: cache.get(i - 2), next: cache.get(i + 1) }, extra)
       if (arriving) ctx.restore()
       if (span) labelSpans.set(i, span)
+      if (change && extra?.changeSpan) changeSpans.set(i, { ...extra.changeSpan, says: change.says })
     }
     // Each fold's line, above the newest commit it holds.
     for (const r of viewRows) {
@@ -1926,12 +2022,13 @@
 
   function onSearchKey(e: KeyboardEvent) {
     const items = suggestShown ? (suggested?.items ?? []) : []
-    // Find's row, when it's offered, comes before the suggestions.
-    const extra = suggestShown ? findRows : 0
+    // Find's and the history search's rows, when they're offered, come before the suggestions.
+    const extra = suggestShown ? extraRows : 0
     const rows = items.length + 1 + extra
     if (e.key === 'Enter') {
       e.preventDefault()
-      if (extra && suggestAt === 1) return findInFiles()
+      if (extra && findRows && suggestAt === 1) return findInFiles()
+      if (extra && suggestAt === historyRow) return historySearch()
       // On a suggestion, Enter picks it.
       const item = items[suggestAt - 1 - extra]
       if (suggestAt > extra && item) return pickSuggestion(item)
@@ -2162,6 +2259,8 @@
           soFar={!!suggested && !suggested.status.done}
           find={onFindInFiles ? { count: findCount } : undefined}
           onFind={findInFiles}
+          history={!!onHistorySearch}
+          onHistory={historySearch}
           onPick={pickSuggestion}
           onSearch={() => jump(1)}
         />
@@ -2279,13 +2378,16 @@
         const author = i >= 0 && !drag?.active && onAuthorText(i, e.clientX - rect.left, e.clientY - rect.top)
         const onChip = i >= 0 && !drag?.active ? chipAt(i, e.clientX - rect.left, e.clientY - rect.top) : undefined
         const chip = onChip ? chipId(onChip) : ''
-        if (over !== hoveredFold || author !== hoveredAuthor || chip !== hoveredChip) {
+        // A history search's mark names each file in full, in its tooltip.
+        const change = i >= 0 && !drag?.active && !onChip ? (changeAt(i, e.clientX - rect.left, e.clientY - rect.top)?.says ?? '') : ''
+        if (over !== hoveredFold || author !== hoveredAuthor || chip !== hoveredChip || change !== hoveredChange) {
           hoveredFold = over
           hoveredAuthor = author
           hoveredChip = chip
+          hoveredChange = change
           // A fold's line, an author and a chip all take a click.
           scroller.style.cursor = over || author || chip ? 'pointer' : ''
-          scroller.title = onChip ? `Filter the graph to ${onChip.keyLabel}: ${chipValue(onChip)}` : ''
+          scroller.title = onChip ? `Filter the graph to ${onChip.keyLabel}: ${chipValue(onChip)}` : change
           schedule()
         }
         updateExpanded()
