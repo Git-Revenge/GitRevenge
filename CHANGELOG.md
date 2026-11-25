@@ -40,6 +40,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 - Fetching and pulling still drop the remote-tracking branches whose branch the remote deleted, but now respect your config: `remote.<name>.prune = false` keeps that remote's, and `fetch.prune = false` keeps every remote's. Before, the app always pruned whatever the config said. Only remote-tracking branches go, never a local branch or a tag. When a fetch or pull drops any, a message says which ("Fetched origin. 2 deleted branches dropped: …"), so a branch leaving the Remotes panel is never silent. (#923)
 - When you write a smart link, the suggested address for issues now covers Gitea, Forgejo and Codeberg as well as GitHub and GitLab. A self-hosted GitLab is suggested once its host is named under Forges, no longer because "gitlab" is in its name. (#918)
 
+### Fixed
+
+- The conflict tool lost every place's original in a file where git had joined two conflicts a line or two apart into one, as git's default conflict style does: **Three-way** was off, and the file had no suggestions while the operation strip counted some. The tool now works from git's merge with the originals kept whenever the file on disk is still the same merge, so the places come apart again, each with its original. (#974)
+
 ## [1.1.0] - 2026-11-22
 
 ### Added

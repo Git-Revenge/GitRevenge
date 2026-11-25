@@ -32,6 +32,20 @@ describe('parsePlaces and startingResult', () => {
     expect(sourceOf({ merged: { text: merged }, diff3: '' })).toBe(merged)
   })
 
+  it('keeps the originals when git joined places the re-merge keeps apart (#974)', () => {
+    // git's default style wrote the two changes and the line between them as one place.
+    const joined = ['feed:', '<<<<<<< HEAD', '  timeout_s: 10', 'alerts:', '  wind_knots: 32', '=======', '  max_age_min: 30', '  timeout_s: 5', 'alerts:', '  wind_kmh: 55', '>>>>>>> feature/reading-times', ''].join('\n')
+    const apart = ['feed:', '<<<<<<< ours', '  timeout_s: 10', '||||||| base', '  timeout_s: 5', '=======', '  max_age_min: 30', '  timeout_s: 5', '>>>>>>> theirs', 'alerts:', '<<<<<<< ours', '  wind_knots: 32', '||||||| base', '  wind_kmh: 60', '=======', '  wind_kmh: 55', '>>>>>>> theirs', ''].join('\n')
+    const file = { merged: { text: joined }, diff3: apart }
+    expect(sourceOf(file)).toBe(apart)
+    expect(parsePlaces(sourceOf(file)).places.map((p) => p.base)).toEqual(['  timeout_s: 5\n', '  wind_kmh: 60\n'])
+    // Once something is resolved on disk, the file is worked from as it is.
+    const resolved = joined.replace(/<<<<<<< HEAD\n(.*\n)*?=======\n/, '').replace('>>>>>>> feature/reading-times\n', '')
+    expect(sourceOf({ merged: { text: resolved }, diff3: apart })).toBe(resolved)
+    // So is a file edited outside its places.
+    expect(sourceOf({ merged: { text: joined.replace('feed:', 'feed: # read nightly') }, diff3: apart })).toBe(joined.replace('feed:', 'feed: # read nightly'))
+  })
+
   it('has no places in a file with no markers', () => {
     expect(parsePlaces('plain\n')).toEqual({ text: ['plain\n'], places: [] })
   })
