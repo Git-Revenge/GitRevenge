@@ -10,6 +10,7 @@ Open **Settings** with <kbd>Ctrl</kbd>+<kbd>,</kbd> or from the command palette.
 | **Theme** | System, Light or Dark. Switching cross-fades the window. |
 | **Commit graph** | Timeline (a line for each day, and authors beside their commits) or Compact (one commit per line). |
 | **Zoom** | Scales the whole app, from 80% to 150%. |
+| **Forge marks in their brands' colours** | The GitHub, GitLab and other forge marks in the [Remotes panel](remotes.md#the-remotes-panel) take their brands' colours. Off draws them in ink. Off by default. |
 | **Read code to compare it** | [Diffs](diffs.md#reading-the-code) of files in the languages read as code find changes token by token, with formatting and renames told apart. Off compares whole lines, as git does. Each diff has **Code** and **Lines** to switch. On by default. |
 | **Hide formatting-only changes** | Diffs start with formatting hidden. Where you stage, it's never hidden. Each diff has **Hide formatting** to switch. Off by default. |
 | **Line diff** | How [diffs](diffs.md#lines-and-words) match up lines, for files not read as code and for **Lines**: as git does (the repository's `diff.algorithm`, or Myers), or Myers, Minimal, Patience or Histogram. |
@@ -99,6 +100,39 @@ In the list, each link has a switch, arrows to change the order, **Edit** and **
 Links are kept in git config, in sections named `[gitrevenge-link "name"]`, so the [Git Config tab](git-config.md) shows them too.
 
 When a branch's name holds a ticket key, the branch's right-click menu starts with the link to it.
+
+### Forges
+
+**Forges**, at the foot of Settings › Links, says what a server of your own runs, so its remotes [open on the web](remotes.md#forges-and-web-pages): GitLab, Gitea, Forgejo, GitHub Enterprise, Bitbucket Data Center or Azure DevOps Server. Remotes on GitHub, GitLab.com, Gitea.com, Codeberg, Bitbucket and Azure DevOps need nothing here, and a forge is never guessed from a host's name.
+
+Under the rules, it lists the hosts of the repository's remotes that have no forge named, so starting one is a click. **Its pages are at** is only for a forge whose pages aren't at `https://` and the host, such as one you reach through an SSH alias.
+
+A rule is kept in git config, the repository's or your global one, and a repository's rule for a host replaces the global one:
+
+```ini
+[gitrevenge-forge "git.example.com"]
+	type = gitlab
+	web = https://gitlab.example.com
+```
+
+`type` is `gitlab`, `gitea`, `forgejo`, `github`, `bitbucket-server` or `azure`.
+
+## Pushing
+
+**Settings › Pushing** says where pushes go, for **This repository** or **All my repositories** (your global config). Each row shows its git key, and is written only when you change it. A row you haven't touched says what's used now: the setting from your other config, or Git Revenge's own default where git says nothing.
+
+![Settings › Pushing for this repository, each row with its git key and what's used while it's not set](../img/settings-pushing-light.webp#gh-light-mode-only)
+![Settings › Pushing for this repository, each row with its git key and what's used while it's not set](../img/settings-pushing-dark.webp#gh-dark-mode-only)
+
+| Row | Key | Choices |
+|---|---|---|
+| **Push goes to** | `remote.pushDefault` | The remote each branch tracks, or always one remote, such as your fork. |
+| **On the remote, the branch is named** | `push.default` | The same as here (`simple`), the same as here, always (`current`), or whatever it tracks (`upstream`). Not set, a branch goes to the branch it tracks where it tracks one on that remote, else under the same name. `matching` and `nothing` are shown as they are; change them in the [Git Config tab](git-config.md). |
+| **A branch's first push** | `push.autoSetupRemote` | Track the branch it creates, or ask where it should track. Not set, a first push publishes the branch and tracks it. |
+| **Send tags with the commits they mark** | `push.followTags` | Yes or no. Not set, no. |
+| **After a push, fetch the other places it went** | An app setting | When a remote also [pushes to another remote's URL](remotes.md#pushing-to-several-places), that remote is fetched after the push. Off by default. |
+
+**Always push … to ▸** in a branch's menu sends one branch somewhere else (`branch.<name>.pushRemote`). [Where a push goes](remotes.md#where-a-push-goes) has the order these are read in.
 
 ## The command palette
 

@@ -21,7 +21,7 @@ export interface RefExtras {
   trackedBy: string[]
   /** Whether a local branch of the same name is there already. */
   localExists: boolean
-  /** Every remote, for Push this branch to ▸. */
+  /** Every remote, for Always push … to ▸. */
   remotes: string[]
   /** Where Push sends a local branch, by git's rules and the Pushing settings. */
   plan?: git.PushPlan
@@ -61,7 +61,7 @@ export async function loadRefExtras(path: string, refs: Ref[]): Promise<Map<stri
   const remoteRefs = all.filter((r) => r.kind === 'remote').map((r) => r.short)
   const listed = await Remotes(path).catch(() => null)
   const remotes = listed ? listed.map((r) => r.name) : [...new Set([...remoteRefs, ...wanted.map((r) => remoteBranchOf(r)!)].map((s) => s.slice(0, s.indexOf('/'))))]
-  // A local branch with no upstream still gets the remotes, for Push this branch to ▸.
+  // A local branch with no upstream still gets the remotes, for Always push … to ▸.
   for (const ref of refs) {
     if (ref.kind === 'local' && !remoteBranchOf(ref)) out.set(ref.short, { remote: '', branch: ref.short, host: '', trackedBy: [], localExists: true, remotes })
   }

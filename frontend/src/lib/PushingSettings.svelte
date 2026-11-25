@@ -137,7 +137,7 @@
         <input type="checkbox" checked={data.fetchAfterPush} onchange={(e) => setFetch(e.currentTarget.checked)} />
         <span class="pill">app setting</span>
       </label>
-      <p class="hint">Push this branch to ▸, in a branch's menu, sends one branch somewhere else (<code>branch.&lt;name&gt;.pushRemote</code>).</p>
+      <p class="hint">Always push … to ▸, in a branch's menu, sends one branch somewhere else (<code>branch.&lt;name&gt;.pushRemote</code>).</p>
     {/if}
   {/if}
 </fieldset>

@@ -487,7 +487,7 @@ describe("a remote branch's menu with what it reads as it opens", () => {
 })
 
 // #927
-describe('Push this branch to', () => {
+describe('Always push … to', () => {
   it('lists every remote, checks the one it pushes to, and goes back to where the rest go', () => {
     const local = { ...ref('feature', 'local'), pushRemote: 'fork' }
     const items = refItems(local, ctx('main'), { remote: '', branch: 'feature', host: '', trackedBy: [], localExists: true, remotes: ['origin', 'fork'] } as never)

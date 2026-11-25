@@ -19,7 +19,9 @@
 //        $env:APPDATA = "C:\some\scratch\appdata"; $env:GIT_CONFIG_GLOBAL = "T:\gitconfig"
 //        wails dev -browser=false
 //      To keep your everyday wails dev running, start this one from a git worktree, with
-//      -devserver localhost:34116, and set APP_URL to match.
+//      -devserver localhost:34116, and set APP_URL to match. The Remotes scenes edit the app's
+//      fetch times, which it keeps under LOCALAPPDATA: give the app and this script the same
+//      one (see Remotes below).
 //   4. From docs-site/:
 //        node scripts/screenshots.mjs [scene ...]
 //
@@ -31,7 +33,7 @@
 // DEMO_SCRIPT runs a local demo-repo.sh instead of the pinned one, to try a change to
 // demo-repos before it's tagged.
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -82,7 +84,7 @@ async function demoScript() {
 
 /** Closes every tab, rebuilds the demo repositories, and opens the ones named. With clean,
  * tidewater's uncommitted changes are dropped first; with branch, that branch is checked out. */
-async function reset(page, open = ['tidewater'], { clean = false, branch } = {}) {
+async function reset(page, open = ['tidewater'], { clean = false, branch, remotes = false } = {}) {
   await page.evaluate(async () => {
     // Tabs that aren't repositories stay open across a reload.
     const pause = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -116,6 +118,7 @@ async function reset(page, open = ['tidewater'], { clean = false, branch } = {})
   }
   if (clean) run('git', ['-C', REPO, 'reset', '-q', '--hard'])
   if (branch) run('git', ['-C', REPO, 'checkout', '-q', branch])
+  if (remotes) addRemotes()
   // Only the demo repositories belong on the start page, and it should look lived in: all
   // three recent, and a group in a known order. tidewater is opened last, to lead the list.
   await page.evaluate(async (demo) => {
@@ -1438,14 +1441,149 @@ scenes.links = (page) =>
     // The links are read after the dialog opens.
     await p.waitForSelector('input[aria-label="Tidewater issues on"]', { timeout: 30000 })
     await sleep(500)
-    // Bring the Links section to the top of the dialog, with a little air above its heading.
-    await p.evaluate(() => {
-      const legend = [...document.querySelectorAll('legend')].find((l) => l.textContent.trim() === 'Links')
-      let box = legend?.parentElement
-      while (box && !(box.scrollHeight > box.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(box).overflowY))) box = box.parentElement
-      if (box) box.scrollTop += legend.getBoundingClientRect().top - box.getBoundingClientRect().top - 24
+    await toSection(p, 'Links')
+    await park(p)
+  })
+
+/** Scrolls a section of the Settings dialog to its top, with a little air above its heading. */
+async function toSection(p, name) {
+  await p.evaluate((name) => {
+    const legend = [...document.querySelectorAll('legend')].find((l) => l.textContent.trim() === name)
+    let box = legend?.parentElement
+    while (box && !(box.scrollHeight > box.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(box).overflowY))) box = box.parentElement
+    if (box) box.scrollTop += legend.getBoundingClientRect().top - box.getBoundingClientRect().top - 24
+  }, name)
+  await sleep(300)
+}
+
+// ── Remotes ───────────────────────────────────────────────────────────────────────────
+// The demo's one remote, origin, is a folder. These scenes give tidewater the remotes a project
+// on a forge has: its repository and a teammate's fork on GitHub, a mirror on GitLab.com, and a
+// backup reached only over SSH. Those addresses are made up and can't be fetched (an insteadOf
+// rewrite wouldn't do: the app shows the address git really uses), so their branches are
+// written straight into refs/remotes, and FETCH_HEAD is written to say what each sent last.
+// The practice repository readers build keeps its one remote, so Fetch still works for them.
+//
+// The app keeps its own fetch times in the cache folder, %LOCALAPPDATA%\GitRevenge\fetched.
+// Start the app and this script with the same LOCALAPPDATA, since fetchTimes edits the file
+// there. A scratch folder keeps them out of your own; then set GOCACHE to your usual one
+// (`go env GOCACHE`), or wails dev builds everything afresh.
+const MADE_UP = {
+  upstream: { url: 'https://github.com/tidewater-weather/tidewater.git', ago: 2 * 3600, branches: { main: 'origin/main~3', 'release/v1.9': 'origin/release/v1.9' } },
+  sarah: { url: 'https://github.com/sarah-mitchell/tidewater.git', ago: 5 * 86400, branches: { main: 'origin/main~3', 'feature/offline-cache': 'origin/feature/offline-cache~1' } },
+  gitlab: { url: 'https://gitlab.com/tidewater-weather/tidewater.git', ago: 3 * 86400, branches: { main: 'origin/main~3', 'release/v1.9': 'origin/release/v1.9' } },
+  // Its time comes from FETCH_HEAD alone: over a week ago, so its age is in ochre.
+  backup: { url: 'git@backup.tidewater.example:tidewater.git', branches: { main: 'origin/main~12', 'release/v1.9': 'origin/release/v1.9' } },
+}
+const FETCH_HEAD_AGO = 9 * 86400
+// A branch the demo merged and deleted, still here as origin's: Tidy calls it gone.
+const LEFTOVER = { 'origin/feature/station-map': 'origin/main~60' }
+
+/** Adds the made-up remotes and their branches, and has origin push to the mirror and the
+ * backup too. Runs before the repository opens. */
+function addRemotes() {
+  for (const [name, r] of Object.entries(MADE_UP)) {
+    git('remote', 'add', name, r.url)
+    for (const [b, rev] of Object.entries(r.branches)) git('update-ref', `refs/remotes/${name}/${b}`, git('rev-parse', rev))
+  }
+  git('config', '--add', 'remote.origin.pushurl', git('config', 'remote.origin.url'))
+  for (const name of ['gitlab', 'backup']) git('config', '--add', 'remote.origin.pushurl', MADE_UP[name].url)
+}
+
+/** Dates each remote's last fetch, with the repository open, and opens the Remotes panel
+ * grouped as given, wide enough for the hosts' names. The app writes a time down only when it
+ * fetches, so origin is fetched for real, then the file it wrote is edited. */
+async function fetchTimes(p, grouping = 'remote', width = 340) {
+  await p.evaluate(
+    async (remoteGrouping, width) => {
+      const A = window.go.app.App
+      const repo = (await A.RestoreSession()).tabs[0].path
+      await A.Fetch(repo, 'origin')
+      localStorage.setItem(`gitrevenge.sidebar:${repo}`, JSON.stringify({ panel: 'remotes', collapsed: false, width, open: {}, sort: 'name', remoteGrouping }))
+    },
+    grouping,
+    width,
+  )
+  const dir = path.join(process.env.LOCALAPPDATA ?? '', 'GitRevenge', 'fetched')
+  const [log] = readdirSync(dir)
+    .map((f) => path.join(dir, f))
+    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
+  const now = Math.floor(Date.now() / 1000)
+  const times = { ...JSON.parse(readFileSync(log, 'utf8')), origin: now - 4 * 60 }
+  for (const [name, r] of Object.entries(MADE_UP)) if (r.ago) times[name] = now - r.ago
+  writeFileSync(log, JSON.stringify(times))
+  // Fetching origin pruned whatever origin doesn't have, so the leftover goes in after.
+  for (const [ref, rev] of Object.entries(LEFTOVER)) git('update-ref', `refs/remotes/${ref}`, git('rev-parse', rev))
+  // What each remote sent last: origin's lines as its fetch wrote them, then the others'.
+  const head = path.join(REPO, '.git', 'FETCH_HEAD')
+  const lines = readFileSync(head, 'utf8').trimEnd().split('\n')
+  for (const r of Object.values(MADE_UP)) {
+    for (const [b, rev] of Object.entries(r.branches)) lines.push(`${git('rev-parse', rev)}\tnot-for-merge\tbranch '${b}' of ${r.url.replace(/\.git$/, '')}`)
+  }
+  writeFileSync(head, lines.join('\n') + '\n')
+  const then = new Date((now - FETCH_HEAD_AGO) * 1000)
+  utimesSync(head, then, then)
+  // The panel reads the remotes when the repository opens.
+  await p.reload({ waitUntil: 'networkidle0' })
+  await overlay(p)
+  await p.waitForSelector('.row.ref')
+  // Until the remotes' hosts are read, Host groups by remote and the rows have no chips. The
+  // backup's age, the one marked stale, comes last.
+  if (grouping !== 'name') await p.waitForSelector('.row.folder .meta.age.stale', { timeout: 30000 })
+  await sleep(1200)
+}
+
+/** The Remotes panel with the made-up remotes, grouped as given. */
+async function remotesPanel(p, grouping, width) {
+  await reset(p, ['tidewater'], { clean: true, remotes: true })
+  await fetchTimes(p, grouping, width)
+}
+
+/** The sidebar at the Remotes scenes' width: the rail's 44 pixels and the panel's 340. */
+const REMOTES = { x: 0, y: 40, width: 384, height: 600 }
+
+scenes.remotesByHost = (page) => stills(page, 'remotes-by-host', (p) => remotesPanel(p, 'host'), REMOTES)
+
+// Wider, for the four chips a row shows and the count of main's five remotes.
+scenes.remotesByName = (page) => stills(page, 'remotes-by-name', (p) => remotesPanel(p, 'name', 480), { ...REMOTES, width: 524 })
+
+scenes.remoteMenu = (page) =>
+  stills(page, 'remote-menu', async (p) => {
+    await remotesPanel(p, 'host')
+    await click(p, 'button[aria-label="More for upstream"]', { pause: 700 })
+  })
+
+scenes.tidy = (page) =>
+  stills(page, 'tidy', async (p) => {
+    await remotesPanel(p)
+    await p.evaluate(async () => {
+      const A = window.go.app.App
+      await A.SetQuietDays((await A.RestoreSession()).tabs[0].path, 182)
     })
-    await sleep(300)
+    await click(p, 'button[aria-label="More for origin"]', { pause: 500 })
+    await click(p, byText('Tidy origin'), { pause: 1500 })
+    await park(p)
+  })
+
+scenes.remotesDialog = (page) =>
+  stills(page, 'remotes-dialog', async (p) => {
+    await remotesPanel(p)
+    await click(p, 'button[aria-label="Manage remotes"]', { pause: 700 })
+    await click(p, `::-p-xpath(//li[.//span[contains(@class,'name') and normalize-space(.)='origin']]//button[normalize-space(.)='Edit'])`, { pause: 1000 })
+    // The form is under the list: bring its fetch rules and push URLs into view.
+    await toSection(p, 'Fetching')
+    await park(p)
+  })
+
+scenes.pushing = (page) =>
+  stills(page, 'settings-pushing', async (p) => {
+    await remotesPanel(p)
+    await p.keyboard.down('Control')
+    await p.keyboard.press(',')
+    await p.keyboard.up('Control')
+    await p.waitForSelector('::-p-xpath(//legend[normalize-space(.)="Pushing"])', { timeout: 30000 })
+    await sleep(800)
+    await toSection(p, 'Pushing')
     await park(p)
   })
 

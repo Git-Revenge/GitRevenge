@@ -1,6 +1,6 @@
 # Privacy policy
 
-*Effective 22 November 2026. Changes to this policy are made in public, in this file's [history](https://github.com/Git-Revenge/GitRevenge/commits/main/docs/privacy.md).*
+*Effective 25 November 2026. Changes to this policy are made in public, in this file's [history](https://github.com/Git-Revenge/GitRevenge/commits/main/docs/privacy.md).*
 
 Git Revenge is a desktop git client made by Ris Adams and its contributors ("we"). It has no accounts, no servers of its own and no telemetry. This policy covers the app, the website at gitrevenge.com, and the ways we distribute the app. In short: we don't collect personal data, and the few services that see your requests are run by GitHub or by projects you chose to use.
 
@@ -8,7 +8,7 @@ Git Revenge is a desktop git client made by Ris Adams and its contributors ("we"
 
 **What the app sends on its own.** One thing: the update check. At startup, and when you choose **Check for updates**, the app asks GitHub's releases API for the latest version number. The request carries the app's version in its User-Agent (for example `GitRevenge/1.0.0`) and nothing that identifies you or your repositories. GitHub sees your IP address, as it does for any request. Turn the startup check off in [Settings](guide/settings.md).
 
-**What it sends because you asked.** Fetch, pull, push and clone go to your remotes through your own `git`, credential helpers and SSH agent. Links you click, such as a smart link or one in a commit message, open in your web browser. Those requests are between you and the services you're reaching, under their policies.
+**What it sends because you asked.** Fetch, pull, push and clone go to your remotes through your own `git`, credential helpers and SSH agent. If you turn on fetching after a push, the places a push went are fetched afterwards. Links you click, such as a smart link, one in a commit message or a remote's page on its forge, open in your web browser. Those requests are between you and the services you're reaching, under their policies.
 
 **What it doesn't do.** It keeps no usage statistics, sends no crash reports, and has no analytics, advertising or tracking. Rendered previews fetch nothing from the network: images from the web are shown as links, HTML runs in a sandbox with no network, and GeoJSON is drawn without map tiles. The Map and Insights are worked out from the repository alone.
 

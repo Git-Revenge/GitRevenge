@@ -170,12 +170,13 @@ Git Revenge is local-first. It makes one request of its own, and everything else
 | What | Where it goes | When |
 |---|---|---|
 | The update check | GitHub's releases API, for the latest version number | At startup, and when you choose **Check for updates**. Turn it off in [Settings](settings.md). |
-| Fetch, pull, push and clone | Your remotes, through your own `git`, credential helpers and SSH agent | When you ask for one |
-| A link | Your web browser | When you click a link, such as a [smart link](settings.md#links) or one in a commit message. The app only builds the address |
+| Fetch, pull, push and clone | Your remotes, through your own `git`, credential helpers and SSH agent | When you ask for one, and a fetch after a push if you turn on [After a push, fetch the other places it went](settings.md#pushing) |
+| A link | Your web browser | When you click a link, such as a [smart link](settings.md#links), one in a commit message, or a remote's [page on its forge](remotes.md#forges-and-web-pages). The app only builds the address |
 
 Everything else stays on your machine, including the parts that could easily have reached out:
 
 - **Rendered previews** fetch nothing. A Markdown or notebook image from the web is shown as a link, an HTML page runs in a sandbox with no network, a GeoJSON file is drawn without map tiles, and audio, video and PDFs are read from the repository.
 - **The Map and Insights** are worked out from the repository alone, with no hosting service's API.
+- **Forge marks and web pages** come from a remote's address and your [forge rules](settings.md#forges). No forge's API is called.
 - **No telemetry.** The app keeps no usage statistics and sends no crash reports.
 - **The docs site** loads its fonts from itself, not from a font service.
