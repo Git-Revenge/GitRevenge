@@ -92,7 +92,7 @@ func TestFindSaysWhatsWrongInWords(t *testing.T) {
 		o    git.GrepOptions
 		want string
 	}{
-		{git.GrepOptions{Text: "kmalloc_array(", Regex: true}, "Not a regular expression: a ( is never closed. Turn off Regular expression"},
+		{git.GrepOptions{Text: "kmalloc_array(", Regex: true}, "Not a regular expression: its ( and ) don't pair up. Turn off Regular expression"},
 		{git.GrepOptions{Text: "km/h", Rev: "no-such-branch"}, "There's no branch, tag or commit called “no-such-branch”."},
 		{git.GrepOptions{Text: "two\nlines"}, "Find looks for text within one line."},
 	} {

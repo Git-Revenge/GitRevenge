@@ -185,7 +185,7 @@ func TestGrepSaysWhatsWrong(t *testing.T) {
 	ctx := context.Background()
 	none := func(GrepLine) {}
 	for text, reason := range map[string]string{
-		"kmalloc_array(": "a ( is never closed",
+		"kmalloc_array(": "its ( and ) don't pair up",
 		"[abc":           "a [ is never closed",
 	} {
 		_, err := repo.Grep(ctx, GrepOptions{Text: text, Regex: true}, 0, none)
@@ -206,6 +206,34 @@ func TestGrepSaysWhatsWrong(t *testing.T) {
 	for _, text := range []string{"", "two\nlines"} {
 		if _, err := repo.Grep(ctx, GrepOptions{Text: text}, 0, none); !errors.Is(err, ErrFindText) {
 			t.Errorf("text %q: err = %v", text, err)
+		}
+	}
+}
+
+// Git reads a regular expression with the system's library, GNU's or BSD's (macOS), and
+// each words its complaints its own way: both must come out the same.
+func TestPatternReasonReadsBothLibraries(t *testing.T) {
+	t.Parallel()
+	for in, want := range map[string]string{
+		`Unmatched ( or \(`:                    "its ( and ) don't pair up",
+		`Unmatched ) or \)`:                    "its ( and ) don't pair up",
+		"parentheses not balanced":             "its ( and ) don't pair up",
+		"Unmatched [, [^, [:, [., or [=":       "a [ is never closed",
+		"Unmatched [ or [^":                    "a [ is never closed",
+		"brackets ([ ]) not balanced":          "a [ is never closed",
+		`Unmatched \{`:                         "a { is never closed",
+		"braces not balanced":                  "a { is never closed",
+		"Invalid preceding regular expression": "a *, + or ? has nothing before it to repeat",
+		"repetition-operator operand invalid":  "a *, + or ? has nothing before it to repeat",
+		"Trailing backslash":                   `it ends with a \ that escapes nothing`,
+		`trailing backslash (\)`:               `it ends with a \ that escapes nothing`,
+		"Invalid range end":                    "a range in [ ] runs backwards",
+		"invalid character range":              "a range in [ ] runs backwards",
+		"empty (sub)expression":                "a ( ) or | has nothing in it",
+		"something new":                        "something new",
+	} {
+		if got := patternReason(in); got != want {
+			t.Errorf("%q = %q, want %q", in, got, want)
 		}
 	}
 }

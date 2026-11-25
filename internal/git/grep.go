@@ -385,23 +385,34 @@ func grepError(err error) error {
 	return err
 }
 
-// patternReason puts the regular expression library's complaint into words.
+// patternReason puts the regular expression library's complaint into words. Git uses the
+// system's library: GNU's on Linux and Windows says "Unmatched ( or \(", BSD's on macOS
+// "parentheses not balanced", so each reason has both spellings, and says the same on all.
 func patternReason(s string) string {
+	l := strings.ToLower(s)
+	has := func(prefixes ...string) bool {
+		for _, p := range prefixes {
+			if strings.HasPrefix(l, p) {
+				return true
+			}
+		}
+		return false
+	}
 	switch {
-	case strings.HasPrefix(s, "Unmatched ( or"):
-		return "a ( is never closed"
-	case strings.HasPrefix(s, "Unmatched ) or"):
-		return "a ) has no ( before it"
-	case strings.HasPrefix(s, "Unmatched [") || strings.HasPrefix(s, "brackets ([ ]) not balanced"):
+	case has("unmatched ( or", "unmatched ) or", "parentheses not balanced"):
+		return "its ( and ) don't pair up"
+	case has("unmatched [", "brackets ([ ]) not balanced"):
 		return "a [ is never closed"
-	case strings.HasPrefix(s, "Unmatched \\{") || strings.HasPrefix(s, "braces not balanced"):
+	case has("unmatched \\{", "braces not balanced"):
 		return "a { is never closed"
-	case strings.HasPrefix(s, "Invalid preceding regular expression") || strings.HasPrefix(s, "repetition-operator operand invalid"):
+	case has("invalid preceding regular expression", "repetition-operator operand invalid"):
 		return "a *, + or ? has nothing before it to repeat"
-	case strings.HasPrefix(s, "Trailing backslash"):
+	case has("trailing backslash"):
 		return "it ends with a \\ that escapes nothing"
-	case strings.HasPrefix(s, "Invalid range end"):
+	case has("invalid range end", "invalid character range"):
 		return "a range in [ ] runs backwards"
+	case has("empty (sub)expression"):
+		return "a ( ) or | has nothing in it"
 	}
 	return s
 }
