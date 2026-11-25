@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/git-revenge/gitrevenge/internal/askpass"
 	"github.com/git-revenge/gitrevenge/internal/git"
@@ -57,6 +58,13 @@ type App struct {
 	trailerReadings trailerReadings
 	// trailerFilters holds each open repository's smart filter, for the session.
 	trailerFilters trailerFilters
+	// historyNoted is when each running history search last told the window, so it does
+	// so at most once a historyEvery (see historysearch.go).
+	historyNotes sync.Mutex
+	historyNoted map[*historyRun]time.Time
+	// historyChunkSize overrides historyChunk; tests set it, for searches that run long
+	// enough to stop.
+	historyChunkSize int
 	// trailerPins keeps what each open repository's config says about its trailer keys.
 	trailerPins trailerPins
 	// trailerCares keeps the questions each open repository's trailers raise.

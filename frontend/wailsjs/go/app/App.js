@@ -78,6 +78,10 @@ export function CancelNetwork(arg1) {
   return window['go']['app']['App']['CancelNetwork'](arg1);
 }
 
+export function CarryOnHistorySearch(arg1) {
+  return window['go']['app']['App']['CarryOnHistorySearch'](arg1);
+}
+
 export function CheckForUpdate(arg1) {
   return window['go']['app']['App']['CheckForUpdate'](arg1);
 }
@@ -296,6 +300,10 @@ export function HideBranch(arg1, arg2, arg3) {
 
 export function HideRemote(arg1, arg2, arg3) {
   return window['go']['app']['App']['HideRemote'](arg1, arg2, arg3);
+}
+
+export function HistoryChanges(arg1, arg2) {
+  return window['go']['app']['App']['HistoryChanges'](arg1, arg2);
 }
 
 export function HomeDir() {
@@ -762,6 +770,10 @@ export function SetGraphView(arg1) {
   return window['go']['app']['App']['SetGraphView'](arg1);
 }
 
+export function SetHistorySearch(arg1, arg2) {
+  return window['go']['app']['App']['SetHistorySearch'](arg1, arg2);
+}
+
 export function SetIgnoreTab(arg1) {
   return window['go']['app']['App']['SetIgnoreTab'](arg1);
 }
@@ -888,6 +900,10 @@ export function StashAction(arg1, arg2, arg3) {
 
 export function StashSave(arg1, arg2, arg3) {
   return window['go']['app']['App']['StashSave'](arg1, arg2, arg3);
+}
+
+export function StopHistorySearch(arg1) {
+  return window['go']['app']['App']['StopHistorySearch'](arg1);
 }
 
 export function StopIgnoring(arg1, arg2, arg3, arg4) {
