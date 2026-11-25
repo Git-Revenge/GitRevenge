@@ -353,7 +353,8 @@ func TestFallsBackToLines(t *testing.T) {
 	}{
 		{"size", big, big + "var y = 2\n", Options{Language: "go"}, FallbackSize},
 		{"time", slow, slow + "var y = 2\n", Options{Language: "go", ReadTime: time.Microsecond}, FallbackTime},
-		{"errors", "package p\nvar x = 1\n", "}}}} ))) {{{{ ]]]] ;;;; ,,,,\nvar x = 2\n", Options{Language: "go"}, FallbackErrors},
+		// No clock for errors: under the default limit a busy runner can run out of time first.
+		{"errors", "package p\nvar x = 1\n", "}}}} ))) {{{{ ]]]] ;;;; ,,,,\nvar x = 2\n", Options{Language: "go", ReadTime: -1}, FallbackErrors},
 	} {
 		res, err := Diff(context.Background(), c.before, c.after, c.opts)
 		if err != nil {
