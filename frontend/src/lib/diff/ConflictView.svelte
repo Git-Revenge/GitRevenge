@@ -933,6 +933,14 @@
     color: var(--code-comment);
   }
 
+  /* The tokens a reason names, as they're written. */
+  .editor :global(.place-why code) {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-style: normal;
+    color: var(--code-text);
+  }
+
   /* Where each part of a suggestion came from. */
   .editor :global(.origin.ours) {
     border-radius: 2px;

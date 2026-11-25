@@ -12,7 +12,7 @@
 //        subst T: A:\demo
 //   2. Build the demo once, so its global git config exists. The script lives in
 //      https://github.com/Git-Revenge/demo-repos; this uses the tag DEMO_REPOS_TAG names:
-//        curl -fsSL https://github.com/Git-Revenge/demo-repos/releases/download/v3.0.0/demo-repo.sh -o demo-repo.sh
+//        curl -fsSL https://github.com/Git-Revenge/demo-repos/releases/download/v3.1.0/demo-repo.sh -o demo-repo.sh
 //        bash demo-repo.sh /t/
 //   3. Point the app's settings at a scratch folder and its global git config at the demo's,
 //      so your own repositories and config stay out of the shots, and start it:
@@ -49,7 +49,7 @@ const BASH = process.env.BASH_EXE ?? 'C:\\Program Files\\Git\\bin\\bash.exe'
 const REPO = path.win32.join(DEMO, 'tidewater')
 // The demo-repos release the docs' pictures are built from (its semver says when a move
 // changes them; see its README). Moving it means retaking them.
-const DEMO_REPOS_TAG = 'v3.0.0'
+const DEMO_REPOS_TAG = 'v3.1.0'
 const WIDTH = 1280
 const HEIGHT = 800
 
@@ -501,6 +501,60 @@ scenes.diff = (page) =>
     await sleep(800)
   })
 
+/** Opens file in the commit with this subject, in a layout, with the sidebar and the panel on
+ * the right put away so the diff has the room. With algorithm, the repository's
+ * diff.algorithm is set to it first. */
+async function commitDiff(p, subject, name, { layout = 'Unified', algorithm } = {}) {
+  await reset(p, ['tidewater'], { clean: true })
+  if (algorithm) run('git', ['-C', REPO, 'config', 'diff.algorithm', algorithm])
+  await selectCommit(p, subject)
+  await showFiles(p)
+  await click(p, file(name))
+  await sleep(800)
+  await click(p, `::-p-xpath(//span[@aria-label='Diff layout']/button[normalize-space(.)=${JSON.stringify(layout)}])`)
+  await click(p, '[aria-label="Hide the sidebar panel"]')
+  await hidePanel(p)
+  // A key pressed after a click shows the clicked button's focus ring.
+  await p.evaluate(() => document.activeElement?.blur())
+  await sleep(1000)
+}
+
+/** Reading a diff: a function renamed, and lines wrapped in a try, read as Python. */
+scenes.diffCode = (page) =>
+  stills(page, 'diff-code', async (p) => {
+    await commitDiff(p, 'say what fetch fetches', 'scripts/check_stations.py')
+    // On to the second place, so the rename and the move into the try both show.
+    for (let i = 0; i < 2; i++) {
+      await p.keyboard.press('F7')
+      await sleep(500)
+    }
+  })
+
+/** Split, with the ribbon: a change, lines added, formatting and a move. */
+scenes.diffSplit = (page) =>
+  stills(page, 'diff-split', (p) => commitDiff(p, 'Run the nightly check at 01:30 UTC', '.github/workflows/nightly.yml', { layout: 'Split' }))
+
+/** A JSON file written out in full, with its formatting hidden: one change is left. */
+scenes.diffHideFormatting = (page) =>
+  stills(page, 'diff-hide-formatting', async (p) => {
+    await commitDiff(p, 'write the limits out in full', 'data/checks.json')
+    await click(p, byText('Hide formatting', 'button'))
+    await sleep(800)
+  })
+
+// The .fail rule moved above .pass and changed on the way. Myers, git's default, keeps .fail where
+// it was and reads .pass as removed and added again, a rule too short to count as a move; histogram
+// lines up .pass, so .fail is the move.
+const MOVED_AND_CHANGED = ['Make the failing stations stand out more', 'public/checks.css', { algorithm: 'histogram' }]
+
+scenes.diffMoved = (page) => stills(page, 'diff-moved-changed', (p) => commitDiff(p, ...MOVED_AND_CHANGED))
+
+scenes.diffCompare = (page) =>
+  stills(page, 'move-compare', async (p) => {
+    await commitDiff(p, ...MOVED_AND_CHANGED)
+    await click(p, byText('Compare with the original', 'button'), { pause: 1200 })
+  })
+
 /** Opens file in the commit with this subject, in the File layout, rendered. */
 async function preview(p, subject, name) {
   await reset(p, ['tidewater'], { clean: true })
@@ -703,10 +757,11 @@ scenes.rebaseAnim = (page) =>
 /** The button that runs a merge or rebase from its preview. */
 const PREVIEW_GO = '[role=dialog] button[type=submit]'
 
-/** Merges feature/metric-units into main, which stops on a conflict in src/feed.js. */
-async function merge(p) {
-  await click(p, sidebarRef('metric-units'), { button: 'right', pause: 500 })
-  await click(p, byText('Merge feature/metric-units into main'), { pause: 300 })
+/** Merges feature/<branch> into main, which stops on conflicts: feature/metric-units in
+ * src/feed.js, and feature/reading-times in config.yaml and src/feed.js. */
+async function merge(p, branch = 'metric-units') {
+  await click(p, sidebarRef(branch), { button: 'right', pause: 500 })
+  await click(p, byText(`Merge feature/${branch} into main`), { pause: 300 })
   // The preview names the conflict; its button goes ahead.
   await p.waitForSelector(`${PREVIEW_GO}:not([disabled])`)
   await click(p, PREVIEW_GO, { pause: 300 })
@@ -722,6 +777,17 @@ scenes.conflict = (page) =>
     await merge(p)
     await click(p, 'button.wip', { pause: 800 })
     await click(p, '[title="Open the conflict tool"]', { pause: 1500 })
+  })
+
+/** The conflict tool on config.yaml: one place it combined, and one where both sides changed
+ * the same value. */
+scenes.conflictSuggestion = (page) =>
+  stills(page, 'conflict-suggestion', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await merge(p, 'reading-times')
+    await click(p, 'button.wip', { pause: 800 })
+    await click(p, `::-p-xpath(//button[@title='Open the conflict tool'][contains(normalize-space(.), 'config.yaml')])`, { pause: 2500 })
+    await park(p)
   })
 
 scenes.conflictAnim = (page) =>
@@ -1623,6 +1689,8 @@ const browser = await puppeteer.launch({
 })
 try {
   const page = await browser.newPage()
+  // The demo is dated in UTC: shown in UTC, its times read as written, wherever they're taken.
+  await page.emulateTimezone('UTC')
   await page.goto(APP, { waitUntil: 'networkidle0' })
   // Scenes close tabs and delete recent repositories: never let them near a session in use.
   const global = await page.evaluate(() => window.go.app.App.GitConfigScopes('').then((s) => s.global))
