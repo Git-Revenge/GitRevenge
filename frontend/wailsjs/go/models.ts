@@ -1266,6 +1266,54 @@ export namespace app {
 	        this.error = source["error"];
 	    }
 	}
+	export class HistoryState {
+	    options: git.HistoryOptions;
+	    found: number;
+	    searched: number;
+	    total: number;
+	    backTo: number;
+	    running: boolean;
+	    stopped: boolean;
+	    ms: number;
+	    estimateMs: number;
+	    problem: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HistoryState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.options = this.convertValues(source["options"], git.HistoryOptions);
+	        this.found = source["found"];
+	        this.searched = source["searched"];
+	        this.total = source["total"];
+	        this.backTo = source["backTo"];
+	        this.running = source["running"];
+	        this.stopped = source["stopped"];
+	        this.ms = source["ms"];
+	        this.estimateMs = source["estimateMs"];
+	        this.problem = source["problem"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class HotFile {
 	    path: string;
 	    lines: number;
@@ -2794,6 +2842,7 @@ export namespace app {
 	    only: boolean;
 	    kept: number;
 	    total: number;
+	    history?: HistoryState;
 	
 	    static createFrom(source: any = {}) {
 	        return new TrailerFilterState(source);
@@ -2805,6 +2854,7 @@ export namespace app {
 	        this.only = source["only"];
 	        this.kept = source["kept"];
 	        this.total = source["total"];
+	        this.history = this.convertValues(source["history"], HistoryState);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -3667,6 +3717,28 @@ export namespace git {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.branch = source["branch"];
 	        this.commit = source["commit"];
+	    }
+	}
+	export class HistoryOptions {
+	    text: string;
+	    matchCase: boolean;
+	    regex: boolean;
+	    lines: boolean;
+	    paths: string[];
+	    since: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HistoryOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.text = source["text"];
+	        this.matchCase = source["matchCase"];
+	        this.regex = source["regex"];
+	        this.lines = source["lines"];
+	        this.paths = source["paths"];
+	        this.since = source["since"];
 	    }
 	}
 	

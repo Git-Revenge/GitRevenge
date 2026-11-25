@@ -44,6 +44,9 @@ type TrailerFilterState struct {
 	Kept int `json:"kept"`
 	// Total is how many commits the graph would show with no filter; 0 until it's counted.
 	Total int `json:"total"`
+	// History is the history search in the filter (#981), or nil without one. With picks
+	// as well, a commit must have a value picked and be one the search found.
+	History *HistoryState `json:"history"`
 }
 
 // trailerFilters holds each open repository's filter.
@@ -59,6 +62,9 @@ type trailerFilters struct {
 type repoFilter struct {
 	picks []trailerindex.Pick
 	only  bool
+	// history is the history search in the filter, or nil. What it keeps grows as it runs,
+	// so what's worked out from it below is kept with the generation it was worked out at.
+	history *historyRun
 	// keep is what the picks keep while the filter highlights, for marking rows as they're
 	// handed out; nil under Only these, where every row of the graph is one of them.
 	keep map[string]struct{}
@@ -68,24 +74,46 @@ type repoFilter struct {
 	// change: another filter is another repoFilter), since the strip's Previous and Next ask
 	// on every click, and on a long history working them out takes a fifth of a second (#899).
 	keptBy   *trailerindex.Reading
+	keptGen  int
 	kept     map[string]struct{}
 	rowsBy   *trailerindex.Reading
+	rowsGen  int
 	rowsIn   *graph.Graph
 	rowsLen  int
 	rowsKept []int
 }
 
-// keeps returns what f's picks keep as reading reads them.
+// keeps returns what f keeps as reading reads its picks: what the picks keep, what its
+// history search has found, or with both, what both keep.
 func (fs *trailerFilters) keeps(f *repoFilter, reading *trailerindex.Reading) map[string]struct{} {
+	gen := f.history.generation()
 	fs.mu.Lock()
-	if f.keptBy == reading && f.kept != nil {
+	if f.keptBy == reading && f.keptGen == gen && f.kept != nil {
 		defer fs.mu.Unlock()
 		return f.kept
 	}
 	fs.mu.Unlock()
-	keep := reading.Filter(f.picks)
+	var keep map[string]struct{}
+	if len(f.picks) > 0 {
+		keep = reading.Filter(f.picks)
+	}
+	if f.history != nil {
+		found := f.history.keeps()
+		if keep == nil {
+			keep = found
+		} else {
+			for id := range keep {
+				if _, ok := found[id]; !ok {
+					delete(keep, id)
+				}
+			}
+		}
+	}
+	if keep == nil {
+		keep = map[string]struct{}{}
+	}
 	fs.mu.Lock()
-	f.keptBy, f.kept = reading, keep
+	f.keptBy, f.keptGen, f.kept = reading, gen, keep
 	fs.mu.Unlock()
 	return keep
 }
@@ -93,8 +121,9 @@ func (fs *trailerFilters) keeps(f *repoFilter, reading *trailerindex.Reading) ma
 // rows returns the rows of g that f's picks keep as reading reads them, in order. The slice
 // is shared: it mustn't be changed.
 func (fs *trailerFilters) rows(f *repoFilter, reading *trailerindex.Reading, g *graph.Graph) []int {
+	gen := f.history.generation()
 	fs.mu.Lock()
-	if f.rowsBy == reading && f.rowsIn == g && f.rowsLen == g.Len() && f.rowsKept != nil {
+	if f.rowsBy == reading && f.rowsGen == gen && f.rowsIn == g && f.rowsLen == g.Len() && f.rowsKept != nil {
 		defer fs.mu.Unlock()
 		return f.rowsKept
 	}
@@ -106,7 +135,7 @@ func (fs *trailerFilters) rows(f *repoFilter, reading *trailerindex.Reading, g *
 	}
 	rows := rowsOf(g, ids, len(ids)).Rows
 	fs.mu.Lock()
-	f.rowsBy, f.rowsIn, f.rowsLen, f.rowsKept = reading, g, g.Len(), rows
+	f.rowsBy, f.rowsGen, f.rowsIn, f.rowsLen, f.rowsKept = reading, gen, g, g.Len(), rows
 	fs.mu.Unlock()
 	return rows
 }
@@ -143,8 +172,13 @@ func (fs *trailerFilters) get(path string) *repoFilter {
 func (fs *trailerFilters) set(path string, f *repoFilter) {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
-	for p := range fs.by {
+	for p, was := range fs.by {
 		if fsutil.SamePath(p, path) {
+			// A history search the new filter doesn't hold stops: replaced, cleared, or the
+			// tab closed.
+			if was.history != nil && (f == nil || f.history != was.history) {
+				was.history.stop(false)
+			}
 			delete(fs.by, p)
 		}
 	}
@@ -172,10 +206,15 @@ func (a *App) SetTrailerFilter(path string, picks []trailerindex.Pick, only bool
 			known = append(known, trailerindex.Pick{Key: reading.KeyID(p.Key), Value: p.Value})
 		}
 	}
-	if len(known) == 0 {
+	// A history search in the filter stays, whatever's picked.
+	var history *historyRun
+	if f := a.trailerFilters.get(r.Path); f != nil {
+		history = f.history
+	}
+	if len(known) == 0 && history == nil {
 		a.trailerFilters.set(r.Path, nil)
 	} else {
-		a.trailerFilters.set(r.Path, &repoFilter{picks: known, only: only})
+		a.trailerFilters.set(r.Path, &repoFilter{picks: known, only: only, history: history})
 	}
 	return a.applyTrailerFilter(r), nil
 }
@@ -219,6 +258,7 @@ func (a *App) applyTrailerFilter(r *session.Repo) TrailerFilterState {
 		state.Picks = append(state.Picks, FilterPick{Key: p.Key, Value: p.Value, KeyLabel: k.Label, ValueLabel: v.Label, Kind: string(v.Kind)})
 	}
 	state.Only = f.only
+	state.History = f.history.state()
 	keep := a.trailerFilters.keeps(f, reading)
 	state.Kept = len(keep)
 	if !f.only {
@@ -227,8 +267,13 @@ func (a *App) applyTrailerFilter(r *session.Repo) TrailerFilterState {
 		return state
 	}
 	a.trailerFilters.setHighlighted(f, nil)
-	// The same picks keep more once more of the history has been read, or a commit made.
-	sig, _ := json.Marshal([]any{f.picks, reading.Gen(), len(keep)})
+	// The same picks keep more once more of the history has been read, or a commit made,
+	// and a history search more as it goes.
+	var searched any
+	if f.history != nil {
+		searched = []any{f.history.opts, f.history.generation()}
+	}
+	sig, _ := json.Marshal([]any{f.picks, reading.Gen(), len(keep), searched})
 	r.SetFilter(&session.Filter{Keep: keep, Sig: string(sig)})
 	return state
 }

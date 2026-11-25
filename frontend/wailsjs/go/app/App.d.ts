@@ -47,6 +47,8 @@ export function CancelClone():Promise<void>;
 
 export function CancelNetwork(arg1:string):Promise<void>;
 
+export function CarryOnHistorySearch(arg1:string):Promise<app.TrailerFilterState>;
+
 export function CheckForUpdate(arg1:boolean):Promise<app.UpdateInfo>;
 
 export function CheckIgnorePath(arg1:string,arg2:string):Promise<git.IgnoreCheck>;
@@ -156,6 +158,8 @@ export function HeadCommit(arg1:string):Promise<git.HeadState>;
 export function HideBranch(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function HideRemote(arg1:string,arg2:string,arg3:boolean):Promise<void>;
+
+export function HistoryChanges(arg1:string,arg2:Array<string>):Promise<Record<string, Array<git.HistoryChange>>>;
 
 export function HomeDir():Promise<string>;
 
@@ -389,6 +393,8 @@ export function SetGraphFocus(arg1:string,arg2:string,arg3:boolean):Promise<void
 
 export function SetGraphView(arg1:string):Promise<void>;
 
+export function SetHistorySearch(arg1:string,arg2:git.HistoryOptions):Promise<app.TrailerFilterState>;
+
 export function SetIgnoreTab(arg1:string):Promise<void>;
 
 export function SetInsightsTab(arg1:string):Promise<void>;
@@ -452,6 +458,8 @@ export function StartBisect(arg1:string,arg2:string,arg3:string):Promise<void>;
 export function StashAction(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function StashSave(arg1:string,arg2:string,arg3:boolean):Promise<void>;
+
+export function StopHistorySearch(arg1:string):Promise<app.TrailerFilterState>;
 
 export function StopIgnoring(arg1:string,arg2:string,arg3:git.IgnoreLine,arg4:boolean):Promise<git.IgnoreLine>;
 
