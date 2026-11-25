@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -28,6 +29,21 @@ var baseArgs = []string{
 type Runner struct {
 	bin string
 	env []string
+	// ver is the version of git at bin, asked once (see version).
+	verOnce sync.Once
+	ver     Version
+}
+
+// version returns the version of git r runs, asked the first time and kept. It's zero when
+// git couldn't say, which every comparison takes as older.
+func (r *Runner) version() Version {
+	r.verOnce.Do(func() {
+		var out bytes.Buffer
+		if r.run(context.Background(), Cmd{Args: []string{"version"}}, &out) == nil {
+			r.ver, _ = ParseVersion(out.String())
+		}
+	})
+	return r.ver
 }
 
 // NewRunner returns a Runner for the git binary at bin.

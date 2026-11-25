@@ -1106,6 +1106,42 @@ export namespace app {
 	        this.kind = source["kind"];
 	    }
 	}
+	export class FindCounted {
+	    lines: number;
+	    files: number;
+	    superseded: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new FindCounted(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.lines = source["lines"];
+	        this.files = source["files"];
+	        this.superseded = source["superseded"];
+	    }
+	}
+	export class FindResult {
+	    lines: number;
+	    files: number;
+	    truncated: boolean;
+	    ms: number;
+	    superseded: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new FindResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.lines = source["lines"];
+	        this.files = source["files"];
+	        this.truncated = source["truncated"];
+	        this.ms = source["ms"];
+	        this.superseded = source["superseded"];
+	    }
+	}
 	export class ForecastCommit {
 	    id: string;
 	    subject: string;
@@ -3591,6 +3627,30 @@ export namespace git {
 	        this.binary = source["binary"];
 	        this.caseClash = source["caseClash"];
 	        this.caseTwin = source["caseTwin"];
+	    }
+	}
+	export class GrepOptions {
+	    text: string;
+	    matchCase: boolean;
+	    wholeWord: boolean;
+	    regex: boolean;
+	    untracked: boolean;
+	    rev: string;
+	    paths: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new GrepOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.text = source["text"];
+	        this.matchCase = source["matchCase"];
+	        this.wholeWord = source["wholeWord"];
+	        this.regex = source["regex"];
+	        this.untracked = source["untracked"];
+	        this.rev = source["rev"];
+	        this.paths = source["paths"];
 	    }
 	}
 	export class HeadState {
