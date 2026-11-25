@@ -195,9 +195,11 @@
     outline-offset: 1px;
   }
 
+  /* The accent, which each theme sets: --ink-rose-deep has no dark value, and was dark rose on
+     the dark theme's rose wash. */
   .open :global(svg) {
     flex: none;
-    color: var(--ink-rose-deep);
+    color: var(--accent);
   }
 
   .verb {
@@ -328,9 +330,11 @@
     font-family: var(--font-mono);
   }
 
+  /* Only in has what As far back as leaves: the select is as wide as its longest choice, so
+     "The whole history" is never cut. */
   .two {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 12px;
   }
 
