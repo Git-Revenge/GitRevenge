@@ -93,6 +93,22 @@ test.describe('the history search’s chip', () => {
     expect(await events(page, 'history-remove')).toHaveLength(1)
   })
 
+  test('as far back as shows its choice whole', async ({ page }) => {
+    await show(page, searching({ found: 7, searched: 1_511, ms: 200 }))
+    await chip(page).click()
+    // As wide as its longest choice needs, which Only in's half of the popover wasn't (#997).
+    const select = dialog(page).getByRole('combobox', { name: 'As far back as' })
+    await expect(select).toHaveValue('all')
+    const [given, needed] = await select.evaluate((el: HTMLSelectElement) => {
+      const given = el.getBoundingClientRect().width
+      el.style.width = 'max-content'
+      const needed = el.getBoundingClientRect().width
+      el.style.width = ''
+      return [given, needed]
+    })
+    expect(given).toBeGreaterThanOrEqual(needed - 0.5)
+  })
+
   test('sits beside a trailer’s chip', async ({ page }) => {
     const fixed = { key: 'changelog', value: 'label:fixed', keyLabel: 'Changelog', valueLabel: 'fixed', kind: 'label' }
     await open(page, 'filterStrip', { filterStrip: { filter: filtered(searching({ found: 7, searched: 1_511, ms: 200 }), { picks: [fixed], kept: 2 }) } })
