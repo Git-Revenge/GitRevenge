@@ -28,6 +28,20 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text = '
   return e
 }
 
+/** Fills node with text, each `quoted` stretch as code: a reason quotes the tokens it names
+ * that way. Text with an odd number of backticks, from a token holding one, stays as it is. */
+export function withCode(node: HTMLElement, text: string): HTMLElement {
+  const parts = text.split('`')
+  if (parts.length % 2 === 0) {
+    node.textContent = text
+    return node
+  }
+  parts.forEach((part, i) => {
+    if (part) node.append(i % 2 ? el('code', '', part) : document.createTextNode(part))
+  })
+  return node
+}
+
 class Heading extends WidgetType {
   constructor(
     readonly index: number,
@@ -60,7 +74,7 @@ class Heading extends WidgetType {
     head.append(el('span', 'place-label', placeLabel(this.index, this.status)))
     // What the token merge found: what each side did, or why they can't be combined.
     const why = s?.ok ? (this.status === 'suggested' || this.status === 'combined' ? s.reason : '') : s?.reason && this.status === 'undecided' ? `can't be combined: ${s.reason}` : ''
-    if (why) head.append(el('span', 'place-why', why))
+    if (why) head.append(withCode(el('span', 'place-why'), why))
     head.append(el('span', 'place-gap'))
     const chip = (label: string, title: string, on: boolean, run?: () => void) => {
       const b = el('button', `chip${on ? ' on' : ''}`, label)

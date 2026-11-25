@@ -17,6 +17,9 @@ In **Split**, a **ribbon** runs between the sides. The sides aren't padded to li
 - A move is drawn over the others in its own colour, so its band can be followed from one end to the other.
 - The change you're on is outlined.
 
+![A workflow file in Split: the ribbon joins a change, three additions, formatting and a move from one side to the other](../img/diff-split-light.webp#gh-light-mode-only)
+![A workflow file in Split: the ribbon joins a change, three additions, formatting and a move from one side to the other](../img/diff-split-dark.webp#gh-dark-mode-only)
+
 To pad the sides instead, turn the ribbon off in [Settings](settings.md).
 
 A row above the diff counts the lines added and removed and the moves; read as code, it also counts the changes, renames and formatting. <kbd>F7</kbd> and <kbd>Shift</kbd>+<kbd>F7</kbd> step through the changes, as the arrows beside the count do, and the change you're on is marked at its left edge.
@@ -42,7 +45,13 @@ A chip after the file's name says **Read as Go** (or whichever it is). Changes a
 - **Renames.** A name changed the same way in more than one place, where the old name is gone from the file, is a rename. It has "renamed from out" beside it, and the row above the diff says "rename: out → readings, 4 places". Each rename has its own colour, starting with ochre. Click one to light up every place it changed, on both sides; click it again to stop.
 - **Reordered code.** When arguments swap places, `send(station, reading)` to `send(reading, station)`, the one that moved across the other is marked as moved, in teal, not as removed and added.
 
+![Read as Python: fetch renamed to latest_reading, and lines moved into a try statement](../img/diff-code-light.webp#gh-light-mode-only)
+![Read as Python: fetch renamed to latest_reading, and lines moved into a try statement](../img/diff-code-dark.webp#gh-dark-mode-only)
+
 **Hide formatting** beside the layout buttons takes formatting out of the view: the lines read as unchanged, in their new form, and the row above the diff says how many changes it hid, with a link to show them. Settings can make it the starting point.
+
+![A JSON file written out in full, with its formatting hidden: one change is left](../img/diff-hide-formatting-light.webp#gh-light-mode-only)
+![A JSON file written out in full, with its formatting hidden: one change is left](../img/diff-hide-formatting-dark.webp#gh-dark-mode-only)
 
 Where you stage, unstage or discard, nothing is hidden: you see exactly what will be written. Formatting stands in hunks of its own, tagged **formatting only**, so it can be staged or left on its own. A file whose changes are all formatting says **formatting only** in the commit's file list and in your uncommitted changes.
 
@@ -57,6 +66,12 @@ Moves are found three ways:
 - **Lines moved unchanged**, apart from their indentation: "moved from line 3, unchanged", or "indented differently".
 - **Lines moved and edited on the way.** A function moved to the end of the file with one line changed is still a move: "moved from line 3, changed". Its note offers **Compare with the original**, which opens the moved lines against the lines they came from, so the edit shows as an edit.
 - **Code wrapped in new structure**, when the file is read as code. Statements wrapped in an `if`, a loop or a `try` stay where they were but sit inside something new. Their lines show as a move, "moved into an if statement", and only the new `if` line and its closing brace are added. If one of them was edited as well, the note says "moved into an if statement, changed" and offers **Compare with the original**.
+
+![A CSS rule moved above another and changed on the way, with a note at each end](../img/diff-moved-changed-light.webp#gh-light-mode-only)
+![A CSS rule moved above another and changed on the way, with a note at each end](../img/diff-moved-changed-dark.webp#gh-dark-mode-only)
+
+![Compare with the original: the moved rule against the lines it came from, two values changed](../img/move-compare-light.webp#gh-light-mode-only)
+![Compare with the original: the moved rule against the lines it came from, two values changed](../img/move-compare-dark.webp#gh-dark-mode-only)
 
 [Settings](settings.md) can turn finding moves off.
 

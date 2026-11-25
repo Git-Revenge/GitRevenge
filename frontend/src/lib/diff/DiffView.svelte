@@ -357,7 +357,8 @@
       {#if code}
         {#if code.changes}<span class="sum"><span class="swatch change" aria-hidden="true"></span>{count(code.changes, 'change', 'changes')}</span>{/if}
         {#each code.renames.slice(0, 2) as r (r.from)}
-          <span class="sum"><span class="swatch rename" aria-hidden="true"></span>rename: <code>{r.from}</code> → <code>{r.to}</code>, {count(r.count, 'place', 'places')}</span>
+          <!-- One item in the flex row, so the comma stays with the name before it. -->
+          <span class="sum"><span class="swatch rename" aria-hidden="true"></span><span>rename: <code>{r.from}</code> → <code>{r.to}</code>, {count(r.count, 'place', 'places')}</span></span>
         {/each}
         {#if code.renames.length > 2}<span class="sum">{count(code.renames.length - 2, 'more rename', 'more renames')}</span>{/if}
       {:else}

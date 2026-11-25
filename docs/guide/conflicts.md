@@ -40,6 +40,9 @@ A suggestion is never kept for you. It counts as undecided until you keep it or 
 
 Where both sides changed the same token, such as one number to two different values, the place stays undecided and says why: *can't be combined: both sides changed `48`*. **Write it myself** fills it with both sides, ours first, ready to edit.
 
+![The conflict tool on config.yaml: a place filled in with a suggestion that takes both sides' changes, and one where both sides changed the same value](../img/conflict-suggestion-light.webp#gh-light-mode-only)
+![The conflict tool on config.yaml: a place filled in with a suggestion that takes both sides' changes, and one where both sides changed the same value](../img/conflict-suggestion-dark.webp#gh-dark-mode-only)
+
 A string or a comment is one token, so two edits inside the same string are never combined.
 
 **Imports merge as a set.** Their order means nothing, so when both sides add a different import in the same spot, both go in, and one that either side removed stays removed. A list that both sides keep sorted stays sorted. The heading says so: *imports merge as a set: ours added `"log"`; theirs added `"io"`*. This covers Go, JavaScript, TypeScript, Python, Java, Kotlin, Scala, Groovy, C#, Rust, C, C++ and Objective-C includes, PHP, Swift, Dart, Ruby, Haskell and Elixir. A module both sides import in different ways, under two names, say, is still a conflict.

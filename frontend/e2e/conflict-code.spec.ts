@@ -50,7 +50,9 @@ const saved = async (page: Page) => ((await calls(page, 'ResolveConflict'))[0] a
 test('a place whose sides combine is pre-filled and marked, but still counts as undecided', async ({ page }) => {
   await open(page, 'conflictView', scenario())
   await expect(place(page, 1)).toHaveAccessibleName('Place 1 · suggested: both sides combined')
-  await expect(place(page, 1)).toContainText('ours added `ctx int,`; theirs added `, step int`')
+  await expect(place(page, 1)).toContainText('ours added ctx int,; theirs added , step int')
+  // The tokens it names are set as code, not between backticks.
+  await expect(place(page, 1).locator('.place-why code')).toHaveText(['ctx int,', ', step int'])
   await expect.poll(() => text(page)).toContain(combined.trimEnd())
   // Each part of it is washed by the side it came from.
   await expect(page.locator('.editor .origin.ours')).toHaveText('ctx int,')
@@ -68,7 +70,8 @@ test('a place whose sides combine is pre-filled and marked, but still counts as 
 test("a place that can't be combined says why, and can be written by hand from both sides", async ({ page }) => {
   await open(page, 'conflictView', scenario())
   await expect(place(page, 2)).toHaveAccessibleName('Place 2 · choose a side, or type here')
-  await expect(place(page, 2)).toContainText("can't be combined: both sides changed `48`")
+  await expect(place(page, 2)).toContainText("can't be combined: both sides changed 48")
+  await expect(place(page, 2).locator('.place-why code')).toHaveText('48')
   await place(page, 2).getByRole('button', { name: 'Write it myself' }).click()
   await expect(place(page, 2)).toHaveAccessibleName("Place 2 · you're writing this one by hand")
   await expect.poll(() => text(page)).toContain('const maxHours = 72\nconst maxHours = 96')
