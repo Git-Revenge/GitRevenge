@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 )
 
 // tidesFile is three functions; moving the first to the end deletes and adds it.
@@ -68,6 +69,22 @@ func TestAMoveThatWasEditedIsAMoveThatChanged(t *testing.T) {
 			if strings.Join(marked, "|") != "ctx," {
 				t.Errorf("marked %q in the move", marked)
 			}
+		}
+	}
+}
+
+// A move's own diff reads within QuickRead, as a file can have many, unless the caller asked
+// for no limit: then a slow machine can't turn the move's code edits into line edits.
+func TestAMoveReadsWithNoLimitWhenAskedTo(t *testing.T) {
+	for _, c := range []struct{ caller, want time.Duration }{
+		{-1, -1},
+		{0, QuickRead},
+		{time.Microsecond, QuickRead},
+		{PatientRead, QuickRead},
+		{LongRead, QuickRead},
+	} {
+		if got := moveReadTime(c.caller); got != c.want {
+			t.Errorf("caller %s: a move reads within %s, want %s", c.caller, got, c.want)
 		}
 	}
 }

@@ -3,6 +3,7 @@ package semdiff
 import (
 	"context"
 	"slices"
+	"time"
 
 	"znkr.io/diff"
 )
@@ -128,18 +129,29 @@ func changedMoves(ctx context.Context, a, b text, blocks []Block, deleted, added
 // compareMoves gives each changed move its own diff, its blocks counted from the move's first
 // line on each side, read as code when the file is.
 func compareMoves(ctx context.Context, a, b text, res *Result, opts Options) error {
+	limit := moveReadTime(opts.ReadTime)
 	for k := range res.Moves {
 		mv := &res.Moves[k]
 		if !mv.Changed {
 			continue
 		}
-		sub, err := Diff(ctx, a.span(mv.OldStart, mv.OldEnd), b.span(mv.NewStart, mv.NewEnd), Options{Algorithm: opts.Algorithm, Language: opts.Language, ReadTime: QuickRead})
+		sub, err := Diff(ctx, a.span(mv.OldStart, mv.OldEnd), b.span(mv.NewStart, mv.NewEnd), Options{Algorithm: opts.Algorithm, Language: opts.Language, ReadTime: limit})
 		if err != nil {
 			return err
 		}
 		mv.Edits = sub.Blocks
 	}
 	return nil
+}
+
+// moveReadTime is how long a move's own diff may take to read each version, given the
+// caller's ReadTime: QuickRead, as a file can have many moves, unless the caller asked for
+// no limit.
+func moveReadTime(caller time.Duration) time.Duration {
+	if caller < 0 {
+		return caller
+	}
+	return QuickRead
 }
 
 // maxJoinGap is how many lines, on each side, two moves can be apart and still be one move
