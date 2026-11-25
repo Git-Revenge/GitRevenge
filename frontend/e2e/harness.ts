@@ -252,6 +252,7 @@ const mounts = {
         onSearch: record('search'),
         diffShown: (scenario.diffShown ?? null) as DiffTarget | null,
         onOpenFile: record('open-file'),
+        onHistorySearch: record('history-search'),
       },
     })
   },
@@ -275,7 +276,7 @@ const mounts = {
     // A test about the saved view has the app read it first, as the app does when it starts.
     if (scenario.responses?.GraphViews) await (await import('../src/lib/theme.svelte')).theme.load()
     const wip = scenario.wip ? { changes: scenario.wip.changes, active: false, open: record('wip') } : undefined
-    mount(GraphView, { target: host, props: { path: '/repo', wip, onSelect: record('select'), onNote: (row: { index: number }) => win.__events.push(['note', row.index]), onContext: (row: { index: number }) => win.__events.push(['context-row', row.index]), onDrop: record('drop'), ...(scenario.suggests ? { onFilterAdd: record('filter-add'), onFilterDrop: record('filter-drop') } : {}), ...(scenario.finds ? { onFindInFiles: record('find-in-files') } : {}), sparse: scenario.sparse ?? false, highlight: scenario.highlight ?? null, filterPicks: scenario.filterPicks ?? [], pins: scenario.pins ?? [], ...(scenario.graphChips ? { onFilterPick: record('filter-pick') } : {}), trailersUnread: scenario.trailersUnread ?? 0 } })
+    mount(GraphView, { target: host, props: { path: '/repo', wip, onSelect: record('select'), onNote: (row: { index: number }) => win.__events.push(['note', row.index]), onContext: (row: { index: number }) => win.__events.push(['context-row', row.index]), onDrop: record('drop'), ...(scenario.suggests ? { onFilterAdd: record('filter-add'), onFilterDrop: record('filter-drop') } : {}), ...(scenario.finds ? { onFindInFiles: record('find-in-files') } : {}), ...(scenario.histories ? { onHistorySearch: record('history-search') } : {}), history: (scenario.graphHistory ?? null) as never, sparse: scenario.sparse ?? false, highlight: scenario.highlight ?? null, filterPicks: scenario.filterPicks ?? [], pins: scenario.pins ?? [], ...(scenario.graphChips ? { onFilterPick: record('filter-pick') } : {}), trailersUnread: scenario.trailersUnread ?? 0 } })
   },
   async commitMenu() {
     const { default: ContextMenu } = await import('../src/lib/ContextMenu.svelte')
@@ -348,7 +349,20 @@ const mounts = {
     const s: NonNullable<Scenario['filterStrip']> = scenario.filterStrip ?? { filter: null }
     mount(FilterStrip, {
       target: host,
-      props: { filter: s.filter as never, only: s.only ?? true, onlyOffered: s.onlyOffered ?? true, onRemove: record('remove'), onAdd: record('add'), onMode: record('mode'), onClear: record('clear'), onStep: record('step') },
+      props: {
+        filter: s.filter as never,
+        only: s.only ?? true,
+        onlyOffered: s.onlyOffered ?? true,
+        onRemove: record('remove'),
+        onAdd: record('add'),
+        onMode: record('mode'),
+        onClear: record('clear'),
+        onStep: record('step'),
+        onHistorySearch: record('history-search'),
+        onHistoryStop: record('history-stop'),
+        onHistoryCarryOn: record('history-carry-on'),
+        onHistoryRemove: record('history-remove'),
+      },
     })
   },
   // The status bar's line about reading trailers, for the repository on screen.

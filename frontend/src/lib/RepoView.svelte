@@ -1,10 +1,11 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import { CommitRow, SetTrailerFilter, SetTrailerPin, TrailerFilter, TrailerFilterRows, TrailerFilterStep, TrailerPins } from '../../wailsjs/go/app/App.js'
+  import { CarryOnHistorySearch, CommitRow, SetHistorySearch, SetTrailerFilter, SetTrailerPin, StopHistorySearch, TrailerFilter, TrailerFilterRows, TrailerFilterStep, TrailerPins } from '../../wailsjs/go/app/App.js'
   import type { app } from '../../wailsjs/go/models'
   import { onBackend } from './events'
   import FilterStrip from './filters/FilterStrip.svelte'
   import { hasPick, loadOnly, saveOnly, togglePick } from './filters/filters'
+  import { historyKey, historyOptions, type HistoryOptions } from './filters/history'
   import { theme as colorTheme } from './theme.svelte'
   import { repoReads } from './repoReads'
   import { provideCommands } from './commands.svelte'
@@ -101,6 +102,8 @@
   /** The rows a highlighting filter keeps in ink. */
   let highlight = $state<number[] | null>(null)
   let filterAsk = 0
+  /** Whether a filter is on: values picked, a history search (#982), or both. */
+  let filterOn = $derived(filter.picks.length > 0 || !!filter.history)
 
   async function setFilter(picks: { key: string; value: string }[]) {
     const n = ++filterAsk
@@ -114,8 +117,39 @@
     await loadHighlight(n)
   }
 
+  // The history search (#981, #982): the commits that add or remove a text, as part of the
+  // filter. Empty text takes it out; the picks stay either way.
+  async function setHistory(o: HistoryOptions | null) {
+    const n = ++filterAsk
+    let next = await session.run(() => SetHistorySearch(path, (o ?? historyOptions('')) as never))
+    if (n !== filterAsk || !next) return
+    // A search with no filter on starts as Only these: the mode chosen here goes with it.
+    if (next.history && next.only !== only) {
+      next = await session.run(() => SetTrailerFilter(path, next!.picks.map((p) => ({ key: p.key, value: p.value })) as never, only))
+      if (n !== filterAsk || !next) return
+    }
+    if (only || filter.only) graph?.top()
+    filter = next
+    await loadHighlight(n)
+  }
+
+  /** Stops the history search, keeping what it found, or carries on from where it stopped. */
+  async function pauseHistory(stop: boolean) {
+    const n = ++filterAsk
+    const next = await session.run(() => (stop ? StopHistorySearch(path) : CarryOnHistorySearch(path)))
+    if (n !== filterAsk || !next) return
+    filter = next
+    await loadHighlight(n)
+  }
+
+  /** Takes the whole filter off: the history search, then the picks. */
+  async function clearFilter() {
+    if (filter.history) await setHistory(null)
+    if (filter.picks.length) await setFilter([])
+  }
+
   async function loadHighlight(n = ++filterAsk) {
-    if (!filter.picks.length || only) {
+    if (!filterOn || only) {
       highlight = null
       return
     }
@@ -141,6 +175,13 @@
     if (got) pins = got.map((p) => ({ key: p.key, label: p.label }))
   }
 
+  /** Backspace in an empty search box takes out the strip's last chip: the last value picked,
+   * then the history search, which comes first. */
+  function dropLastFilter() {
+    if (filter.picks.length) void setFilter(filter.picks.slice(0, -1))
+    else if (filter.history) void setHistory(null)
+  }
+
   /** A value picked in the search box joins the filter; one that's there already stays. */
   function addPick(key: string, value: string) {
     if (!hasPick(filter.picks, key, value)) void setFilter([...filter.picks, { key, value }])
@@ -156,6 +197,12 @@
   let trailersUnread = $derived(filter.picks.length && trailersRead?.reading && trailersRead.total > 0 ? Math.max(0, 1 - trailersRead.read / trailersRead.total) : 0)
   /** Names the filter that's on, for whoever shows what it picked. */
   let filterSig = $derived(filter.picks.map((p) => `${p.key}=${p.value}`).join('|'))
+  /** The history search in the filter, for the marks beside the commits it found and the
+   * files where its text changed: its options, a key naming them, and how far it has got,
+   * since a commit asked about before it was found has its mark once it is. */
+  let historyOn = $derived(
+    filter.history ? { key: historyKey(filter.history.options), found: filter.history.running || filter.history.stopped ? filter.history.found : -1, options: filter.history.options } : null,
+  )
 
   /** The next commit a highlighting filter keeps after the selected one, or the one before. */
   async function step(dir: 1 | -1) {
@@ -172,7 +219,7 @@
   $effect(() => {
     void only
     untrack(() => {
-      if (filter.picks.length && filter.only !== only) void setFilter(filter.picks)
+      if (filterOn && filter.only !== only) void setFilter(filter.picks)
     })
   })
 
@@ -191,13 +238,22 @@
   // New commits, or more of the history read, change what a filter keeps and where its rows are.
   $effect(() =>
     onBackend('graph:progress', (p) => {
-      if (p.path !== path || !p.done || !filter.picks.length) return
+      if (p.path !== path || !p.done || !filterOn) return
       void TrailerFilter(path)
         .then((f) => {
           filter = f ?? noFilter
           void loadHighlight()
         })
         .catch(() => {})
+    }),
+  )
+  // A history search finds more as it goes, and says so at most once a second.
+  $effect(() =>
+    onBackend('history:progress', (p) => {
+      if (p.path !== path) return
+      filter = p.filter ?? noFilter
+      // Without taking a turn of its own: a click still waiting on the backend keeps its answer.
+      void loadHighlight(filterAsk)
     }),
   )
   /** The card about a commit's author, while one is open: whose, and where it goes. */
@@ -414,6 +470,11 @@
     openDialog={ctx.openDialog}
     diffShown={diff}
     onOpenFile={(t) => (diff = t)}
+    onHistorySearch={(o) => {
+      // The graph shows what the search finds: a file open from Find steps aside for it.
+      diff = null
+      void setHistory(o)
+    }}
   />
   <div class="main">
     <div class="bar" bind:clientWidth={barWidth}>
@@ -425,11 +486,24 @@
     </div>
     <!-- The graph stays mounted while a diff is open, so scroll position and selection
          survive returning to it. -->
-    {#if filter.picks.length && !diff && !rebaseBase}
-      <FilterStrip {filter} {only} {onlyOffered} onRemove={(p) => setFilter(togglePick(filter.picks, p.key, p.value))} onAdd={() => sidebar?.show('filters')} onMode={setMode} onClear={() => setFilter([])} onStep={step} />
+    {#if filterOn && !diff && !rebaseBase}
+      <FilterStrip
+        {filter}
+        {only}
+        {onlyOffered}
+        onRemove={(p) => setFilter(togglePick(filter.picks, p.key, p.value))}
+        onAdd={() => sidebar?.show('filters')}
+        onMode={setMode}
+        onClear={clearFilter}
+        onStep={step}
+        onHistorySearch={setHistory}
+        onHistoryStop={() => pauseHistory(true)}
+        onHistoryCarryOn={() => pauseHistory(false)}
+        onHistoryRemove={() => setHistory(null)}
+      />
     {/if}
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filter.picks.length > 0} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFindInFiles={(text) => findAsk.show(path, text)} onFilterDrop={() => filter.picks.length && setFilter(filter.picks.slice(0, -1))} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filterOn} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFindInFiles={(text) => findAsk.show(path, text)} onHistorySearch={(text) => setHistory(historyOptions(text))} history={historyOn} onFilterDrop={dropLastFilter} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           void whileBusy(loadRefExtras(path, refs)).then((e) => openMenu(commitMenuItems(row, refs, ctx, e), x, y))}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
@@ -532,7 +606,7 @@
       onRevert={revertFound}
     />
   {:else if selected}
-    <CommitPanel {path} onMenu={openMenu} showNotes={noteAsk} {filterSig} {pinnedKeys} onPin={setPin} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} onAuthor={(sha, name, from) => {
+    <CommitPanel {path} onMenu={openMenu} showNotes={noteAsk} {filterSig} {pinnedKeys} onPin={setPin} history={historyOn} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} onAuthor={(sha, name, from) => {
         const at = from.getBoundingClientRect()
         authorCard = { sha, name, x: at.left, y: at.bottom + 4, above: at.top, opener: from }
       }} onReveal={revealCommit} onActions={(x, y) => {

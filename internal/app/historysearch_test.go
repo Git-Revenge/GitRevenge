@@ -178,6 +178,36 @@ func TestHistoryChangesSaysWhatEachCommitDid(t *testing.T) {
 	}
 }
 
+// The graph asks about its rows and the commit panel about its commit at the same moment:
+// neither cuts the other short, which would read as commits that changed nothing (#982).
+func TestHistoryChangesAnswersEveryCaller(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx, path := unitsTab(t, a)
+	if _, err := a.SetHistorySearch(path, git.HistoryOptions{Text: "km/h"}); err != nil {
+		t.Fatal(err)
+	}
+	historyDone(t, a, path)
+	all := strings.Fields(fx.Git("rev-list", "HEAD"))
+	asks := [][]string{{all[1], all[2]}, {all[4], all[5]}}
+	got := make([]map[string][]git.HistoryChange, len(asks))
+	var wg sync.WaitGroup
+	for i, ids := range asks {
+		wg.Go(func() {
+			var err error
+			if got[i], err = a.HistoryChanges(path, ids); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+	for i := range asks {
+		if len(got[i]) != 2 {
+			t.Errorf("ask %d = %v", i, got[i])
+		}
+	}
+}
+
 func TestHistorySearchSaysWhyItEndedEarly(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)

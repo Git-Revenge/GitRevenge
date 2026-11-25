@@ -18,6 +18,9 @@ export interface BackendEvents {
   /** FindLines: lines a Find in files search found, sent as it goes and tagged with the
    * token the search was started with (#979, #980). */
   'find:lines': { path: string; token: string; commit: string; lines: FoundLine[] }
+  /** HistoryProgress: a repository's smart filter while its history search runs, and when
+   * it ends (#981, #982); sent at most once a second. */
+  'history:progress': { path: string; filter: app.TrailerFilterState }
   /** PushResult: what a push to a remote with several push URLs did at each (#926). */
   'push:result': { path: string; remote: string; refspec: string; dests: { url: string; state: string; detail?: string; name: string }[] }
   /** RepoChange: a repository on screen changed on disk, or came on screen and wants reading again. */

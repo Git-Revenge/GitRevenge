@@ -811,6 +811,12 @@ export interface RowExtra {
   chipHover?: string
   /** Filled in by drawRow: where each chip was drawn, for whoever takes clicks. */
   chipSpans?: ChipSpan[]
+  /** What the commit did with a history search's text (#982), "+1 map.js": at the end of the
+   * subject's room, in words as well as colour. */
+  change?: { label: string; tone: 'plus' | 'minus' | 'even' }
+  /** Filled in by drawRow: where the change was drawn, for its tooltip, or left out when
+   * there wasn't room for it. */
+  changeSpan?: { x0: number; x1: number; y0: number; y1: number }
 }
 
 /** A chip as a row shows it: sized, and either one value or a count of the ones not shown. */
@@ -942,6 +948,34 @@ function drawChips(ctx: CanvasRenderingContext2D, fit: FitChip[], x: number, mid
     extra.chipSpans?.push({ x0: x, x1: x + c.width, y0: mid - CHIP_H / 2, y1: mid + CHIP_H / 2, chip: c.chip, more: c.more })
     x += c.width + CHIP_GAP
   }
+  ctx.restore()
+}
+
+/** The least room a subject keeps beside a change mark: with less, the mark gives way. */
+const CHANGE_SUBJECT_MIN = 80
+
+/** A history search's mark, "+1 map.js", drawn from x: washed in the colour of an added or
+ * removed line, or outlined where a line with the text changed and it stayed. */
+function drawChange(ctx: CanvasRenderingContext2D, change: NonNullable<RowExtra['change']>, x: number, width: number, mid: number, theme: Theme) {
+  const ink = change.tone === 'plus' ? theme.good : change.tone === 'minus' ? theme.bad : theme.muted
+  ctx.save()
+  setFont(ctx, CHIP_FONT)
+  ctx.textBaseline = 'middle'
+  ctx.textAlign = 'left'
+  ctx.beginPath()
+  ctx.roundRect(Math.round(x) + 0.5, Math.round(mid - CHIP_H / 2) + 0.5, Math.round(width) - 1, CHIP_H - 1, 4)
+  if (change.tone === 'even') {
+    ctx.strokeStyle = theme.edge
+    ctx.lineWidth = 1
+    ctx.stroke()
+  } else {
+    ctx.globalAlpha *= 0.14
+    ctx.fillStyle = ink
+    ctx.fill()
+    ctx.globalAlpha /= 0.14
+  }
+  ctx.fillStyle = ink
+  ctx.fillText(change.label, x + CHIP_PAD, mid + 0.5)
   ctx.restore()
 }
 
@@ -1328,6 +1362,18 @@ export function drawRow(
   if (!lay.refW && refs.length) {
     left = drawLabels(ctx, refs, left, line1, Math.min(subjectRight - left, (subjectRight - left) * 0.6), color, theme, comfortable, lay.remote)
     labelSpan = [lay.textX, left - LABEL_TRAIL]
+  }
+  // A history search's mark takes the end of the subject's room, while enough is left for
+  // the subject to be read.
+  if (extra.change) {
+    setFont(ctx, CHIP_FONT)
+    const width = Math.ceil(ctx.measureText(extra.change.label).width) + CHIP_PAD * 2
+    if (subjectRight - left - width - CHIP_LEAD >= CHANGE_SUBJECT_MIN) {
+      const x = subjectRight - width
+      drawChange(ctx, extra.change, x, width, line1, theme)
+      extra.changeSpan = { x0: x, x1: x + width, y0: line1 - CHIP_H / 2, y1: line1 + CHIP_H / 2 }
+      subjectRight = x - CHIP_LEAD
+    }
   }
   // A pinned key's values follow the subject, in the timeline: the subject gives up some of
   // its room for them, never more than half.

@@ -232,6 +232,13 @@ func (a *App) TrailerFilter(path string) (TrailerFilterState, error) {
 // now, and has the graph show it: only those commits under Only these, everything under
 // Highlight or with no filter. Asking again with nothing changed reloads nothing.
 func (a *App) applyTrailerFilter(r *session.Repo) TrailerFilterState {
+	return a.applyFilter(r, true)
+}
+
+// applyFilter is applyTrailerFilter, but with graph false a graph under Only these keeps
+// the commits it was last given: a history search's progress, while the graph is still
+// reloading under the last of it (see historyChanged).
+func (a *App) applyFilter(r *session.Repo, graph bool) TrailerFilterState {
 	a.trailerFilters.applying.Lock()
 	defer a.trailerFilters.applying.Unlock()
 	state := TrailerFilterState{Picks: []FilterPick{}}
@@ -272,6 +279,9 @@ func (a *App) applyTrailerFilter(r *session.Repo) TrailerFilterState {
 	var searched any
 	if f.history != nil {
 		searched = []any{f.history.opts, f.history.generation()}
+	}
+	if !graph {
+		return state
 	}
 	sig, _ := json.Marshal([]any{f.picks, reading.Gen(), len(keep), searched})
 	r.SetFilter(&session.Filter{Keep: keep, Sig: string(sig)})

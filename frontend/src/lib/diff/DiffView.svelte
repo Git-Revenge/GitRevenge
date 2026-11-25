@@ -439,6 +439,7 @@
         {current}
         {jump}
         {labels}
+        find={target.mode === 'commit' ? target.find : undefined}
         onStep={step}
         onPick={pick}
         onCompare={(k) => (comparing = k)}
@@ -457,6 +458,7 @@
         {stops}
         {current}
         {jump}
+        find={target.mode === 'commit' ? target.find : undefined}
         onPick={pick}
         onCompare={(k) => (comparing = k)}
       />
