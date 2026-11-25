@@ -1,9 +1,12 @@
 package app
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
+	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
@@ -46,6 +49,53 @@ func TestConflictStopTalliesSuggestionsAndWhatADriverSettled(t *testing.T) {
 	}
 	if want := []MergeDriver{{Name: "keeptheirs", Command: "cp %B %A"}}; !reflect.DeepEqual(st.Drivers, want) {
 		t.Errorf("drivers %+v", st.Drivers)
+	}
+}
+
+// git's default conflict style writes two changes a line apart as one place. The tally counts
+// them apart, each with its original, as the conflict tool shows them; once the file is edited
+// on disk, both go by the file (#974).
+func TestConflictStopCountsThePlacesTheToolShows(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.CommitFile("config.yaml", "feed:\n  timeout_s: 5\nalerts:\n  wind_kmh: 60\n", "config")
+	fx.Branch("topic")
+	fx.CommitFile("config.yaml", "feed:\n  max_age_min: 30\n  timeout_s: 5\nalerts:\n  wind_kmh: 55\n", "their config")
+	fx.Checkout("main")
+	fx.CommitFile("config.yaml", "feed:\n  timeout_s: 10\nalerts:\n  wind_knots: 32\n", "our config")
+	if _, err := fx.TryGit("merge", "topic"); err == nil {
+		t.Fatal("expected a conflict")
+	}
+	disk := filepath.Join(fx.Dir, "config.yaml")
+	written, err := os.ReadFile(disk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len(git.ConflictTexts(string(written))); n != 1 {
+		t.Fatalf("git wrote %d places, want them joined:\n%s", n, written)
+	}
+	tab, err := a.OpenRepo(fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err := a.ConflictStop(tab.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The timeout combines; the wind limit is a value both sides changed.
+	if want := []ConflictTally{{Path: "config.yaml", Places: 2, Suggested: 1, Language: "YAML"}}; !reflect.DeepEqual(st.Files, want) {
+		t.Errorf("as git wrote it: %+v", st.Files)
+	}
+	if err := os.WriteFile(disk, []byte("# settled by hand, partly\n"+string(written)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	st, err = a.ConflictStop(tab.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []ConflictTally{{Path: "config.yaml", Places: 1, Language: "YAML"}}; !reflect.DeepEqual(st.Files, want) {
+		t.Errorf("edited: %+v", st.Files)
 	}
 }
 

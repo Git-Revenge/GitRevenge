@@ -43,16 +43,30 @@ export interface Parsed {
   places: Place[]
 }
 
-/** The merged text to work from: the re-merge that keeps each place's original when it has the
- * same places as the file on disk, and otherwise the file on disk as it is. */
+/** The merged text to work from: the re-merge that keeps each place's original when it's the
+ * same merge as the file on disk, and otherwise the file on disk as it is.
+ *
+ * The two can split places differently: git's default conflict style joins places a line or
+ * two apart, and diff3's never does (#974). So they're compared by what each side reads: taking
+ * every place's ours, and then every place's theirs, gives the same text from both unless
+ * something in the file was resolved or edited. internal/app's placesOf does the same. */
 export function sourceOf(file: { merged: { text: string }; diff3?: string }): string {
   const merged = file.merged.text
   const diff3 = file.diff3 ?? ''
   if (!diff3) return merged
-  const a = parseConflicts(merged)
-  const b = parseConflicts(diff3)
-  const same = a.length === b.length && a.every((r, i) => r.ours === b[i].ours && r.theirs === b[i].theirs)
+  const same = taking(merged, 'ours') === taking(diff3, 'ours') && taking(merged, 'theirs') === taking(diff3, 'theirs')
   return same ? diff3 : merged
+}
+
+/** text with every conflicted place replaced by one side's version of it. */
+function taking(text: string, side: 'ours' | 'theirs'): string {
+  let out = ''
+  let at = 0
+  for (const r of parseConflicts(text)) {
+    out += text.slice(at, r.from) + r[side]
+    at = r.to
+  }
+  return out + text.slice(at)
 }
 
 /** Splits merged text at its conflict markers. */

@@ -109,11 +109,12 @@ func readConflict(ctx context.Context, g *git.Repo, file string, cf git.Conflict
 }
 
 // placesOf is a conflicted file's places as the conflict tool will split them: from the
-// re-merge that keeps each place's original when there is one.
+// re-merge that keeps each place's original when it's the same merge as the file on disk, and
+// otherwise from the file on disk.
 func placesOf(cf git.ConflictFile) []ConflictPlace {
-	text := cf.Diff3
-	if text == "" {
-		text = cf.Merged.Text
+	text := cf.Merged.Text
+	if cf.Diff3 != "" && git.SameMerge(cf.Merged.Text, cf.Diff3) {
+		text = cf.Diff3
 	}
 	var out []ConflictPlace
 	for _, t := range git.ConflictTexts(text) {
