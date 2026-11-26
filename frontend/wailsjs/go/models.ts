@@ -3403,6 +3403,20 @@ export namespace git {
 	        this.last = source["last"];
 	    }
 	}
+	export class BackfillCost {
+	    size: number;
+	    missing: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new BackfillCost(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.size = source["size"];
+	        this.missing = source["missing"];
+	    }
+	}
 	export class BlameLine {
 	    commit: string;
 	    author: string;
@@ -3462,6 +3476,102 @@ export namespace git {
 	        this.submodules = source["submodules"];
 	        this.folders = source["folders"];
 	    }
+	}
+	export class OneBranchShape {
+	    remote: string;
+	    branch: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OneBranchShape(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.remote = source["remote"];
+	        this.branch = source["branch"];
+	    }
+	}
+	export class SparseShape {
+	    cone: boolean;
+	    folders: string[];
+	    files: number;
+	    total: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SparseShape(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cone = source["cone"];
+	        this.folders = source["folders"];
+	        this.files = source["files"];
+	        this.total = source["total"];
+	    }
+	}
+	export class PartialShape {
+	    remote: string;
+	    filter: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PartialShape(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.remote = source["remote"];
+	        this.filter = source["filter"];
+	    }
+	}
+	export class ShallowShape {
+	    since: number;
+	    commits: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ShallowShape(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.since = source["since"];
+	        this.commits = source["commits"];
+	    }
+	}
+	export class CloneShape {
+	    shallow?: ShallowShape;
+	    partial?: PartialShape;
+	    sparse?: SparseShape;
+	    oneBranch?: OneBranchShape;
+	
+	    static createFrom(source: any = {}) {
+	        return new CloneShape(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.shallow = this.convertValues(source["shallow"], ShallowShape);
+	        this.partial = this.convertValues(source["partial"], PartialShape);
+	        this.sparse = this.convertValues(source["sparse"], SparseShape);
+	        this.oneBranch = this.convertValues(source["oneBranch"], OneBranchShape);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class Trailer {
 	    key: string;
@@ -4279,6 +4389,22 @@ export namespace git {
 	        this.lines = source["lines"];
 	    }
 	}
+	export class MoreHistory {
+	    commits: number;
+	    since: number;
+	    all: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new MoreHistory(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.commits = source["commits"];
+	        this.since = source["since"];
+	        this.all = source["all"];
+	    }
+	}
 	export class Note {
 	    ref: string;
 	    text: string;
@@ -4293,6 +4419,8 @@ export namespace git {
 	        this.text = source["text"];
 	    }
 	}
+	
+	
 	export class PlaceOrigin {
 	    commit: string;
 	    author: string;
@@ -4523,6 +4651,7 @@ export namespace git {
 	        this.followTags = source["followTags"];
 	    }
 	}
+	
 	export class ShippedItem {
 	    sha: string;
 	    title: string;
@@ -4599,6 +4728,7 @@ export namespace git {
 	        this.key = source["key"];
 	    }
 	}
+	
 	export class Status {
 	    head: string;
 	    oid: string;

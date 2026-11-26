@@ -2,7 +2,9 @@
   // The sidebar's Repository panel: worktrees, submodules and the ways into LFS and the
   // Ignore rules tab. It stays mounted
   // while other panels show, so the rail's badge and filter counts are always right.
-  import { LFS, RemoveWorktree, Submodules, UpdateSubmodules, Worktrees } from '../../wailsjs/go/app/App.js'
+  import { CloneShape, LFS, RemoveWorktree, Submodules, UpdateSubmodules, Worktrees } from '../../wailsjs/go/app/App.js'
+  import CloneSection from './CloneSection.svelte'
+  import { isWhole, type Shape } from './thisClone'
   import type { app, git } from '../../wailsjs/go/models'
   import type { MenuItem } from './ContextMenu.svelte'
   import type { DialogSpec } from './Dialog.svelte'
@@ -34,6 +36,8 @@
   let trees = $state<git.Worktree[]>([])
   let subs = $state<git.Submodule[]>([])
   let lfs = $state<app.LFSInfo | null>(null)
+  /** How the clone differs from a whole one (#1005); null until known. */
+  let shape = $state<Shape | null>(null)
   let busy = $state(false)
   let lfsOpen = $state(false)
   /** False until the first answer, so the count doesn't claim 0 worktrees. */
@@ -42,7 +46,7 @@
   /** Numbers each load, and remembers the newest each section has shown, so a slow answer
    * can't replace a newer one. */
   let loads = 0
-  const newest = { trees: 0, subs: 0, lfs: 0 }
+  const newest = { trees: 0, subs: 0, lfs: 0, shape: 0 }
 
   /** Each section shows as soon as its own answer arrives: submodules and LFS can take seconds. */
   function load() {
@@ -64,6 +68,12 @@
       session.run(() => LFS(path)).then((l) => {
         if (fresh('lfs')) lfs = l ?? null
       }),
+      // Not worth a banner if it can't be read: the section just doesn't show.
+      CloneShape(path)
+        .catch(() => null)
+        .then((s) => {
+          if (fresh('shape')) shape = s ?? null
+        }),
     ])
   }
 
@@ -78,8 +88,9 @@
   let showLfs = $derived(!!lfs?.available && matchesFilter(filter, ...lfsNames(lfs.status.patterns, lfs.status.files)))
   let showIgnore = $derived(matchesFilter(filter, 'Ignore rules', '.gitignore', 'exclude'))
   let showPeople = $derived(matchesFilter(filter, 'People', '.mailmap', 'mailmap', 'authors'))
+  let showClone = $derived(!isWhole(shape) && matchesFilter(filter, 'This clone', 'shallow', 'partial', 'sparse', 'one branch', 'history', 'folders'))
   let filtering = $derived(filter.trim().length > 0)
-  let matches = $derived(shownTrees.length + shownSubs.length + (showLfs ? 1 : 0) + (showIgnore ? 1 : 0) + (showPeople ? 1 : 0))
+  let matches = $derived(shownTrees.length + shownSubs.length + (showLfs ? 1 : 0) + (showIgnore ? 1 : 0) + (showPeople ? 1 : 0) + (showClone ? 1 : 0))
 
   $effect(() => {
     onStatus?.({ attention: subs.filter((s) => s.state !== 'ok').length, matches })
@@ -123,6 +134,10 @@
   }
   import Empty from './ui/Empty.svelte'
 </script>
+
+{#if showClone && shape}
+  <CloneSection {path} {shape} {openDialog} {onMenu} />
+{/if}
 
 {#if shownTrees.length || !filtering}
   <section>

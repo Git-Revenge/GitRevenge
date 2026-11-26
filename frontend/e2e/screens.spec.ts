@@ -2684,7 +2684,8 @@ test.describe('before the first load has answered', () => {
   test('the Repository panel shows worktrees without waiting for the slower sections', async ({ page }) => {
     await open(page, 'repoPanel', { delays: { Submodules: 5000, LFS: 5000 }, responses: { Worktrees: [tree('/r', true), tree('/r-wt', false)], Submodules: [] } })
     await expect(heading(page)).toHaveText('Worktrees 2', { timeout: 2000 })
-    await expect(page.getByRole('button', { name: 'r-wt' })).toBeVisible()
+    // The row, not its More button ("More for r-wt").
+    await expect(page.getByRole('button', { name: /^r-wt/ })).toBeVisible()
   })
 
   test('a repository with no worktrees listed still reads 0 once loaded', async ({ page }) => {

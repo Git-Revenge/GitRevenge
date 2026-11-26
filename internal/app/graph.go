@@ -234,6 +234,16 @@ func (l *latest) start(kind, path string) (context.Context, func()) {
 	}
 }
 
+// stop cancels the read of kind in the repository at path, if one is running: for a view
+// that stops waiting for it.
+func (l *latest) stop(kind, path string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if prev := l.running[kind+"\x00"+path]; prev != nil {
+		(*prev)()
+	}
+}
+
 // rowsOf returns the graph rows of the commits ids, in graph order, at most limit of them.
 func rowsOf(g *graph.Graph, ids []string, limit int) graph.SearchResult {
 	rows := make([]int, 0, len(ids))

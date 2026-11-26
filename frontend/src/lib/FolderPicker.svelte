@@ -7,19 +7,28 @@
   let {
     counts,
     busy = false,
+    initial = [],
+    everyLabel = 'Every folder after all',
     onCheckout,
     onEvery,
   }: {
     counts: Folder[]
     /** The checkout is running. */
     busy?: boolean
+    /** The folders ticked at first: a sparse checkout's own, when changing them (#1005). */
+    initial?: string[]
+    everyLabel?: string
     onCheckout: (folders: string[]) => void
     /** Every folder after all. */
     onEvery: () => void
   } = $props()
 
-  let chosen = $state<string[]>([])
-  let open = $state<string[]>([])
+  // Only the first value: ticking and unticking change it from there.
+  // svelte-ignore state_referenced_locally
+  let chosen = $state<string[]>([...initial])
+  // The folders above those ticked at first are open, so they show.
+  // svelte-ignore state_referenced_locally
+  let open = $state<string[]>([...new Set(initial.flatMap((f) => f.split('/').slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join('/'))))])
   let filter = $state('')
 
   let total = $derived(counts.find((c) => c.path === '')?.files ?? 0)
@@ -92,7 +101,7 @@
     {/if}
   </p>
   <div class="form-actions">
-    <button type="button" class="btn secondary" disabled={busy} onclick={onEvery}>Every folder after all</button>
+    <button type="button" class="btn secondary" disabled={busy} onclick={onEvery}>{everyLabel}</button>
     <button type="button" class="btn primary" disabled={busy || !picked.length} onclick={() => onCheckout(picked)}>{checkoutLabel}</button>
   </div>
 </div>
