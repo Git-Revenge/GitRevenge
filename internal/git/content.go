@@ -41,10 +41,14 @@ type FileContents struct {
 	Path string `json:"path"`
 	Old  Side   `json:"old"`
 	New  Side   `json:"new"`
-	// Kind is "text", "image", "binary" or "large".
+	// Kind is "text", "image", "binary", "large", or "missing": a partial clone hasn't
+	// downloaded a version yet (#1003), and Missing names what to fetch.
 	Kind string `json:"kind"`
 	// Mime is set for images.
 	Mime string `json:"mime,omitempty"`
+	// Missing lists the objects a partial clone needs to show the file, when Kind is
+	// "missing".
+	Missing []string `json:"missing,omitempty"`
 }
 
 // FileRef names one version of a file being compared.
@@ -73,11 +77,27 @@ func (r *Repo) Contents(ctx context.Context, display string, from, to FileRef, f
 	}
 	var olds, news []byte
 	var err error
+	// A partial clone may lack either version: both are asked for, so one download fetches
+	// what's missing on both sides.
+	var missing []string
 	if fc.Old, olds, err = r.readSide(ctx, from, limit); err != nil {
-		return fc, err
+		ids, ok := NotDownloaded(err)
+		if !ok {
+			return fc, err
+		}
+		missing = append(missing, ids...)
 	}
 	if fc.New, news, err = r.readSide(ctx, to, limit); err != nil {
-		return fc, err
+		ids, ok := NotDownloaded(err)
+		if !ok {
+			return fc, err
+		}
+		missing = append(missing, ids...)
+	}
+	if len(missing) > 0 {
+		fc.Kind, fc.Missing = "missing", missing
+		fc.Old.Text, fc.New.Text = "", ""
+		return fc, nil
 	}
 	switch {
 	case fc.Old.Size > limit || fc.New.Size > limit:
@@ -133,10 +153,19 @@ func (r *Repo) readSide(ctx context.Context, v FileRef, limit int64) (Side, []by
 	if v.Rev != ":" {
 		spec = v.Rev + ":" + v.Path
 	}
-	sizeOut, err := r.Read(ctx, "cat-file", "-s", spec)
+	// Downloads are off: in a partial clone, a version never fetched is reported, not fetched
+	// behind the view's back.
+	sizeOut, err := r.readCmd(ctx, Cmd{Args: []string{"cat-file", "-s", spec}, Env: noLazyFetch})
 	if err != nil {
 		var gerr *Error
 		if errors.As(err, &gerr) && gerr.ExitCode == 128 {
+			// The path is in that version, but its contents were never downloaded: its ID
+			// comes from the folder listing, which a partial clone has.
+			if strings.Contains(gerr.Stderr, "could not get object info") {
+				if id, rerr := r.ReadString(ctx, "rev-parse", "--verify", "-q", spec); rerr == nil && id != "" {
+					return Side{Exists: true}, nil, &NotDownloadedError{IDs: []string{id}}
+				}
+			}
 			return Side{}, nil, nil // not present in that version
 		}
 		return Side{}, nil, err
@@ -148,7 +177,7 @@ func (r *Repo) readSide(ctx context.Context, v FileRef, limit int64) (Side, []by
 		return s, nil, nil
 	}
 	// --filters applies smudge filters (e.g. autocrlf, LFS) to give work-tree form.
-	b, err := r.Read(ctx, "cat-file", "--filters", spec)
+	b, err := r.readCmd(ctx, Cmd{Args: []string{"cat-file", "--filters", spec}, Env: noLazyFetch})
 	return s, b, err
 }
 

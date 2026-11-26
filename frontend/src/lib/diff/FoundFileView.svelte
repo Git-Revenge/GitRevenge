@@ -11,6 +11,7 @@
   import Loading from '../ui/Loading.svelte'
   import type { DiffTarget } from './DiffView.svelte'
   import FileView from './FileView.svelte'
+  import NotDownloaded from './NotDownloaded.svelte'
   import { toggleWrap, wrap } from './wrap.svelte'
 
   let {
@@ -28,10 +29,13 @@
 
   let contents = $state<git.FileContents | null>(null)
   let force = $state(false)
+  /** Counts downloads a partial clone finished for this view (#1003), so it loads again. */
+  let downloaded = $state(0)
 
   $effect(() => {
     const t = target
     const f = force
+    void downloaded
     contents = null
     // A commit's version of the file, or the working tree's (the unstaged side's new one).
     void session.run(() => FileContents(path, t.commit ? 'commit' : 'unstaged', t.commit ?? '', t.file, '', f)).then((c) => {
@@ -78,6 +82,10 @@
   <div class="body code-ground">
     {#if !contents}
       <Loading />
+    {:else if contents.kind === 'missing'}
+      {#key (contents.missing ?? []).join()}
+        <NotDownloaded {path} ids={contents.missing ?? []} onDone={() => (downloaded += 1)} />
+      {/key}
     {:else if contents.kind === 'large'}
       <div class="notice">
         <p>This file is large ({(contents.new.size / (1 << 20)).toFixed(1)} MB). Showing it may be slow.</p>

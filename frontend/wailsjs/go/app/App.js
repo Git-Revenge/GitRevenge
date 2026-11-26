@@ -42,6 +42,14 @@ export function Blame(arg1, arg2, arg3) {
   return window['go']['app']['App']['Blame'](arg1, arg2, arg3);
 }
 
+export function BlameDownloading(arg1, arg2, arg3) {
+  return window['go']['app']['App']['BlameDownloading'](arg1, arg2, arg3);
+}
+
+export function BlameNeeds(arg1, arg2, arg3) {
+  return window['go']['app']['App']['BlameNeeds'](arg1, arg2, arg3);
+}
+
 export function BranchAction(arg1, arg2, arg3) {
   return window['go']['app']['App']['BranchAction'](arg1, arg2, arg3);
 }
@@ -72,6 +80,10 @@ export function BuiltWith() {
 
 export function CancelClone() {
   return window['go']['app']['App']['CancelClone']();
+}
+
+export function CancelDownload(arg1) {
+  return window['go']['app']['App']['CancelDownload'](arg1);
 }
 
 export function CancelNetwork(arg1) {
@@ -180,6 +192,10 @@ export function DeleteStack(arg1, arg2, arg3, arg4) {
 
 export function DiscardFiles(arg1, arg2) {
   return window['go']['app']['App']['DiscardFiles'](arg1, arg2);
+}
+
+export function DownloadFiles(arg1, arg2, arg3) {
+  return window['go']['app']['App']['DownloadFiles'](arg1, arg2, arg3);
 }
 
 export function EffectiveGitConfig(arg1) {

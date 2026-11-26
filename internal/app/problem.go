@@ -138,7 +138,7 @@ func lastWord(output string) string {
 }
 
 // opNames are the operations a Problem's title can start with.
-var opNames = map[string]string{"fetch": "Fetch", "pull": "Pull", "push": "Push", "clone": "Clone"}
+var opNames = map[string]string{"fetch": "Fetch", "pull": "Pull", "push": "Push", "clone": "Clone", "download": "Download"}
 
 // titled puts the operation in front of why it failed: "Fetch failed: couldn't reach
 // github.com". Without a known operation the reason stands alone, capitalised unless it

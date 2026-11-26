@@ -92,7 +92,7 @@ func TestNamesThatAreOptionsNeverReachGit(t *testing.T) {
 		"ForecastRebase": func() error { _, err := repo.ForecastRebase(ctx, "main", n); return err },
 		"ForecastPlan":   func() error { _, err := repo.ForecastPlan(ctx, n, nil); return err },
 		"ResetKeep":      func() error { return repo.ResetKeep(ctx, n) },
-		"Blame rev":      func() error { _, err := repo.Blame(ctx, "a.txt", n); return err },
+		"Blame rev":      func() error { _, err := repo.Blame(ctx, "a.txt", n, false); return err },
 		"RebasePlan":     func() error { _, err := repo.RebasePlan(ctx, n); return err },
 		"Log revs": func() error {
 			return repo.Log(ctx, LogOptions{Revs: []string{n}}, func(LogCommit) error { return nil })

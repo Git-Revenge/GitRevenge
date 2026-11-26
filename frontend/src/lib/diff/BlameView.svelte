@@ -1,7 +1,9 @@
 <script lang="ts">
   import Icon from '../ui/Icon.svelte'
-  import { Blame } from '../../../wailsjs/go/app/App.js'
+  import { Blame, BlameDownloading, BlameNeeds, CancelDownload, DownloadFiles } from '../../../wailsjs/go/app/App.js'
   import type { git } from '../../../wailsjs/go/models'
+  import { errorText } from '../errors'
+  import Busy from '../ui/Busy.svelte'
   import { formatTime, laneVar } from '../graph/draw'
   import { formatShortcut, provideCommands } from '../commands.svelte'
   import { session } from '../session.svelte'
@@ -41,18 +43,66 @@
     return m
   })
 
+  // In a partial clone, blame reads versions that were never downloaded: it asks first, and
+  // they come in one download (#1003). Git would fetch them one at a time.
+  let ask = $state<{ versions: number; missing: string[] } | null>(null)
+  let downloading = $state(false)
+  let failed = $state('')
+  let token = ''
+
+  async function show(f: string, res: git.BlameLine[] | undefined) {
+    lines = res ?? []
+    const text = lines.map((l) => l.line).join('\n')
+    tokens = highlightLines(text, null)
+    const lang = await languageFor(f)
+    if (lang && f === file) tokens = highlightLines(text, lang)
+  }
+
   $effect(() => {
     const [f, r] = [file, rev]
     lines = null
-    void session.run(() => Blame(path, f, r)).then(async (res) => {
+    ask = null
+    failed = ''
+    void (async () => {
+      const needs = await session.run(() => BlameNeeds(path, f, r))
       if (f !== file || r !== rev) return
-      lines = res ?? []
-      const text = lines.map((l) => l.line).join('\n')
-      tokens = highlightLines(text, null)
-      const lang = await languageFor(f)
-      if (lang && f === file) tokens = highlightLines(text, lang)
-    })
+      if (needs?.missing.length) {
+        ask = { versions: needs.versions, missing: needs.missing }
+        return
+      }
+      const res = await session.run(() => Blame(path, f, r))
+      if (f === file && r === rev) await show(f, res)
+    })()
   })
+
+  async function downloadAndBlame() {
+    if (!ask) return
+    const [f, r, want] = [file, rev, ask.missing]
+    const mine = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    token = mine
+    downloading = true
+    failed = ''
+    try {
+      await DownloadFiles(path, mine, want)
+      // Anything blame still finds missing, such as a version from before a rename, it may
+      // fetch now: the person said to download.
+      const res = await BlameDownloading(path, f, r)
+      if (f !== file || r !== rev) return
+      ask = null
+      await show(f, res)
+    } catch (err) {
+      if (token === mine) failed = errorText(err)
+    } finally {
+      if (token === mine) downloading = false
+    }
+  }
+
+  function stop() {
+    void CancelDownload(token)
+  }
+
+  /** How many of the file's versions are missing, in words. */
+  let missingText = $derived(!ask ? '' : ask.missing.length >= ask.versions ? `any of its ${ask.versions.toLocaleString()} versions` : `${ask.missing.length.toLocaleString()} of its ${ask.versions.toLocaleString()} versions`)
 
   provideCommands(() => [wrapCommand()])
 
@@ -75,7 +125,22 @@
     <button class="btn quiet" onclick={() => onOpen({ mode: 'history', file })}>History</button>
   </header>
   <div class="body code-ground">
-    {#if !lines}
+    {#if ask}
+      <div class="ask" role="group" aria-label="Blame {file}?">
+        <h2>Blame <span class="mono">{file}</span>?</h2>
+        <p>Blame reads every version of the file, and this partial clone hasn’t got {missingText} yet. They come from the remote in one download first.</p>
+        {#if failed}<p class="failed" role="alert">The download failed: {failed}</p>{/if}
+        <div class="actions">
+          {#if downloading}
+            <span class="busy" role="status"><Busy /> Downloading {ask.missing.length.toLocaleString()} versions…</span>
+            <button class="btn secondary" onclick={stop}>Stop</button>
+          {:else}
+            <button class="btn secondary" onclick={onClose}>Not now</button>
+            <button class="btn primary" onclick={downloadAndBlame}>Download and blame</button>
+          {/if}
+        </div>
+      </div>
+    {:else if !lines}
       <Loading />
     {:else}
       <table class:wrap={wrap.on}>
@@ -124,6 +189,52 @@
     flex: 1;
     min-height: 0;
     overflow: auto;
+  }
+
+  .ask {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 560px;
+    margin: 32px auto;
+    padding: 18px 20px;
+    border: 1px solid var(--paper-edge);
+    border-radius: 10px;
+    background: var(--paper);
+    color: var(--ink);
+  }
+
+  .ask h2 {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 400;
+  }
+
+  .ask p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+  }
+
+  .ask .failed {
+    color: var(--danger);
+  }
+
+  .ask .actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .ask .busy {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: auto;
+    font-size: 13px;
+    color: var(--ink-mute);
   }
 
   table {
