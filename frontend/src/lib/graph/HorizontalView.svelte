@@ -48,6 +48,7 @@
   } from './horizontal'
   import type { Ref, Row, RowCache } from './rowCache'
   import { placeTicks, rowToY, tickAt, tickSummary, unreadFrom, type MonthMark } from './ruler'
+  import { has, type Run } from './selection'
 
   let {
     path,
@@ -55,6 +56,7 @@
     tick,
     count,
     selected,
+    picks = [],
     headRow,
     remote,
     dimmed,
@@ -62,6 +64,8 @@
     wip,
     folds,
     onSelect,
+    onEscape,
+    onSelectionMenu,
     onContext,
     onDrop,
   }: {
@@ -73,6 +77,8 @@
     /** How many commits the history has, or about how many while it's still being read. */
     count: number
     selected: number
+    /** Several commits selected (#1018), as runs of rows; none while one is. */
+    picks?: Run[]
     /** The checked-out commit's row, or -1. Asked for afresh at each tick, as the cache is. */
     headRow: () => number
     /** The main remote, whose prefix labels leave off. */
@@ -94,7 +100,13 @@
       step: (i: number, by: number) => number
       toggle: (i: number) => void
     }
-    onSelect: (i: number) => void
+    /** A commit chosen: alone, or with Ctrl or Shift held to select several, or by Shift and an
+     * arrow (`extend`), which grows or shrinks the selection from the last one clicked. */
+    onSelect: (i: number, how?: { ctrl: boolean; shift: boolean; extend?: boolean }) => void
+    /** Escape with several selected: back to one. */
+    onEscape?: () => void
+    /** Right-click on a column of a selection of several. */
+    onSelectionMenu?: (x: number, y: number) => void
     onContext?: (row: Row, refs: Ref[], x: number, y: number) => void
     /** One commit's column dragged onto another's. */
     onDrop?: (source: Row, sourceRefs: Ref[], target: Row, targetRefs: Ref[], x: number, y: number) => void
@@ -332,7 +344,17 @@
     const step = (by: number) => (folds ? folds.step(at, by) : at + by)
     // Right is older, as Down is in the timeline.
     const moves: Record<string, () => number> = { ArrowRight: () => step(1), ArrowLeft: () => step(-1), PageDown: () => step(page), PageUp: () => step(-page), Home: () => 0, End: () => count - 1 }
+    if (e.key === 'Escape' && picks.length && onEscape) {
+      e.preventDefault()
+      e.stopPropagation()
+      return onEscape()
+    }
     if (!(e.key in moves) || !count) return
+    // Shift with an arrow or a page grows or shrinks a selection, as in the timeline.
+    if (e.shiftKey && e.key !== 'Home' && e.key !== 'End' && selected >= 0 && !wip?.active) {
+      e.preventDefault()
+      return onSelect(Math.min(count - 1, Math.max(0, moves[e.key]())), { ctrl: false, shift: true, extend: true })
+    }
     e.preventDefault()
     // Left of the newest commit is the working tree; from there, Right comes back.
     if (wip && e.key === 'ArrowLeft' && selected <= 0 && !wip.active) {
@@ -482,6 +504,7 @@
       bind:clientHeight={height}
       tabindex="0"
       role="listbox"
+      aria-multiselectable="true"
       aria-orientation="horizontal"
       aria-label="Commit history, newest first"
       aria-activedescendant={wip?.active ? `${id}-wip` : cols.some((c) => c.i === selected) ? `${id}-${selected}` : undefined}
@@ -497,7 +520,7 @@
         if (i === 'wip') wip?.open()
         // A fold's own column opens it; any other is a commit to choose.
         else if (i >= 0 && folds?.hidden(i)) folds.toggle(i)
-        else if (i >= 0) onSelect(i)
+        else if (i >= 0) onSelect(i, e.ctrlKey || e.metaKey || e.shiftKey ? { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey } : undefined)
       }}
       oncontextmenu={(e) => {
         const i = columnAt(e)
@@ -505,6 +528,7 @@
         const row = i >= 0 ? cache.get(i) : undefined
         if (!row || !onContext) return
         e.preventDefault()
+        if (picks.length && has(picks, i) && onSelectionMenu) return onSelectionMenu(e.clientX, e.clientY)
         onSelect(i)
         onContext(row, cache.refsFor(row.id), e.clientX, e.clientY)
       }}
@@ -536,6 +560,7 @@
           <div
             class="col"
             class:selected={c.i === selected}
+            class:picked={c.i !== selected && picks.length > 0 && has(picks, c.i)}
             class:dimmed={c.i !== selected && dimmed?.(c.i)}
             class:waiting={!c.row}
             class:fold={folded}
@@ -543,7 +568,7 @@
             class:drop={c.i === dropOn}
             id="{id}-{c.i}"
             role="option"
-            aria-selected={c.i === selected}
+            aria-selected={c.i === selected || (picks.length > 0 && has(picks, c.i))}
             aria-label={folded && c.fold ? `${c.fold.label}, folded. Click to show them.` : c.row ? `${c.row.subject}, ${c.row.author}, ${formatTime(c.row.authorTime)}${names.length ? `, ${names.map((l) => l.text).join(', ')}` : ''}` : 'Loading'}
             title={folded && c.fold ? `${c.fold.label}. Click to show them.` : undefined}
             style:left="{c.x}px"
@@ -905,6 +930,11 @@
   /* Lit from the top, thinning down the column: the same idea as the timeline's row. */
   .col.selected {
     background: linear-gradient(to bottom, var(--selected) 0, var(--selected) 38%, color-mix(in srgb, var(--selected) 34%, transparent) 100%);
+  }
+
+  /* One of several selected, not the one last clicked: the same wash, fainter. */
+  .col.picked {
+    background: linear-gradient(to bottom, color-mix(in srgb, var(--selected) 55%, transparent) 0, color-mix(in srgb, var(--selected) 55%, transparent) 38%, color-mix(in srgb, var(--selected) 19%, transparent) 100%);
   }
 
   .col.selected::before {

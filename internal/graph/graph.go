@@ -445,6 +445,40 @@ func (g *Graph) RowOf(id string) (int, bool) {
 	return int(r), ok
 }
 
+// Commit is a row's commit without its lanes: what a list of commits needs.
+type Commit struct {
+	Index      int    `json:"index"`
+	ID         string `json:"id"`
+	Parents    int    `json:"parents"`
+	Author     string `json:"author"`
+	AuthorTime int64  `json:"authorTime"`
+	Subject    string `json:"subject"`
+}
+
+// Commits returns the commits of up to count rows starting at start. Without the lanes it
+// costs next to nothing a row, so a selection of 100,000 rows can be read in one go.
+func (g *Graph) Commits(start, count int) []Commit {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	start = max(start, 0)
+	end := min(start+count, len(g.ids))
+	if start >= end {
+		return []Commit{}
+	}
+	out := make([]Commit, 0, end-start)
+	for i := start; i < end; i++ {
+		out = append(out, Commit{
+			Index:      i,
+			ID:         hex.EncodeToString(g.ids[i][:g.hashLen]),
+			Parents:    int(g.parentStart[i+1] - g.parentStart[i]),
+			Author:     g.authors[g.authorIdx[i]].name,
+			AuthorTime: g.times[i],
+			Subject:    g.subjects[i],
+		})
+	}
+	return out
+}
+
 // Rows returns up to count rows starting at start, with full edge data: every line of every
 // row is a Seg in Up or Down.
 func (g *Graph) Rows(start, count int) []Row { return g.rows(start, count, false) }

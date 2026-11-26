@@ -19,6 +19,9 @@
   import { whileBusy } from './busy'
   import { commitMenuItems, branchAtDialog, checkoutRef, dropItems, newBranchDialog, refItems, stackItems, type MenuContext } from './menus'
   import CommitPanel from './CommitPanel.svelte'
+  import SelectionPanel from './SelectionPanel.svelte'
+  import { selectionMenu } from './selectionMenu'
+  import type { Selected } from './graph/selection'
   import type { DiffTarget } from './diff/DiffView.svelte'
   import Lazy from './ui/Lazy.svelte'
   import { findAsk } from './find/findAsk.svelte'
@@ -76,6 +79,8 @@
   /** Where the graph puts its header tools: in the bar, beside the repository's actions. */
   let toolsHost = $state<HTMLElement>()
   let selected = $state<Row | undefined>()
+  /** Several commits selected in the graph (#1018), or null while one is. */
+  let several = $state<Selected | null>(null)
   /** Which panel is on the right: uncommitted changes, or the selected commit. */
   let view = $state<'wip' | 'commit'>('commit')
   /** Files with uncommitted changes; null until the first answer, so nothing claims "clean". */
@@ -521,7 +526,7 @@
       <ShallowBand {path} since={shallowSince} />
     {/snippet}
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} tail={shallowSince ? shallowTail : undefined} historySince={shallowSince} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filterOn} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFindInFiles={(text) => findAsk.show(path, text)} onHistorySearch={(text) => setHistory(historyOptions(text))} history={historyOn} onFilterDrop={dropLastFilter} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} tail={shallowSince ? shallowTail : undefined} historySince={shallowSince} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filterOn} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFindInFiles={(text) => findAsk.show(path, text)} onHistorySearch={(text) => setHistory(historyOptions(text))} history={historyOn} onFilterDrop={dropLastFilter} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onSelection={(s) => (several = s)} onSelectionMenu={(x, y) => openMenu(selectionMenu(several?.count ?? 0, several?.info ?? null, ctx), x, y)} onContext={(row, refs, x, y) =>
           void whileBusy(loadRefExtras(path, refs)).then((e) => openMenu(commitMenuItems(row, refs, ctx, e), x, y))}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
@@ -623,6 +628,8 @@
       onFixBranch={fixBranch}
       onRevert={revertFound}
     />
+  {:else if several}
+    <SelectionPanel {path} selected={several} {ctx} onUnpick={(row) => graph.unpick(row)} onShow={(row) => graph.reveal(row)} openFile={(t) => (diff = t)} />
   {:else if selected}
     <CommitPanel {path} onMenu={openMenu} showNotes={noteAsk} {filterSig} {pinnedKeys} onPin={setPin} history={historyOn} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} onAuthor={(sha, name, from) => {
         const at = from.getBoundingClientRect()

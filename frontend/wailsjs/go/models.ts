@@ -2482,6 +2482,118 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class Selection {
+	    ids: string[];
+	    commits: graph.Commit[];
+	    authors: number;
+	    author?: string;
+	    first: number;
+	    last: number;
+	    merges: number;
+	    head: boolean;
+	    stale: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Selection(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ids = source["ids"];
+	        this.commits = this.convertValues(source["commits"], graph.Commit);
+	        this.authors = source["authors"];
+	        this.author = source["author"];
+	        this.first = source["first"];
+	        this.last = source["last"];
+	        this.merges = source["merges"];
+	        this.head = source["head"];
+	        this.stale = source["stale"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SelectionFile {
+	    path: string;
+	    commits: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SelectionFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.commits = source["commits"];
+	    }
+	}
+	export class SelectionFiles {
+	    files: SelectionFile[];
+	    total: number;
+	    read: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SelectionFiles(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.files = this.convertValues(source["files"], SelectionFile);
+	        this.total = source["total"];
+	        this.read = source["read"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SelectionPick {
+	    lo: number;
+	    hi: number;
+	    loId: string;
+	    hiId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SelectionPick(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.lo = source["lo"];
+	        this.hi = source["hi"];
+	        this.loId = source["loId"];
+	        this.hiId = source["hiId"];
+	    }
+	}
 	export class SessionState {
 	    tabs: RepoTab[];
 	    active: string;
@@ -4893,6 +5005,28 @@ export namespace gitconfig {
 
 export namespace graph {
 	
+	export class Commit {
+	    index: number;
+	    id: string;
+	    parents: number;
+	    author: string;
+	    authorTime: number;
+	    subject: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Commit(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.index = source["index"];
+	        this.id = source["id"];
+	        this.parents = source["parents"];
+	        this.author = source["author"];
+	        this.authorTime = source["authorTime"];
+	        this.subject = source["subject"];
+	    }
+	}
 	export class MonthMark {
 	    row: number;
 	    time: number;

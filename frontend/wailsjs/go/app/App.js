@@ -174,6 +174,10 @@ export function CommitRow(arg1, arg2) {
   return window['go']['app']['App']['CommitRow'](arg1, arg2);
 }
 
+export function CommitRows(arg1, arg2) {
+  return window['go']['app']['App']['CommitRows'](arg1, arg2);
+}
+
 export function CommitSignatures(arg1, arg2) {
   return window['go']['app']['App']['CommitSignatures'](arg1, arg2);
 }
@@ -792,6 +796,14 @@ export function SaveMailmap(arg1, arg2, arg3, arg4) {
 
 export function SearchGraph(arg1, arg2) {
   return window['go']['app']['App']['SearchGraph'](arg1, arg2);
+}
+
+export function SelectedCommits(arg1, arg2) {
+  return window['go']['app']['App']['SelectedCommits'](arg1, arg2);
+}
+
+export function SelectionFiles(arg1, arg2) {
+  return window['go']['app']['App']['SelectionFiles'](arg1, arg2);
 }
 
 export function SetActiveRepo(arg1) {

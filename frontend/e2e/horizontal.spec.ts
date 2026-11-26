@@ -390,3 +390,44 @@ test.describe('experimental views in settings', () => {
     await expect.poll(async () => ((await calls(page, 'SetPreferences'))[0]?.[0] as { experimentalViews: string[] } | undefined)?.experimentalViews).toEqual([])
   })
 })
+
+test.describe('several commits in the Horizontal view', () => {
+  // #1018: the same clicks and keys as the timeline.
+  const id = (i: number) => String(i).padStart(40, '0')
+  const rows = Array.from({ length: 20 }, (_, i) => ({
+    index: i,
+    col: 0,
+    color: 0,
+    up: i ? [{ from: 0, to: 0, color: 0 }] : [],
+    down: [{ from: 0, to: 0, color: 0 }],
+    width: 1,
+    id: id(i),
+    parents: 1,
+    author: 'A',
+    authorTime: 1793500000 - i * 3600,
+    subject: `Commit number ${i}`,
+  }))
+  const scenario = { graphData: rows, responses: { CommitSignatures: [], Refs: [], RepoPreferences: { hideKinds: [] }, GraphViews: { view: 'horizontal', experimental: ['horizontal'] } } }
+  const commit = (page: Page, i: number) => page.getByRole('option', { name: new RegExp(`^Commit number ${i},`) })
+  const selected = async (page: Page) => {
+    const out: number[] = []
+    for (let i = 0; i < 8; i++) if ((await commit(page, i).getAttribute('aria-selected')) === 'true') out.push(i)
+    return out
+  }
+  const count = async (page: Page) => (await events(page, 'selection')).at(-1)?.[0]
+
+  test('Ctrl and Shift select several, Shift and an arrow grow it, Escape goes back to one', async ({ page }) => {
+    await open(page, 'graph', scenario)
+    await commit(page, 1).click()
+    await commit(page, 3).click({ modifiers: ['ControlOrMeta'] })
+    await expect.poll(() => selected(page)).toEqual([1, 3])
+    await expect.poll(() => count(page)).toBe(2)
+    await commit(page, 5).click({ modifiers: ['Shift'] })
+    await expect.poll(() => selected(page)).toEqual([3, 4, 5])
+    await page.keyboard.press('Shift+ArrowRight')
+    await expect.poll(() => selected(page)).toEqual([3, 4, 5, 6])
+    await page.keyboard.press('Escape')
+    await expect.poll(() => selected(page)).toEqual([6])
+    await expect.poll(() => count(page)).toBe(0)
+  })
+})
