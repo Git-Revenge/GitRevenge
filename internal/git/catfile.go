@@ -121,7 +121,9 @@ func (o *ObjectReader) requestLocked(command, rev string, read func(*bufio.Reade
 
 func (o *ObjectReader) startLocked() error {
 	ctx, cancel := context.WithCancel(context.Background())
-	cmd := o.runner.command(ctx, Cmd{Dir: o.dir, Args: []string{"cat-file", "--batch-command"}, ReadOnly: true})
+	// It reads commits, which every clone has: never a download, which in a partial clone
+	// would hold up every read queued behind it.
+	cmd := o.runner.command(ctx, Cmd{Dir: o.dir, Args: []string{"cat-file", "--batch-command"}, ReadOnly: true, Env: noLazyFetch})
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		cancel()

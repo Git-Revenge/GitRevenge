@@ -29,6 +29,10 @@ export function Bisect(arg1:string):Promise<app.BisectInfo>;
 
 export function Blame(arg1:string,arg2:string,arg3:string):Promise<Array<git.BlameLine>>;
 
+export function BlameDownloading(arg1:string,arg2:string,arg3:string):Promise<Array<git.BlameLine>>;
+
+export function BlameNeeds(arg1:string,arg2:string,arg3:string):Promise<app.BlameNeeds>;
+
 export function BranchAction(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
 export function BranchCaseTwin(arg1:string,arg2:string,arg3:string):Promise<string>;
@@ -44,6 +48,8 @@ export function BranchWebLinks(arg1:string,arg2:string,arg3:string):Promise<app.
 export function BuiltWith():Promise<app.BuiltWith>;
 
 export function CancelClone():Promise<void>;
+
+export function CancelDownload(arg1:string):Promise<void>;
 
 export function CancelNetwork(arg1:string):Promise<void>;
 
@@ -96,6 +102,8 @@ export function DeleteMergedBranches(arg1:string,arg2:Array<string>):Promise<Arr
 export function DeleteStack(arg1:string,arg2:string,arg3:Array<string>,arg4:boolean):Promise<Array<string>>;
 
 export function DiscardFiles(arg1:string,arg2:Array<string>):Promise<void>;
+
+export function DownloadFiles(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
 export function EffectiveGitConfig(arg1:string):Promise<Array<git.ConfigEntry>>;
 

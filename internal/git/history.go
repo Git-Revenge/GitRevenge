@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"io"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -86,8 +88,10 @@ type BlameLine struct {
 }
 
 // Blame attributes each line of path (at rev, or the work tree when rev is "") to the
-// commit that last changed it.
-func (r *Repo) Blame(ctx context.Context, path, rev string) ([]BlameLine, error) {
+// commit that last changed it. Blame reads every version of the file: in a partial clone,
+// only mayDownload lets git fetch the ones never downloaded, one at a time (#1003);
+// otherwise it stops at the first and says which (a NotDownloadedError).
+func (r *Repo) Blame(ctx context.Context, path, rev string, mayDownload bool) ([]BlameLine, error) {
 	if err := CheckRevs(rev); err != nil {
 		return nil, err
 	}
@@ -96,14 +100,27 @@ func (r *Repo) Blame(ctx context.Context, path, rev string) ([]BlameLine, error)
 		args = append(args, rev)
 	}
 	args = append(args, "--", path)
+	c := Cmd{Args: args}
+	if !mayDownload {
+		c.Env = noLazyFetch
+	}
 	var lines []BlameLine
-	err := r.streamCmd(ctx, Cmd{Args: args}, func(rd io.Reader) error {
+	err := r.streamCmd(ctx, c, func(rd io.Reader) error {
 		var err error
 		lines, err = parseBlame(rd)
 		return err
 	})
+	var gerr *Error
+	if errors.As(err, &gerr) {
+		if m := blobNotRead.FindStringSubmatch(gerr.Stderr); m != nil {
+			return nil, &NotDownloadedError{IDs: []string{m[1]}}
+		}
+	}
 	return lines, err
 }
+
+// blobNotRead is how blame says a version wasn't there to read.
+var blobNotRead = regexp.MustCompile(`Cannot read blob ([0-9a-f]{40,64})`)
 
 type blameCommit struct {
 	author  string

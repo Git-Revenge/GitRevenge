@@ -14,7 +14,7 @@ export interface Prompt {
   unexpected?: boolean
 }
 
-const OPS: Record<string, string> = { fetch: 'a fetch', pull: 'a pull', push: 'a push' }
+const OPS: Record<string, string> = { fetch: 'a fetch', pull: 'a pull', push: 'a push', download: 'a download' }
 
 /**
  * Where a prompt came from, in the app's own words: the dialog's text is the server's, so this

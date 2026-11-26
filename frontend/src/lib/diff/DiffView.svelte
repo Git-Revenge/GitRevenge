@@ -28,6 +28,7 @@
   import FileView from './FileView.svelte'
   import ImageDiff from './ImageDiff.svelte'
   import MoveCompare from './MoveCompare.svelte'
+  import NotDownloaded from './NotDownloaded.svelte'
   import { previewerFor } from './previews/registry'
   import SplitDiff from './SplitDiff.svelte'
   import UnifiedDiff, { type Actions } from './UnifiedDiff.svelte'
@@ -113,6 +114,8 @@
   let contents = $derived(loaded?.contents ?? null)
   let diff = $derived(loaded?.diff ?? null)
   let force = $state(false)
+  /** Counts downloads a partial clone finished for this view (#1003), so it loads again. */
+  let downloaded = $state(0)
 
   // Code or lines, and whether formatting hides, start as Settings says; the switches here
   // change this view only.
@@ -159,6 +162,7 @@
   $effect(() => {
     void target
     void force
+    void downloaded
     void readAs
     void anyway
     void prefs.diffAlgorithm
@@ -397,6 +401,10 @@
   <div class="body code-ground" class:fill={layout === 'split' && contents?.kind === 'text'}>
     {#if !contents}
       <Loading />
+    {:else if contents.kind === 'missing'}
+      {#key (contents.missing ?? []).join()}
+        <NotDownloaded {path} ids={contents.missing ?? []} onDone={() => (downloaded += 1)} />
+      {/key}
     {:else if contents.kind === 'large' && previewer?.binary && previewer.large && contents.new.exists}
       {#key target.file + (target.commit ?? '') + target.mode}
         <previewer.component path={target.file} text="" {loadImage} openFile={openRelated} {loadData} />

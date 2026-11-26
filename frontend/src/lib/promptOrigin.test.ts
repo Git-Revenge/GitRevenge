@@ -8,6 +8,8 @@ describe('askedDuring', () => {
     expect(askedDuring(prompt({ op: 'fetch', repo: 'tidewater' }))).toBe('Asked during a fetch in tidewater.')
     expect(askedDuring(prompt({ op: 'push', repo: 'tidewater' }))).toBe('Asked during a push in tidewater.')
     expect(askedDuring(prompt({ op: 'clone', repo: 'tidewater' }))).toBe('Asked while cloning into tidewater.')
+    // A partial clone downloading files it hasn't got (#1003).
+    expect(askedDuring(prompt({ op: 'download', repo: 'linux' }))).toBe('Asked during a download in linux.')
   })
 
   it('says nothing it does not know', () => {

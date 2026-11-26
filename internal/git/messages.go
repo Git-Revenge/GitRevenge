@@ -242,7 +242,8 @@ func (r *Repo) commitIDsByList(ctx context.Context, ids []string) (map[string]st
 }
 
 // MissingObjects returns which of ids the repository no longer has, such as commits a
-// garbage collection removed after their branch was deleted.
+// garbage collection removed after their branch was deleted, or in a partial clone the file
+// contents never downloaded. It never downloads them to find out.
 func (r *Repo) MissingObjects(ctx context.Context, ids []string) ([]string, error) {
 	if len(ids) == 0 {
 		return nil, nil
@@ -252,7 +253,7 @@ func (r *Repo) MissingObjects(ctx context.Context, ids []string) ([]string, erro
 			return nil, errors.New("not an object id: " + strconv.Quote(id))
 		}
 	}
-	out, err := r.readCmd(ctx, Cmd{Args: []string{"cat-file", "--batch-check=%(objectname) %(objecttype)"}, Stdin: strings.NewReader(strings.Join(ids, "\n") + "\n")})
+	out, err := r.readCmd(ctx, Cmd{Args: []string{"cat-file", "--batch-check=%(objectname) %(objecttype)"}, Env: noLazyFetch, Stdin: strings.NewReader(strings.Join(ids, "\n") + "\n")})
 	if err != nil {
 		return nil, err
 	}

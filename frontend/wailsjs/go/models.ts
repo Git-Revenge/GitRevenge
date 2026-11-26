@@ -525,6 +525,22 @@ export namespace app {
 	        this.problem = source["problem"];
 	    }
 	}
+	export class BlameNeeds {
+	    partial: boolean;
+	    versions: number;
+	    missing: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new BlameNeeds(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.partial = source["partial"];
+	        this.versions = source["versions"];
+	        this.missing = source["missing"];
+	    }
+	}
 	export class BranchLoss {
 	    branch: string;
 	    upstream: string;
@@ -3615,6 +3631,7 @@ export namespace git {
 	    new: Side;
 	    kind: string;
 	    mime?: string;
+	    missing?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new FileContents(source);
@@ -3627,6 +3644,7 @@ export namespace git {
 	        this.new = this.convertValues(source["new"], Side);
 	        this.kind = source["kind"];
 	        this.mime = source["mime"];
+	        this.missing = source["missing"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

@@ -47,7 +47,7 @@ func TestBlame(t *testing.T) {
 	second := fx.CommitFile("f.go", "package main\n\nfunc a() {}\nfunc b() {}\n", "add b")
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
 
-	lines, err := repo.Blame(context.Background(), "f.go", "")
+	lines, err := repo.Blame(context.Background(), "f.go", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,12 +63,12 @@ func TestBlame(t *testing.T) {
 
 	// Uncommitted edits are attributed to the work tree.
 	fx.WriteFile("f.go", "package main\n\nfunc a() {}\nfunc b() {}\nfunc c() {}\n")
-	lines, _ = repo.Blame(context.Background(), "f.go", "")
+	lines, _ = repo.Blame(context.Background(), "f.go", "", false)
 	if last := lines[len(lines)-1]; !strings.HasPrefix(last.Commit, "0000000") {
 		t.Fatalf("uncommitted line = %+v", last)
 	}
 	// At a revision.
-	lines, _ = repo.Blame(context.Background(), "f.go", first)
+	lines, _ = repo.Blame(context.Background(), "f.go", first, false)
 	if len(lines) != 3 {
 		t.Fatalf("blame at first commit = %d lines", len(lines))
 	}
