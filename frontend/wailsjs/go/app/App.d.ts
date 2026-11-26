@@ -65,7 +65,9 @@ export function ChooseFile(arg1:string):Promise<string>;
 
 export function ChooseFolder(arg1:string):Promise<string>;
 
-export function Clone(arg1:string,arg2:string,arg3:string):Promise<string>;
+export function Clone(arg1:string,arg2:string,arg3:string,arg4:git.CloneOptions):Promise<string>;
+
+export function CloneBranches(arg1:string,arg2:string,arg3:string):Promise<git.RemoteHeads>;
 
 export function CloneName(arg1:string):Promise<string>;
 

@@ -30,13 +30,25 @@ func (a *App) HomeDir() string {
 	return home
 }
 
-// Clone clones url into parent/name and returns the new repository's path. Progress is
-// reported as "net:progress" events with op "clone"; CancelClone stops it. A folder the
-// clone created, or files it left in an empty one, are removed if it fails.
-func (a *App) Clone(url, parent, name string) (string, error) {
+// cloneBranchesKey registers a listing of a server's branches for the clone dialog, apart
+// from the clone itself.
+const cloneBranchesKey = "\x00clone-branches"
+
+// Clone clones url into parent/name with the options chosen, and returns the new
+// repository's path. Progress is reported as "net:progress" events with op "clone";
+// CancelClone stops it. A folder the clone created, or files it left in an empty one, are
+// removed if it fails.
+func (a *App) Clone(url, parent, name string, opts git.CloneOptions) (string, error) {
 	url, name = strings.TrimSpace(url), strings.TrimSpace(name)
+	opts.Branch = strings.TrimSpace(opts.Branch)
 	if url == "" {
 		return "", userError("Enter the URL of the repository to clone.")
+	}
+	if opts.Depth < 0 {
+		return "", userError("The number of commits to clone has to be 1 or more.")
+	}
+	if git.CheckRevs(opts.Branch) != nil {
+		return "", userError("“" + opts.Branch + "” can't be a branch name.")
 	}
 	dir, err := newRepoDir(parent, name)
 	if err != nil {
@@ -52,7 +64,7 @@ func (a *App) Clone(url, parent, name string) (string, error) {
 	}
 	hosts := func() []string { return []string{git.RemoteHost(url)} }
 	err = a.track(cloneKey, dir, "clone", hosts, "A clone is already running.", func(ctx context.Context, o git.NetOptions) error {
-		return git.Clone(ctx, runner, url, dir, o)
+		return git.Clone(ctx, runner, url, dir, opts, o)
 	})
 	if err != nil {
 		removeClone(dir, existed)
@@ -67,6 +79,42 @@ func (a *App) Clone(url, parent, name string) (string, error) {
 func (a *App) CancelClone() {
 	a.cancelNetwork(cloneKey)
 }
+
+// CloneBranches asks the server at url which branches it has, for the clone dialog's "Only
+// one branch", as the clone itself would ask it: so it can prompt for a password the same
+// way, and the clone after it won't. parent and name are where the clone would go, which a
+// prompt names. A listing still running is stopped.
+func (a *App) CloneBranches(url, parent, name string) (git.RemoteHeads, error) {
+	url = strings.TrimSpace(url)
+	if url == "" {
+		return git.RemoteHeads{}, userError("Enter the URL of the repository to clone.")
+	}
+	runner, err := a.runner()
+	if err != nil {
+		return git.RemoteHeads{}, err
+	}
+	a.cancelNetwork(cloneBranchesKey)
+	dir := filepath.Join(parent, strings.TrimSpace(name))
+	hosts := func() []string { return []string{git.RemoteHost(url)} }
+	var heads git.RemoteHeads
+	err = a.track(cloneBranchesKey, dir, "clone", hosts, "The branches are already being listed.", func(ctx context.Context, o git.NetOptions) error {
+		// Nothing shows progress for a listing, and a server that doesn't answer mustn't hold
+		// the dialog.
+		o.OnProgress = nil
+		ctx, cancel := context.WithTimeout(ctx, cloneBranchesWait)
+		defer cancel()
+		var err error
+		heads, err = git.LsRemoteHeads(ctx, runner, url, o)
+		return err
+	})
+	if err != nil {
+		return git.RemoteHeads{}, err
+	}
+	return heads, nil
+}
+
+// cloneBranchesWait is how long a listing of a server's branches waits for it.
+const cloneBranchesWait = 30 * time.Second
 
 // Init creates an empty repository in dir (creating the folder if needed) and returns its
 // path. branch names the initial branch; empty uses the user's init.defaultBranch.

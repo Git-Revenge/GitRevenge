@@ -3381,6 +3381,26 @@ export namespace git {
 	        this.unmerged = source["unmerged"];
 	    }
 	}
+	export class CloneOptions {
+	    depth: number;
+	    since: number;
+	    partial: boolean;
+	    branch: string;
+	    submodules: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new CloneOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.depth = source["depth"];
+	        this.since = source["since"];
+	        this.partial = source["partial"];
+	        this.branch = source["branch"];
+	        this.submodules = source["submodules"];
+	    }
+	}
 	export class Trailer {
 	    key: string;
 	    value: string;
@@ -4376,6 +4396,20 @@ export namespace git {
 		    }
 		    return a;
 		}
+	}
+	export class RemoteHeads {
+	    branches: string[];
+	    default: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RemoteHeads(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.branches = source["branches"];
+	        this.default = source["default"];
+	    }
 	}
 	export class RemoteSettings {
 	    pushDefault: string;
