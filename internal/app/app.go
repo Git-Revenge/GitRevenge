@@ -26,8 +26,11 @@ type App struct {
 	sess     *session.Manager
 	sessErr  error
 
-	net  network
-	undo undoStacks
+	net network
+	// halfCloned holds clones made with only some folders, between the history arriving and
+	// the folders being chosen (#1004).
+	halfCloned halfClones
+	undo       undoStacks
 	// problems holds the last structured error, until the frontend takes it.
 	problems problems
 	// upstreams remembers where branches' upstreams were before fetches prune them, for

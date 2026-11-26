@@ -118,8 +118,20 @@ export function Clone(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['Clone'](arg1, arg2, arg3, arg4);
 }
 
+export function CloneAbandon(arg1) {
+  return window['go']['app']['App']['CloneAbandon'](arg1);
+}
+
 export function CloneBranches(arg1, arg2, arg3) {
   return window['go']['app']['App']['CloneBranches'](arg1, arg2, arg3);
+}
+
+export function CloneCheckout(arg1, arg2) {
+  return window['go']['app']['App']['CloneCheckout'](arg1, arg2);
+}
+
+export function CloneFolders(arg1) {
+  return window['go']['app']['App']['CloneFolders'](arg1);
 }
 
 export function CloneName(arg1) {
