@@ -5,7 +5,7 @@ import { calls, open } from './support'
 // each choice is one of git's own options. The backend is stubbed: these check what reaches it.
 
 const URL = 'https://git.example.com/kernel/linux.git'
-const plain = { depth: 0, since: 0, partial: false, branch: '', submodules: false }
+const plain = { depth: 0, since: 0, partial: false, branch: '', submodules: false, folders: false }
 
 const dialog = (page: Page) => page.getByRole('dialog')
 const summary = (page: Page) => dialog(page).locator('details.options summary')
@@ -46,7 +46,7 @@ test.describe('the clone dialog’s options', () => {
     await expect(dialog(page).getByText(/A shallow clone/)).toBeVisible()
     await expect(dialog(page).getByText(/A partial clone/)).toBeVisible()
     await cloneButton(page).click()
-    expect((await sent(page))[3]).toEqual({ depth: 50, since: 0, partial: true, branch: 'dev', submodules: true })
+    expect((await sent(page))[3]).toEqual({ depth: 50, since: 0, partial: true, branch: 'dev', submodules: true, folders: false })
   })
 
   test('since a day sends the start of that day', async ({ page }) => {
@@ -91,5 +91,75 @@ test.describe('the clone dialog’s options', () => {
     await dialog(page).getByLabel('How many commits').fill('1')
     await expect(summary(page)).toHaveText(/the last commit/)
     await expect(cloneButton(page)).toBeEnabled()
+  })
+})
+
+// Only some folders (#1004): the first step clones without writing a file; the second lists
+// the folders from the tree and writes the ones chosen.
+test.describe('only some folders', () => {
+  const DIR = 'A:\\src\\linux'
+  // The kernel bench's HEAD, as #935's design showed it.
+  const kernel = [
+    { path: '', files: 97310, direct: 18 },
+    { path: 'arch', files: 18949, direct: 2 },
+    { path: 'arch/arm', files: 4634, direct: 0 },
+    { path: 'arch/x86', files: 1401, direct: 0 },
+    { path: 'include', files: 6764, direct: 0 },
+    { path: 'kernel', files: 754, direct: 0 },
+    { path: 'mm', files: 208, direct: 0 },
+  ]
+  const next = (page: Page) => dialog(page).getByRole('button', { name: 'Next: choose folders' })
+  const folder = (page: Page, name: string) => dialog(page).getByRole('checkbox', { name: `${name}/` })
+
+  async function secondStep(page: Page) {
+    await start(page, { responses: { Clone: DIR, CloneFolders: kernel } })
+    await summary(page).click()
+    await dialog(page).getByRole('radio', { name: 'Only the ones I choose, next' }).check()
+    await expect(summary(page)).toHaveText(/some folders/)
+    await next(page).click()
+    await expect(dialog(page).getByRole('heading', { name: 'Which folders do you want?' })).toBeVisible()
+  }
+
+  test('the first step clones without writing, and the second writes what’s chosen', async ({ page }) => {
+    await secondStep(page)
+    expect((await sent(page))[3]).toEqual({ ...plain, folders: true })
+    expect(await calls(page, 'CloneFolders')).toEqual([[DIR]])
+    // The top level's folders; arch opens on its own.
+    await expect(dialog(page).locator('.folders .name')).toHaveText(['arch/', 'include/', 'kernel/', 'mm/'])
+    await dialog(page).getByRole('button', { name: 'Show the folders in arch' }).click()
+    for (const f of ['x86', 'include', 'kernel', 'mm']) await folder(page, f).check()
+    // The design's example: with arch's 2 files and the top level's 18.
+    await expect(dialog(page).getByRole('status').filter({ hasText: 'will be written' })).toContainText('9,147 of 97,310 files')
+    await dialog(page).getByRole('button', { name: 'Check out 4 folders' }).click()
+    await expect.poll(() => calls(page, 'CloneCheckout')).toEqual([[DIR, ['arch/x86', 'include', 'kernel', 'mm']]])
+    await expect.poll(() => calls(page, 'OpenRepo')).toEqual([[DIR]])
+  })
+
+  test('a folder chosen brings those inside it', async ({ page }) => {
+    await secondStep(page)
+    await dialog(page).getByRole('button', { name: 'Show the folders in arch' }).click()
+    await folder(page, 'arch').check()
+    await expect(folder(page, 'x86')).toBeChecked()
+    await expect(folder(page, 'x86')).toBeDisabled()
+    await expect(dialog(page).getByRole('status').filter({ hasText: 'will be written' })).toContainText('18,967 of 97,310 files')
+  })
+
+  test('every folder after all checks out everything', async ({ page }) => {
+    await secondStep(page)
+    await dialog(page).getByRole('button', { name: 'Every folder after all' }).click()
+    await expect.poll(() => calls(page, 'CloneCheckout')).toEqual([[DIR, []]])
+  })
+
+  test('closing the second step takes the clone away', async ({ page }) => {
+    await secondStep(page)
+    await page.keyboard.press('Escape')
+    await expect.poll(() => calls(page, 'CloneAbandon')).toEqual([[DIR]])
+    expect(await calls(page, 'CloneCheckout')).toEqual([])
+  })
+
+  test('the filter finds a folder at any depth', async ({ page }) => {
+    await secondStep(page)
+    await dialog(page).getByLabel('Filter folders').fill('x86')
+    await expect(dialog(page).locator('.folders .name')).toHaveText(['arch/x86/'])
   })
 })

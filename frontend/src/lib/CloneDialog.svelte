@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { CancelClone, ChooseFolder, Clone, CloneBranches, CloneName, HomeDir } from '../../wailsjs/go/app/App.js'
-  import { cloneOptions, cloneSummary, defaultPicks, picksProblem, type ClonePicks } from './clone'
+  import { CancelClone, ChooseFolder, Clone, CloneAbandon, CloneBranches, CloneCheckout, CloneFolders, CloneName, HomeDir } from '../../wailsjs/go/app/App.js'
+  import { cloneOptions, cloneSummary, defaultPicks, picksProblem, type ClonePicks, type Folder } from './clone'
+  import FolderPicker from './FolderPicker.svelte'
   import { onBackend } from './events'
   import { errorText } from './errors'
   import { dayOfSince, lastYear } from './filters/history'
@@ -33,6 +34,14 @@
   let picks = $state<ClonePicks>(defaultPicks(dayOfSince(lastYear())))
   let summary = $derived(cloneSummary(picks))
   let problem = $derived(picksProblem(picks))
+
+  // Only some folders (#1004): the first step brings the history and writes nothing; the
+  // second lists the folders from the tree and writes the ones chosen.
+  let step = $state<'options' | 'folders'>('options')
+  /** The clone waiting for its folders. */
+  let cloned = $state('')
+  let folders = $state<Folder[] | null>(null)
+  let finishing = $state(false)
 
   // The server's branches, for "Only": asked once one branch is wanted, for the URL as it
   // is, as the clone would ask, so a password prompt then comes now rather than later.
@@ -78,6 +87,12 @@
     error = ''
     try {
       const dir = await Clone(url, parent, name, cloneOptions(picks))
+      if (picks.folders === 'some') {
+        cloned = dir
+        step = 'folders'
+        folders = await CloneFolders(dir)
+        return
+      }
       await session.open(dir)
       onClose()
     } catch (err) {
@@ -87,10 +102,30 @@
     }
   }
 
-  /** Cancel stops a running clone (its error then shows here); otherwise it closes. */
+  /** Writes the chosen folders, or every folder when none are named, and opens the clone. */
+  async function checkout(chosen: string[]) {
+    finishing = true
+    error = ''
+    try {
+      await CloneCheckout(cloned, chosen)
+      await session.open(cloned)
+      onClose()
+    } catch (err) {
+      error = errorText(err)
+    } finally {
+      finishing = false
+    }
+  }
+
+  /** Cancel stops a running clone (its error then shows here); otherwise it closes. Closed
+   * before the folders are chosen, the clone is taken away: nothing was written to it. */
   function cancel() {
     if (running) void CancelClone()
-    else onClose()
+    else if (finishing) return
+    else {
+      if (step === 'folders' && cloned) void CloneAbandon(cloned).catch(() => {})
+      onClose()
+    }
   }
 
   onMount(() => {
@@ -111,7 +146,23 @@
   )
 </script>
 
-<Modal title="Clone a repository" eyebrow="bring it aboard" width={560} onClose={cancel} scrimCloses={!running}>
+<Modal
+  title={step === 'folders' ? 'Which folders do you want?' : 'Clone a repository'}
+  eyebrow={step === 'folders' ? 'step two of two' : 'bring it aboard'}
+  width={560}
+  onClose={cancel}
+  scrimCloses={!running && !finishing}
+>
+  {#if step === 'folders'}
+    <p class="lead">The history is here, and nothing is written to <span class="mono">{cloned}</span> until you choose.</p>
+    {#if folders}
+      <FolderPicker counts={folders} busy={finishing} onCheckout={(chosen) => void checkout(chosen)} onEvery={() => void checkout([])} />
+    {:else}
+      <p class="status" role="status"><Busy /> Reading the folders…</p>
+    {/if}
+    {#if finishing}<p class="status" role="status"><Busy /> Writing the files…</p>{/if}
+    {#if error}<p class="form-error" role="alert">{error}</p>{/if}
+  {:else}
   <form onsubmit={submit}>
     <label class="form-field">
       <span>Repository URL</span>
@@ -188,6 +239,17 @@
         </fieldset>
 
         <fieldset disabled={running}>
+          <legend>Folders</legend>
+          <div class="choices">
+            <label><input type="radio" name="{uid}-folders" value="all" bind:group={picks.folders} /> Every folder</label>
+            <label><input type="radio" name="{uid}-folders" value="some" bind:group={picks.folders} /> Only the ones I choose, next</label>
+            {#if picks.folders === 'some'}
+              <p class="hint">A sparse checkout: the history comes first, then you choose from the real folders, before any file is written.</p>
+            {/if}
+          </div>
+        </fieldset>
+
+        <fieldset disabled={running}>
           <legend>Submodules</legend>
           <div class="choices">
             <label><input type="checkbox" bind:checked={picks.submodules} /> Clone them too</label>
@@ -204,9 +266,12 @@
     {#if error}<p class="form-error" role="alert">{error}</p>{/if}
     <div class="form-actions">
       <InkButton variant="secondary" onclick={cancel}>{running ? 'Stop' : 'Cancel'}</InkButton>
-      <InkButton type="submit" disabled={running || !!problem || !url.trim() || !parent.trim() || !name.trim()}>Clone</InkButton>
+      <InkButton type="submit" disabled={running || !!problem || !url.trim() || !parent.trim() || !name.trim()}
+        >{picks.folders === 'some' ? 'Next: choose folders' : 'Clone'}</InkButton
+      >
     </div>
   </form>
+  {/if}
 </Modal>
 
 <style>
@@ -320,6 +385,19 @@
     margin: 0;
     font-size: 13px;
     color: var(--warning);
+  }
+
+  .lead {
+    margin: 0 0 12px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+  }
+
+  .lead .mono {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    overflow-wrap: anywhere;
   }
 
   .status {

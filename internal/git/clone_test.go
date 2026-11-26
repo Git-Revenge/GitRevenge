@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -55,6 +56,7 @@ func TestCloneOptionArgs(t *testing.T) {
 		{CloneOptions{Branch: "dev"}, []string{"--single-branch", "--branch", "dev"}},
 		{CloneOptions{Depth: 1, Branch: "dev"}, []string{"--depth", "1", "--single-branch", "--branch", "dev"}},
 		{CloneOptions{Submodules: true}, []string{"--recurse-submodules"}},
+		{CloneOptions{Folders: true}, []string{"--no-checkout", "--sparse"}},
 		{
 			CloneOptions{Depth: 1, Partial: true, Submodules: true},
 			[]string{"--depth", "1", "--filter=blob:none", "--no-single-branch", "--recurse-submodules", "--shallow-submodules", "--also-filter-submodules"},
@@ -178,6 +180,100 @@ func TestCloneSubmodules(t *testing.T) {
 	repo := cloneWith(t, src, CloneOptions{Submodules: true}, allowFile)
 	if _, err := os.Stat(filepath.Join(repo.Dir(), "lib", "lib.txt")); err != nil {
 		t.Errorf("the submodule wasn't cloned: %v", err)
+	}
+}
+
+// foldersSource is a repository with files at the top, in nested folders, and in folders
+// beside them, to clone and choose from.
+func foldersSource(t *testing.T) *gittest.Repo {
+	t.Helper()
+	src := gittest.New(t)
+	for _, f := range []string{"top.txt", "src/a.go", "src/sub/b.go", "src/sub/c.go", "docs/d.md", "other/e.txt"} {
+		src.WriteFile(f, f+"\n")
+	}
+	src.Git("add", ".")
+	src.Commit("files")
+	return src
+}
+
+func TestFolderCounts(t *testing.T) {
+	t.Parallel()
+	repo := OpenRepo(newTestRunner(t), foldersSource(t).Dir)
+	got, err := repo.FolderCounts(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []FolderCount{{"", 6, 1}, {"docs", 1, 1}, {"other", 1, 1}, {"src", 3, 1}, {"src/sub", 2, 2}}
+	if !slices.Equal(got, want) {
+		t.Fatalf("counts = %+v\nwant %+v", got, want)
+	}
+}
+
+// onDisk lists the files a clone wrote, with forward slashes.
+func onDisk(t *testing.T, dir string) []string {
+	t.Helper()
+	var files []string
+	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() && d.Name() == ".git" {
+			return filepath.SkipDir
+		}
+		if !d.IsDir() {
+			rel, _ := filepath.Rel(dir, p)
+			files = append(files, filepath.ToSlash(rel))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(files)
+	return files
+}
+
+func TestCloneFoldersWritesOnlyThoseChosen(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	src := foldersSource(t)
+	repo := cloneWith(t, src, CloneOptions{Folders: true}, NetOptions{})
+	if got := onDisk(t, repo.Dir()); len(got) != 0 {
+		t.Fatalf("the first step wrote %v", got)
+	}
+	// The folder list comes from the tree, with nothing checked out.
+	counts, err := repo.FolderCounts(ctx, "")
+	if err != nil || len(counts) != 5 {
+		t.Fatalf("counts = %+v, %v", counts, err)
+	}
+	if err := repo.CheckOutFolders(ctx, []string{"src/sub"}); err != nil {
+		t.Fatal(err)
+	}
+	// Cone mode: the folder, the files directly in its parents, and the top level's own.
+	want := []string{"src/a.go", "src/sub/b.go", "src/sub/c.go", "top.txt"}
+	if got := onDisk(t, repo.Dir()); !slices.Equal(got, want) {
+		t.Fatalf("wrote %v, want %v", got, want)
+	}
+}
+
+func TestCloneFoldersEveryFolderAfterAll(t *testing.T) {
+	t.Parallel()
+	repo := cloneWith(t, foldersSource(t), CloneOptions{Folders: true}, NetOptions{})
+	if err := repo.CheckOutFolders(context.Background(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := onDisk(t, repo.Dir()); len(got) != 6 {
+		t.Fatalf("wrote %v, want all 6", got)
+	}
+}
+
+func TestCheckOutFoldersRefusesPathsOutside(t *testing.T) {
+	t.Parallel()
+	repo := cloneWith(t, foldersSource(t), CloneOptions{Folders: true}, NetOptions{})
+	for _, bad := range []string{"../x", "/etc", "", "src\nother"} {
+		if err := repo.CheckOutFolders(context.Background(), []string{bad}); !errors.Is(err, ErrCloneOptions) {
+			t.Errorf("%q: err = %v", bad, err)
+		}
 	}
 }
 
