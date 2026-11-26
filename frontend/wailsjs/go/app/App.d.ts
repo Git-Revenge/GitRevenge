@@ -25,6 +25,10 @@ export function ArrivedCommits(arg1:string,arg2:string,arg3:string):Promise<app.
 
 export function AuthorCard(arg1:string,arg2:string):Promise<app.AuthorCard>;
 
+export function Backfill(arg1:string):Promise<void>;
+
+export function BackfillCost(arg1:string):Promise<git.BackfillCost>;
+
 export function Bisect(arg1:string):Promise<app.BisectInfo>;
 
 export function Blame(arg1:string,arg2:string,arg3:string):Promise<Array<git.BlameLine>>;
@@ -77,6 +81,8 @@ export function CloneFolders(arg1:string):Promise<Array<git.FolderCount>>;
 
 export function CloneName(arg1:string):Promise<string>;
 
+export function CloneShape(arg1:string):Promise<git.CloneShape>;
+
 export function CloseGitConfig(arg1:string):Promise<void>;
 
 export function CloseRepo(arg1:string):Promise<void>;
@@ -120,6 +126,10 @@ export function Environment():Promise<app.Environment>;
 export function Fetch(arg1:string,arg2:string):Promise<void>;
 
 export function FetchBranch(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function FetchEveryBranch(arg1:string,arg2:string):Promise<void>;
+
+export function FetchMoreHistory(arg1:string,arg2:git.MoreHistory):Promise<void>;
 
 export function FileContents(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:boolean):Promise<git.FileContents>;
 
@@ -353,6 +363,8 @@ export function ReorderLinkRules(arg1:string,arg2:string,arg3:Array<string>):Pro
 
 export function ReplaceGitConfigValue(arg1:string,arg2:string,arg3:string,arg4:string):Promise<app.ConfigDoc>;
 
+export function RepoFolders(arg1:string):Promise<Array<git.FolderCount>>;
+
 export function RepoInfo(arg1:string):Promise<app.RepoTab>;
 
 export function RepoPreferences(arg1:string):Promise<app.RepoPreferences>;
@@ -439,6 +451,8 @@ export function SetRepoPreferences(arg1:string,arg2:app.RepoPreferences):Promise
 
 export function SetShowHidden(arg1:string,arg2:boolean):Promise<void>;
 
+export function SetSparseFolders(arg1:string,arg2:Array<string>):Promise<void>;
+
 export function SetStackParent(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<void>;
 
 export function SetStagedContent(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
@@ -474,6 +488,8 @@ export function StartBisect(arg1:string,arg2:string,arg3:string):Promise<void>;
 export function StashAction(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function StashSave(arg1:string,arg2:string,arg3:boolean):Promise<void>;
+
+export function StopBackfillCost(arg1:string):Promise<void>;
 
 export function StopHistorySearch(arg1:string):Promise<app.TrailerFilterState>;
 

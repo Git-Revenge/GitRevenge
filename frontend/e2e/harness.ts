@@ -1,7 +1,7 @@
 // Mounts one real component in a real browser, against a stubbed Go backend. A test picks the
 // component with ?mount= and supplies the backend's answers through window.__scenario. It isn't
 // part of the app's build: only index.html is an entry there.
-import { mount } from 'svelte'
+import { mount, unmount } from 'svelte'
 import '../src/style.css'
 import type { Scenario } from './support'
 import type { DiffTarget } from '../src/lib/diff/DiffView.svelte'
@@ -491,7 +491,19 @@ const mounts = {
   },
   async repoPanel() {
     const { default: RepoPanel } = await import('../src/lib/RepoPanel.svelte')
-    mount(RepoPanel, { target: host, props: { path: '/r', filter: '', openDialog: () => {} } })
+    // Dialogs and menus as the app shows them, loaded when first asked for.
+    const openDialog = async (spec: unknown) => {
+      const { default: Dialog } = await import('../src/lib/Dialog.svelte')
+      const d = mount(Dialog, { target: host, props: { spec: spec as never, onClose: () => void unmount(d) } })
+    }
+    const onMenu = async (items: unknown[], x: number, y: number) => {
+      const { default: ContextMenu } = await import('../src/lib/ContextMenu.svelte')
+      const m = mount(ContextMenu, { target: host, props: { x, y, items: items as never, onClose: () => void unmount(m) } })
+    }
+    mount(RepoPanel, { target: host, props: { path: '/r', filter: '', openDialog: (s) => void openDialog(s), onMenu: (i, x, y) => void onMenu(i, x, y) } })
+    // The toolbar shows what the panel's This clone section runs (#1005). Not waited for: the
+    // panel is ready before it, as tests of its first answers need.
+    void import('../src/lib/Toolbar.svelte').then(({ default: Toolbar }) => mount(Toolbar, { target: host, props: { path: '/r' } }))
   },
   async diff() {
     host.style.cssText = 'display:block;height:100vh'

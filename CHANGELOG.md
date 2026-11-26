@@ -35,6 +35,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 - The clone dialog has **Options** for big repositories, each one of git's own: **History** (every commit, the last N commits, or since a day: a shallow clone), **File contents** (every version now, or only when something needs them: a partial clone), **Branches** (every branch and tag, or only one, chosen from the server's branches) and **Submodules** (clone them too, shallow or partial as the clone is). Every default is what plain `git clone URL` does, and while Options is folded a line beside it says what's chosen. (#1002)
 - In a partial clone, a file version that was never downloaded downloads by itself when a diff or a file opens: it says so, has **Stop**, and shows the file when it's in. **Blame**, which reads every version of a file, asks first, saying how many versions it needs, and fetches them in one download, where git would fetch them one at a time (blame on the kernel's Makefile made 1,888 downloads in 15 minutes). (#1003)
 - The clone dialog can check out **only some folders** (Options › Folders). The history and folder listings come first, and no file is written. Then a second step lists the folders from the repository's own tree, each with how many files it holds, and says how many files a checkout of the ones you tick will write, counting what a sparse checkout always keeps (the top level's files, and those directly in the folders above the ones you chose). **Check out** writes them, **Every folder after all** writes everything, and closing the dialog takes the clone away. On Windows, writing the Linux kernel's 97,310 files took 16 to 19 minutes; `mm/` and the top level took 22 seconds. (#1004)
+- The Repository panel has a **This clone** section for a clone that is shallow, partial, sparse or one branch, whoever made it. Each row says what the clone has and offers the rest:
+  - **Shallow:** **Fetch more history** gets a year more, 1,000 commits more, or all of it.
+  - **Partial:** **Download them all…** first says what it would fetch, counting the versions while you decide. On a long history the count may still be running, and the download needn't wait for it.
+  - **Sparse:** **Change folders…** opens the folder list with the current folders ticked. **Every folder** asks first, saying how many files it writes.
+  - **One branch:** **Fetch every branch**.
+
+  Each runs as a fetch does: progress and **Cancel** in the toolbar, and the graph and lists updating when it lands. (#1005)
 
 ### Changed
 

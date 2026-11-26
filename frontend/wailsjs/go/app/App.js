@@ -34,6 +34,14 @@ export function AuthorCard(arg1, arg2) {
   return window['go']['app']['App']['AuthorCard'](arg1, arg2);
 }
 
+export function Backfill(arg1) {
+  return window['go']['app']['App']['Backfill'](arg1);
+}
+
+export function BackfillCost(arg1) {
+  return window['go']['app']['App']['BackfillCost'](arg1);
+}
+
 export function Bisect(arg1) {
   return window['go']['app']['App']['Bisect'](arg1);
 }
@@ -138,6 +146,10 @@ export function CloneName(arg1) {
   return window['go']['app']['App']['CloneName'](arg1);
 }
 
+export function CloneShape(arg1) {
+  return window['go']['app']['App']['CloneShape'](arg1);
+}
+
 export function CloseGitConfig(arg1) {
   return window['go']['app']['App']['CloseGitConfig'](arg1);
 }
@@ -224,6 +236,14 @@ export function Fetch(arg1, arg2) {
 
 export function FetchBranch(arg1, arg2, arg3) {
   return window['go']['app']['App']['FetchBranch'](arg1, arg2, arg3);
+}
+
+export function FetchEveryBranch(arg1, arg2) {
+  return window['go']['app']['App']['FetchEveryBranch'](arg1, arg2);
+}
+
+export function FetchMoreHistory(arg1, arg2) {
+  return window['go']['app']['App']['FetchMoreHistory'](arg1, arg2);
 }
 
 export function FileContents(arg1, arg2, arg3, arg4, arg5, arg6) {
@@ -690,6 +710,10 @@ export function ReplaceGitConfigValue(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['ReplaceGitConfigValue'](arg1, arg2, arg3, arg4);
 }
 
+export function RepoFolders(arg1) {
+  return window['go']['app']['App']['RepoFolders'](arg1);
+}
+
 export function RepoInfo(arg1) {
   return window['go']['app']['App']['RepoInfo'](arg1);
 }
@@ -862,6 +886,10 @@ export function SetShowHidden(arg1, arg2) {
   return window['go']['app']['App']['SetShowHidden'](arg1, arg2);
 }
 
+export function SetSparseFolders(arg1, arg2) {
+  return window['go']['app']['App']['SetSparseFolders'](arg1, arg2);
+}
+
 export function SetStackParent(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['SetStackParent'](arg1, arg2, arg3, arg4);
 }
@@ -932,6 +960,10 @@ export function StashAction(arg1, arg2, arg3) {
 
 export function StashSave(arg1, arg2, arg3) {
   return window['go']['app']['App']['StashSave'](arg1, arg2, arg3);
+}
+
+export function StopBackfillCost(arg1) {
+  return window['go']['app']['App']['StopBackfillCost'](arg1);
 }
 
 export function StopHistorySearch(arg1) {

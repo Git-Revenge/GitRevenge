@@ -13,6 +13,7 @@
   import { formatShortcut, isMac, provideCommands, type Command } from './commands.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
   import { session } from './session.svelte'
+  import { network, NETWORK_LABELS } from './network.svelte'
   import Busy from './ui/Busy.svelte'
   import Icon from './ui/Icon.svelte'
   import { SQUEEZE } from './barSqueeze'
@@ -29,12 +30,18 @@
   let undoWords = $derived(squeeze < SQUEEZE.undo)
   let netWords = $derived(squeeze < SQUEEZE.network)
 
-  /** The running network operation, if any. */
-  let running = $state<string | null>(null)
+  /** The running network operation, if any: this toolbar's, or one the Repository panel
+   * started (#1005). */
+  let running = $derived(network.running[path] ?? null)
   let progress = $state('')
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
 
-  const labels: Record<string, string> = { fetch: 'Fetching', pull: 'Pulling', push: 'Pushing' }
+  const labels = NETWORK_LABELS
+  // Each operation's progress starts afresh.
+  $effect(() => {
+    void running
+    progress = ''
+  })
 
   /** Labels of the operations Undo and Redo would reverse; "" when unavailable. */
   let undoLabel = $state('')
@@ -87,11 +94,7 @@
   const redo = () => step(false)
 
   async function run(op: string, fn: () => Promise<void>) {
-    running = op
-    progress = ''
-    await session.run(fn)
-    running = null
-    progress = ''
+    await network.run(path, op, fn)
     await refreshUndo()
   }
 

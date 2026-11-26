@@ -137,10 +137,8 @@ func splitDir(p string) (dir, name string) {
 // named, in cone mode, or every folder when none are. Names arrive on standard input, so
 // none can be read as an option.
 func (r *Repo) CheckOutFolders(ctx context.Context, folders []string) error {
-	for _, f := range folders {
-		if f == "" || strings.HasPrefix(f, "/") || slices.Contains(strings.Split(f, "/"), "..") || strings.ContainsAny(f, "\r\n") {
-			return fmt.Errorf("%w: folder %q", ErrCloneOptions, f)
-		}
+	if err := checkFolders(folders); err != nil {
+		return err
 	}
 	if len(folders) == 0 {
 		if _, err := r.Write(ctx, Cmd{Args: []string{"sparse-checkout", "disable"}}); err != nil {
@@ -163,6 +161,16 @@ func (r *Repo) CheckOutFolders(ctx context.Context, folders []string) error {
 	}
 	_, err := r.Write(ctx, Cmd{Args: []string{"read-tree", "-mu", "HEAD"}})
 	return err
+}
+
+// checkFolders refuses a folder name that isn't a folder inside the repository.
+func checkFolders(folders []string) error {
+	for _, f := range folders {
+		if f == "" || strings.HasPrefix(f, "/") || slices.Contains(strings.Split(f, "/"), "..") || strings.ContainsAny(f, "\r\n") {
+			return fmt.Errorf("%w: folder %q", ErrCloneOptions, f)
+		}
+	}
+	return nil
 }
 
 // Clone clones url into dir, which must not exist or be empty, with the options chosen. git
