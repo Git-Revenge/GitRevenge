@@ -39,7 +39,7 @@ jobs:
             os: macos-latest
             platform: darwin/universal
           # Each Linux package is built on the oldest system it supports. The .deb's glibc and
-          # WebKitGTK suit Debian 13 too. RHEL 9 only has WebKitGTK 4.0, and RHEL 10 only has
+          # WebKitGTK suit newer Ubuntu and Debian too. RHEL 9 only has WebKitGTK 4.0, and RHEL 10 only has
           # 4.1, from EPEL, so they can't share a package. AlmaLinux stands in for RHEL.
           - name: deb
             os: ubuntu-24.04
@@ -377,9 +377,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Debian 13 isn't here: its git is 2.47 and the package needs 2.50 (ADR-0010).
           - image: ubuntu:24.04
-            artifact: release-deb
-          - image: debian:13
             artifact: release-deb
           - image: almalinux:9
             artifact: release-el9
@@ -395,7 +394,12 @@ jobs:
       - name: Install the package
         run: |
           if command -v apt-get >/dev/null; then
+            export DEBIAN_FRONTEND=noninteractive
             apt-get update
+            # Ubuntu 24.04's own git is 2.43 and the package needs 2.50: the install guide has
+            # people add the Git maintainers' PPA first, and so does this.
+            apt-get install -y software-properties-common
+            add-apt-repository -y ppa:git-core/ppa
             apt-get install -y ./dist/*.deb xvfb xauth desktop-file-utils
           else
             if [ "${{ matrix.image }}" = "almalinux:10" ]; then

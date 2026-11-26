@@ -89,17 +89,10 @@ var ErrFindText = errors.New("find looks for text within one line")
 // ErrUnknownRevision means Rev names no commit.
 var ErrUnknownRevision = errors.New("no such branch, tag or commit")
 
-// ErrLazyFetch means searching the commit would download files: a partial clone, with a git
-// older than 2.44, which can't be told not to.
-var ErrLazyFetch = errors.New("searching this commit would download files")
-
-// noLazyFetch is the git that understands GIT_NO_LAZY_FETCH.
-var noLazyFetch = Version{2, 44, 0}
-
 // Grep finds the lines that match o, handing each to found as git prints it, and stops after
 // limit lines (0 for no limit), saying so in the summary.
 func (r *Repo) Grep(ctx context.Context, o GrepOptions, limit int, found func(GrepLine)) (GrepSummary, error) {
-	c, err := r.grepCmd(ctx, o, false)
+	c, err := grepCmd(o, false)
 	if err != nil {
 		return GrepSummary{}, err
 	}
@@ -143,7 +136,7 @@ func (r *Repo) Grep(ctx context.Context, o GrepOptions, limit int, found func(Gr
 
 // GrepCount counts the lines and files that match o, without reading them.
 func (r *Repo) GrepCount(ctx context.Context, o GrepOptions) (GrepSummary, error) {
-	c, err := r.grepCmd(ctx, o, true)
+	c, err := grepCmd(o, true)
 	if err != nil {
 		return GrepSummary{}, err
 	}
@@ -167,7 +160,7 @@ func (r *Repo) GrepCount(ctx context.Context, o GrepOptions) (GrepSummary, error
 }
 
 // grepCmd is the git grep command for o, counting or listing lines.
-func (r *Repo) grepCmd(ctx context.Context, o GrepOptions, count bool) (Cmd, error) {
+func grepCmd(o GrepOptions, count bool) (Cmd, error) {
 	if o.Text == "" || strings.ContainsAny(o.Text, "\r\n") {
 		return Cmd{}, ErrFindText
 	}
@@ -203,9 +196,6 @@ func (r *Repo) grepCmd(ctx context.Context, o GrepOptions, count bool) (Cmd, err
 		// A commit's files may never have been downloaded, in a partial clone. Git would
 		// fetch each one it reads; told not to, it stops, and the search says why.
 		c.Env = []string{"GIT_NO_LAZY_FETCH=1"}
-		if r.runner.version().Less(noLazyFetch) && r.partialClone(ctx) {
-			return Cmd{}, ErrLazyFetch
-		}
 	}
 	args = append(args, "--")
 	args = append(args, grepPathspecs(o.Paths)...)
@@ -227,12 +217,6 @@ func grepPathspecs(paths []string) []string {
 		}
 	}
 	return out
-}
-
-// partialClone reports whether some remote is a promisor, so objects may be missing.
-func (r *Repo) partialClone(ctx context.Context) bool {
-	out, err := r.ReadString(ctx, "config", "--get-regexp", `^remote\..*\.promisor$`)
-	return err == nil && strings.Contains(out, "true")
 }
 
 // parseGrepLine reads one record of `git grep -z -n --column`: the file, a NUL, the line

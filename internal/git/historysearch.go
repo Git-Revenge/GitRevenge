@@ -93,7 +93,7 @@ func (r *Repo) HistoryCount(ctx context.Context, opts LogOptions, since int64) (
 // HistoryChunk returns which of ids o finds, in the order given. A commit's files that were
 // never downloaded, in a partial clone, stop it with ErrNotDownloaded: nothing is fetched.
 func (r *Repo) HistoryChunk(ctx context.Context, o HistoryOptions, ids []string) ([]string, error) {
-	c, err := r.historyCmd(ctx, o, ids, "--format=%H")
+	c, err := historyCmd(o, ids, "--format=%H")
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func (r *Repo) HistoryChanges(ctx context.Context, o HistoryOptions, ids []strin
 	match := historyMatcher(o)
 	// The patches of the files the search finds (git leaves the others out of a commit's
 	// patch without --pickaxe-all), with no context lines: only what changed is counted.
-	c, err := r.historyCmd(ctx, o, ids, "--format=%x01%H", "-p", "--unified=0", "--no-ext-diff", "--no-color")
+	c, err := historyCmd(o, ids, "--format=%x01%H", "-p", "--unified=0", "--no-ext-diff", "--no-color")
 	if err != nil {
 		return nil, err
 	}
@@ -197,15 +197,12 @@ func patchPath(s, prefix string) string {
 }
 
 // historyCmd is git log over ids with o's search, the commits given on its input.
-func (r *Repo) historyCmd(ctx context.Context, o HistoryOptions, ids []string, extra ...string) (Cmd, error) {
+func historyCmd(o HistoryOptions, ids []string, extra ...string) (Cmd, error) {
 	if o.Text == "" || strings.ContainsAny(o.Text, "\r\n") {
 		return Cmd{}, ErrFindText
 	}
 	// A commit's files may never have been downloaded, in a partial clone: told not to
-	// fetch them, git stops, and the search says why. A git older than 2.44 can't be told.
-	if r.runner.version().Less(noLazyFetch) && r.partialClone(ctx) {
-		return Cmd{}, ErrLazyFetch
-	}
+	// fetch them (GIT_NO_LAZY_FETCH, below), git stops, and the search says why.
 	args := append([]string{"log", "--no-walk=unsorted", "--stdin"}, extra...)
 	if o.Lines {
 		text := o.Text

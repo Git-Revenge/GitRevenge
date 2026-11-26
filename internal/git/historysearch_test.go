@@ -173,11 +173,7 @@ func TestHistorySaysWhatsWrong(t *testing.T) {
 func TestHistoryInAPartialCloneDownloadsNothing(t *testing.T) {
 	t.Parallel()
 	dest := partialClone(t)
-	runner := newTestRunner(t)
-	if runner.version().Less(noLazyFetch) {
-		t.Skip("git older than 2.44: TestHistoryWithAnOlderGitRefusesToDownload covers it")
-	}
-	repo := OpenRepo(runner, dest)
+	repo := OpenRepo(newTestRunner(t), dest)
 	var every []string
 	if err := repo.HistoryCommits(context.Background(), LogOptions{}, 0, func(c HistoryCommit) error {
 		every = append(every, c.ID)
@@ -191,23 +187,4 @@ func TestHistoryInAPartialCloneDownloadsNothing(t *testing.T) {
 	if !stillMissing(t, repo) {
 		t.Fatal("the search downloaded old.txt")
 	}
-}
-
-func TestHistoryWithAnOlderGitRefusesToDownload(t *testing.T) {
-	t.Parallel()
-	dest := partialClone(t)
-	runner := newTestRunner(t)
-	runner.verOnce.Do(func() { runner.ver = Version{2, 43, 0} })
-	repo := OpenRepo(runner, dest)
-	head, err := repo.ReadString(context.Background(), "rev-parse", "HEAD")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := repo.HistoryChunk(context.Background(), HistoryOptions{Text: "km/h"}, []string{head}); !errors.Is(err, ErrLazyFetch) {
-		t.Fatalf("err = %v", err)
-	}
-	if !stillMissing(t, repo) {
-		t.Fatal("the search downloaded old.txt")
-	}
-
 }

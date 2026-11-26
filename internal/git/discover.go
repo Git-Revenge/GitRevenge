@@ -12,8 +12,9 @@ import (
 	"strconv"
 )
 
-// MinVersion is the oldest git release Git Revenge supports.
-var MinVersion = Version{2, 40, 0}
+// MinVersion is the oldest git release Git Revenge supports: 2.50, for partial clones
+// (GIT_NO_LAZY_FETCH, 2.44) and downloading what one is missing (git backfill, 2.49).
+var MinVersion = Version{2, 50, 0}
 
 // Version is a git release number.
 type Version struct {

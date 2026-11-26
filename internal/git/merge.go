@@ -78,8 +78,8 @@ func (r *Repo) Rebase(ctx context.Context, onto string) error {
 }
 
 // RebaseAutosquash replays the current branch's commits onto ref, folding each fixup! and
-// squash! commit into the commit it names. Before git 2.44 --autosquash needs an interactive
-// rebase, so it runs one with the todo list accepted as git wrote it.
+// squash! commit into the commit it names. It runs an interactive rebase with the todo list
+// accepted as git wrote it, which is what --autosquash does on its own since git 2.44.
 func (r *Repo) RebaseAutosquash(ctx context.Context, onto string) error {
 	if err := CheckRevs(onto); err != nil {
 		return err

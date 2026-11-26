@@ -23,5 +23,6 @@ We do not bundle git.
 - The user's config, credential helpers, SSH agent, signing, hooks and LFS behave exactly as they do on the command line.
 - There is no cgo, so cross-platform builds stay simple.
 - Git must be installed. The app checks the git version at startup and shows a clear error if it is missing or too old.
+- *Amended 2026-11-26 (#1001): the minimum is git 2.50 from 1.2.0. Partial clones need 2.44, the first git that can be told not to download (`GIT_NO_LAZY_FETCH`), and downloading what one is missing needs 2.49 (`git backfill`). ADR-0010 says what this means for each Linux.*
 - Parsing CLI output must be robust. We run git with `-z` formats, `LC_ALL=C` and `core.quotepath=off`.
 - If CLI parsing becomes the bottleneck for the graph, we can add a native reader for the `commit-graph` file later.

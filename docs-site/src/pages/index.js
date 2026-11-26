@@ -234,7 +234,7 @@ const installs = [
   },
   {
     os: 'Linux',
-    how: 'From the signed apt and dnf repositories, for Ubuntu, Debian and RHEL 9 and 10. Add one once; the install guide has the commands.',
+    how: 'From the signed apt and dnf repositories, for Ubuntu and RHEL 9 and 10. Add one once; the install guide has the commands.',
     code: 'sudo apt install gitrevenge\nsudo dnf install gitrevenge',
   },
 ];
