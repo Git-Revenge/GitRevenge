@@ -30,6 +30,9 @@ type ForecastCommit struct {
 // MergePreview is what merging a branch, tag or commit into the checked-out branch would do
 // (issue #594). Nothing is changed to work it out.
 type MergePreview struct {
+	// Missing, in a partial clone, lists the file versions the forecast needs that were never
+	// downloaded (#1010). Nothing else is filled in: the dialog downloads them and asks again.
+	Missing []string `json:"missing,omitempty"`
 	// Into is the checked-out branch, or "" when HEAD is detached.
 	Into string `json:"into"`
 	// AlreadyMerged means there is nothing to merge.
@@ -53,6 +56,8 @@ type MergePreview struct {
 
 // RebasePreview is what rebasing the checked-out branch onto another commit would do.
 type RebasePreview struct {
+	// Missing is as for MergePreview.
+	Missing []string `json:"missing,omitempty"`
 	// Branch is the checked-out branch, or "" when HEAD is detached.
 	Branch string `json:"branch"`
 	// Commits are written again oldest first, up to a cap; CommitCount is how many in all.
@@ -120,10 +125,18 @@ func (a *App) PreviewMerge(path, source string) (MergePreview, error) {
 		return MergePreview{}, userError("Choose what to merge.")
 	}
 	ctx := context.Background()
+	// Past a shallow clone's edge there's nothing to forecast, nor to download for it.
 	if r.Git.PartsPastEdge(ctx, "HEAD", source) {
 		return MergePreview{Into: currentBranch(ctx, r.Git), PastEdge: true, Commits: []ForecastCommit{}, Conflicts: []ForecastConflict{}}, nil
 	}
-	f, err := r.Git.ForecastMerge(ctx, "HEAD", source)
+	if missing, err := r.Git.MergeNeeds(ctx, "HEAD", source); err != nil {
+		return MergePreview{}, friendly(err)
+	} else if len(missing) > 0 {
+		return MergePreview{Missing: missing, Commits: []ForecastCommit{}, Conflicts: []ForecastConflict{}}, nil
+	}
+	// Whatever else the merge reads (a rename's other side, say) isn't downloaded behind the
+	// preview: it says the conflicts couldn't be checked, and the merge itself downloads.
+	f, err := r.Git.ForecastMerge(git.NoDownloads(ctx), "HEAD", source)
 	if err != nil {
 		return MergePreview{}, friendly(err)
 	}
@@ -153,7 +166,12 @@ func (a *App) PreviewRebase(path, onto string) (RebasePreview, error) {
 	if r.Git.PartsPastEdge(ctx, tip, onto) {
 		return RebasePreview{Branch: branch, PastEdge: true, Commits: []ForecastCommit{}, Conflicts: []ForecastConflict{}}, nil
 	}
-	f, err := r.Git.ForecastRebase(ctx, tip, onto)
+	if missing, err := r.Git.MergeNeeds(ctx, tip, onto); err != nil {
+		return RebasePreview{}, friendly(err)
+	} else if len(missing) > 0 {
+		return RebasePreview{Missing: missing, Branch: branch, Commits: []ForecastCommit{}, Conflicts: []ForecastConflict{}}, nil
+	}
+	f, err := r.Git.ForecastRebase(git.NoDownloads(ctx), tip, onto)
 	if err != nil {
 		return RebasePreview{}, friendly(err)
 	}

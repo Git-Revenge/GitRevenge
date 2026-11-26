@@ -40,6 +40,7 @@ export namespace app {
 	    behind: number;
 	    added: number;
 	    removed: number;
+	    linesUnknown?: boolean;
 	    paths: string[];
 	    staleDays: number;
 	    ageDays: number;
@@ -60,6 +61,7 @@ export namespace app {
 	        this.behind = source["behind"];
 	        this.added = source["added"];
 	        this.removed = source["removed"];
+	        this.linesUnknown = source["linesUnknown"];
 	        this.paths = source["paths"];
 	        this.staleDays = source["staleDays"];
 	        this.ageDays = source["ageDays"];
@@ -722,6 +724,7 @@ export namespace app {
 	export class CommitInfo {
 	    commit: git.CommitDetail;
 	    files: git.FileChange[];
+	    countsMissing?: string[];
 	    author: git.Identity;
 	    committer: git.Identity;
 	    edge?: boolean;
@@ -734,6 +737,7 @@ export namespace app {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.commit = this.convertValues(source["commit"], git.CommitDetail);
 	        this.files = this.convertValues(source["files"], git.FileChange);
+	        this.countsMissing = source["countsMissing"];
 	        this.author = this.convertValues(source["author"], git.Identity);
 	        this.committer = this.convertValues(source["committer"], git.Identity);
 	        this.edge = source["edge"];
@@ -1104,6 +1108,38 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class FileHistoryResult {
+	    commits: git.FileCommit[];
+	    stop?: git.HistoryStop;
+	
+	    static createFrom(source: any = {}) {
+	        return new FileHistoryResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.commits = this.convertValues(source["commits"], git.FileCommit);
+	        this.stop = this.convertValues(source["stop"], git.HistoryStop);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class FilterPick {
 	    key: string;
 	    value: string;
@@ -1354,6 +1390,7 @@ export namespace app {
 	    window: InsightsWindow;
 	    files: HotFile[];
 	    rework: git.ShippedItem[];
+	    linesMissing: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new HotspotsResult(source);
@@ -1364,6 +1401,7 @@ export namespace app {
 	        this.window = this.convertValues(source["window"], InsightsWindow);
 	        this.files = this.convertValues(source["files"], HotFile);
 	        this.rework = this.convertValues(source["rework"], git.ShippedItem);
+	        this.linesMissing = source["linesMissing"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1681,6 +1719,7 @@ export namespace app {
 	
 	
 	export class MergePreview {
+	    missing?: string[];
 	    into: string;
 	    alreadyMerged: boolean;
 	    fastForward: boolean;
@@ -1698,6 +1737,7 @@ export namespace app {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.missing = source["missing"];
 	        this.into = source["into"];
 	        this.alreadyMerged = source["alreadyMerged"];
 	        this.fastForward = source["fastForward"];
@@ -1924,6 +1964,20 @@ export namespace app {
 	        this.languages = source["languages"];
 	    }
 	}
+	export class PreviewImage {
+	    url: string;
+	    missing?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PreviewImage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.url = source["url"];
+	        this.missing = source["missing"];
+	    }
+	}
 	export class ProblemAction {
 	    kind: string;
 	    label: string;
@@ -2040,6 +2094,7 @@ export namespace app {
 		}
 	}
 	export class RebasePlanPreview {
+	    missing?: string[];
 	    stopsAt: string;
 	    conflicts: ForecastConflict[];
 	    incomplete: boolean;
@@ -2053,6 +2108,7 @@ export namespace app {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.missing = source["missing"];
 	        this.stopsAt = source["stopsAt"];
 	        this.conflicts = this.convertValues(source["conflicts"], ForecastConflict);
 	        this.incomplete = source["incomplete"];
@@ -2080,6 +2136,7 @@ export namespace app {
 		}
 	}
 	export class RebasePreview {
+	    missing?: string[];
 	    branch: string;
 	    commits: ForecastCommit[];
 	    commitCount: number;
@@ -2100,6 +2157,7 @@ export namespace app {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.missing = source["missing"];
 	        this.branch = source["branch"];
 	        this.commits = this.convertValues(source["commits"], ForecastCommit);
 	        this.commitCount = source["commitCount"];
@@ -2511,6 +2569,7 @@ export namespace app {
 	export class ShippedResult {
 	    window: InsightsWindow;
 	    items: git.ShippedItem[];
+	    linesMissing: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new ShippedResult(source);
@@ -2520,6 +2579,7 @@ export namespace app {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.window = this.convertValues(source["window"], InsightsWindow);
 	        this.items = this.convertValues(source["items"], git.ShippedItem);
+	        this.linesMissing = source["linesMissing"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -3913,6 +3973,20 @@ export namespace git {
 	        this.lines = source["lines"];
 	        this.paths = source["paths"];
 	        this.since = source["since"];
+	    }
+	}
+	export class HistoryStop {
+	    commit: string;
+	    missing: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new HistoryStop(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.commit = source["commit"];
+	        this.missing = source["missing"];
 	    }
 	}
 	

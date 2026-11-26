@@ -74,6 +74,22 @@ func (w InsightsWindow) query() git.ShippedQuery {
 type ShippedResult struct {
 	Window InsightsWindow    `json:"window"`
 	Items  []git.ShippedItem `json:"items"`
+	// LinesMissing, in a partial clone, counts the file versions the window's lines changed
+	// need that were never downloaded (#1010). Then the items have files and no lines, until
+	// InsightsDownload brings them.
+	LinesMissing int `json:"linesMissing"`
+}
+
+// windowLines decides how q reads a window in a partial clone (#1010): lines only once the
+// files they need are downloaded, which Insights does only when asked. It returns how many
+// versions are missing, and sets q to read names alone while any are.
+func windowLines(ctx context.Context, g *git.Repo, q *git.ShippedQuery) (int, error) {
+	missing, err := g.WindowNeeds(ctx, *q)
+	if err != nil {
+		return 0, err
+	}
+	q.Names = len(missing) > 0
+	return len(missing), nil
 }
 
 const day = int64(24 * 60 * 60)
@@ -197,12 +213,16 @@ func (a *App) InsightsShipped(path string, in InsightsInputs) (ShippedResult, er
 		lc := a.linkConfig(ctx, g)
 		q.References = shippedReferences(ctx, g, lc)
 		w.References = lc.Patterns()
-		items, err := g.Shipped(ctx, q)
+		missing, err := windowLines(ctx, g, &q)
+		if err != nil {
+			return ShippedResult{}, err
+		}
+		items, err := g.Shipped(git.NoDownloads(ctx), q)
 		if err != nil {
 			return ShippedResult{}, err
 		}
 		markBots(items, rules)
-		return ShippedResult{Window: w, Items: items}, nil
+		return ShippedResult{Window: w, Items: items, LinesMissing: missing}, nil
 	})
 }
 

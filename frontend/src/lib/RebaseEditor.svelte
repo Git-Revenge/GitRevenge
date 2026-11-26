@@ -7,6 +7,7 @@
   import { ACTIONS, actionForKey, isCommitId, actionLabel, changed, foldable, foldIn, foldTarget, move, newPlan, outcome, problem as problemOf, setAction, toRun, type Action, type PlanItem } from './rebasePlan'
   import { session } from './session.svelte'
   import Icon from './ui/Icon.svelte'
+  import NotDownloaded from './diff/NotDownloaded.svelte'
 
   /** The interactive rebase editor (issue #596): what happens to each commit after base, oldest
    * first as git applies them, with the branch as it will be afterwards beside it. */
@@ -59,8 +60,13 @@
   let forecasting = $state(false)
   let asked = 0
   let order = $derived(items.map((it) => `${it.commit}:${it.action === 'drop' ? 'drop' : 'keep'}`).join(' '))
+  // In a partial clone the forecast needs the commits' files (#1010): one download, shown in
+  // the forecast's place, then it's asked for again.
+  let downloaded = $state(0)
+  let missing = $derived(forecast?.missing ?? [])
   $effect(() => {
     void order
+    void downloaded
     if (!loaded || !items.length || problem) {
       forecast = null
       return
@@ -377,6 +383,12 @@
 
         {#if problem}
           <!-- The plan can't run yet, so there's nothing to forecast. -->
+        {:else if missing.length}
+          <div class="card">
+            {#key missing.join()}
+              <NotDownloaded {path} inline ids={missing} about="the files these commits change, to check this order for conflicts" onDone={() => (downloaded += 1)} />
+            {/key}
+          </div>
         {:else if forecast?.stopsAt}
           <div class="card warn" role="status">
             <div class="head">
@@ -408,7 +420,7 @@
             <strong>This branch is already pushed</strong>
             <p>Its commits get new ids, so <span class="mono">{forecast.upstream}</span> will need a force push afterwards.</p>
           </div>
-        {:else if forecast}
+        {:else if forecast && !missing.length}
           <p class="note foot">These commits aren't pushed, so nobody else has them.</p>
         {/if}
       </aside>

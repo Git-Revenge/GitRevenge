@@ -92,13 +92,13 @@ func TestFileImage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	url, err := a.FileImage(tab.Path, DiffCommit, head, "docs/img/dot.png")
-	if err != nil || !strings.HasPrefix(url, "data:image/png;base64,") {
-		t.Fatalf("FileImage(png) = %.40q, %v", url, err)
+	img, err := a.FileImage(tab.Path, DiffCommit, head, "docs/img/dot.png")
+	if err != nil || !strings.HasPrefix(img.URL, "data:image/png;base64,") || img.Missing != nil {
+		t.Fatalf("FileImage(png) = %.40q, %v", img.URL, err)
 	}
 	for _, p := range []string{"docs/readme.md", "docs/missing.png", "../outside.png", "/etc/passwd"} {
-		if url, err := a.FileImage(tab.Path, DiffUnstaged, "", p); err != nil || url != "" {
-			t.Errorf("FileImage(%q) = %.40q, %v; want empty", p, url, err)
+		if img, err := a.FileImage(tab.Path, DiffUnstaged, "", p); err != nil || img.URL != "" || img.Missing != nil {
+			t.Errorf("FileImage(%q) = %+v, %v; want empty", p, img, err)
 		}
 	}
 }

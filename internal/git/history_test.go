@@ -18,9 +18,9 @@ func TestFileHistoryFollowsRenames(t *testing.T) {
 	fx.Commit("rename")
 	fx.CommitFile("new.txt", strings.Repeat("content\n", 10)+"more\nand more\n", "edit after rename")
 
-	hist, err := OpenRepo(newTestRunner(t), fx.Dir).FileHistory(context.Background(), "new.txt")
-	if err != nil {
-		t.Fatal(err)
+	hist, stop, err := OpenRepo(newTestRunner(t), fx.Dir).FileHistory(context.Background(), "new.txt")
+	if err != nil || stop != nil {
+		t.Fatal(err, stop)
 	}
 	var subjects []string
 	for _, c := range hist {

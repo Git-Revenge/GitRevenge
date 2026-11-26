@@ -28,8 +28,18 @@ type FileCommit struct {
 // MaxFileHistory caps how many commits FileHistory returns.
 const MaxFileHistory = 5000
 
-// FileHistory lists the commits that changed path, newest first, following renames.
-func (r *Repo) FileHistory(ctx context.Context, path string) ([]FileCommit, error) {
+// HistoryStop says where a file's history stopped in a partial clone (#1010): following the
+// rename at Commit compares files never downloaded. Missing lists them, to download in one
+// request and follow further.
+type HistoryStop struct {
+	Commit  string   `json:"commit"`
+	Missing []string `json:"missing"`
+}
+
+// FileHistory lists the commits that changed path, newest first, following renames. It
+// downloads nothing: in a partial clone, where a rename can't be followed without the files
+// it compares, the history ends there and stop says so.
+func (r *Repo) FileHistory(ctx context.Context, path string) (commits []FileCommit, stop *HistoryStop, err error) {
 	out, err := r.readCmd(ctx, Cmd{
 		Args: []string{
 			"log", "--follow", "--name-status", "-z",
@@ -37,12 +47,66 @@ func (r *Repo) FileHistory(ctx context.Context, path string) ([]FileCommit, erro
 			"--format=%x1e%H%x1f%aN%x1f%at%x1f%s",
 			"--", path,
 		},
-		Env: []string{"GIT_LITERAL_PATHSPECS=1"},
+		Env: append([]string{"GIT_LITERAL_PATHSPECS=1"}, noLazyFetch...),
 	})
+	if err == nil {
+		return parseFileHistory(out), nil, nil
+	}
+	if ctx.Err() != nil || !r.Partial(ctx) {
+		return nil, nil, err
+	}
+	// git wrote the commits up to the one it couldn't follow past.
+	commits = parseFileHistory(out)
+	if stop, serr := r.historyStop(ctx, commits, path); serr == nil && stop != nil {
+		return commits, stop, nil
+	}
+	return nil, nil, err
+}
+
+// historyStop finds the commit a file's history stopped at, after commits, and what following
+// a rename there reads that a partial clone hasn't got: the file's versions there and every
+// file the commit deleted, any of which it may have been renamed from.
+func (r *Repo) historyStop(ctx context.Context, commits []FileCommit, path string) (*HistoryStop, error) {
+	from, cur := "HEAD", path
+	if len(commits) > 0 {
+		last := commits[len(commits)-1]
+		from, cur = last.ID+"^", last.Path
+		if last.OldPath != "" {
+			cur = last.OldPath
+		}
+	}
+	at, err := r.readCmd(ctx, Cmd{Args: []string{"rev-list", "-1", from, "--", cur}, Env: append([]string{"GIT_LITERAL_PATHSPECS=1"}, noLazyFetch...)})
+	commit := strings.TrimSpace(string(at))
+	if err != nil || commit == "" {
+		return nil, err
+	}
+	args := []string{"diff-tree", "-r", "-z", "--raw", "--no-renames", "--no-abbrev", "--no-commit-id", "--root", commit}
+	raw, err := r.readCmd(ctx, Cmd{Args: args, Env: noLazyFetch})
 	if err != nil {
 		return nil, err
 	}
-	return parseFileHistory(out), nil
+	var ids []string
+	f := strings.Split(strings.TrimSuffix(string(raw), "\x00"), "\x00")
+	for i := 0; i+1 < len(f); i += 2 {
+		head := strings.Fields(f[i])
+		if len(head) < 5 || !strings.HasPrefix(head[0], ":") {
+			continue
+		}
+		if p := f[i+1]; p == cur {
+			for _, id := range head[2:4] {
+				if strings.Trim(id, "0") != "" {
+					ids = append(ids, id)
+				}
+			}
+		} else if head[4] == "D" && head[0] != ":160000" {
+			ids = append(ids, head[2])
+		}
+	}
+	missing, err := r.missingOf(ctx, ids)
+	if err != nil || len(missing) == 0 {
+		return nil, err
+	}
+	return &HistoryStop{Commit: commit, Missing: missing}, nil
 }
 
 // parseFileHistory reads records of: RS sha US author US time US subject, then -z

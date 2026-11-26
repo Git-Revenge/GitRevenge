@@ -7,6 +7,7 @@
   import { session } from '../session.svelte'
   import DiffView, { type DiffTarget } from './DiffView.svelte'
   import Loading from '../ui/Loading.svelte'
+  import NotDownloaded from './NotDownloaded.svelte'
 
   let {
     path,
@@ -20,19 +21,27 @@
   /** Where a shallow clone's history stops, when this file's reaches its edge (#1006): its
    * oldest commit here isn't where the file began. 0 otherwise. */
   let edgeSince = $state(0)
+  // In a partial clone the history may stop at a rename it can't follow without downloading
+  // (#1010): it says so, and downloads the files that rename compares only when asked.
+  let stop = $state<git.HistoryStop | null>(null)
+  let following = $state(false)
+  let downloaded = $state(0)
 
   $effect(() => {
     const f = file
     void session.revision[path]
+    void downloaded
     commits = null
-    selected = null
     edgeSince = 0
-    void session.run(() => FileHistory(path, f)).then(async (c) => {
+    stop = null
+    following = false
+    void session.run(() => FileHistory(path, f)).then(async (res) => {
       if (f !== file) return
-      commits = c ?? []
-      selected = commits[0] ?? null
+      commits = res?.commits ?? []
+      stop = res?.stop ?? null
+      selected = commits.find((c) => c.id === selected?.id) ?? commits[0] ?? null
       const oldest = commits.at(-1)
-      if (oldest && (await IsShallowEdge(path, oldest.id).catch(() => false)) && f === file) {
+      if (!stop && oldest && (await IsShallowEdge(path, oldest.id).catch(() => false)) && f === file) {
         const shape = await CloneShape(path).catch(() => null)
         if (f === file) edgeSince = shape?.shallow?.since ?? oldest.time
       }
@@ -65,10 +74,23 @@
           </button>
         </li>
       {:else}
-        <li><Empty note="untouched">No commits touch this file.</Empty></li>
+        {#if !stop}<li><Empty note="untouched">No commits touch this file.</Empty></li>{/if}
       {/each}
       {#if edgeSince}
         <li class="edge"><ShallowBand {path} since={edgeSince} {file} /></li>
+      {/if}
+      {#if stop}
+        <li class="stop" role="status">
+          {#if following}
+            <NotDownloaded {path} inline ids={stop.missing} about="the files this rename compares" onDone={() => (downloaded += 1)} />
+          {:else}
+            <p>
+              The history stops at <span class="sha">{stop.commit.slice(0, 7)}</span>, where the file was renamed. Following it further back compares
+              {stop.missing.length === 1 ? 'a file' : `${stop.missing.length} files`} this partial clone hasn’t downloaded.
+            </p>
+            <button class="btn secondary" onclick={() => (following = true)}>Download and follow</button>
+          {/if}
+        </li>
       {/if}
     {/if}
   </ul>
@@ -110,8 +132,8 @@
     border-bottom: 1px dotted var(--paper-edge);
   }
 
-  /* A commit's row: not the buttons of the band at the end. */
-  .list li > button {
+  /* A commit's row: not the stop row's button, nor the band's at the end. */
+  .list li:not(.stop) > button {
     display: flex;
     gap: 12px;
     align-items: baseline;
@@ -123,16 +145,32 @@
     text-align: left;
   }
 
-  .list li > button:hover:not(:disabled) {
+  .list li:not(.stop) > button:hover:not(:disabled) {
     background: var(--wash-hover);
   }
 
-  .list li > button.active {
+  .list li:not(.stop) > button.active {
     background: var(--selected);
   }
 
   .list .edge {
     border-bottom: none;
+  }
+
+  .list .stop {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  .stop p {
+    flex: 1 1 280px;
+    margin: 0;
+    line-height: 1.45;
   }
 
   .sha {

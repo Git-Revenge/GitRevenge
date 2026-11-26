@@ -1,8 +1,10 @@
 import {
+  CancelDownload,
   Fetch,
   GroupBatch,
   Groups,
   InsightsBranches,
+  InsightsDownload,
   InsightsFetchedAt,
   InsightsHotspots,
   InsightsShipped,
@@ -120,6 +122,61 @@ class InsightsTab {
   /** Conflict checks still running. */
   pending = $derived(this.branches.filter((b) => !b.conflict).length)
 
+  /** Repositories in scope whose lines changed aren't counted: partial clones that haven't
+   * downloaded the files the lines read (#1010). Insights downloads nothing by itself. */
+  partial = $derived(
+    this.repos.filter((repo) => {
+      const d = this.data[repo]
+      if (!d) return false
+      if ((d.shipped?.linesMissing ?? 0) > 0 || (d.hotspots?.linesMissing ?? 0) > 0) return true
+      return this.branches.some((b) => b.repo === repo && (b.value.linesUnknown || b.conflict?.unknown))
+    }),
+  )
+
+  /** Whether a repository's lines changed are missing. */
+  linesMissing = (repo: string) => this.partial.includes(repo)
+
+  /** The download of the lines, when asked for. */
+  download = $state<{ phase: 'idle' | 'downloading' | 'counting' | 'stopped' | 'failed'; error: string }>({ phase: 'idle', error: '' })
+  private downloads: string[] = []
+
+  /** Downloads what the lines and dry-run merges of the partial repositories read, one
+   * repository at a time, each as one request, then measures them again. */
+  async downloadLines() {
+    const repos = [...this.partial]
+    if (!repos.length) return
+    this.download = { phase: 'downloading', error: '' }
+    const mine = repos.map(() => `${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    this.downloads = mine
+    try {
+      for (const [i, repo] of repos.entries()) {
+        await InsightsDownload(repo, mine[i], this.inputs(this.data[repo]?.shipped?.window.asOf ?? this.asOf))
+        if (this.downloads !== mine) return
+      }
+    } catch (e) {
+      if (this.downloads !== mine) return
+      const text = errorText(e)
+      this.download = /cancel|stopp?ed|killed|interrupt/i.test(text) ? { phase: 'stopped', error: '' } : { phase: 'failed', error: text }
+      return
+    }
+    // Dry-run merges that couldn't be tried can be now.
+    for (const [key, c] of Object.entries(this.conflicts)) if (c.unknown) delete this.conflicts[key]
+    // Said until the lines are on the page, so the old note doesn't offer the download again.
+    this.download = { phase: 'counting', error: '' }
+    try {
+      await this.load(this.scope?.kind === 'group' ? undefined : repos)
+    } finally {
+      if (this.downloads === mine) this.download = { phase: 'idle', error: '' }
+    }
+  }
+
+  stopDownload() {
+    const running = this.downloads
+    this.downloads = []
+    this.download = { phase: 'stopped', error: '' }
+    for (const token of running) void CancelDownload(token)
+  }
+
   /** The window the results share: the first repository's (a group shares one as-of point). */
   resolved = $derived(this.repos.map((r) => this.data[r]?.shipped?.window).find((w) => w))
 
@@ -155,7 +212,11 @@ class InsightsTab {
   async exportCSV(what: 'shipped' | 'attention' | 'hotspots') {
     const inp = this.reportInputs()
     const text =
-      what === 'shipped' ? shippedCSV(inp, this.items, this.repoName) : what === 'attention' ? attentionCSV(inp, attention(this.branches), this.repoName) : hotspotsCSV(inp, this.hot, this.repoName)
+      what === 'shipped'
+        ? shippedCSV(inp, this.items, this.repoName, this.linesMissing)
+        : what === 'attention'
+          ? attentionCSV(inp, attention(this.branches), this.repoName)
+          : hotspotsCSV(inp, this.hot, this.repoName, this.linesMissing)
     const name = exportName(this.label(), what, inp.windows[0]?.asOf ?? 0, 'csv')
     try {
       await SaveFile('Export CSV', name, textToBase64(text))

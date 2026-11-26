@@ -113,6 +113,23 @@ describe('CSV', () => {
     expect(hotspotsCSV(inputs, [{ repo: '/r/api', value: { path: 'a.go', lines: 5, items: 2, openBranches: 1 } }], name)).toContain('api,a.go,5,2,1')
   })
 
+  it('leaves lines empty where a partial clone counted none, and says so of its merges', () => {
+    const partial = (repo: string) => repo === '/r/api'
+    const shipped = shippedCSV(inputs, items, name, partial).split('\r\n')
+    expect(shipped[9]).toContain('Maya Okafor,maya@x,,2,,,no')
+    expect(shipped[10]).toContain('TIDE-88,2,10,3,yes')
+    expect(hotspotsCSV(inputs, [{ repo: '/r/api', value: { path: 'a.go', lines: 0, items: 2, openBranches: 1 } }], name, partial)).toContain('api,a.go,,2,1')
+    const unknown: Ranked<Signal>[] = [
+      {
+        repo: '/r/api',
+        value: { ...flagged[1].value, added: 0, removed: 0, linesUnknown: true },
+        conflict: { repo: '/r/api', targetSha: 'bbb222', branch: 'spike', sha: 'c2', conflicts: false, files: [], unknown: true },
+      },
+    ]
+    expect(attentionCSV(inputs, unknown, name)).toContain('api,spike,c2,yes,Priya,unknown,,12,13,7,,stale')
+    expect(summary(inputs, [], unknown, [], { shipped: false, attention: true, hotspots: false, groupByReference: false }, name)).toContain('conflicts not checked (files not downloaded)')
+  })
+
   it('names files after the scope, list and as-of day', () => {
     expect(exportName('Harbour team', 'shipped', T, 'csv')).toBe('insights-harbour-team-shipped-2026-07-22.csv')
   })

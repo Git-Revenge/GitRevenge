@@ -1,5 +1,6 @@
 <script lang="ts">
   import { CloneShape, Integrate, PreviewMerge, PreviewRebase, RepoState } from '../../wailsjs/go/app/App.js'
+  import NotDownloaded from './diff/NotDownloaded.svelte'
   import ShallowBand from './ShallowBand.svelte'
   import type { app } from '../../wailsjs/go/models'
   import { errorText } from './errors'
@@ -47,9 +48,18 @@
     if (pastEdge && !edgeSince) void CloneShape(path).then((s) => (edgeSince = s?.shallow?.since ?? 0)).catch(() => {})
   })
 
+  // In a partial clone the forecast may need files never downloaded (#1010): they come in one
+  // download, shown here, and the forecast is asked for again. Stopped, the dialog goes on
+  // without a forecast, as when one fails: the operation downloads what it needs itself.
+  let downloaded = $state(0)
+  let stopped = $state(false)
+  let missing = $derived((kind === 'merge' ? merge?.missing : rebase?.missing) ?? [])
+  let blind = $derived(!!failed || stopped)
+
   // The dialog is useful without a forecast: it says so and still offers the operation.
   $effect(() => {
     void fetched
+    void downloaded
     if (kind === 'merge') {
       void PreviewMerge(path, target)
         .then((p) => (merge = p))
@@ -61,11 +71,13 @@
     }
   })
 
-  let choices = $derived(merge ? mergeChoices(merge, current, label) : [])
+  // A forecast with files missing has nothing else in it.
+  let known = $derived(!missing.length)
+  let choices = $derived(merge && known ? mergeChoices(merge, current, label) : [])
   let chosen = $derived(how ?? choices.find((c) => !c.off)?.how ?? 'no-ff')
   let conflicts = $derived((kind === 'merge' ? merge?.conflicts : rebase?.conflicts) ?? [])
-  let unknown = $derived(!!failed || (kind === 'merge' ? !!merge?.unknown : !!rebase?.incomplete))
-  let loaded = $derived(!!failed || (kind === 'merge' ? !!merge : !!rebase))
+  let unknown = $derived(blind || (kind === 'merge' ? !!merge?.unknown : !!rebase?.incomplete))
+  let loaded = $derived(blind || ((kind === 'merge' ? !!merge : !!rebase) && known))
   let nothing = $derived(kind === 'merge' ? !!merge?.alreadyMerged : !!rebase && rebase.commitCount === 0)
   let fixups = $derived(rebase?.fixups ?? 0)
   // A fast-forward or a squash can't stop on these conflicts the way a merge commit does.
@@ -101,8 +113,23 @@
       if (loaded && !nothing && !pastEdge) run()
     }}
   >
+    {#if missing.length && !failed}
+      {#key missing.join()}
+        <NotDownloaded
+          {path}
+          inline
+          ids={missing}
+          about="the files both sides changed"
+          onDone={() => {
+            stopped = false
+            downloaded += 1
+          }}
+          onStopped={() => (stopped = true)}
+        />
+      {/key}
+    {/if}
     {#if !loaded}
-      <p class="form-note" role="status">Working out what this would do…</p>
+      {#if known}<p class="form-note" role="status">Working out what this would do…</p>{/if}
     {:else if pastEdge}
       <ShallowBand
         {path}
@@ -118,7 +145,7 @@
           has no commits that <span class="mono">{label}</span> doesn't. There's nothing to rebase.{/if}
       </p>
     {:else}
-      {#if merge}
+      {#if merge && known}
         <div class="how">
           <span class="meta">How</span>
           <span class="segmented" role="group" aria-label="How to merge">
@@ -136,10 +163,10 @@
         <div class="card">
           <div class="head">
             <Icon name="info" size={20} />
-            <strong>{kind === 'rebase' && rebase?.incomplete && !failed ? 'Not every commit could be checked' : "Conflicts couldn't be checked ahead of time"}</strong>
+            <strong>{kind === 'rebase' && rebase?.incomplete && !blind ? 'Not every commit could be checked' : "Conflicts couldn't be checked ahead of time"}</strong>
           </div>
           <p class="form-note">
-            {kind === 'rebase' && rebase?.incomplete && !failed ? 'None of the commits that were tried conflict.' : ''} If there are any, the {kind} stops and shows them, and you can resolve them or abort.
+            {kind === 'rebase' && rebase?.incomplete && !blind ? 'None of the commits that were tried conflict.' : ''} If there are any, the {kind} stops and shows them, and you can resolve them or abort.
           </p>
         </div>
       {:else if showConflicts}
@@ -177,7 +204,9 @@
         </div>
       {/if}
 
-      {#if merge}
+      {#if !known}
+        <!-- Stopped before the forecast: nothing more is known. -->
+      {:else if merge}
         <section>
           <h3 class="meta">Coming in · {plural(merge.commitCount, 'commit', 'commits')} · {plural(merge.files, 'file', 'files')}</h3>
           <ul class="rows scroll">
@@ -228,7 +257,7 @@
       <button type="button" class="btn quiet" onclick={onClose}>{nothing ? 'Close' : 'Cancel'}</button>
       {#if !nothing}
         <button type="submit" class="btn lg primary" disabled={!loaded || pastEdge}>
-          {#if !loaded || failed}{kind === 'merge' ? 'Merge' : 'Rebase'}{:else if merge}{mergeVerb(merge, chosen, current)}{:else if rebase}{rebaseVerb(rebase, edit)}{/if}
+          {#if !loaded || blind || pastEdge}{kind === 'merge' ? 'Merge' : 'Rebase'}{:else if merge}{mergeVerb(merge, chosen, current)}{:else if rebase}{rebaseVerb(rebase, edit)}{/if}
           <span class="arrow" aria-hidden="true">→</span>
         </button>
       {/if}

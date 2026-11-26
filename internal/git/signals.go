@@ -36,6 +36,9 @@ type OpenBranch struct {
 	// Added and Removed are lines changed against the merge base.
 	Added   int `json:"added"`
 	Removed int `json:"removed"`
+	// LinesUnknown means a partial clone hasn't downloaded the files the lines need
+	// (#1010): Added and Removed are 0, and Paths come from the listings, without renames.
+	LinesUnknown bool `json:"linesUnknown,omitempty"`
 	// Paths are the files the branch changes against the merge base, sorted.
 	Paths []string `json:"paths"`
 }
@@ -100,16 +103,64 @@ func (r *Repo) OpenBranches(ctx context.Context, target string, limit int, skip 
 		return strings.Compare(a.Name, b.Name)
 	})
 	bs = bs[:min(len(bs), limit)]
+	partial := r.Partial(ctx)
 	for i := range bs {
-		if err := r.measure(ctx, target, &bs[i]); err != nil {
+		if err := r.measure(ctx, target, &bs[i], partial); err != nil {
 			return nil, err
 		}
 	}
 	return bs, nil
 }
 
-// measure fills in a branch's author, age, drift and size.
-func (r *Repo) measure(ctx context.Context, target string, b *OpenBranch) error {
+// BranchNeeds lists what a partial clone hasn't got of the files that measuring b against
+// target reads: both sides of its changes since the merge base, for its lines, and what a
+// dry-run merge into target reads (MergeNeeds).
+func (r *Repo) BranchNeeds(ctx context.Context, target string, b OpenBranch) ([]string, error) {
+	if !r.Partial(ctx) {
+		return nil, nil
+	}
+	if err := CheckRevs(target, b.SHA); err != nil {
+		return nil, err
+	}
+	base, err := r.ReadString(ctx, append(pinned(target), "merge-base", target, b.SHA)...)
+	if err != nil {
+		return nil, nil // unrelated histories: nothing is measured
+	}
+	raw, err := r.readCmd(ctx, Cmd{Args: append(pinned(target), "diff-tree", "-r", "-z", "--raw", "--no-renames", "--no-abbrev", base, b.SHA), Env: noLazyFetch})
+	if err != nil {
+		return nil, err
+	}
+	_, ids := rawChangesZ(raw)
+	merging, err := r.MergeNeeds(ctx, target, b.SHA)
+	if err != nil {
+		return nil, err
+	}
+	return r.missingOf(ctx, append(ids, merging...))
+}
+
+// rawChangesZ reads `diff-tree -r -z --raw --no-renames` output: the paths changed, and the
+// versions on both sides (not a side that isn't there, nor a submodule's commits).
+func rawChangesZ(out []byte) (paths, ids []string) {
+	f := strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
+	for i := 0; i+1 < len(f); i += 2 {
+		head := strings.Fields(f[i])
+		if len(head) < 5 || !strings.HasPrefix(head[0], ":") {
+			continue
+		}
+		paths = append(paths, f[i+1])
+		modes := []string{strings.TrimPrefix(head[0], ":"), head[1]}
+		for k, id := range head[2:4] {
+			if strings.Trim(id, "0") != "" && modes[k] != "160000" {
+				ids = append(ids, id)
+			}
+		}
+	}
+	return paths, ids
+}
+
+// measure fills in a branch's author, age, drift and size. In a partial clone that hasn't
+// downloaded what its lines need, its size is unknown (#1010).
+func (r *Repo) measure(ctx context.Context, target string, b *OpenBranch, partial bool) error {
 	pin := pinned(target)
 	read := func(args ...string) (string, error) { return r.ReadString(ctx, append(slices.Clone(pin), args...)...) }
 
@@ -136,6 +187,22 @@ func (r *Repo) measure(ctx context.Context, target string, b *OpenBranch) error 
 	if err != nil {
 		// Unrelated histories: nothing to compare against.
 		return nil
+	}
+	if partial {
+		raw, err := r.readCmd(ctx, Cmd{Args: append(slices.Clone(pin), "diff-tree", "-r", "-z", "--raw", "--no-renames", "--no-abbrev", base, b.SHA), Env: noLazyFetch})
+		if err != nil {
+			return err
+		}
+		paths, ids := rawChangesZ(raw)
+		missing, err := r.missingOf(ctx, ids)
+		if err != nil {
+			return err
+		}
+		if len(missing) > 0 {
+			b.Paths, b.LinesUnknown = paths, true
+			slices.Sort(b.Paths)
+			return nil
+		}
 	}
 	diff, err := read("diff", "--numstat", "-M", "--no-textconv", "--no-ext-diff", base, b.SHA, "--")
 	if err != nil {
@@ -181,6 +248,9 @@ type Conflict struct {
 	Conflicts bool `json:"conflicts"`
 	// Files are the conflicting paths, sorted.
 	Files []string `json:"files"`
+	// Unknown means the merge couldn't be tried: a partial clone hasn't downloaded the files
+	// it reads (#1010). Conflicts is false then, and says nothing.
+	Unknown bool `json:"unknown,omitempty"`
 }
 
 // WouldConflict merges branch into target in memory (git merge-tree), touching nothing on
@@ -226,14 +296,10 @@ func (r *Repo) HotFiles(ctx context.Context, q ShippedQuery) ([]HotFile, error) 
 	if err := CheckRevs(q.Target, q.Range); err != nil {
 		return nil, err
 	}
-	args := append(pinned(q.Target),
-		"log", "--first-parent", "--diff-merges=first-parent", "--numstat", "-M",
-		"--no-textconv", "--no-ext-diff", "--format=%x1e%ct%x1d")
-	if q.Range != "" {
-		args = append(args, q.Range, "--")
-	} else {
-		args = append(args, q.Target, "--")
-	}
+	args := append(append(pinned(q.Target),
+		"log", "--first-parent", "--diff-merges=first-parent"), q.changes()...)
+	args = append(args, "--no-textconv", "--no-ext-diff", "--format=%x1e%ct%x1d")
+	args = append(args, q.revs()...)
 	files := map[string]*HotFile{}
 	err := r.Stream(ctx, func(rd io.Reader) error {
 		br := bufio.NewReaderSize(rd, 64*1024)
@@ -246,19 +312,17 @@ func (r *Repo) HotFiles(ctx context.Context, q ShippedQuery) ([]HotFile, error) 
 				}
 				if q.Range != "" || at <= q.Until {
 					for line := range strings.SplitSeq(numstat, "\n") {
-						cols := strings.SplitN(line, "\t", 3)
-						if len(cols) != 3 {
+						path, a, d, ok := changeLine(line)
+						if !ok {
 							continue
 						}
-						p := renamedTo(cols[2])
+						p := renamedTo(path)
 						fc := files[p]
 						if fc == nil {
 							fc = &HotFile{Path: p}
 							files[p] = fc
 						}
 						fc.Items++
-						a, _ := strconv.Atoi(cols[0])
-						d, _ := strconv.Atoi(cols[1])
 						fc.Lines += a + d
 					}
 				}
@@ -281,6 +345,10 @@ func (r *Repo) HotFiles(ctx context.Context, q ShippedQuery) ([]HotFile, error) 
 	slices.SortFunc(out, func(a, b HotFile) int {
 		if a.Lines != b.Lines {
 			return b.Lines - a.Lines
+		}
+		// Without lines (q.Names), the files most items changed.
+		if q.Names && a.Items != b.Items {
+			return b.Items - a.Items
 		}
 		return strings.Compare(a.Path, b.Path)
 	})

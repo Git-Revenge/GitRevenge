@@ -29,6 +29,7 @@ type HistoryIdentity struct {
 // It reads every commit, which takes about twenty seconds for the Linux kernel's 1.5
 // million, so the caller keeps the answer until a ref moves.
 func (r *Repo) HistoryIdentities(ctx context.Context) ([]HistoryIdentity, int, error) {
+	ctx = NoDownloads(ctx) // commits only (#1010)
 	type count struct{ authored, coAuthored int }
 	seen := map[Identity]*count{}
 	var order []Identity

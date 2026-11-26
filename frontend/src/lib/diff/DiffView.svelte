@@ -83,6 +83,13 @@
 
   // In File mode a file with a previewer shows rendered by default; Raw shows its source.
   const RENDER_KEY = 'gitrevenge.renderPreviews'
+  // Stands in for a picture a partial clone hasn't downloaded (#1010). An image can't read the
+  // theme, so its grey reads on both papers.
+  const NOT_DOWNLOADED =
+    'data:image/svg+xml,' +
+    encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="56" viewBox="0 0 220 56"><rect x="1" y="1" width="218" height="54" rx="6" fill="none" stroke="#8c8378" stroke-dasharray="4 3"/><text x="110" y="33" font-family="sans-serif" font-size="13" fill="#8c8378" text-anchor="middle">Picture not downloaded</text></svg>',
+    )
   let rendered = $state(readRendered())
   function readRendered(): boolean {
     try {
@@ -101,8 +108,37 @@
   }
   let previewer = $derived(previewerFor(target.file))
 
+  // Pictures a rendered preview shows from other files (#1010): in a partial clone some may
+  // never have been downloaded. Each shows as not downloaded, and they come in one download,
+  // shown above the preview, gathered for a moment so a document's pictures go together.
+  let pictures = $state<string[]>([])
+  let picturesIn = $state(0)
+  let pictureWait: ReturnType<typeof setTimeout> | undefined
+  // Gathered here, not shown as they come: pictures is set once they've stopped arriving.
+  let wanted: string[] = []
+  $effect(() => {
+    void target.file
+    void target.commit
+    void target.mode
+    wanted = []
+    clearTimeout(pictureWait)
+    pictures = []
+  })
+
   /** Loads another file in the repository at the version shown, for a rendered preview. */
-  const loadImage = (file: string) => FileImage(path, target.mode, target.commit ?? '', file)
+  const loadImage = async (file: string) => {
+    const img = await FileImage(path, target.mode, target.commit ?? '', file)
+    if (!img?.missing?.length) return img?.url ?? ''
+    for (const id of img.missing) if (!wanted.includes(id)) wanted.push(id)
+    clearTimeout(pictureWait)
+    pictureWait = setTimeout(() => (pictures = [...wanted]), 150)
+    return NOT_DOWNLOADED
+  }
+  function picturesDownloaded() {
+    wanted = []
+    pictures = []
+    picturesIn += 1
+  }
   const openRelated = (file: string) => onOpen?.({ mode: target.mode, file, commit: target.commit })
   /** This file's bytes at the version shown (or its last version when deleted). */
   const loadData = () =>
@@ -431,7 +467,14 @@
       {/if}
       {@const text = contents.new.exists ? contents.new.text : contents.old.text}
       {#if previewer && rendered}
-        <previewer.component path={target.file} {text} {loadImage} openFile={openRelated} />
+        {#if pictures.length}
+          <div class="pictures-note">
+            <NotDownloaded {path} inline ids={pictures} about={pictures.length === 1 ? 'a picture this preview shows' : `${pictures.length} pictures this preview shows`} onDone={picturesDownloaded} />
+          </div>
+        {/if}
+        {#key picturesIn}
+          <previewer.component path={target.file} {text} {loadImage} openFile={openRelated} />
+        {/key}
       {:else}
         <FileView path={target.file} {text} />
       {/if}
@@ -750,6 +793,13 @@
 
   .notice {
     padding: 16px;
+  }
+
+  .pictures-note {
+    padding: 12px 32px;
+    border-bottom: 1px solid var(--hairline);
+    background: var(--paper-warm);
+    font-size: 13px;
   }
 
   .muted {

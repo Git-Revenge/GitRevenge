@@ -61,6 +61,7 @@ func (r *Repo) reading(ctx context.Context) (reading context.Context, done func(
 // readCmd runs c in the repository as a read, for one that needs more than arguments (an
 // environment, or input).
 func (r *Repo) readCmd(ctx context.Context, c Cmd) ([]byte, error) {
+	c = withDownloadsOff(ctx, c)
 	ctx, done := r.reading(ctx)
 	defer done()
 	c.Dir, c.ReadOnly = r.dir, true
@@ -69,6 +70,7 @@ func (r *Repo) readCmd(ctx context.Context, c Cmd) ([]byte, error) {
 
 // streamCmd is readCmd for output read as it arrives.
 func (r *Repo) streamCmd(ctx context.Context, c Cmd, consume func(io.Reader) error) error {
+	c = withDownloadsOff(ctx, c)
 	ctx, done := r.reading(ctx)
 	defer done()
 	c.Dir, c.ReadOnly = r.dir, true
