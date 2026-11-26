@@ -109,23 +109,66 @@ type FileChange struct {
 
 // ChangedFiles lists the files a commit changed relative to its first parent (or, for a
 // root commit, everything it added). Renames are detected.
-func (r *Repo) ChangedFiles(ctx context.Context, c CommitDetail) ([]FileChange, error) {
-	args := []string{"diff-tree", "-r", "-z", "--name-status", "-M", "--no-commit-id"}
-	if len(c.Parents) == 0 {
-		args = append(args, "--root", c.ID)
-	} else {
-		args = append(args, c.Parents[0], c.ID)
+//
+// In a partial clone, renames and line counts read the files' contents, which may never have
+// been downloaded (#1010). Then the names come from the folder listings alone, with no
+// renames and no counts, and missing lists the versions the counts need: one download, by
+// the panel, brings them. Git isn't left to fail on them, which can take most of a minute.
+func (r *Repo) ChangedFiles(ctx context.Context, c CommitDetail) (changes []FileChange, missing []string, err error) {
+	commits := []string{"--root", c.ID}
+	if len(c.Parents) > 0 {
+		commits = []string{c.Parents[0], c.ID}
 	}
-	out, err := r.Read(ctx, args...)
+	if r.Partial(ctx) {
+		if missing, err = r.changeContentsMissing(ctx, commits); err != nil {
+			return nil, nil, err
+		}
+	}
+	renames := "-M"
+	if len(missing) > 0 {
+		renames = "--no-renames"
+	}
+	args := append([]string{"diff-tree", "-r", "-z", "--name-status", renames, "--no-commit-id"}, commits...)
+	out, err := r.readCmd(ctx, Cmd{Args: args, Env: noLazyFetch})
+	if err != nil {
+		return nil, nil, err
+	}
+	changes = parseNameStatus(out)
+	if len(missing) > 0 {
+		return changes, missing, nil
+	}
+	args[slices.Index(args, "--name-status")] = "--numstat"
+	if counts, err := r.readCmd(ctx, Cmd{Args: args, Env: noLazyFetch}); err == nil {
+		applyNumstat(changes, counts)
+	}
+	return changes, nil, nil
+}
+
+// changeContentsMissing lists the versions a commit's changes need that a partial clone
+// hasn't got: both sides of each changed file, from the folder listings, which it has.
+func (r *Repo) changeContentsMissing(ctx context.Context, commits []string) ([]string, error) {
+	args := append([]string{"diff-tree", "-r", "-z", "--raw", "--no-renames", "--no-abbrev", "--no-commit-id"}, commits...)
+	out, err := r.readCmd(ctx, Cmd{Args: args, Env: noLazyFetch})
 	if err != nil {
 		return nil, err
 	}
-	changes := parseNameStatus(out)
-	args[slices.Index(args, "--name-status")] = "--numstat"
-	if counts, err := r.Read(ctx, args...); err == nil {
-		applyNumstat(changes, counts)
+	var ids []string
+	// -z --raw: ":old-mode new-mode old-id new-id status" NUL path NUL.
+	for field := range strings.SplitSeq(string(out), "\x00") {
+		f := strings.Fields(field)
+		if len(f) < 5 || !strings.HasPrefix(f[0], ":") {
+			continue
+		}
+		modes := []string{strings.TrimPrefix(f[0], ":"), f[1]}
+		for i, id := range f[2:4] {
+			// A submodule's commit isn't a file to download.
+			if strings.Trim(id, "0") != "" && modes[i] != "160000" {
+				ids = append(ids, id)
+			}
+		}
 	}
-	return changes, nil
+	slices.Sort(ids)
+	return r.MissingObjects(ctx, slices.Compact(ids))
 }
 
 // applyNumstat fills in line counts from `--numstat -z` output.

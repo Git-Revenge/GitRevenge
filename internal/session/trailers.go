@@ -53,7 +53,8 @@ func (t *trailerReader) kick() {
 	t.mu.Unlock()
 	go func() {
 		defer t.wg.Done()
-		err := t.index.Read(ctx, t.repo, t.report)
+		// Commit messages only: in a partial clone nothing is downloaded behind it (#1010).
+		err := t.index.Read(git.NoDownloads(ctx), t.repo, t.report)
 		cancel()
 		t.mu.Lock()
 		t.running, t.cancel = false, nil

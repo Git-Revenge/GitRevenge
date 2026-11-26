@@ -2,6 +2,7 @@
   // The Insights tab (#141): what shipped in a window and which work is stuck, computed from
   // the repositories alone (ADR-0008). The side panel holds every input a result depends on.
   import { session } from '../session.svelte'
+  import Busy from '../ui/Busy.svelte'
   import Icon from '../ui/Icon.svelte'
   import InkButton from '../ui/InkButton.svelte'
   import { insights, VIEWS, type WindowKind } from './insights.svelte'
@@ -27,6 +28,10 @@
   let peak = $derived(Math.max(1, ...days.map((d) => d.count)))
   let failed = $derived(insights.repos.filter((r) => insights.data[r]?.error))
   let multi = $derived(insights.repos.length > 1)
+  // What the lines' download covers, in words: the window's changes (#1010).
+  let changesWords = $derived(
+    insights.window === '7d' ? 'a week of changes' : insights.window === '14d' ? 'two weeks of changes' : insights.window === 'month' ? 'the month’s changes' : 'the release’s changes',
+  )
   let pickingDate = $state(false)
   let summaryOpen = $state(false)
 
@@ -169,6 +174,27 @@
     {#each failed as repo (repo)}
       <p class="banner" role="alert"><Icon name="warning" size={16} />{repoName(repo)}: {insights.data[repo].error}</p>
     {/each}
+    {#if insights.partial.length}
+      {@const names = insights.partial.map(repoName).join(', ')}
+      <div class="banner note" role="status">
+        {#if insights.download.phase === 'downloading'}
+          <Busy />
+          <span class="note-text">Downloading {changesWords}…</span>
+          <button class="btn secondary" onclick={() => insights.stopDownload()}>Stop</button>
+        {:else if insights.download.phase === 'counting'}
+          <Busy />
+          <span class="note-text">Counting lines changed…</span>
+        {:else}
+          <Icon name="info" size={16} />
+          <span class="note-text">
+            {#if insights.download.phase === 'failed'}The download failed: {insights.download.error}
+            {:else}Lines changed aren’t counted{multi ? ` for ${names}` : ''}: {insights.partial.length === 1 ? 'it’s a partial clone' : 'they’re partial clones'}
+              without the files the lines need{insights.download.phase === 'stopped' ? ', and the download was stopped' : ''}. Commits and files are.{/if}
+          </span>
+          <button class="btn secondary" onclick={() => void insights.downloadLines()}>{insights.download.phase === 'failed' ? 'Try again' : `Download ${changesWords}`}</button>
+        {/if}
+      </div>
+    {/if}
     {#if !scope}
       <Empty note="nothing to measure">Open a repository or make a project group to see its insights.</Empty>
     {/if}
@@ -487,6 +513,18 @@
     padding: 10px 16px;
     border-radius: var(--r-md);
     background: var(--danger-wash);
+  }
+
+  .banner.note {
+    flex-wrap: wrap;
+    background: var(--paper-warm);
+    border: 1px solid var(--hairline);
+    color: var(--ink-soft);
+  }
+
+  .note-text {
+    flex: 1 1 240px;
+    line-height: 1.45;
   }
 
   .tiles {

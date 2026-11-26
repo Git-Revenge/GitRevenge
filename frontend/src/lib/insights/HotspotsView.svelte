@@ -8,7 +8,11 @@
   let multi = $derived(insights.repos.length > 1)
   let loaded = $derived(insights.repos.every((r) => insights.data[r]?.hotspots || insights.data[r]?.error))
   let files = $derived(insights.hot)
-  let peak = $derived(Math.max(1, ...files.map((f) => f.value.lines)))
+  // Partial clones count no lines until asked (#1010): with none counted anywhere in scope,
+  // the files measure by how many items changed them.
+  let byItems = $derived(files.length > 0 && files.every((f) => insights.linesMissing(f.repo)))
+  const measure = (f: (typeof files)[number]) => (byItems ? f.value.items : f.value.lines)
+  let peak = $derived(Math.max(1, ...files.map(measure)))
   let rework = $derived(latest(insights.items.filter((i) => i.value.revert || i.value.fixup)))
 
   const repoName = (path: string) => session.tabs.find((t) => t.path === path)?.name ?? path.split(/[\\/]/).pop() ?? path
@@ -18,7 +22,9 @@
 
 <div class="hotspots">
   <section aria-labelledby="hot">
-    <h2 id="hot">Most changed files <span class="meta"><span class="why" title="Lines added plus removed by the shipped items in the window">lines changed</span></span></h2>
+    <h2 id="hot">
+      Most changed files <span class="meta">{#if byItems}<span class="why" title="How many shipped items in the window changed each file. Lines changed need this partial clone’s files downloaded">items</span>{:else}<span class="why" title="Lines added plus removed by the shipped items in the window">lines changed</span>{/if}</span>
+    </h2>
     {#if !loaded}
       <p class="sub quiet">Counting…</p>
     {:else}
@@ -31,8 +37,8 @@
               {f.value.items === 1 ? 'item' : 'items'}{multi ? ` · ${repoName(f.repo)}` : ''}{#if f.value.openBranches}<span> · </span><span class="danger">{f.value.openBranches} open {f.value.openBranches === 1 ? 'branch touches' : 'branches touch'} it</span>{/if}
             </span>
           </div>
-          <span class="bar-track" aria-hidden="true"><span class="bar" style:width="{(f.value.lines / peak) * 100}%"></span></span>
-          <span class="lines">{f.value.lines}</span>
+          <span class="bar-track" aria-hidden="true"><span class="bar" style:width="{(measure(f) / peak) * 100}%"></span></span>
+          <span class="lines">{byItems ? f.value.items : insights.linesMissing(f.repo) ? '—' : f.value.lines}</span>
         </div>
       {:else}
         <Empty note="nothing moved">No files changed in this window.</Empty>

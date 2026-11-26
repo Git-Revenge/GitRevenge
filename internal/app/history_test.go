@@ -14,8 +14,9 @@ func TestHistoryAndBlameBindings(t *testing.T) {
 	fx.CommitFile("a.txt", "one\ntwo\n", "second")
 	tab, _ := a.OpenRepo(fx.Dir)
 
-	hist, err := a.FileHistory(tab.Path, "a.txt")
-	if err != nil || len(hist) != 2 || hist[0].Subject != "second" {
+	res, err := a.FileHistory(tab.Path, "a.txt")
+	hist := res.Commits
+	if err != nil || len(hist) != 2 || hist[0].Subject != "second" || res.Stop != nil {
 		t.Fatalf("history = %+v, %v", hist, err)
 	}
 	lines, err := a.Blame(tab.Path, "a.txt", "")

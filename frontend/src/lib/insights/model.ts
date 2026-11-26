@@ -32,6 +32,8 @@ export interface ConflictInfo {
   sha: string
   conflicts: boolean
   files: string[]
+  /** The merge couldn't be tried: a partial clone hasn't the files it reads (#1010). */
+  unknown?: boolean
 }
 
 /** Something from one repository of the scope. */

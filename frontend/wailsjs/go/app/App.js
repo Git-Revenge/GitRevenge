@@ -358,6 +358,10 @@ export function InsightsBranches(arg1, arg2) {
   return window['go']['app']['App']['InsightsBranches'](arg1, arg2);
 }
 
+export function InsightsDownload(arg1, arg2, arg3) {
+  return window['go']['app']['App']['InsightsDownload'](arg1, arg2, arg3);
+}
+
 export function InsightsFetchedAt(arg1) {
   return window['go']['app']['App']['InsightsFetchedAt'](arg1);
 }

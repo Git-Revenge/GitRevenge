@@ -148,7 +148,7 @@ func (a *App) InsightsBranches(path string, in InsightsInputs) (AttentionResult,
 		if err != nil {
 			return AttentionResult{}, err
 		}
-		open, err := g.OpenBranches(ctx, w.Target, git.MaxSignalBranches, endStates(rules))
+		open, err := g.OpenBranches(git.NoDownloads(ctx), w.Target, git.MaxSignalBranches, endStates(rules))
 		if err != nil {
 			return AttentionResult{}, err
 		}
@@ -182,13 +182,22 @@ func (a *App) checkConflicts(ctx context.Context, g *git.Repo, root string, res 
 			todo = append(todo, s.OpenBranch)
 		}
 	}
+	// In a partial clone a merge would download what it reads, one file at a time behind the
+	// view: it's tried with downloads off, and one that needs them isn't known (#1010).
+	partial := g.Partial(ctx)
+	reading := git.NoDownloads(ctx)
 	jobs := make(chan git.OpenBranch)
 	for range conflictWorkers {
 		go func() {
 			for b := range jobs {
-				c, err := g.WouldConflict(ctx, target, b.SHA)
+				c, err := g.WouldConflict(reading, target, b.SHA)
 				if ctx.Err() != nil {
 					return
+				}
+				if err != nil && partial {
+					// Not kept: once downloaded, the merge can be tried.
+					report(b, git.Conflict{Files: []string{}, Unknown: true})
+					continue
 				}
 				if err != nil {
 					continue
@@ -229,6 +238,9 @@ type HotspotsResult struct {
 	Files []HotFile `json:"files"`
 	// Rework is the reverts and fixup commits among the shipped items.
 	Rework []git.ShippedItem `json:"rework"`
+	// LinesMissing is as for ShippedResult: while it's more than 0, Files have no lines and
+	// are ranked by how many items changed them.
+	LinesMissing int `json:"linesMissing"`
 }
 
 // maxHotFiles caps the hotspots list.
@@ -262,6 +274,11 @@ func hotspots(ctx context.Context, g *git.Repo, in InsightsInputs, rules branchk
 		return HotspotsResult{}, err
 	}
 	q := w.query()
+	missing, err := windowLines(ctx, g, &q)
+	if err != nil {
+		return HotspotsResult{}, err
+	}
+	ctx = git.NoDownloads(ctx)
 	files, err := g.HotFiles(ctx, q)
 	if err != nil {
 		return HotspotsResult{}, err
@@ -274,7 +291,7 @@ func hotspots(ctx context.Context, g *git.Repo, in InsightsInputs, rules branchk
 	if err != nil {
 		return HotspotsResult{}, err
 	}
-	res := HotspotsResult{Window: w, Files: []HotFile{}, Rework: []git.ShippedItem{}}
+	res := HotspotsResult{Window: w, Files: []HotFile{}, Rework: []git.ShippedItem{}, LinesMissing: missing}
 	for _, f := range files[:min(len(files), maxHotFiles)] {
 		h := HotFile{HotFile: f}
 		for _, b := range open {
