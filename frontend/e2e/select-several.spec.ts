@@ -6,7 +6,8 @@ import { branch, calls, open } from './support'
 // the graph lists them oldest first, and the menu acts on them all. The backend is stubbed.
 
 const id = (i: number) => String(i).padStart(40, '0')
-/** Rows by different authors an hour apart: each takes a whole row in the timeline. */
+/** Rows by different authors a minute apart, on one day in any time zone: each takes a whole row in
+ * the timeline, with no day line between them to move the rows the clicks aim at. */
 const rows = (n: number) =>
   Array.from({ length: n }, (_, i) => ({
     index: i,
@@ -18,7 +19,7 @@ const rows = (n: number) =>
     id: id(i),
     parents: 1,
     author: `Author ${i}`,
-    authorTime: 1793500000 - i * 3600,
+    authorTime: 1793500000 - i * 60,
     subject: `Commit ${i}`,
   }))
 const person = { name: 'Author 0', email: 'a@example.com', time: 1793500000 }
@@ -44,6 +45,7 @@ const panel = (page: Page) => page.getByRole('complementary', { name: 'Several c
 const commitsIn = (page: Page) => panel(page).getByRole('region', { name: 'The commits' }).locator('li .subject')
 
 test.describe('several commits selected', () => {
+  test.use({ timezoneId: 'UTC' })
   test('Shift+click takes every row between, and the panel lists them oldest first', async ({ page }) => {
     await open(page, 'repoView', { graphData: rows(8), responses: base })
     await click(page, 1)
