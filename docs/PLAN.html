@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="generator" content="Docusaurus v3.10.2">
 <title data-rh="true">Git Revenge — Plan | Git Revenge</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" name="twitter:image" content="https://gitrevenge.com/img/social-card.png"><meta data-rh="true" property="og:url" content="https://gitrevenge.com/docs/PLAN"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Git Revenge — Plan | Git Revenge"><meta data-rh="true" name="description" content="Git Revenge is a fast, local-only desktop git client. It has a Go backend and is built to handle multiple repos, including very large ones."><meta data-rh="true" property="og:description" content="Git Revenge is a fast, local-only desktop git client. It has a Go backend and is built to handle multiple repos, including very large ones."><link data-rh="true" rel="icon" href="/img/favicon.svg"><link data-rh="true" rel="canonical" href="https://gitrevenge.com/docs/PLAN"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/PLAN" hreflang="en"><link data-rh="true" rel="alternate" href="https://gitrevenge.com/docs/PLAN" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Plan","item":"https://gitrevenge.com/docs/PLAN"}]}</script><link rel="apple-touch-icon" href="/img/apple-touch-icon.png"><link rel="stylesheet" href="/assets/css/styles.1bf894f5.css">
-<script src="/assets/js/runtime~main.3abf020f.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.6b1a4f55.js" defer="defer"></script>
 <script src="/assets/js/main.8aa3c71b.js" defer="defer"></script>
 </head>
 <body>
@@ -29,8 +29,8 @@
 </ul>
 <h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="platforms">Platforms<a href="#platforms" class="hash-link" aria-label="Direct link to Platforms" title="Direct link to Platforms" translate="no">​</a></h2>
 <ul>
-<li class=""><strong>Windows, macOS and Linux are first-class.</strong> Linux means Ubuntu 24.04, Debian 13, RHEL 9, and RHEL 10 with EPEL, or newer (<a class="" href="/docs/adr/linux-first-class">ADR-0010</a>).</li>
-<li class="">Requires a system <code>git</code> <strong>&gt;= 2.40</strong>. <code>git-lfs</code> is required for LFS features.</li>
+<li class=""><strong>Windows, macOS and Linux are first-class.</strong> Linux means Ubuntu 24.04 with the Git PPA, RHEL 9, and RHEL 10 with EPEL, or newer (<a class="" href="/docs/adr/linux-first-class">ADR-0010</a>). Debian is supported again from its next release, whose own git meets the minimum.</li>
+<li class="">Requires a system <code>git</code> <strong>&gt;= 2.50</strong> (2.40 before 1.2.0). <code>git-lfs</code> is required for LFS features.</li>
 </ul>
 <h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="architecture">Architecture<a href="#architecture" class="hash-link" aria-label="Direct link to Architecture" title="Direct link to Architecture" translate="no">​</a></h2>
 
@@ -302,7 +302,7 @@
 <ul>
 <li class=""><strong>Your settings.</strong> A newer 1.x reads the <code>settings.json</code> an older one wrote, keeping your settings, project groups, recent repositories and open tabs. A 1.x may add settings; it doesn&#x27;t drop or reinterpret one.</li>
 <li class=""><strong>Repository settings in git config.</strong> The <code>gitrevenge.*</code> keys (branch kinds, hidden branches, smart links, cleanup and notes options) keep their names and meaning, so a repository set up by one 1.x works the same in the next, and so do teammates on different 1.x versions.</li>
-<li class=""><strong>What it runs on.</strong> The systems under <a href="#platforms" class="">Platforms</a> and the minimum git (2.40). Dropping one waits for a major version, unless its vendor has ended support for it.</li>
+<li class=""><strong>What it runs on.</strong> The systems under <a href="#platforms" class="">Platforms</a> and the minimum git. Dropping one waits for a major version, unless its vendor has ended support for it. One exception, decided on 2026-11-26: 1.2.0 raises the minimum git from 2.40 to 2.50, for partial clones. That leaves Debian 13, whose git is 2.47, until its next release, and Ubuntu 24.04 needs the Git PPA.</li>
 <li class=""><strong>How git is used.</strong> Git Revenge keeps running your own <code>git</code>, with your config, hooks, credential helpers and SSH agent.</li>
 <li class=""><strong>Where it installs.</strong> The install locations, the package names (<code>gitrevenge</code> in apt, dnf and Homebrew), and the repository and signing key at packages.gitrevenge.com.</li>
 </ul>
