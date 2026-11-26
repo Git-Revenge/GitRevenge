@@ -67,7 +67,13 @@ export function ChooseFolder(arg1:string):Promise<string>;
 
 export function Clone(arg1:string,arg2:string,arg3:string,arg4:git.CloneOptions):Promise<string>;
 
+export function CloneAbandon(arg1:string):Promise<void>;
+
 export function CloneBranches(arg1:string,arg2:string,arg3:string):Promise<git.RemoteHeads>;
+
+export function CloneCheckout(arg1:string,arg2:Array<string>):Promise<void>;
+
+export function CloneFolders(arg1:string):Promise<Array<git.FolderCount>>;
 
 export function CloneName(arg1:string):Promise<string>;
 

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -26,6 +27,9 @@ type CloneOptions struct {
 	Branch string `json:"branch"`
 	// Submodules clones the submodules too, shallow or partial as the clone is.
 	Submodules bool `json:"submodules"`
+	// Folders clones without writing any file (--no-checkout --sparse), so the folders to
+	// check out can be chosen from the tree before CheckOutFolders writes them (#1004).
+	Folders bool `json:"folders"`
 }
 
 // ErrCloneOptions means the clone's options can't be put on git's command line.
@@ -68,7 +72,97 @@ func (o CloneOptions) args() ([]string, error) {
 			a = append(a, "--also-filter-submodules")
 		}
 	}
+	if o.Folders {
+		// The history and folder listings arrive and no file is written; --sparse starts the
+		// working tree at the top level's own files, in cone mode.
+		a = append(a, "--no-checkout", "--sparse")
+	}
 	return a, nil
+}
+
+// FolderCount is how many files a folder holds at a commit: all of them, at any depth, and
+// those directly in it, which cone mode writes for a folder chosen below it.
+type FolderCount struct {
+	// Path is the folder, "" for the top level.
+	Path   string `json:"path"`
+	Files  int    `json:"files"`
+	Direct int    `json:"direct"`
+}
+
+// FolderCounts counts the files in every folder at rev, from its listing alone: a partial
+// clone answers without downloading anything, and nothing needs to be checked out. The top
+// level comes first, then the folders in path order.
+func (r *Repo) FolderCounts(ctx context.Context, rev string) ([]FolderCount, error) {
+	if err := CheckRevs(rev); err != nil {
+		return nil, err
+	}
+	if rev == "" {
+		rev = "HEAD"
+	}
+	// The listing never needs a file's contents; told not to, a partial clone downloads none.
+	out, err := r.readCmd(ctx, Cmd{Args: []string{"ls-tree", "-r", "-z", "--name-only", rev}, Env: noLazyFetch})
+	if err != nil {
+		return nil, err
+	}
+	files := map[string]int{"": 0}
+	direct := map[string]int{"": 0}
+	for p := range strings.SplitSeq(string(out), "\x00") {
+		if p == "" {
+			continue
+		}
+		files[""]++
+		dir, _ := splitDir(p)
+		direct[dir]++
+		for d := dir; d != ""; d, _ = splitDir(d) {
+			files[d]++
+		}
+	}
+	counts := make([]FolderCount, 0, len(files))
+	for p, n := range files {
+		counts = append(counts, FolderCount{Path: p, Files: n, Direct: direct[p]})
+	}
+	slices.SortFunc(counts, func(a, b FolderCount) int { return strings.Compare(a.Path, b.Path) })
+	return counts, nil
+}
+
+// splitDir splits "a/b/c" into "a/b" and "c", and "c" into "" and "c".
+func splitDir(p string) (dir, name string) {
+	if i := strings.LastIndexByte(p, '/'); i >= 0 {
+		return p[:i], p[i+1:]
+	}
+	return "", p
+}
+
+// CheckOutFolders writes the working tree of a clone made with Folders: only the folders
+// named, in cone mode, or every folder when none are. Names arrive on standard input, so
+// none can be read as an option.
+func (r *Repo) CheckOutFolders(ctx context.Context, folders []string) error {
+	for _, f := range folders {
+		if f == "" || strings.HasPrefix(f, "/") || slices.Contains(strings.Split(f, "/"), "..") || strings.ContainsAny(f, "\r\n") {
+			return fmt.Errorf("%w: folder %q", ErrCloneOptions, f)
+		}
+	}
+	if len(folders) == 0 {
+		if _, err := r.Write(ctx, Cmd{Args: []string{"sparse-checkout", "disable"}}); err != nil {
+			return err
+		}
+	} else {
+		c := Cmd{Args: []string{"sparse-checkout", "set", "--cone", "--stdin"}, Stdin: strings.NewReader(strings.Join(folders, "\n") + "\n")}
+		if _, err := r.Write(ctx, c); err != nil {
+			return err
+		}
+	}
+	// The clone wrote nothing, so the index is empty: checking out the branch writes the
+	// files the patterns allow. A detached HEAD has no branch to name.
+	if branch, err := r.ReadString(ctx, "symbolic-ref", "-q", "--short", "HEAD"); err == nil && branch != "" {
+		if err := CheckRevs(branch); err != nil {
+			return err
+		}
+		_, err := r.Write(ctx, Cmd{Args: []string{"checkout", "-q", branch, "--"}})
+		return err
+	}
+	_, err := r.Write(ctx, Cmd{Args: []string{"read-tree", "-mu", "HEAD"}})
+	return err
 }
 
 // Clone clones url into dir, which must not exist or be empty, with the options chosen. git

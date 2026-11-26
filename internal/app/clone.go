@@ -72,6 +72,10 @@ func (a *App) Clone(url, parent, name string, opts git.CloneOptions) (string, er
 	}
 	// A clone holds only what git and the user's own settings put in its config and hooks.
 	a.trustNew(dir)
+	if opts.Folders {
+		// No file is written yet: the dialog asks which folders, then CloneCheckout.
+		a.halfCloned.add(dir, halfClone{existed: existed, submodules: opts.Submodules})
+	}
 	return dir, nil
 }
 

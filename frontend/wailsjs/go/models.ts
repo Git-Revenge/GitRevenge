@@ -3387,6 +3387,7 @@ export namespace git {
 	    partial: boolean;
 	    branch: string;
 	    submodules: boolean;
+	    folders: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new CloneOptions(source);
@@ -3399,6 +3400,7 @@ export namespace git {
 	        this.partial = source["partial"];
 	        this.branch = source["branch"];
 	        this.submodules = source["submodules"];
+	        this.folders = source["folders"];
 	    }
 	}
 	export class Trailer {
@@ -3717,6 +3719,22 @@ export namespace git {
 	        this.binary = source["binary"];
 	        this.caseClash = source["caseClash"];
 	        this.caseTwin = source["caseTwin"];
+	    }
+	}
+	export class FolderCount {
+	    path: string;
+	    files: number;
+	    direct: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new FolderCount(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.files = source["files"];
+	        this.direct = source["direct"];
 	    }
 	}
 	export class GrepOptions {

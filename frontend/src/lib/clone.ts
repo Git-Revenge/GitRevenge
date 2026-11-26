@@ -15,11 +15,13 @@ export interface ClonePicks {
   branches: 'all' | 'one'
   branch: string
   submodules: boolean
+  /** Every folder, or only some, chosen in the dialog's second step (#1004). */
+  folders: 'all' | 'some'
 }
 
 /** A plain `git clone URL`. */
 export function defaultPicks(since = ''): ClonePicks {
-  return { history: 'all', depth: '1000', since, contents: 'all', branches: 'all', branch: '', submodules: false }
+  return { history: 'all', depth: '1000', since, contents: 'all', branches: 'all', branch: '', submodules: false, folders: 'all' }
 }
 
 /** The number of commits typed, or 0 when it isn't a whole number from 1 up. */
@@ -50,6 +52,7 @@ export function cloneOptions(p: ClonePicks): git.CloneOptions {
     partial: p.contents === 'partial',
     branch: p.branches === 'one' ? p.branch.trim() : '',
     submodules: p.submodules,
+    folders: p.folders === 'some',
   } as git.CloneOptions
 }
 
@@ -69,5 +72,55 @@ export function cloneSummary(p: ClonePicks): string {
   if (p.contents === 'partial') parts.push('contents when needed')
   if (p.branches === 'one') parts.push(p.branch.trim() ? `only ${p.branch.trim()}` : 'one branch')
   if (p.submodules) parts.push('with submodules')
+  if (p.folders === 'some') parts.push('some folders')
   return parts.length ? parts.join(' · ') : 'as git clone does'
+}
+
+// The second step's folders (#1004), from the clone's tree: how many files each holds, and
+// what a checkout of some of them writes, in cone mode.
+
+/** A folder and its files (git.FolderCount): all of them, and those directly in it. "" is the
+ * top level. */
+export interface Folder {
+  path: string
+  files: number
+  direct: number
+}
+
+/** The folder a path is in: "" for one at the top. */
+export const parentOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
+
+/** A path's last part. */
+export const nameOf = (p: string) => p.slice(p.lastIndexOf('/') + 1)
+
+/** The folders directly in parent ("" for the top level), in path order. */
+export function childrenOf(counts: Folder[], parent: string): Folder[] {
+  return counts.filter((c) => c.path !== '' && parentOf(c.path) === parent)
+}
+
+/** The chosen folders without any that's inside another chosen one, which brings it anyway. */
+export function outermost(chosen: string[]): string[] {
+  const set = [...new Set(chosen)]
+  return set.filter((p) => !set.some((q) => q !== p && p.startsWith(q + '/'))).sort()
+}
+
+/** Whether path is a chosen folder or inside one. */
+export const within = (path: string, chosen: string[]) => chosen.some((q) => path === q || path.startsWith(q + '/'))
+
+/**
+ * How many files a checkout of the chosen folders writes, by cone mode's rule: the top
+ * level's own files, every file in a chosen folder, and the files directly in each folder
+ * above one ("arch/x86" brings the 2 files directly in "arch").
+ */
+export function filesWritten(counts: Folder[], chosen: string[]): number {
+  const by = new Map(counts.map((c) => [c.path, c]))
+  const picked = outermost(chosen)
+  let n = by.get('')?.direct ?? 0
+  const above = new Set<string>()
+  for (const p of picked) {
+    n += by.get(p)?.files ?? 0
+    for (let d = parentOf(p); d !== ''; d = parentOf(d)) above.add(d)
+  }
+  for (const d of above) n += by.get(d)?.direct ?? 0
+  return n
 }
