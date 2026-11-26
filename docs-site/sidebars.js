@@ -36,6 +36,7 @@ const sidebars = {
       label: 'User guide',
       items: [
         { type: 'doc', id: 'guide/repositories', label: 'Repositories and tabs' },
+        { type: 'doc', id: 'guide/big-repositories', label: 'Cloning a big repository' },
         { type: 'doc', id: 'guide/graph', label: 'The commit graph' },
         { type: 'doc', id: 'guide/searching-code', label: 'Searching the code' },
         { type: 'doc', id: 'guide/experimental-views', label: 'Experimental views' },

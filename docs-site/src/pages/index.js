@@ -129,6 +129,11 @@ const features = [
     to: '/docs/guide/history',
   },
   {
+    title: 'Big repositories, in part',
+    body: 'Clone part of the history, file contents only when they’re needed, one branch or some folders. A shallow history says where it stops, and a file you open downloads by itself, while anything that would download thousands asks first.',
+    to: '/docs/guide/big-repositories',
+  },
+  {
     title: 'Many repositories',
     body: 'Repositories open in tabs that come back when you restart. Put related ones in a group and fetch or pull them all from one dashboard. Worktrees are listed and open as tabs.',
     to: '/docs/guide/repositories',

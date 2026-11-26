@@ -8,7 +8,7 @@
 The start page has three ways in:
 
 - **Open repository** picks a folder that's already a git repository (<kbd>Ctrl</kbd>+<kbd>O</kbd>).
-- **Clone a repository** takes a URL and a folder. Where it clones to by default is set in [Settings](settings.md).
+- **Clone a repository** takes a URL and a folder. Where it clones to by default is set in [Settings](settings.md). Its **Options** clone less of a big repository: part of the history, file contents only when needed, one branch or some folders. [Cloning a big repository](big-repositories.md) says what each costs.
 - **New repository** runs `git init` in a folder you choose.
 
 Repositories you open are listed under **Recent**, so you can get back to them in one click.
