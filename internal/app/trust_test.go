@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/git-revenge/gitrevenge/internal/fsutil"
+	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
@@ -152,7 +153,7 @@ func TestAClonedRepositoryIsTrusted(t *testing.T) {
 	src.CommitFile("a.txt", "a\n", "one")
 	a := newTestApp(t)
 	parent := t.TempDir()
-	dir, err := a.Clone(src.Dir, parent, "copy")
+	dir, err := a.Clone(src.Dir, parent, "copy", git.CloneOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

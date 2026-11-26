@@ -6,10 +6,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
@@ -19,7 +21,7 @@ func TestCloneOpensAsRepo(t *testing.T) {
 	_, remote := gittest.WithRemote(t, 2)
 	parent := t.TempDir()
 
-	dir, err := a.Clone(remote.Dir, parent, a.CloneName(remote.Dir))
+	dir, err := a.Clone(remote.Dir, parent, a.CloneName(remote.Dir), git.CloneOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +43,7 @@ func TestCloneIntoEmptyFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := a.Clone(remote.Dir, parent, "here"); err != nil {
+	if _, err := a.Clone(remote.Dir, parent, "here", git.CloneOptions{}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -59,7 +61,7 @@ func TestCloneRefusesNonEmptyFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := a.Clone(remote.Dir, parent, "taken")
+	_, err := a.Clone(remote.Dir, parent, "taken", git.CloneOptions{})
 	if err == nil || !strings.Contains(err.Error(), "isn't an empty folder") {
 		t.Fatalf("err = %v", err)
 	}
@@ -80,11 +82,59 @@ func TestCloneValidatesInput(t *testing.T) {
 		{"https://example.com/x.git", parent, ".."},
 		{"https://example.com/x.git", parent, "a/b"},
 	} {
-		if _, err := a.Clone(c.url, c.parent, c.name); err == nil {
+		if _, err := a.Clone(c.url, c.parent, c.name, git.CloneOptions{}); err == nil {
 			t.Errorf("Clone(%q, %q, %q) succeeded", c.url, c.parent, c.name)
 		} else if ue := userError(""); !errors.As(err, &ue) {
 			t.Errorf("Clone(%q, %q, %q) = %v, want a user error", c.url, c.parent, c.name, err)
 		}
+	}
+}
+
+func TestCloneWithOptions(t *testing.T) {
+	isolateGit(t)
+	a := newTestApp(t)
+	_, remote := gittest.WithRemote(t, 3)
+	parent := t.TempDir()
+
+	// Over file://, as from a server, so --depth applies.
+	dir, err := a.Clone("file://"+filepath.ToSlash(remote.Dir), parent, "shallow", git.CloneOptions{Depth: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".git", "shallow")); err != nil {
+		t.Fatalf("not a shallow clone: %v", err)
+	}
+}
+
+func TestCloneRefusesOptionsGitWouldMisread(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	parent := t.TempDir()
+	for _, o := range []git.CloneOptions{{Depth: -1}, {Branch: "--upload-pack=touch x"}} {
+		_, err := a.Clone("https://example.com/x.git", parent, "x", o)
+		if ue := userError(""); err == nil || !errors.As(err, &ue) {
+			t.Errorf("%+v: err = %v, want a user error", o, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(parent, "x")); !os.IsNotExist(err) {
+		t.Fatalf("a folder was made: %v", err)
+	}
+}
+
+func TestCloneBranchesListsTheServersBranches(t *testing.T) {
+	isolateGit(t)
+	a := newTestApp(t)
+	_, remote := gittest.WithRemote(t, 2)
+
+	heads, err := a.CloneBranches(remote.Dir, t.TempDir(), "copy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if heads.Default != "main" || !slices.Contains(heads.Branches, "main") {
+		t.Fatalf("heads = %+v", heads)
+	}
+	if _, err := a.CloneBranches("  ", t.TempDir(), "copy"); err == nil {
+		t.Error("no URL listed something")
 	}
 }
 
@@ -93,7 +143,7 @@ func TestCloneMissingRepoIsExplained(t *testing.T) {
 	a := newTestApp(t)
 	parent := t.TempDir()
 
-	_, err := a.Clone(filepath.Join(t.TempDir(), "nope"), parent, "copy")
+	_, err := a.Clone(filepath.Join(t.TempDir(), "nope"), parent, "copy", git.CloneOptions{})
 	if err == nil || !strings.Contains(err.Error(), "no repository was found") {
 		t.Fatalf("err = %v", err)
 	}
@@ -123,7 +173,7 @@ func TestCancelCloneCleansUp(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		_, err := a.Clone(srv.URL+"/repo.git", parent, "repo")
+		_, err := a.Clone(srv.URL+"/repo.git", parent, "repo", git.CloneOptions{})
 		done <- err
 	}()
 	select {

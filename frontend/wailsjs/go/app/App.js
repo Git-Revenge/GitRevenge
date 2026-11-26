@@ -102,8 +102,12 @@ export function ChooseFolder(arg1) {
   return window['go']['app']['App']['ChooseFolder'](arg1);
 }
 
-export function Clone(arg1, arg2, arg3) {
-  return window['go']['app']['App']['Clone'](arg1, arg2, arg3);
+export function Clone(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['Clone'](arg1, arg2, arg3, arg4);
+}
+
+export function CloneBranches(arg1, arg2, arg3) {
+  return window['go']['app']['App']['CloneBranches'](arg1, arg2, arg3);
 }
 
 export function CloneName(arg1) {
