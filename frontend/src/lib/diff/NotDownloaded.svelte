@@ -10,13 +10,22 @@
   let {
     path,
     ids,
+    about,
     onDone,
+    onStopped,
+    inline = false,
   }: {
     path: string
+    /** Sits in a dialog or a card, rather than filling a view. */
+    inline?: boolean
     /** The versions to download, as the backend named them. */
     ids: string[]
+    /** What they are, in words ("the files both sides changed"); a file's versions when unset. */
+    about?: string
     /** Called once they're in, to load the file again. */
     onDone: () => void
+    /** Called when the download stops or fails, for a view that can go on without them. */
+    onStopped?: () => void
   } = $props()
 
   let token = ''
@@ -41,16 +50,21 @@
         phase = 'failed'
         error = text
       }
+      onStopped?.()
     }
   }
 
   function stop() {
     phase = 'stopped'
     void CancelDownload(token)
+    onStopped?.()
   }
 
+  // Keyed on the list's contents: a view asking again with the same list (the rebase editor,
+  // as commits move) doesn't start a second download.
+  let wanted = $derived(ids.join(' '))
   $effect(() => {
-    void download([...ids])
+    void download(wanted.split(' '))
   })
 
   onDestroy(() => {
@@ -59,19 +73,19 @@
     token = ''
   })
 
-  let what = $derived(ids.length === 1 ? 'this version' : 'both versions')
+  let what = $derived(about ?? `${ids.length === 1 ? 'this version' : 'both versions'} of the file`)
 </script>
 
-<div class="not-downloaded" role="status">
+<div class="not-downloaded" class:inline role="status">
   {#if phase === 'downloading'}
-    <p class="line"><Busy /> This partial clone hasn’t got {what} of the file yet. Downloading…</p>
+    <p class="line"><Busy /> This partial clone hasn’t got {what} yet. Downloading…</p>
     <button class="btn secondary" onclick={stop}>Stop</button>
   {:else if phase === 'stopped'}
-    <p class="line">The download was stopped. This partial clone hasn’t got {what} of the file yet.</p>
-    <button class="btn secondary" onclick={() => void download([...ids])}>Download</button>
+    <p class="line">The download was stopped. This partial clone hasn’t got {what} yet.</p>
+    <button class="btn secondary" onclick={() => void download(wanted.split(' '))}>Download</button>
   {:else}
     <p class="line">The download failed: {error}</p>
-    <button class="btn secondary" onclick={() => void download([...ids])}>Try again</button>
+    <button class="btn secondary" onclick={() => void download(wanted.split(' '))}>Try again</button>
   {/if}
 </div>
 
@@ -83,6 +97,11 @@
     gap: 10px;
     padding: 24px;
     color: var(--code-text, var(--ink));
+  }
+
+  .not-downloaded.inline {
+    padding: 0;
+    color: inherit;
   }
 
   .line {

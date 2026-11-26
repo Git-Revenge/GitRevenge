@@ -22,7 +22,7 @@ func TestChangedFilesCountsLines(t *testing.T) {
 	id := fx.Commit("change")
 
 	repo := OpenRepo(newTestRunner(t), fx.Dir)
-	files, err := repo.ChangedFiles(context.Background(), CommitDetail{ID: id, Parents: []string{id + "~1"}})
+	files, _, err := repo.ChangedFiles(context.Background(), CommitDetail{ID: id, Parents: []string{id + "~1"}})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -63,7 +63,7 @@ func changed(t *testing.T, fx *gittest.Repo, rev string) []FileChange {
 	if err != nil {
 		t.Fatal(err)
 	}
-	files, err := repo.ChangedFiles(context.Background(), c)
+	files, _, err := repo.ChangedFiles(context.Background(), c)
 	if err != nil {
 		t.Fatal(err)
 	}

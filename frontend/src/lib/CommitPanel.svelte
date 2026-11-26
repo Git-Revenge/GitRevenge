@@ -1,6 +1,7 @@
 <script lang="ts">
   import { errorText } from './errors'
-  import { CommitDetail, CommitNotes, CommitSignatures, FormattingOnly, HistoryChanges, SetCommitNote, TrailerFilterLines } from '../../wailsjs/go/app/App.js'
+  import { CancelDownload, CommitDetail, CommitNotes, CommitSignatures, DownloadFiles, FormattingOnly, HistoryChanges, SetCommitNote, TrailerFilterLines } from '../../wailsjs/go/app/App.js'
+  import Busy from './ui/Busy.svelte'
   import { fileMark, type HistoryChange, type HistoryOptions } from './filters/history'
   import type { FindOptions } from './find/find'
   import { prefs } from './prefs.svelte'
@@ -356,6 +357,49 @@
     })
   })
 
+  // In a partial clone, a commit's line counts need its files' contents (#1010): the panel
+  // shows the names at once and downloads them by itself, as a file opened would, with Stop.
+  // Once per commit: what still won't come waits for Download. The state names its commit,
+  // so another commit's never shows.
+  let countsState = $state<{ id: string; phase: 'downloading' | 'stopped' | 'failed'; error: string } | null>(null)
+  let counts = $derived(countsState?.id === commitId ? countsState.phase : 'idle')
+  let countsError = $derived(countsState?.id === commitId ? countsState.error : '')
+  let countsToken = ''
+  let countsTried = ''
+
+  $effect(() => {
+    const id = commitId
+    const missing = info?.countsMissing ?? []
+    if (!missing.length || countsTried === id) return
+    countsTried = id
+    void downloadCounts(id, [...missing])
+  })
+
+  async function downloadCounts(id: string, ids: string[]) {
+    const mine = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    countsToken = mine
+    countsState = { id, phase: 'downloading', error: '' }
+    try {
+      await DownloadFiles(path, mine, ids)
+      if (countsToken !== mine) return
+      const res = await CommitDetail(path, id)
+      if (countsToken !== mine) return
+      if (id === commitId) info = res
+      countsState = res.countsMissing?.length ? { id, phase: 'failed', error: '' } : null
+    } catch (err) {
+      if (countsToken !== mine) return
+      const text = errorText(err)
+      countsState = /cancel|stopp?ed|killed|interrupt/i.test(text) ? { id, phase: 'stopped', error: '' } : { id, phase: 'failed', error: text }
+    }
+  }
+
+  function stopCounts() {
+    if (countsState) countsState = { ...countsState, phase: 'stopped' }
+    const token = countsToken
+    countsToken = ''
+    void CancelDownload(token)
+  }
+
   function showFile(f: git.FileChange) {
     openFile({ mode: 'commit', commit: commitId, file: f.path, oldPath: f.oldPath, find: historyFind })
   }
@@ -465,6 +509,17 @@
     <span class="meta label">Files changed</span>
     {#if info && info.commit.parents.length > 1}<span class="merge-note" title="Changes are shown against the first parent">First parent</span>{/if}
   </div>
+  {#if counts === 'downloading'}
+    <p class="counts-note" role="status">
+      <Busy /> Downloading this commit’s files for their line counts…
+      <button class="btn text" onclick={stopCounts}>Stop</button>
+    </p>
+  {:else if (counts === 'stopped' || counts === 'failed') && info?.countsMissing?.length}
+    <p class="counts-note" role="status">
+      {counts === 'failed' && countsError ? `The line counts couldn’t be downloaded: ${countsError}` : 'Line counts need this commit’s files, which this partial clone hasn’t got yet.'}
+      <button class="btn text" onclick={() => void downloadCounts(commitId, [...(info?.countsMissing ?? [])])}>Download</button>
+    </p>
+  {/if}
   {#if (info?.files.length ?? 0) >= FILTER_FROM}
     <div class="file-tools"><FileListTools bind:query={fileQuery} bind:tree={fileTree} /></div>
   {/if}
@@ -936,6 +991,17 @@
   .side-files .files {
     margin-left: 20px;
     margin-right: 12px;
+  }
+
+  .counts-note {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 8px;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--ink-mute);
   }
 
   .merge-note {

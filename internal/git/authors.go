@@ -49,6 +49,7 @@ func (r *Repo) AuthorLog(ctx context.Context, since int64, revs []string, each f
 	if err := CheckRevs(revs...); err != nil {
 		return err
 	}
+	ctx = NoDownloads(ctx) // commits only (#1010)
 	args := append(authorFlags(), "log", "--no-merges", "--format=%x1e%H%x1f%aN%x1f%aE%x1f%ct%x1f"+coAuthorTrailers)
 	if since > 0 {
 		args = append(args, "--since="+strconv.FormatInt(since, 10))
@@ -121,6 +122,7 @@ type AuthorHistory struct {
 // them counts as well: git maps a commit's author, and leaves its trailers as written.
 func (r *Repo) AuthorHistory(ctx context.Context, revs []string, ids []Identity, mailmap *Mailmap) (AuthorHistory, error) {
 	var out AuthorHistory
+	ctx = NoDownloads(ctx) // commits only (#1010)
 	if err := CheckRevs(revs...); err != nil {
 		return out, err
 	}

@@ -100,6 +100,8 @@ func (r *Repo) AuthorFiles(ctx context.Context, since int64, revs []string, ids 
 	if err := CheckRevs(revs...); err != nil {
 		return err
 	}
+	// Names from the listings only: a partial clone downloads nothing for it (#1010).
+	ctx = NoDownloads(ctx)
 	who := personOf(ids, mailmap)
 	if len(who.authorArgs) == 0 {
 		return nil

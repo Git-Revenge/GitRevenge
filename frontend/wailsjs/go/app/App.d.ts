@@ -127,9 +127,9 @@ export function FileData(arg1:string,arg2:string,arg3:string,arg4:string):Promis
 
 export function FileDiff(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:boolean,arg7:string):Promise<app.FileDiff>;
 
-export function FileHistory(arg1:string,arg2:string):Promise<Array<git.FileCommit>>;
+export function FileHistory(arg1:string,arg2:string):Promise<app.FileHistoryResult>;
 
-export function FileImage(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
+export function FileImage(arg1:string,arg2:string,arg3:string,arg4:string):Promise<app.PreviewImage>;
 
 export function FindCount(arg1:string,arg2:git.GrepOptions):Promise<app.FindCounted>;
 
@@ -192,6 +192,8 @@ export function ImportLinkRules(arg1:string,arg2:string,arg3:string):Promise<num
 export function Init(arg1:string,arg2:string):Promise<string>;
 
 export function InsightsBranches(arg1:string,arg2:app.InsightsInputs):Promise<app.AttentionResult>;
+
+export function InsightsDownload(arg1:string,arg2:string,arg3:app.InsightsInputs):Promise<void>;
 
 export function InsightsFetchedAt(arg1:string):Promise<number>;
 

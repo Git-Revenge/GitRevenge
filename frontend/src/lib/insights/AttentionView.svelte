@@ -75,6 +75,8 @@
               <td>
                 {#if !b.conflict}
                   <span class="checking">checking…</span>
+                {:else if b.conflict.unknown}
+                  <span class="checking" title="This partial clone hasn’t downloaded the files the merge reads">not downloaded</span>
                 {:else if b.conflict.conflicts}
                   <span class="tag rose">conflicts</span>
                   <span class="files">{b.conflict.files.slice(0, 2).join(', ')}{b.conflict.files.length > 2 ? ` +${b.conflict.files.length - 2}` : ''}</span>
@@ -85,7 +87,9 @@
               <td class="num"><span class="val" class:over={s.flags.includes('stale')}>{days(s.staleDays)}</span></td>
               <td class="num"><span class="val" class:over={s.flags.includes('long-lived')}>{days(s.ageDays)}</span></td>
               <td class="num"><span class="val" class:over={s.flags.includes('drifting')}>{s.behind}</span></td>
-              <td class="num"><span class="val" class:over={s.flags.includes('big-batch')}>{s.added + s.removed}</span></td>
+              <td class="num">
+                {#if s.linesUnknown}<span class="val" title="This partial clone hasn’t downloaded the files the lines need">—</span>{:else}<span class="val" class:over={s.flags.includes('big-batch')}>{s.added + s.removed}</span>{/if}
+              </td>
             </tr>
           {/each}
         </tbody>

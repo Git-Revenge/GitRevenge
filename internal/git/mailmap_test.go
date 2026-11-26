@@ -44,7 +44,7 @@ func TestListsOfCommitsReadNamesThroughTheMailmap(t *testing.T) {
 	r := OpenRepo(newTestRunner(t), fx.Dir)
 	ctx := context.Background()
 
-	history, err := r.FileHistory(ctx, "a.txt")
+	history, _, err := r.FileHistory(ctx, "a.txt")
 	if err != nil || len(history) != 2 {
 		t.Fatalf("history = %+v, %v", history, err)
 	}

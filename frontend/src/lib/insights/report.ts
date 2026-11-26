@@ -46,6 +46,8 @@ export interface Signal extends Branch {
   behind: number
   added: number
   removed: number
+  /** A partial clone hasn't the files its lines need (#1010). */
+  linesUnknown?: boolean
 }
 
 /** A shipped item with its size and cycle (git.ShippedItem). */
@@ -106,6 +108,7 @@ function branchNotes(b: Ranked<Signal>): string {
   if (f.includes('drifting')) notes.push(`${b.value.behind} behind`)
   if (f.includes('big-batch')) notes.push(`${b.value.added + b.value.removed} lines`)
   if (!b.conflict) notes.push('conflict check pending')
+  else if (b.conflict.unknown) notes.push('conflicts not checked (files not downloaded)')
   return notes.join(', ')
 }
 
@@ -176,10 +179,13 @@ function withInputs(inp: ReportInputs, table: (string | number)[][]): string {
   return toCSV([...inputLines(inp).map(([k, v]) => [k, v]), [], ...table])
 }
 
-export function shippedCSV(inp: ReportInputs, items: Tagged<Shipped>[], repoName: (p: string) => string): string {
+/** linesMissing says which repositories count no lines (partial clones, #1010): their lines
+ * are left empty rather than written as 0. */
+export function shippedCSV(inp: ReportInputs, items: Tagged<Shipped>[], repoName: (p: string) => string, linesMissing: (repo: string) => boolean = () => false): string {
   const rows: (string | number)[][] = [['repository', 'commit', 'committed_utc', 'title', 'author', 'email', 'references', 'files', 'added', 'removed', 'merge', 'cycle_hours', 'revert', 'fixup', 'bot']]
   for (const { repo, value: i } of latest(items)) {
-    rows.push([repoName(repo), i.sha, iso(i.committed), i.title, i.author, i.email, i.refs.join(' '), i.files, i.added, i.removed, i.merge ? 'yes' : 'no', i.cycle ? (i.cycle / 3600).toFixed(1) : '', i.revert ? 'yes' : 'no', i.fixup ? 'yes' : 'no', i.bot ? 'yes' : 'no'])
+    const [added, removed] = linesMissing(repo) ? ['', ''] : [i.added, i.removed]
+    rows.push([repoName(repo), i.sha, iso(i.committed), i.title, i.author, i.email, i.refs.join(' '), i.files, added, removed, i.merge ? 'yes' : 'no', i.cycle ? (i.cycle / 3600).toFixed(1) : '', i.revert ? 'yes' : 'no', i.fixup ? 'yes' : 'no', i.bot ? 'yes' : 'no'])
   }
   return withInputs(inp, rows)
 }
@@ -194,21 +200,21 @@ export function attentionCSV(inp: ReportInputs, flagged: Ranked<Signal>[], repoN
       v.sha,
       v.local ? 'yes' : 'no',
       v.author,
-      b.conflict ? (b.conflict.conflicts ? 'yes' : 'no') : 'pending',
+      b.conflict ? (b.conflict.unknown ? 'unknown' : b.conflict.conflicts ? 'yes' : 'no') : 'pending',
       b.conflict?.files.join(' ') ?? '',
       v.staleDays,
       v.ageDays,
       v.behind,
-      v.added + v.removed,
+      v.linesUnknown ? '' : v.added + v.removed,
       v.flags.join(' '),
     ])
   }
   return withInputs(inp, rows)
 }
 
-export function hotspotsCSV(inp: ReportInputs, hot: Tagged<Hot>[], repoName: (p: string) => string): string {
+export function hotspotsCSV(inp: ReportInputs, hot: Tagged<Hot>[], repoName: (p: string) => string, linesMissing: (repo: string) => boolean = () => false): string {
   const rows: (string | number)[][] = [['repository', 'path', 'lines', 'items', 'open_branches']]
-  for (const h of hot) rows.push([repoName(h.repo), h.value.path, h.value.lines, h.value.items, h.value.openBranches])
+  for (const h of hot) rows.push([repoName(h.repo), h.value.path, linesMissing(h.repo) ? '' : h.value.lines, h.value.items, h.value.openBranches])
   return withInputs(inp, rows)
 }
 

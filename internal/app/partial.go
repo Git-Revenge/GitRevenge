@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
@@ -38,6 +39,57 @@ func (a *App) DownloadFiles(path, token string, ids []string) error {
 	err = a.track(downloadKey(token), r.Path, "download", hosts, "That download is already running.",
 		func(ctx context.Context, o git.NetOptions) error { return r.Git.Download(ctx, ids, o) })
 	return ownLinksOnly(err, hosts)
+}
+
+// InsightsDownload fetches, in one request, the files a partial clone's Insights read for
+// these inputs and hasn't got (#1010): both sides of the window's changes, for its lines, and
+// each open branch's changes and dry-run merge. Insights reads none of them by itself; this is
+// for when someone asks ("Download two weeks of changes"). Then the results are read again.
+func (a *App) InsightsDownload(path, token string, in InsightsInputs) error {
+	if token == "" {
+		return userError("A download needs a name.")
+	}
+	r, err := a.openRepo(path)
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+	g, root, err := a.repoGit(ctx, path)
+	if err != nil {
+		return err
+	}
+	rules := a.branchRules(root)
+	w, err := resolveInputs(ctx, g, in, rules)
+	if err != nil {
+		return err
+	}
+	ids, err := g.WindowNeeds(ctx, w.query())
+	if err != nil {
+		return err
+	}
+	open, err := g.OpenBranches(git.NoDownloads(ctx), w.Target, git.MaxSignalBranches, endStates(rules))
+	if err != nil {
+		return err
+	}
+	for _, b := range open {
+		more, err := g.BranchNeeds(ctx, w.Target, b)
+		if err != nil {
+			return err
+		}
+		ids = append(ids, more...)
+	}
+	if len(ids) > 0 {
+		slices.Sort(ids)
+		ids = slices.Compact(ids)
+		hosts := func() []string { return remoteHosts(context.Background(), r.Git) }
+		err = a.track(downloadKey(token), r.Path, "download", hosts, "That download is already running.",
+			func(ctx context.Context, o git.NetOptions) error { return r.Git.Download(ctx, ids, o) })
+		if err := ownLinksOnly(err, hosts); err != nil {
+			return err
+		}
+	}
+	a.insights.clear()
+	return nil
 }
 
 // CancelDownload stops the download token names.
