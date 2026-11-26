@@ -596,9 +596,16 @@
         <button class="btn sm secondary sha" onclick={() => copySha(c.id)} title="Copy the full SHA" aria-label="Copy SHA {c.id.slice(0, 7)}"
           >{#if copied}Copied{:else}{c.id.slice(0, 7)}{/if}<Icon name={copied ? 'check' : 'copy'} size={13} /></button
         >
-        {#each c.parents as p (p)}
-          <button class="btn sm text" onclick={() => onReveal?.(p)} title="Show this parent in the graph">parent {p.slice(0, 7)}</button>
-        {/each}
+        {#if info.edge}
+          <!-- A shallow clone's edge: its parents are on the server only (#1006). -->
+          <span class="edge-note" title="This clone's history stops here: {c.parents.map((p) => p.slice(0, 7)).join(', ')} {c.parents.length === 1 ? "wasn't" : "weren't"} fetched"
+            >{c.parents.length === 1 ? 'parent' : 'parents'} not fetched</span
+          >
+        {:else}
+          {#each c.parents as p (p)}
+            <button class="btn sm text" onclick={() => onReveal?.(p)} title="Show this parent in the graph">parent {p.slice(0, 7)}</button>
+          {/each}
+        {/if}
         {#if info.commit.signed && sig}
           <span class="sig-mark sig-{sig.status}" title={SIG_TEXT[sig.status] ?? 'Unsigned'}><Icon name={sig.status === 'good' ? 'check' : 'warning'} size={13} />{sig.status === 'good' ? 'Verified' : 'Signature'}</span>
         {/if}
@@ -991,6 +998,14 @@
   .side-files .files {
     margin-left: 20px;
     margin-right: 12px;
+  }
+
+  .edge-note {
+    font-family: var(--font-hand);
+    font-size: 18px;
+    line-height: 1;
+    color: var(--ink-mute);
+    padding: 0 4px;
   }
 
   .counts-note {

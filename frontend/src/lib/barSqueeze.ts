@@ -27,7 +27,8 @@ export function squeezeFor(width: number, steps: number[]): number {
 
 /** What the search field says when empty: what it searches, or, once the count has left the bar,
  * how many commits that is. */
-export function searchPlaceholder(level: number, commits: number, more: boolean): string {
+export function searchPlaceholder(level: number, commits: number, more: boolean, since = ''): string {
   if (level < SQUEEZE.count) return 'Search message, author or SHA'
-  return `Search ${commits.toLocaleString()}${more ? '+' : ''} ${commits === 1 && !more ? 'commit' : 'commits'}`
+  // A shallow clone's count is of the history it has (#1006).
+  return `Search ${commits.toLocaleString()}${more ? '+' : ''} ${commits === 1 && !more ? 'commit' : 'commits'}${since ? ` since ${since}` : ''}`
 }

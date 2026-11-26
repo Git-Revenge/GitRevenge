@@ -76,6 +76,9 @@ type Row struct {
 	// Match marks a commit a highlighting smart filter keeps. The graph doesn't know about
 	// filters: whoever hands rows to a window says so here.
 	Match bool `json:"match,omitempty"`
+	// Edge marks a commit at a shallow clone's edge: its parents weren't fetched, and its
+	// lanes run on below it as EdgeKind (#1006).
+	Edge bool `json:"edge,omitempty"`
 
 	ID         string `json:"id"`
 	Parents    int    `json:"parents"`
@@ -226,6 +229,47 @@ type layout struct {
 	// tip's first parents. kindNames[0] is "".
 	tipKind   map[oid]uint8
 	kindNames []string
+	// edge holds a shallow clone's edge commits with the parents it hasn't got, and
+	// shallow the kind their lanes take below them (see SetEdge).
+	edge    map[oid][]oid
+	shallow uint8
+}
+
+// EdgeKind is the kind of a lane that runs on below a shallow clone's edge (#1006): the
+// history goes on there, on the server, and the graph draws it dashed.
+const EdgeKind = "shallow"
+
+// SetEdge gives a shallow clone's edge commits the parents their commit objects name (#1006).
+// git lists them with none, and the graph would draw each as a first commit. With these,
+// which never arrive, their lanes run on to the end of the graph as EdgeKind. It must be
+// called before the first Add.
+func (g *Graph) SetEdge(edge map[string][]string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if len(g.ids) > 0 || len(edge) == 0 {
+		return
+	}
+	g.cfg.edge = map[oid][]oid{}
+	for id, ps := range edge {
+		o, err := parseOID(id)
+		if err != nil {
+			continue
+		}
+		var parents []oid
+		for _, p := range ps {
+			if po, err := parseOID(p); err == nil {
+				parents = append(parents, po)
+			}
+		}
+		g.cfg.edge[o] = parents
+	}
+	if len(g.cfg.kindNames) == 0 {
+		g.cfg.kindNames = []string{""}
+	}
+	if len(g.cfg.kindNames) < 256 {
+		g.cfg.shallow = uint8(len(g.cfg.kindNames))
+		g.cfg.kindNames = append(g.cfg.kindNames, EdgeKind)
+	}
 }
 
 // SetTipKinds gives branch tips a kind ("docs", "release", …), which the lane starting at
@@ -239,8 +283,14 @@ func (g *Graph) SetTipKinds(tips map[string]string) {
 		return
 	}
 	g.cfg.tipKind = map[oid]uint8{}
-	g.cfg.kindNames = []string{""}
+	// Kept if SetEdge came first: its kind stays where it is.
+	if len(g.cfg.kindNames) == 0 {
+		g.cfg.kindNames = []string{""}
+	}
 	codes := map[string]uint8{}
+	for i, name := range g.cfg.kindNames {
+		codes[name] = uint8(i)
+	}
 	for id, kind := range tips {
 		o, err := parseOID(id)
 		if err != nil || kind == "" {
@@ -291,6 +341,10 @@ func (g *Graph) Add(c git.LogCommit) error {
 	defer g.mu.Unlock()
 	if g.hashLen == 0 {
 		g.hashLen = len(c.ID) / 2
+	}
+	// git lists an edge commit with no parents: it has them, on the server.
+	if edge, ok := g.cfg.edge[id]; ok && len(ps) == 0 {
+		ps = edge
 	}
 	row := len(g.ids)
 	if row == g.nextCP {
@@ -494,6 +548,15 @@ func step(st *state, cfg *layout, id oid, ps []oid, base int32, row *Row, pack b
 	if row != nil {
 		row.Kind = cfg.name(kind)
 	}
+	// Below a shallow clone's edge commit the lanes run on as its parents, which the clone
+	// hasn't got: they take the edge's kind, whatever the branch.
+	down := kind
+	if _, ok := cfg.edge[id]; ok && cfg.shallow != 0 {
+		down = cfg.shallow
+		if row != nil {
+			row.Edge = true
+		}
+	}
 
 	// Lines entering from above: lanes waiting for this commit converge on the node, the
 	// rest pass straight through. Then clear every lane that was waiting for this commit.
@@ -530,11 +593,11 @@ func step(st *state, cfg *layout, id oid, ps []oid, base int32, row *Row, pack b
 			target, tcolor = col, color
 			// The Up pass cleared this column, so the lane starts again here for the parent.
 			if l := st.lanes[col]; !l.used || l.want != p {
-				start(target, lane{want: p, pos: base + int32(pi), color: tcolor, kind: kind, used: true})
+				start(target, lane{want: p, pos: base + int32(pi), color: tcolor, kind: down, used: true})
 				created = append(created, target)
 			}
 			if row != nil {
-				row.Down = append(row.Down, Seg{From: col, To: target, Color: color, Kind: cfg.name(kind)})
+				row.Down = append(row.Down, Seg{From: col, To: target, Color: color, Kind: cfg.name(down)})
 			}
 			continue
 		}
@@ -548,9 +611,13 @@ func step(st *state, cfg *layout, id oid, ps []oid, base int32, row *Row, pack b
 		if target < 0 {
 			if pi == 0 {
 				// The first parent continues this lane, kind and all.
-				target, tcolor, tkind = col, color, kind
+				target, tcolor, tkind = col, color, down
 			} else {
+				// A merge's other parents start lanes of no kind, but below the edge.
 				target, tcolor = st.freeSlot(max(col+1, reserved)), st.newColor()
+				if down != kind {
+					tkind = down
+				}
 			}
 			start(target, lane{want: p, pos: base + int32(pi), color: tcolor, kind: tkind, used: true})
 			created = append(created, target)
@@ -558,7 +625,7 @@ func step(st *state, cfg *layout, id oid, ps []oid, base int32, row *Row, pack b
 		if row != nil {
 			segColor, segKind := tcolor, tkind
 			if pi == 0 {
-				segColor, segKind = color, kind
+				segColor, segKind = color, down
 			}
 			row.Down = append(row.Down, Seg{From: col, To: target, Color: segColor, Kind: cfg.name(segKind)})
 		}

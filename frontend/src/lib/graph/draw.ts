@@ -190,6 +190,12 @@ export interface DayLine {
   stuck?: boolean
 }
 
+/** The kind of a lane running on past a shallow clone's edge, toward history the clone hasn't
+ * fetched (#1006, graph.EdgeKind). */
+export const EDGE_KIND = 'shallow'
+const EDGE_DASH = [2, 5]
+const SPARSE_DASH = [3, 4]
+
 /** The lanes that reach a commit, drawn on through a row above it that isn't a commit, so the
  * graph isn't cut there: each as it is at the commit's top edge. */
 function drawPassing(ctx: CanvasRenderingContext2D, below: Row, near: Near, y: number, h: number, lay: Layout) {
@@ -204,6 +210,7 @@ function drawPassing(ctx: CanvasRenderingContext2D, below: Row, near: Near, y: n
     ctx.globalAlpha = (kind === 'docs' ? MUTED : 1) * (active ? 1 : QUIET_ALPHA)
     ctx.lineWidth = active ? LINE_WIDTH : QUIET_WIDTH
     ctx.strokeStyle = laneColor(color)
+    ctx.setLineDash(kind === EDGE_KIND ? EDGE_DASH : [])
     ctx.beginPath()
     ctx.moveTo(x, y)
     ctx.lineTo(x, y + h)
@@ -223,6 +230,10 @@ function lanesInView(lay: Layout): [number, number] {
 
 /** How tall a fold's line is: a lane's machine commits of one day, as one row. */
 export const FOLD_H = 28
+
+/** How tall the row after the last commit is, where a caller has one (#1006): room at its foot
+ * for the button back to the branch, which floats over the bottom of the graph. */
+export const TAIL_H = 196
 
 /** A fold's line. */
 export interface FoldLine {
@@ -1167,6 +1178,9 @@ export function drawRow(
   ctx.lineJoin = 'round'
   // Docs lanes (a published site, not code) draw muted.
   const strength = (kind: string | undefined) => before * (kind === 'docs' ? MUTED : 1)
+  // Dashed: a lane running on past a shallow clone's edge (#1006), and, under a filter, every
+  // line, since the commits on a lane aren't each other's parents.
+  const dashOf = (kind: string | undefined) => (kind === EDGE_KIND ? EDGE_DASH : extra.sparse ? SPARSE_DASH : [])
   const straight = (col: number, lane: number, kind: string | undefined, y1: number, y2: number, strongEnd: number | null) => {
     const sx = lx(col)
     if (sx < graphLeft || sx > graphRight) return
@@ -1174,6 +1188,7 @@ export function drawRow(
     ctx.globalAlpha = strength(kind) * (active ? 1 : QUIET_ALPHA)
     ctx.lineWidth = active ? LINE_WIDTH : QUIET_WIDTH
     ctx.strokeStyle = laneColor(lane)
+    ctx.setLineDash(dashOf(kind))
     ctx.beginPath()
     ctx.moveTo(sx, y1)
     ctx.lineTo(sx, y2)
@@ -1207,21 +1222,21 @@ export function drawRow(
   const link = (s: Seg, y1: number, y2: number, leaving: boolean) => {
     const e = elbow(lx(s.from), y1, lx(s.to), y2, leaving)
     ctx.globalAlpha = strength(s.kind)
+    ctx.setLineDash([])
     stroke(e, HALO_WIDTH, theme.bg)
     washOver(() => stroke(e, HALO_WIDTH, wash))
+    ctx.setLineDash(dashOf(s.kind))
     stroke(e, LINE_WIDTH, laneColor(s.color))
   }
   // The lanes that pass straight through arrive packed, and only the ones in view are read.
   const [firstCol, lastCol] = lanesInView(lay)
-  // Under a filter the commits on a lane aren't each other's parents: the line says so.
-  if (extra.sparse) ctx.setLineDash([3, 4])
   for (const s of row.up) if (s.from === s.to) straight(s.from, s.color, s.kind, y, mid, strongAbove(s.from, near) ? y : null)
   eachPass(row, firstCol, lastCol, (col, lane, kind) => straight(col, lane, kind, y, mid, strongAbove(col, near) ? y : null))
   for (const s of row.down) if (s.from === s.to) straight(s.from, s.color, s.kind, mid, y + h, strongBelow(s.from, near) ? y + h : null)
   eachPass(row, firstCol, lastCol, (col, lane, kind) => straight(col, lane, kind, mid, y + h, strongBelow(col, near) ? y + h : null))
   for (const s of row.up) if (s.from !== s.to) link(s, y, mid, false)
   for (const s of row.down) if (s.from !== s.to) link(s, mid, y + h, true)
-  if (extra.sparse) ctx.setLineDash([])
+  ctx.setLineDash([])
   ctx.globalAlpha = before
   ctx.lineWidth = LINE_WIDTH
   if (docs) ctx.globalAlpha *= MUTED

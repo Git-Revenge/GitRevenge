@@ -84,6 +84,57 @@ func TestBranchAndMerge(t *testing.T) {
 	}
 }
 
+// #1006: a shallow clone's edge commits are listed with no parents. Given the ones they have
+// on the server, their lanes run on to the end, as EdgeKind, instead of ending as if the
+// history began there.
+func TestShallowEdgeLanesRunOn(t *testing.T) {
+	// 0 -> 1, 1 at the edge (its parent 100 not fetched); 2 a tip -> 3, 3 a merge at the
+	// edge (parents 101 and 102 not fetched). git lists 1 and 3 with no parents.
+	commits := [][]int{{1}, {}, {3}, {}}
+	g := New()
+	g.SetTipKinds(map[string]string{fakeID(2): "docs"})
+	g.SetEdge(map[string][]string{fakeID(1): {fakeID(100)}, fakeID(3): {fakeID(101), fakeID(102)}})
+	for i, ps := range commits {
+		c := git.LogCommit{ID: fakeID(i), Subject: fmt.Sprint(i), AuthorName: "a"}
+		for _, p := range ps {
+			c.Parents = append(c.Parents, fakeID(p))
+		}
+		if err := g.Add(c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rows := g.Rows(0, 4)
+	kinds := func(segs []Seg) (out []string) {
+		for _, s := range segs {
+			out = append(out, s.Kind)
+		}
+		return out
+	}
+	if !rows[1].Edge || rows[1].Parents != 1 || !slices.Equal(kinds(rows[1].Down), []string{EdgeKind}) {
+		t.Fatalf("edge row 1: edge %v, parents %d, down %+v", rows[1].Edge, rows[1].Parents, rows[1].Down)
+	}
+	if rows[0].Edge || rows[2].Edge || rows[2].Kind != "docs" {
+		t.Fatalf("rows 0 and 2: %+v %+v", rows[0], rows[2])
+	}
+	if !rows[3].Edge || rows[3].Parents != 2 {
+		t.Fatalf("edge merge row 3: %+v", rows[3])
+	}
+	// At the end, all three lanes run on: 1's parent and both of 3's.
+	if got := kinds(rows[3].Down); len(got) != 3 || slices.ContainsFunc(got, func(k string) bool { return k != EdgeKind }) {
+		t.Fatalf("last row down = %+v; want three lanes running on", rows[3].Down)
+	}
+	// Paged rows agree.
+	if page := g.Page(3, 1); len(page[0].Down) != 2 || page[0].PassKind[0] != EdgeKind {
+		t.Fatalf("paged last row: %+v", page[0])
+	}
+
+	// Without the edge the same commits end where git lists them.
+	plain := build(t, commits)
+	if r := plain.Rows(0, 4); len(r[1].Down) != 0 || r[1].Edge {
+		t.Fatalf("no edge: row 1 = %+v", r[1])
+	}
+}
+
 func TestTwoTipsOpenTwoLanes(t *testing.T) {
 	// 0: tip A -> 2, 1: tip B -> 2, 2: root
 	g := build(t, [][]int{{2}, {2}, {}})

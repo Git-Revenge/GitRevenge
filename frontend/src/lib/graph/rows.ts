@@ -13,7 +13,8 @@
  * commits, such as a row of its own above the first commit.
  */
 
-export type RowKind = 'lead' | 'day' | 'fold' | 'commit'
+/** A tail is a caller's row after the last commit, such as where a shallow clone's history stops. */
+export type RowKind = 'lead' | 'day' | 'fold' | 'commit' | 'tail'
 
 /** One row a slot brings. */
 export interface SlotRow {

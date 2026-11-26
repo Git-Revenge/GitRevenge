@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from '../ui/Icon.svelte'
-  import { FileHistory } from '../../../wailsjs/go/app/App.js'
+  import { CloneShape, FileHistory, IsShallowEdge } from '../../../wailsjs/go/app/App.js'
+  import ShallowBand from '../ShallowBand.svelte'
   import type { git } from '../../../wailsjs/go/models'
   import { formatTime } from '../graph/draw'
   import { session } from '../session.svelte'
@@ -17,6 +18,9 @@
 
   let commits = $state<git.FileCommit[] | null>(null)
   let selected = $state<git.FileCommit | null>(null)
+  /** Where a shallow clone's history stops, when this file's reaches its edge (#1006): its
+   * oldest commit here isn't where the file began. 0 otherwise. */
+  let edgeSince = $state(0)
   // In a partial clone the history may stop at a rename it can't follow without downloading
   // (#1010): it says so, and downloads the files that rename compares only when asked.
   let stop = $state<git.HistoryStop | null>(null)
@@ -25,15 +29,22 @@
 
   $effect(() => {
     const f = file
+    void session.revision[path]
     void downloaded
     commits = null
+    edgeSince = 0
     stop = null
     following = false
-    void session.run(() => FileHistory(path, f)).then((res) => {
+    void session.run(() => FileHistory(path, f)).then(async (res) => {
       if (f !== file) return
       commits = res?.commits ?? []
       stop = res?.stop ?? null
       selected = commits.find((c) => c.id === selected?.id) ?? commits[0] ?? null
+      const oldest = commits.at(-1)
+      if (!stop && oldest && (await IsShallowEdge(path, oldest.id).catch(() => false)) && f === file) {
+        const shape = await CloneShape(path).catch(() => null)
+        if (f === file) edgeSince = shape?.shallow?.since ?? oldest.time
+      }
     })
   })
   import Empty from '../ui/Empty.svelte'
@@ -65,6 +76,9 @@
       {:else}
         {#if !stop}<li><Empty note="untouched">No commits touch this file.</Empty></li>{/if}
       {/each}
+      {#if edgeSince}
+        <li class="edge"><ShallowBand {path} since={edgeSince} {file} /></li>
+      {/if}
       {#if stop}
         <li class="stop" role="status">
           {#if following}
@@ -118,6 +132,7 @@
     border-bottom: 1px dotted var(--paper-edge);
   }
 
+  /* A commit's row: not the stop row's button, nor the band's at the end. */
   .list li:not(.stop) > button {
     display: flex;
     gap: 12px;
@@ -136,6 +151,10 @@
 
   .list li:not(.stop) > button.active {
     background: var(--selected);
+  }
+
+  .list .edge {
+    border-bottom: none;
   }
 
   .list .stop {

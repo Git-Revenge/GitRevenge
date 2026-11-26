@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { Integrate, PreviewMerge, PreviewRebase, RepoState } from '../../wailsjs/go/app/App.js'
+  import { CloneShape, Integrate, PreviewMerge, PreviewRebase, RepoState } from '../../wailsjs/go/app/App.js'
   import NotDownloaded from './diff/NotDownloaded.svelte'
+  import ShallowBand from './ShallowBand.svelte'
   import type { app } from '../../wailsjs/go/models'
   import { errorText } from './errors'
   import { mergeChoices, mergeSummary, mergeVerb, placesNote, plural, rebaseVerb, type MergeHow } from './preview'
@@ -38,6 +39,15 @@
   let fold = $state(true)
   let edit = $state(false)
 
+  // A shallow clone whose history stops before where the two part (#1006): more history comes
+  // first, from the band shown here, and then the forecast is asked for again.
+  let fetched = $state(0)
+  let edgeSince = $state(0)
+  let pastEdge = $derived(kind === 'merge' ? !!merge?.pastEdge : !!rebase?.pastEdge)
+  $effect(() => {
+    if (pastEdge && !edgeSince) void CloneShape(path).then((s) => (edgeSince = s?.shallow?.since ?? 0)).catch(() => {})
+  })
+
   // In a partial clone the forecast may need files never downloaded (#1010): they come in one
   // download, shown here, and the forecast is asked for again. Stopped, the dialog goes on
   // without a forecast, as when one fails: the operation downloads what it needs itself.
@@ -48,6 +58,7 @@
 
   // The dialog is useful without a forecast: it says so and still offers the operation.
   $effect(() => {
+    void fetched
     void downloaded
     if (kind === 'merge') {
       void PreviewMerge(path, target)
@@ -99,7 +110,7 @@
     class="preview"
     onsubmit={(e) => {
       e.preventDefault()
-      if (loaded && !nothing) run()
+      if (loaded && !nothing && !pastEdge) run()
     }}
   >
     {#if missing.length && !failed}
@@ -119,6 +130,15 @@
     {/if}
     {#if !loaded}
       {#if known}<p class="form-note" role="status">Working out what this would do…</p>{/if}
+    {:else if pastEdge}
+      <ShallowBand
+        {path}
+        since={edgeSince}
+        why="This shallow clone's history stops before where {current} and {label} part, so git would take them for unrelated histories{kind === 'rebase'
+          ? ' and write again every commit it has'
+          : ''}. Fetch more of the history first."
+        onFetched={() => (fetched += 1)}
+      />
     {:else if nothing}
       <p class="form-note" role="status">
         {#if kind === 'merge'}<span class="mono">{current}</span> already has everything in <span class="mono">{label}</span>. There's nothing to merge.{:else}<span class="mono">{current}</span>
@@ -236,8 +256,8 @@
     <div class="form-actions">
       <button type="button" class="btn quiet" onclick={onClose}>{nothing ? 'Close' : 'Cancel'}</button>
       {#if !nothing}
-        <button type="submit" class="btn lg primary" disabled={!loaded}>
-          {#if !loaded || blind}{kind === 'merge' ? 'Merge' : 'Rebase'}{:else if merge}{mergeVerb(merge, chosen, current)}{:else if rebase}{rebaseVerb(rebase, edit)}{/if}
+        <button type="submit" class="btn lg primary" disabled={!loaded || pastEdge}>
+          {#if !loaded || blind || pastEdge}{kind === 'merge' ? 'Merge' : 'Rebase'}{:else if merge}{mergeVerb(merge, chosen, current)}{:else if rebase}{rebaseVerb(rebase, edit)}{/if}
           <span class="arrow" aria-hidden="true">→</span>
         </button>
       {/if}

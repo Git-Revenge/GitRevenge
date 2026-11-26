@@ -43,6 +43,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
   - **One branch:** **Fetch every branch**.
 
   Each runs as a fetch does: progress and **Cancel** in the toolbar, and the graph and lists updating when it lands. (#1005)
+- A shallow clone's history no longer looks as if it began where the clone's stops. Wherever it is shown:
+  - **The graph:** its oldest commits' lines run on, dashed, into a band at the end that says "history stops here", the date it starts from, and offers a year more, 1,000 commits more or the whole history.
+  - **Counts:** the graph's count says "since" that date, and so do Insights, the Map and People, so a quiet author isn't read as gone.
+  - **Blame:** lines from before the edge say "before" its date, rather than crediting its commit.
+  - **A file's history:** it ends with the same band.
+  - **The commit panel:** an edge commit opens with its files as its own and says its parent wasn't fetched, where it failed before.
+  - **Merges and rebases:** a merge or rebase whose branches part before the edge waits for more history, instead of git's "refusing to merge unrelated histories". (#1006)
 
 ### Changed
 

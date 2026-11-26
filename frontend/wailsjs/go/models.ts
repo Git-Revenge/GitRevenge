@@ -727,6 +727,7 @@ export namespace app {
 	    countsMissing?: string[];
 	    author: git.Identity;
 	    committer: git.Identity;
+	    edge?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new CommitInfo(source);
@@ -739,6 +740,7 @@ export namespace app {
 	        this.countsMissing = source["countsMissing"];
 	        this.author = this.convertValues(source["author"], git.Identity);
 	        this.committer = this.convertValues(source["committer"], git.Identity);
+	        this.edge = source["edge"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1727,6 +1729,7 @@ export namespace app {
 	    files: number;
 	    conflicts: ForecastConflict[];
 	    unknown: boolean;
+	    pastEdge?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new MergePreview(source);
@@ -1744,6 +1747,7 @@ export namespace app {
 	        this.files = source["files"];
 	        this.conflicts = this.convertValues(source["conflicts"], ForecastConflict);
 	        this.unknown = source["unknown"];
+	        this.pastEdge = source["pastEdge"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2145,6 +2149,7 @@ export namespace app {
 	    incomplete: boolean;
 	    pushed: boolean;
 	    upstream: string;
+	    pastEdge?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new RebasePreview(source);
@@ -2165,6 +2170,7 @@ export namespace app {
 	        this.incomplete = source["incomplete"];
 	        this.pushed = source["pushed"];
 	        this.upstream = source["upstream"];
+	        this.pastEdge = source["pastEdge"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -3424,6 +3430,7 @@ export namespace git {
 	    summary: string;
 	    line: string;
 	    origLine: number;
+	    edge?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new BlameLine(source);
@@ -3437,6 +3444,7 @@ export namespace git {
 	        this.summary = source["summary"];
 	        this.line = source["line"];
 	        this.origLine = source["origLine"];
+	        this.edge = source["edge"];
 	    }
 	}
 	export class BranchMerge {
@@ -4928,6 +4936,7 @@ export namespace graph {
 	    width: number;
 	    kind?: string;
 	    match?: boolean;
+	    edge?: boolean;
 	    id: string;
 	    parents: number;
 	    author: string;
@@ -4950,6 +4959,7 @@ export namespace graph {
 	        this.width = source["width"];
 	        this.kind = source["kind"];
 	        this.match = source["match"];
+	        this.edge = source["edge"];
 	        this.id = source["id"];
 	        this.parents = source["parents"];
 	        this.author = source["author"];

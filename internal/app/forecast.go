@@ -49,6 +49,9 @@ type MergePreview struct {
 	Conflicts []ForecastConflict `json:"conflicts"`
 	// Unknown means the conflicts couldn't be worked out; Conflicts then says nothing.
 	Unknown bool `json:"unknown"`
+	// PastEdge means a shallow clone's history stops before where the two part (#1006): git
+	// would merge them as unrelated. Nothing else is filled in; more history comes first.
+	PastEdge bool `json:"pastEdge,omitempty"`
 }
 
 // RebasePreview is what rebasing the checked-out branch onto another commit would do.
@@ -76,6 +79,8 @@ type RebasePreview struct {
 	// needed afterwards.
 	Pushed   bool   `json:"pushed"`
 	Upstream string `json:"upstream"`
+	// PastEdge is as for MergePreview: a rebase would write again every commit the clone has.
+	PastEdge bool `json:"pastEdge,omitempty"`
 }
 
 func forecastConflicts(ctx context.Context, g *git.Repo, in []git.ForecastConflict) []ForecastConflict {
@@ -120,6 +125,10 @@ func (a *App) PreviewMerge(path, source string) (MergePreview, error) {
 		return MergePreview{}, userError("Choose what to merge.")
 	}
 	ctx := context.Background()
+	// Past a shallow clone's edge there's nothing to forecast, nor to download for it.
+	if r.Git.PartsPastEdge(ctx, "HEAD", source) {
+		return MergePreview{Into: currentBranch(ctx, r.Git), PastEdge: true, Commits: []ForecastCommit{}, Conflicts: []ForecastConflict{}}, nil
+	}
 	if missing, err := r.Git.MergeNeeds(ctx, "HEAD", source); err != nil {
 		return MergePreview{}, friendly(err)
 	} else if len(missing) > 0 {
@@ -153,6 +162,9 @@ func (a *App) PreviewRebase(path, onto string) (RebasePreview, error) {
 	tip := branch
 	if tip == "" {
 		tip = "HEAD"
+	}
+	if r.Git.PartsPastEdge(ctx, tip, onto) {
+		return RebasePreview{Branch: branch, PastEdge: true, Commits: []ForecastCommit{}, Conflicts: []ForecastConflict{}}, nil
 	}
 	if missing, err := r.Git.MergeNeeds(ctx, tip, onto); err != nil {
 		return RebasePreview{}, friendly(err)

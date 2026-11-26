@@ -5,6 +5,7 @@
   import { errorText } from '../errors'
   import Busy from '../ui/Busy.svelte'
   import { formatTime, laneVar } from '../graph/draw'
+  import { day } from '../thisClone'
   import { formatShortcut, provideCommands } from '../commands.svelte'
   import { session } from '../session.svelte'
   import type { DiffTarget } from './DiffView.svelte'
@@ -155,8 +156,13 @@
                   {:else}
                     <span class="who-when">
                       <button class="sha" onclick={() => onReveal(l.commit)} title="{l.summary}&#10;Show in graph">{l.commit.slice(0, 7)}</button>
-                      <span class="who" title={l.author}>{l.author}</span>
-                      <span class="muted when">{formatTime(l.time)}</span>
+                      {#if l.edge}
+                        <!-- A shallow clone's edge (#1006): written there or earlier, in history it hasn't got. -->
+                        <span class="who before" title="This clone's history stops at {l.commit.slice(0, 7)}: these lines are as old as it, or older">before {day(l.time)}</span>
+                      {:else}
+                        <span class="who" title={l.author}>{l.author}</span>
+                        <span class="muted when">{formatTime(l.time)}</span>
+                      {/if}
                     </span>
                   {/if}
                 {/if}
@@ -296,6 +302,11 @@
     margin: 0 6px;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .who.before {
+    font-style: italic;
+    color: var(--ink-mute);
   }
 
   .when {

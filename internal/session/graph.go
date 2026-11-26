@@ -633,6 +633,11 @@ func (l *graphLoader) reload() {
 			pins, kinds := KindTips(ctx, l.repo, rules, remotes, show)
 			g.Pin(pins)
 			g.SetTipKinds(kinds)
+			// A shallow clone's edge commits keep their lanes running on (#1006): its history
+			// doesn't begin there. Without the edge they read as first commits, as before.
+			if edge, err := l.repo.ShallowEdge(ctx); err == nil {
+				g.SetEdge(edge)
+			}
 		}
 		opts := git.LogOptions{Extra: stashIDs}
 		if len(focused) > 0 {

@@ -84,6 +84,16 @@ func (a *App) SetSparseFolders(path string, folders []string) error {
 	return err
 }
 
+// IsShallowEdge says whether a commit is at a shallow clone's edge (#1006): its parents
+// weren't fetched, so a history that reaches it stops there, not where the project began.
+func (a *App) IsShallowEdge(path, id string) bool {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return false
+	}
+	return r.Git.IsShallowEdge(context.Background(), id)
+}
+
 // RepoFolders lists the checked-out commit's folders with how many files each holds, for
 // changing a sparse checkout's folders. It reads the folder listings only.
 func (a *App) RepoFolders(path string) ([]git.FolderCount, error) {

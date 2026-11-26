@@ -84,6 +84,80 @@ func TestShallowCloneFetchesMoreHistory(t *testing.T) {
 	}
 }
 
+func TestShallowEdgeNamesTheParentsNotFetched(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	src := shapeSource(t)
+	repo := cloneShaped(t, src, "--depth=2")
+	edge, err := repo.ShallowEdge(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// main~1 is the edge; its parent, main~2, is on the server only.
+	at, parent := src.Git("rev-parse", "main~1"), src.Git("rev-parse", "main~2")
+	if len(edge) != 1 || !slices.Equal(edge[at], []string{parent}) {
+		t.Fatalf("edge %v; want %s with parent %s", edge, at, parent)
+	}
+	// git itself lists the edge with no parents.
+	if ps, _ := repo.ReadString(ctx, "log", "-1", "--format=%P", at); ps != "" {
+		t.Fatalf("log gave the edge parents %q", ps)
+	}
+	if edge, err := cloneShaped(t, src).ShallowEdge(ctx); err != nil || edge != nil {
+		t.Errorf("a whole clone has an edge: %v, %v", edge, err)
+	}
+}
+
+// Two branches that part before a shallow clone's edge have no common commit in it.
+func TestPartsPastEdge(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	src := gittest.New(t)
+	src.CommitFile("a.txt", "a\n", "base")
+	src.Branch("side")
+	src.CommitFile("s.txt", "1\n", "side one")
+	src.CommitFile("s.txt", "2\n", "side two")
+	src.Checkout("main")
+	src.CommitFile("m.txt", "1\n", "main one")
+	src.CommitFile("m.txt", "2\n", "main two")
+	src.Git("config", "uploadpack.allowFilter", "true")
+	shallow := cloneShaped(t, src, "--depth=2", "--no-single-branch")
+	if !shallow.PartsPastEdge(ctx, "HEAD", "origin/side") {
+		t.Error("main and side part at base, past the edge: want true")
+	}
+	if shallow.PartsPastEdge(ctx, "HEAD", "HEAD~1") {
+		t.Error("HEAD and its parent share HEAD~1")
+	}
+	if cloneShaped(t, src).PartsPastEdge(ctx, "HEAD", "origin/side") {
+		t.Error("a whole clone has their base")
+	}
+}
+
+// Blame in a shallow clone: lines older than the edge are blamed on its commit, which git marks
+// as the boundary. They're marked as from the edge; lines written after it aren't.
+func TestBlameMarksLinesFromBeforeTheEdge(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	src := gittest.New(t)
+	src.CommitFile("f.txt", "old\n", "one")
+	src.CommitFile("f.txt", "old\nmiddle\n", "two")
+	src.CommitFile("f.txt", "old\nmiddle\nnew\n", "three")
+	src.Git("config", "uploadpack.allowFilter", "true")
+	repo := cloneShaped(t, src, "--depth=2")
+	lines, err := repo.Blame(ctx, "f.txt", "", false)
+	if err != nil || len(lines) != 3 {
+		t.Fatalf("blame %+v, %v", lines, err)
+	}
+	// "old" and "middle" go back to the edge commit, "two"; "new" is three's own.
+	if !lines[0].Edge || !lines[1].Edge || lines[2].Edge {
+		t.Fatalf("edge marks: %v %v %v; want the first two", lines[0].Edge, lines[1].Edge, lines[2].Edge)
+	}
+	// In a whole clone the first commit isn't an edge.
+	whole, err := cloneShaped(t, src).Blame(ctx, "f.txt", "", false)
+	if err != nil || whole[0].Edge {
+		t.Fatalf("whole clone: %+v, %v", whole[0], err)
+	}
+}
+
 func TestPartialCloneBackfills(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
