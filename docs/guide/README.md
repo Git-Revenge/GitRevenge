@@ -25,6 +25,7 @@ After that, the guide covers each part of the app in turn:
 | Page | What it covers |
 |---|---|
 | [Repositories and tabs](repositories.md) | Opening, cloning, tabs, groups, the dashboard and worktrees. |
+| [Cloning a big repository](big-repositories.md) | Shallow, partial, one-branch and sparse clones: what each costs, This clone, where a shallow history stops, and when a file isn't here yet. |
 | [The commit graph](graph.md) | Reading the graph, moving around it, searching, and the sidebar. |
 | [Searching the code](searching-code.md) | Find in files, and the history search: the commits that brought a text in or took it out. |
 | [Experimental views](experimental-views.md) | Horizontal, with time running across, and Map, a picture of every branch around the trunk, or of everyone who wrote the commits. |

@@ -1963,6 +1963,133 @@ scenes.historySearchRunning = (page) =>
     },
   )
 
+// ── Big repositories (#935) ───────────────────────────────────────────────────────────
+
+/** A clone of the demo that holds less than the whole repository, as a big one might: its last
+ * 25 commits, file contents only when needed, docs/ and src/ written, main alone. Made with
+ * git from tidewater, served over file:// as from a server. */
+const SLIM = path.win32.join(DEMO, 'tidewater-slim')
+const slimURL = () => `file:///${REPO.replace(/\\/g, '/')}`
+
+function slimClone() {
+  rmSync(SLIM, { recursive: true, force: true })
+  run('git', ['-C', REPO, 'config', 'uploadpack.allowFilter', 'true'])
+  run('git', ['clone', '-q', '--depth', '25', '--filter=blob:none', '--sparse', '--single-branch', slimURL(), SLIM])
+  run('git', ['-C', SLIM, 'sparse-checkout', 'set', 'docs', 'src'])
+}
+
+/** Types into a field in place of what's there (the dialog fills some in). */
+async function replaceIn(p, selector, text) {
+  await click(p, selector)
+  await p.keyboard.down('Control')
+  await p.keyboard.press('a')
+  await p.keyboard.up('Control')
+  await type(p, text, 0)
+}
+
+/** Opens the slim clone alone, after a reset, and waits for its graph. */
+async function openSlim(p) {
+  await reset(p, [])
+  slimClone()
+  await p.evaluate(async (dir) => {
+    const A = window.go.app.App
+    await A.OpenRepo(dir)
+    await A.SetActiveRepo(dir)
+  }, SLIM)
+  await p.reload({ waitUntil: 'networkidle0' })
+  await overlay(p)
+  await p.waitForSelector('.scroller')
+  await untilSettled(p, () => !!document.querySelector('.row.ref') && !document.body.innerText.includes('Loading history'))
+}
+
+scenes.cloneOptions = (page) =>
+  stills(page, 'clone-options', async (p) => {
+    await reset(p, [])
+    await click(p, byText('Clone a repository'), { pause: 500 })
+    await click(p, '[role=dialog] input[placeholder^="https://"]')
+    // A made-up address: with every branch chosen, nothing asks it anything.
+    await type(p, 'https://github.com/tidewater-weather/tidewater.git', 0)
+    await replaceIn(p, '[role=dialog] input[placeholder="Choose a folder"]', DEMO)
+    await click(p, byText('Options'), { pause: 400 })
+    await click(p, '[role=dialog] input[value="depth"]')
+    await replaceIn(p, '[role=dialog] input[aria-label="How many commits"]', '1000')
+    await click(p, '[role=dialog] input[value="partial"]')
+    await click(p, '[role=dialog] input[value="some"]')
+    await p.evaluate(() => document.activeElement?.blur())
+    await park(p)
+  })
+
+scenes.cloneFolders = (page) =>
+  stills(page, 'clone-folders', async (p) => {
+    await reset(p, [])
+    const into = path.win32.join(DEMO, 'tidewater-folders')
+    rmSync(into, { recursive: true, force: true })
+    await click(p, byText('Clone a repository'), { pause: 500 })
+    await click(p, '[role=dialog] input[placeholder^="https://"]')
+    await type(p, slimURL(), 0)
+    await replaceIn(p, '[role=dialog] input[placeholder="Choose a folder"]', DEMO)
+    await replaceIn(p, '[role=dialog] label.form-field:nth-of-type(3) input', 'tidewater-folders')
+    await click(p, byText('Options'), { pause: 400 })
+    await click(p, '[role=dialog] input[value="some"]')
+    await click(p, byText('Next: choose folders'), { pause: 400 })
+    await waiting(() => p.waitForSelector('[role=dialog] .folders input[type=checkbox]', { timeout: 60000 }))
+    // The site and the docs, and src's alerts with them.
+    for (const folder of ['docs/', 'public/']) {
+      await click(p, `::-p-xpath(//ul[contains(@class,'folders')]//label[normalize-space(.)=${JSON.stringify(folder)}]/input)`)
+    }
+    await park(p)
+  })
+
+scenes.thisClone = (page) =>
+  stills(
+    page,
+    'this-clone',
+    async (p) => {
+      await openSlim(p)
+      await click(p, rail('Repository'), { pause: 300 })
+      await p.waitForSelector('section[aria-labelledby^="this-clone"]', { timeout: 30000 })
+      await sleep(500)
+      await park(p)
+    },
+    { ...SIDEBAR, height: 600 },
+  )
+
+scenes.shallowEdge = (page) =>
+  stills(page, 'shallow-edge', async (p) => {
+    await openSlim(p)
+    // To the end of the history, where the band is.
+    const g = await (await p.$('.scroller')).boundingBox()
+    await p.mouse.move(g.x + g.width / 2, g.y + g.height / 2)
+    for (let i = 0; i < 40; i++) {
+      await p.mouse.wheel({ deltaY: 2000 })
+      await sleep(40)
+    }
+    await p.waitForSelector('[role=note][aria-label="Where this history stops"]', { timeout: 30000 })
+    await sleep(600)
+    await park(p)
+  })
+
+scenes.partialDownload = (page) =>
+  stills(page, 'partial-download', async (p) => {
+    await openSlim(p)
+    // Over file:// a download is too quick to see: the "server" packs slowly for this scene,
+    // for less time than the next reset waits for the folder to be free.
+    const hook = path.join(work, 'slow-pack.sh')
+    writeFileSync(hook, 'sleep 10\nexec "$@"\n')
+    run('git', ['config', '-f', path.win32.join(DEMO, 'gitconfig'), 'uploadpack.packObjectsHook', `sh ${hook.replace(/\\/g, '/')}`])
+    try {
+      // A recent commit: its file's earlier version was never downloaded.
+      await selectCommit(p, 'Show wind in knots')
+      await showFiles(p)
+      await click(p, file('src/feed.js'), { pause: 400 })
+      await waiting(() => p.waitForFunction(() => document.body.innerText.includes('Downloading…'), { timeout: 30000 }))
+      await sleep(500)
+      await park(p)
+    } finally {
+      run('git', ['config', '-f', path.win32.join(DEMO, 'gitconfig'), '--unset', 'uploadpack.packObjectsHook'])
+    }
+  })
+
 scenes.about = (page) =>
   stills(page, 'about', async (p) => {
     await reset(p, ['tidewater'], { clean: true })
