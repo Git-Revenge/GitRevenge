@@ -11,6 +11,9 @@ import (
 type CommitInfo struct {
 	Commit git.CommitDetail `json:"commit"`
 	Files  []git.FileChange `json:"files"`
+	// CountsMissing, in a partial clone, lists the file versions the line counts and renames
+	// need that were never downloaded (#1010): the panel downloads them, then asks again.
+	CountsMissing []string `json:"countsMissing,omitempty"`
 	// Author and Committer are who the mailmap says wrote and committed it: the names the
 	// graph shows. They're the commit's own (Commit.Author, Commit.Committer) unless a
 	// mailmap line reads them as someone else.
@@ -39,10 +42,10 @@ func (a *App) CommitDetail(path, id string) (CommitInfo, error) {
 		ids, _ := r.Git.Mailmap(context.Background(), written)
 		shown <- ids
 	}()
-	files, err := r.Git.ChangedFiles(context.Background(), c)
+	files, missing, err := r.Git.ChangedFiles(context.Background(), c)
 	ids := <-shown
 	if err != nil {
 		return CommitInfo{}, err
 	}
-	return CommitInfo{Commit: c, Files: files, Author: ids[0], Committer: ids[1]}, nil
+	return CommitInfo{Commit: c, Files: files, CountsMissing: missing, Author: ids[0], Committer: ids[1]}, nil
 }

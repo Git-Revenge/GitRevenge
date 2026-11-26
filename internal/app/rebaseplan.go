@@ -18,6 +18,9 @@ type DroppedCommit struct {
 
 // RebasePlanPreview is what running the rebase editor's plan would do (issue #596).
 type RebasePlanPreview struct {
+	// Missing, in a partial clone, lists the file versions replaying the plan needs that
+	// were never downloaded (#1010): the editor downloads them and asks again.
+	Missing []string `json:"missing,omitempty"`
 	// StopsAt is the first commit that wouldn't apply in this order, or "".
 	StopsAt   string             `json:"stopsAt"`
 	Conflicts []ForecastConflict `json:"conflicts"`
@@ -38,7 +41,12 @@ func (a *App) PreviewRebasePlan(path, base string, items []git.RebaseItem) (Reba
 		return RebasePlanPreview{}, err
 	}
 	ctx := context.Background()
-	f, err := r.Git.ForecastPlan(ctx, base, items)
+	if missing, err := r.Git.ReplayNeeds(ctx, base, "HEAD"); err != nil {
+		return RebasePlanPreview{}, friendly(err)
+	} else if len(missing) > 0 {
+		return RebasePlanPreview{Missing: missing, Conflicts: []ForecastConflict{}, Dropped: []DroppedCommit{}}, nil
+	}
+	f, err := r.Git.ForecastPlan(git.NoDownloads(ctx), base, items)
 	if err != nil {
 		return RebasePlanPreview{}, friendly(err)
 	}

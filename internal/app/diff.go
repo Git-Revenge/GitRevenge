@@ -262,26 +262,39 @@ func (d *diffCache) get() *semdiff.Cache {
 
 // FileImage returns an image in the repository as a data URL, at the version a diff of
 // mode shows (a commit, the index or the working tree). Rendered markdown uses it for
-// relative images. It returns "" when the file isn't an image or doesn't exist there.
-func (a *App) FileImage(path, mode, commit, file string) (string, error) {
+// relative images. Its URL is "" when the file isn't an image or doesn't exist there. In a
+// partial clone it downloads nothing: a picture never downloaded comes back Missing.
+func (a *App) FileImage(path, mode, commit, file string) (PreviewImage, error) {
 	r, err := a.openRepo(path)
 	if err != nil {
-		return "", err
+		return PreviewImage{}, err
 	}
 	// The path comes from a document's link: keep it inside the repository.
 	clean := filepath.ToSlash(filepath.Clean(file))
 	if file == "" || filepath.IsAbs(file) || clean == ".." || strings.HasPrefix(clean, "../") {
-		return "", nil
+		return PreviewImage{}, nil
 	}
 	at, ok := versionRef(mode, commit, clean)
 	if !ok {
-		return "", userError("Unknown diff mode " + mode + ".")
+		return PreviewImage{}, userError("Unknown diff mode " + mode + ".")
 	}
 	fc, err := r.Git.Contents(context.Background(), clean, git.FileRef{}, at, false)
-	if err != nil || fc.Kind != "image" || !fc.New.Exists {
-		return "", nil // a broken image in a document isn't an error worth a banner
+	if err == nil && fc.Kind == "missing" {
+		return PreviewImage{Missing: fc.Missing}, nil
 	}
-	return "data:" + fc.Mime + ";base64," + fc.New.Image, nil
+	if err != nil || fc.Kind != "image" || !fc.New.Exists {
+		return PreviewImage{}, nil // a broken image in a document isn't an error worth a banner
+	}
+	return PreviewImage{URL: "data:" + fc.Mime + ";base64," + fc.New.Image}, nil
+}
+
+// PreviewImage is a picture a rendered document shows from another file.
+type PreviewImage struct {
+	// URL is the picture as a data: URL, or "" when there's none to show.
+	URL string `json:"url"`
+	// Missing, in a partial clone, lists the picture's version when it was never downloaded
+	// (#1010): the preview shows it as not downloaded, and fetches its pictures in one go.
+	Missing []string `json:"missing,omitempty"`
 }
 
 // FileData returns a file in the repository as base64, at the version a diff of mode shows,

@@ -517,6 +517,12 @@ const mounts = {
     const target = scenario.diffTarget ?? { mode: 'commit', commit: 'c0ffee'.padEnd(40, '0'), file: 'internal/tides/forecast.go' }
     mount(DiffView, { target: host, props: { path: '/r', target, onClose: record('close'), onOpen: record('open') } })
   },
+  // A file's history, as the diff view's History opens it.
+  async fileHistory() {
+    host.style.cssText = 'display:block;height:100vh'
+    const { default: FileHistoryView } = await import('../src/lib/diff/FileHistoryView.svelte')
+    mount(FileHistoryView, { target: host, props: { path: '/r', file: 'new.txt', onClose: record('close'), onOpen: record('open') } })
+  },
   async closingDiff() {
     host.style.cssText = 'display:block;height:100vh'
     const { default: DiffView } = await import('../src/lib/diff/DiffView.svelte')
@@ -658,6 +664,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'insights':
     await mounts.insights()
+    break
+  case 'fileHistory':
+    await mounts.fileHistory()
     break
   default:
     throw new Error('Unknown component to mount.')

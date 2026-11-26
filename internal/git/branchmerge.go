@@ -33,10 +33,14 @@ type BranchMerge struct {
 // commits of their own that were squashed separately, and later changes on the target can
 // make merging them conflict. Anything that goes wrong reads as "not known to be merged",
 // since the answer decides whether deleting the branch asks first.
+//
+// In a partial clone it downloads nothing (#1010): a check that would read files never
+// downloaded fails, and reads as not known to be merged.
 func (r *Repo) BranchMergeState(ctx context.Context, branch string, targets []string) BranchMerge {
 	if err := CheckRevs(append([]string{branch}, targets...)...); err != nil {
 		return BranchMerge{}
 	}
+	ctx = NoDownloads(ctx)
 	targets = r.distinctTargets(ctx, targets)
 	first := r.mergeIntoAny(ctx, "refs/heads/"+branch, targets)
 	if first.How != "" || len(targets) == 0 {
@@ -320,6 +324,7 @@ func (r *Repo) BranchStates(ctx context.Context, names, targets []string) map[st
 	if len(targets) == 0 {
 		return merged
 	}
+	ctx = NoDownloads(ctx) // as BranchMergeState
 	targets = r.distinctTargets(ctx, targets)
 	above := make(map[string][]string, len(names))
 	for _, name := range names {

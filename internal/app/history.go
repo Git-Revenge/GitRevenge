@@ -7,20 +7,31 @@ import (
 	"github.com/git-revenge/gitrevenge/internal/git"
 )
 
+// FileHistoryResult is a file's history.
+type FileHistoryResult struct {
+	Commits []git.FileCommit `json:"commits"`
+	// Stop, in a partial clone, says where following the file's renames stopped: at a rename
+	// that compares files never downloaded (#1010). The view offers to download them.
+	Stop *git.HistoryStop `json:"stop,omitempty"`
+}
+
 // FileHistory lists commits that changed file, newest first, following renames. Asking for
 // another file's history stops this one, which then answers with nothing.
-func (a *App) FileHistory(path, file string) ([]git.FileCommit, error) {
+func (a *App) FileHistory(path, file string) (FileHistoryResult, error) {
 	r, err := a.openRepo(path)
 	if err != nil {
-		return nil, err
+		return FileHistoryResult{}, err
 	}
 	ctx, done := a.latest.start("history", r.Path)
 	defer done()
-	commits, err := r.Git.FileHistory(ctx, file)
+	commits, stop, err := r.Git.FileHistory(ctx, file)
 	if errors.Is(err, context.Canceled) {
-		return []git.FileCommit{}, nil // superseded, or the repository closed
+		return FileHistoryResult{Commits: []git.FileCommit{}}, nil // superseded, or the repository closed
 	}
-	return commits, err
+	if err != nil {
+		return FileHistoryResult{}, err
+	}
+	return FileHistoryResult{Commits: commits, Stop: stop}, nil
 }
 
 // Blame attributes each line of file at rev ("" for the work tree) to a commit. Asking for

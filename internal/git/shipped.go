@@ -118,6 +118,10 @@ type ShippedQuery struct {
 	Target       string
 	Since, Until int64
 	Range        string
+	// Names reads only which files each item changed, from the folder listings, and no
+	// lines: for a partial clone that hasn't downloaded the files the lines need (#1010).
+	// Renames aren't followed then; a renamed file counts as two.
+	Names bool
 	// References finds the ticket references of a whole commit message, in the order written
 	// and each once. Which trailers name tickets is for whoever reads trailers to say, so
 	// that's not decided here: nil finds the ones in the subject, PROJ-123 and #123.
@@ -155,15 +159,11 @@ func (r *Repo) Shipped(ctx context.Context, q ShippedQuery) ([]ShippedItem, erro
 	if err := CheckRevs(q.Target, q.Range); err != nil {
 		return nil, err
 	}
-	args := append(pinned(q.Target),
-		"log", "--first-parent", "--diff-merges=first-parent", "--numstat", "-M",
-		"--no-textconv", "--no-ext-diff",
+	args := append(append(pinned(q.Target),
+		"log", "--first-parent", "--diff-merges=first-parent"), q.changes()...)
+	args = append(args, "--no-textconv", "--no-ext-diff",
 		"--format=%x1e%H%x1f%P%x1f%aN%x1f%aE%x1f%ct%x1f%B%x1d")
-	if q.Range != "" {
-		args = append(args, q.Range, "--")
-	} else {
-		args = append(args, q.Target, "--")
-	}
+	args = append(args, q.revs()...)
 
 	items := []ShippedItem{}
 	var parents [][]string
@@ -201,6 +201,112 @@ func (r *Repo) Shipped(ctx context.Context, q ShippedQuery) ([]ShippedItem, erro
 	return items, nil
 }
 
+// revs is what a walk over q reads: its range, or the target's first-parent line bounded by
+// the window's dates. git shows, and so diffs, only the commits in the window. Walking on
+// and stopping here once past it would leave git diffing the commits either side, which in a
+// partial clone read files nobody asked to download (#1010).
+func (q ShippedQuery) revs() []string {
+	if q.Range != "" {
+		return []string{q.Range, "--"}
+	}
+	// "@seconds +zone" is the form git reads exactly; without the zone a small number isn't
+	// taken for a time at all.
+	at := func(t int64) string { return "@" + strconv.FormatInt(t, 10) + " +0000" }
+	return []string{"--since=" + at(q.Since), "--until=" + at(q.Until), q.Target, "--"}
+}
+
+// changes is how a walk over q lists each commit's files: lines and renames, or (Names) the
+// raw listing, which reads no file's contents.
+func (q ShippedQuery) changes() []string {
+	if q.Names {
+		return []string{"--raw", "--no-renames", "--no-abbrev"}
+	}
+	return []string{"--numstat", "-M"}
+}
+
+// changeLine reads one line of a walk's changes: the path, and the lines added and removed
+// when counted (a binary file's are 0). A --raw line is ":modes ids status" TAB path; a
+// --numstat line is added TAB removed TAB path.
+func changeLine(line string) (path string, added, removed int, ok bool) {
+	if strings.HasPrefix(line, ":") {
+		_, path, ok = strings.Cut(line, "\t")
+		return path, 0, 0, ok
+	}
+	cols := strings.SplitN(line, "\t", 3)
+	if len(cols) != 3 {
+		return "", 0, 0, false
+	}
+	// Binary files show "-" and add no lines.
+	added, _ = strconv.Atoi(cols[0])
+	removed, _ = strconv.Atoi(cols[1])
+	return cols[2], added, removed, true
+}
+
+// WindowNeeds lists the file versions the lines changed in q's window would read that a
+// partial clone hasn't got: both sides of every change on its first-parent line, read from
+// the listings. A whole clone needs nothing.
+func (r *Repo) WindowNeeds(ctx context.Context, q ShippedQuery) ([]string, error) {
+	if !r.Partial(ctx) {
+		return nil, nil
+	}
+	if err := CheckRevs(q.Target, q.Range); err != nil {
+		return nil, err
+	}
+	args := append(pinned(q.Target), "log", "--first-parent", "--diff-merges=first-parent",
+		"--raw", "--no-renames", "--no-abbrev", "--format=%x1e%ct%x1d")
+	args = append(args, q.revs()...)
+	var ids []string
+	err := r.streamCmd(ctx, Cmd{Args: args, Env: noLazyFetch}, func(rd io.Reader) error {
+		br := bufio.NewReaderSize(rd, 64*1024)
+		for {
+			rec, err := br.ReadString('\x1e')
+			if head, raw, ok := strings.Cut(strings.TrimSuffix(rec, "\x1e"), "\x1d"); ok {
+				at, _ := strconv.ParseInt(strings.TrimSpace(head), 10, 64)
+				if q.Range == "" && at < q.Since {
+					return errStopWalk
+				}
+				if q.Range != "" || at <= q.Until {
+					ids = append(ids, rawVersions(raw)...)
+				}
+			}
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+		}
+	})
+	if err != nil && !errors.Is(err, errStopWalk) && !isEmptyRepoLogError(err) {
+		return nil, err
+	}
+	// The walk reads names through the target's .mailmap (pinned).
+	if id, err := r.ReadString(ctx, "rev-parse", "--verify", "-q", q.Target+":.mailmap"); err == nil && id != "" {
+		ids = append(ids, id)
+	}
+	return r.missingOf(ctx, ids)
+}
+
+// rawVersions lists the file versions in --raw lines (not -z): both sides of each change,
+// leaving out a side that isn't there and a submodule's commits.
+func rawVersions(raw string) []string {
+	var ids []string
+	for line := range strings.SplitSeq(raw, "\n") {
+		head, _, ok := strings.Cut(line, "\t")
+		f := strings.Fields(head)
+		if !ok || len(f) < 5 || !strings.HasPrefix(f[0], ":") {
+			continue
+		}
+		modes := []string{strings.TrimPrefix(f[0], ":"), f[1]}
+		for i, id := range f[2:4] {
+			if strings.Trim(id, "0") != "" && modes[i] != "160000" {
+				ids = append(ids, id)
+			}
+		}
+	}
+	return ids
+}
+
 // errStopWalk ends a first-parent walk once it has passed the start of the window.
 var errStopWalk = errors.New("stop")
 
@@ -230,17 +336,10 @@ func parseShipped(head, numstat string, q ShippedQuery) (item *ShippedItem, pare
 		Fixup:  strings.HasPrefix(title, "fixup! ") || strings.HasPrefix(title, "squash! ") || strings.HasPrefix(title, "amend! "),
 	}
 	for line := range strings.SplitSeq(numstat, "\n") {
-		cols := strings.SplitN(line, "\t", 3)
-		if len(cols) != 3 {
-			continue
-		}
-		it.Files++
-		// Binary files show "-" and add no lines.
-		if a, err := strconv.Atoi(cols[0]); err == nil {
-			it.Added += a
-		}
-		if d, err := strconv.Atoi(cols[1]); err == nil {
-			it.Removed += d
+		if _, added, removed, ok := changeLine(line); ok {
+			it.Files++
+			it.Added += added
+			it.Removed += removed
 		}
 	}
 	return it, parents, false

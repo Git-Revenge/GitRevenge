@@ -6,6 +6,7 @@
   import { session } from '../session.svelte'
   import DiffView, { type DiffTarget } from './DiffView.svelte'
   import Loading from '../ui/Loading.svelte'
+  import NotDownloaded from './NotDownloaded.svelte'
 
   let {
     path,
@@ -16,15 +17,23 @@
 
   let commits = $state<git.FileCommit[] | null>(null)
   let selected = $state<git.FileCommit | null>(null)
+  // In a partial clone the history may stop at a rename it can't follow without downloading
+  // (#1010): it says so, and downloads the files that rename compares only when asked.
+  let stop = $state<git.HistoryStop | null>(null)
+  let following = $state(false)
+  let downloaded = $state(0)
 
   $effect(() => {
     const f = file
+    void downloaded
     commits = null
-    selected = null
-    void session.run(() => FileHistory(path, f)).then((c) => {
+    stop = null
+    following = false
+    void session.run(() => FileHistory(path, f)).then((res) => {
       if (f !== file) return
-      commits = c ?? []
-      selected = commits[0] ?? null
+      commits = res?.commits ?? []
+      stop = res?.stop ?? null
+      selected = commits.find((c) => c.id === selected?.id) ?? commits[0] ?? null
     })
   })
   import Empty from '../ui/Empty.svelte'
@@ -54,8 +63,21 @@
           </button>
         </li>
       {:else}
-        <li><Empty note="untouched">No commits touch this file.</Empty></li>
+        {#if !stop}<li><Empty note="untouched">No commits touch this file.</Empty></li>{/if}
       {/each}
+      {#if stop}
+        <li class="stop" role="status">
+          {#if following}
+            <NotDownloaded {path} inline ids={stop.missing} about="the files this rename compares" onDone={() => (downloaded += 1)} />
+          {:else}
+            <p>
+              The history stops at <span class="sha">{stop.commit.slice(0, 7)}</span>, where the file was renamed. Following it further back compares
+              {stop.missing.length === 1 ? 'a file' : `${stop.missing.length} files`} this partial clone hasn’t downloaded.
+            </p>
+            <button class="btn secondary" onclick={() => (following = true)}>Download and follow</button>
+          {/if}
+        </li>
+      {/if}
     {/if}
   </ul>
   {#if selected}
@@ -96,7 +118,7 @@
     border-bottom: 1px dotted var(--paper-edge);
   }
 
-  .list button {
+  .list li:not(.stop) > button {
     display: flex;
     gap: 12px;
     align-items: baseline;
@@ -108,12 +130,28 @@
     text-align: left;
   }
 
-  .list button:hover:not(:disabled) {
+  .list li:not(.stop) > button:hover:not(:disabled) {
     background: var(--wash-hover);
   }
 
-  .list button.active {
+  .list li:not(.stop) > button.active {
     background: var(--selected);
+  }
+
+  .list .stop {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  .stop p {
+    flex: 1 1 280px;
+    margin: 0;
+    line-height: 1.45;
   }
 
   .sha {

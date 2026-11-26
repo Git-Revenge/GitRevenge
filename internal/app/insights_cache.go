@@ -46,6 +46,14 @@ func (c *insightsCache) put(key string, v any) {
 	c.results[key] = v
 }
 
+// clear forgets every result: files a partial clone downloaded change what the same refs give
+// (#1010), which the keys can't see.
+func (c *insightsCache) clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.results = nil
+}
+
 func conflictKey(targetSHA, branchSHA string) string { return targetSHA + "\x00" + branchSHA }
 
 func (c *insightsCache) conflict(targetSHA, branchSHA string) (git.Conflict, bool) {
