@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import { CarryOnHistorySearch, CommitRow, SetHistorySearch, SetTrailerFilter, SetTrailerPin, StopHistorySearch, TrailerFilter, TrailerFilterRows, TrailerFilterStep, TrailerPins } from '../../wailsjs/go/app/App.js'
+  import { CarryOnHistorySearch, CloneShape, CommitRow, SetHistorySearch, SetTrailerFilter, SetTrailerPin, StopHistorySearch, TrailerFilter, TrailerFilterRows, TrailerFilterStep, TrailerPins } from '../../wailsjs/go/app/App.js'
+  import ShallowBand from './ShallowBand.svelte'
   import type { app } from '../../wailsjs/go/models'
   import { onBackend } from './events'
   import FilterStrip from './filters/FilterStrip.svelte'
@@ -79,6 +80,19 @@
   let view = $state<'wip' | 'commit'>('commit')
   /** Files with uncommitted changes; null until the first answer, so nothing claims "clean". */
   let changes = $state<number | null>(null)
+
+  /** Where a shallow clone's history stops, Unix seconds; 0 for a whole history (#1006). The
+   * graph ends with a band saying so, and offering the rest. */
+  let shallowSince = $state(0)
+  $effect(() => {
+    const p = path
+    void session.revision[p]
+    void CloneShape(p)
+      .then((s) => {
+        if (p === path) shallowSince = s?.shallow?.since ?? 0
+      })
+      .catch(() => {})
+  })
 
   /** Shows the working tree's panel: from its row in the graph, or its column in a view that
    * runs across. */
@@ -502,8 +516,12 @@
         onHistoryRemove={() => setHistory(null)}
       />
     {/if}
+    <!-- Where a shallow clone's history stops: after the graph's last commit (#1006). -->
+    {#snippet shallowTail()}
+      <ShallowBand {path} since={shallowSince} />
+    {/snippet}
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filterOn} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFindInFiles={(text) => findAsk.show(path, text)} onHistorySearch={(text) => setHistory(historyOptions(text))} history={historyOn} onFilterDrop={dropLastFilter} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} tail={shallowSince ? shallowTail : undefined} historySince={shallowSince} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filterOn} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFindInFiles={(text) => findAsk.show(path, text)} onHistorySearch={(text) => setHistory(historyOptions(text))} history={historyOn} onFilterDrop={dropLastFilter} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onContext={(row, refs, x, y) =>
           void whileBusy(loadRefExtras(path, refs)).then((e) => openMenu(commitMenuItems(row, refs, ctx, e), x, y))}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)

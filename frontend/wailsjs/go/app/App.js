@@ -426,6 +426,10 @@ export function InteractiveRebase(arg1, arg2, arg3) {
   return window['go']['app']['App']['InteractiveRebase'](arg1, arg2, arg3);
 }
 
+export function IsShallowEdge(arg1, arg2) {
+  return window['go']['app']['App']['IsShallowEdge'](arg1, arg2);
+}
+
 export function IssueURL(arg1) {
   return window['go']['app']['App']['IssueURL'](arg1);
 }

@@ -116,6 +116,105 @@ func (r *Repo) shallowShape(ctx context.Context) (*ShallowShape, error) {
 	return s, nil
 }
 
+// ShallowEdge lists a shallow clone's edge commits with the parents their commit objects name,
+// which the clone hasn't got (#1006). git lists these commits as having no parents, so the
+// graph would draw them as where the history began. A whole clone has no edge.
+func (r *Repo) ShallowEdge(ctx context.Context) (map[string][]string, error) {
+	if out, _ := r.ReadString(ctx, "rev-parse", "--is-shallow-repository"); out != "true" {
+		return nil, nil
+	}
+	file, err := r.ReadString(ctx, "rev-parse", "--git-path", "shallow")
+	if err != nil {
+		return nil, err
+	}
+	if !filepath.IsAbs(file) {
+		file = filepath.Join(r.dir, file)
+	}
+	edge, err := os.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	// cat-file reads the objects as they are: their parent lines, which log hides.
+	out, err := r.readCmd(ctx, Cmd{Args: []string{"cat-file", "--batch"}, Stdin: strings.NewReader(string(edge)), Env: noLazyFetch})
+	if err != nil {
+		return nil, err
+	}
+	return parseEdge(out), nil
+}
+
+// IsShallowEdge reports whether id is one of a shallow clone's edge commits: its parents
+// weren't fetched, so nothing can be compared with them.
+func (r *Repo) IsShallowEdge(ctx context.Context, id string) bool {
+	return r.shallowSet(ctx)[id]
+}
+
+// PartsPastEdge reports whether, in a shallow clone, a and b have no common commit the clone
+// has: where they part is older than its history (#1006). git would merge them as unrelated
+// histories, or rebase every commit it can see. A whole clone's unrelated histories really are.
+func (r *Repo) PartsPastEdge(ctx context.Context, a, b string) bool {
+	if err := CheckRevs(a, b); err != nil || len(r.shallowSet(ctx)) == 0 {
+		return false
+	}
+	base, err := r.ReadString(ctx, "merge-base", a, b)
+	return err != nil && base == ""
+}
+
+// shallowSet reads the shallow file's commits: none for a whole clone.
+func (r *Repo) shallowSet(ctx context.Context) map[string]bool {
+	file, err := r.ReadString(ctx, "rev-parse", "--git-path", "shallow")
+	if err != nil {
+		return nil
+	}
+	if !filepath.IsAbs(file) {
+		file = filepath.Join(r.dir, file)
+	}
+	edge, err := os.ReadFile(file)
+	if err != nil {
+		return nil // a whole clone has no shallow file
+	}
+	set := map[string]bool{}
+	for _, id := range strings.Fields(string(edge)) {
+		set[id] = true
+	}
+	return set
+}
+
+// parseEdge reads `cat-file --batch` output for commits: each "id commit size" line, the
+// object, and a newline. It takes each commit's parent lines.
+func parseEdge(out []byte) map[string][]string {
+	edge := map[string][]string{}
+	rest := out
+	for len(rest) > 0 {
+		head, after, ok := strings.Cut(string(rest), "\n")
+		if !ok {
+			break
+		}
+		f := strings.Fields(head)
+		if len(f) != 3 || f[1] != "commit" {
+			// "<id> missing", or another type: nothing to read.
+			rest = []byte(after)
+			continue
+		}
+		size, err := strconv.Atoi(f[2])
+		if err != nil || size > len(after) {
+			break
+		}
+		obj := after[:size]
+		var parents []string
+		for line := range strings.SplitSeq(obj, "\n") {
+			if line == "" {
+				break // the message starts
+			}
+			if p, ok := strings.CutPrefix(line, "parent "); ok {
+				parents = append(parents, p)
+			}
+		}
+		edge[f[0]] = parents
+		rest = []byte(strings.TrimPrefix(after[size:], "\n"))
+	}
+	return edge
+}
+
 func (r *Repo) sparseShape(ctx context.Context) (*SparseShape, error) {
 	if on, _ := r.ReadString(ctx, "config", "--type=bool", "core.sparseCheckout"); on != "true" {
 		return nil, nil

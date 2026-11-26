@@ -3,6 +3,7 @@
   // the repositories alone (ADR-0008). The side panel holds every input a result depends on.
   import { session } from '../session.svelte'
   import Icon from '../ui/Icon.svelte'
+  import ShallowNote from '../ShallowNote.svelte'
   import InkButton from '../ui/InkButton.svelte'
   import { insights, VIEWS, type WindowKind } from './insights.svelte'
   import { ago, attention, groupLabel, latest, perDay, tiles, utcDay, utcMoment } from './model'
@@ -153,6 +154,8 @@
         <span class="hand eyebrow">{eyebrow}</span>
         <h1>{insights.label()}</h1>
         {#if multi}<span class="repos">{insights.repos.map(repoName).join(' · ')}</span>{/if}
+        <!-- A shallow clone counts only the history it has (#1006). -->
+        {#each insights.repos as repo (repo)}<ShallowNote path={repo} name={multi ? repoName(repo) : ''} />{/each}
       </div>
       {#if insights.loading}<span class="busy">Computing…</span>{/if}
       {#if w}

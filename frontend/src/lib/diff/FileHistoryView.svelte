@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from '../ui/Icon.svelte'
-  import { FileHistory } from '../../../wailsjs/go/app/App.js'
+  import { CloneShape, FileHistory, IsShallowEdge } from '../../../wailsjs/go/app/App.js'
+  import ShallowBand from '../ShallowBand.svelte'
   import type { git } from '../../../wailsjs/go/models'
   import { formatTime } from '../graph/draw'
   import { session } from '../session.svelte'
@@ -16,15 +17,25 @@
 
   let commits = $state<git.FileCommit[] | null>(null)
   let selected = $state<git.FileCommit | null>(null)
+  /** Where a shallow clone's history stops, when this file's reaches its edge (#1006): its
+   * oldest commit here isn't where the file began. 0 otherwise. */
+  let edgeSince = $state(0)
 
   $effect(() => {
     const f = file
+    void session.revision[path]
     commits = null
     selected = null
-    void session.run(() => FileHistory(path, f)).then((c) => {
+    edgeSince = 0
+    void session.run(() => FileHistory(path, f)).then(async (c) => {
       if (f !== file) return
       commits = c ?? []
       selected = commits[0] ?? null
+      const oldest = commits.at(-1)
+      if (oldest && (await IsShallowEdge(path, oldest.id).catch(() => false)) && f === file) {
+        const shape = await CloneShape(path).catch(() => null)
+        if (f === file) edgeSince = shape?.shallow?.since ?? oldest.time
+      }
     })
   })
   import Empty from '../ui/Empty.svelte'
@@ -56,6 +67,9 @@
       {:else}
         <li><Empty note="untouched">No commits touch this file.</Empty></li>
       {/each}
+      {#if edgeSince}
+        <li class="edge"><ShallowBand {path} since={edgeSince} {file} /></li>
+      {/if}
     {/if}
   </ul>
   {#if selected}
@@ -96,7 +110,8 @@
     border-bottom: 1px dotted var(--paper-edge);
   }
 
-  .list button {
+  /* A commit's row: not the buttons of the band at the end. */
+  .list li > button {
     display: flex;
     gap: 12px;
     align-items: baseline;
@@ -108,12 +123,16 @@
     text-align: left;
   }
 
-  .list button:hover:not(:disabled) {
+  .list li > button:hover:not(:disabled) {
     background: var(--wash-hover);
   }
 
-  .list button.active {
+  .list li > button.active {
     background: var(--selected);
+  }
+
+  .list .edge {
+    border-bottom: none;
   }
 
   .sha {

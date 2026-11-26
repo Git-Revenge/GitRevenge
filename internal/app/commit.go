@@ -16,6 +16,9 @@ type CommitInfo struct {
 	// mailmap line reads them as someone else.
 	Author    git.Identity `json:"author"`
 	Committer git.Identity `json:"committer"`
+	// Edge means the commit is at a shallow clone's edge (#1006): its parents weren't fetched,
+	// so Files are every file it has, as for a first commit.
+	Edge bool `json:"edge,omitempty"`
 }
 
 // CommitDetail returns a commit's metadata, message and changed files.
@@ -39,10 +42,17 @@ func (a *App) CommitDetail(path, id string) (CommitInfo, error) {
 		ids, _ := r.Git.Mailmap(context.Background(), written)
 		shown <- ids
 	}()
-	files, err := r.Git.ChangedFiles(context.Background(), c)
+	// At a shallow clone's edge there's no parent to compare with: the commit's files are all
+	// its own, as a first commit's are.
+	compared := c
+	edge := len(c.Parents) > 0 && r.Git.IsShallowEdge(context.Background(), c.ID)
+	if edge {
+		compared.Parents = nil
+	}
+	files, err := r.Git.ChangedFiles(context.Background(), compared)
 	ids := <-shown
 	if err != nil {
 		return CommitInfo{}, err
 	}
-	return CommitInfo{Commit: c, Files: files, Author: ids[0], Committer: ids[1]}, nil
+	return CommitInfo{Commit: c, Files: files, Author: ids[0], Committer: ids[1], Edge: edge}, nil
 }

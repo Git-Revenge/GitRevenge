@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
 )
@@ -58,6 +59,10 @@ func (a *App) Integrate(path, action string, args []string) error {
 		return userError("There are conflicts to resolve. Fix the conflicted files, stage them, then use Continue in the banner, or Abort to undo.")
 	}
 	var gerr *git.Error
+	// In a shallow clone, "unrelated" means their common history wasn't fetched (#1006).
+	if errors.As(err, &gerr) && strings.Contains(gerr.Stderr, "unrelated histories") && r.Git.PartsPastEdge(ctx, "HEAD", arg(0)) {
+		return userError("This shallow clone's history stops before where " + shortRef(arg(0)) + " and the checked-out branch part. Fetch more history (at the end of the graph, or This clone in the Repository panel), then try again.")
+	}
 	if errors.As(err, &gerr) && gerr.Stderr != "" {
 		return gitMessage(gerr.Stderr)
 	}

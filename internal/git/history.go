@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -85,6 +86,11 @@ type BlameLine struct {
 	Line string `json:"line"`
 	// OrigLine is the line number in that commit's version of the file.
 	OrigLine int `json:"origLine"`
+	// Edge means Commit is at a shallow clone's edge (#1006): the line is as old as it, or
+	// older, from history the clone didn't fetch.
+	Edge bool `json:"edge,omitempty"`
+	// boundary is blame's word that it looked no further back than Commit.
+	boundary bool
 }
 
 // Blame attributes each line of path (at rev, or the work tree when rev is "") to the
@@ -116,16 +122,33 @@ func (r *Repo) Blame(ctx context.Context, path, rev string, mayDownload bool) ([
 			return nil, &NotDownloadedError{IDs: []string{m[1]}}
 		}
 	}
+	if err == nil {
+		r.markEdge(ctx, lines)
+	}
 	return lines, err
+}
+
+// markEdge marks the lines blame gives a shallow clone's edge commits (#1006). git can't look
+// past the edge, so such a line was written there or earlier: the view says "before" its date
+// rather than crediting the edge commit with it.
+func (r *Repo) markEdge(ctx context.Context, lines []BlameLine) {
+	if !slices.ContainsFunc(lines, func(l BlameLine) bool { return l.boundary }) {
+		return
+	}
+	edge := r.shallowSet(ctx)
+	for i := range lines {
+		lines[i].Edge = lines[i].boundary && edge[lines[i].Commit]
+	}
 }
 
 // blobNotRead is how blame says a version wasn't there to read.
 var blobNotRead = regexp.MustCompile(`Cannot read blob ([0-9a-f]{40,64})`)
 
 type blameCommit struct {
-	author  string
-	time    int64
-	summary string
+	author   string
+	time     int64
+	summary  string
+	boundary bool
 }
 
 // parseBlame reads `git blame --porcelain`. Commit details appear only the first time a
@@ -143,7 +166,7 @@ func parseBlame(rd io.Reader) ([]BlameLine, error) {
 			c := commits[cur]
 			bl := BlameLine{Commit: cur, OrigLine: orig, Line: strings.TrimSuffix(line[1:], "\r")}
 			if c != nil {
-				bl.Author, bl.Time, bl.Summary = c.author, c.time, c.summary
+				bl.Author, bl.Time, bl.Summary, bl.boundary = c.author, c.time, c.summary, c.boundary
 			}
 			lines = append(lines, bl)
 			continue
@@ -172,6 +195,8 @@ func parseBlame(rd io.Reader) ([]BlameLine, error) {
 			c.time, _ = strconv.ParseInt(val, 10, 64)
 		case "summary":
 			c.summary = val
+		case "boundary":
+			c.boundary = true
 		}
 	}
 	return lines, sc.Err()

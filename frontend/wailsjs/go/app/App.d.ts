@@ -221,6 +221,8 @@ export function Integrate(arg1:string,arg2:string,arg3:Array<string>):Promise<vo
 
 export function InteractiveRebase(arg1:string,arg2:string,arg3:Array<git.RebaseItem>):Promise<void>;
 
+export function IsShallowEdge(arg1:string,arg2:string):Promise<boolean>;
+
 export function IssueURL(arg1:string):Promise<string>;
 
 export function KeepApart(arg1:string,arg2:string,arg3:boolean):Promise<void>;

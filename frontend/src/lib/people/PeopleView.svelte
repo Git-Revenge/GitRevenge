@@ -15,6 +15,7 @@
   import SamePersonDialog from './SamePersonDialog.svelte'
   import { apartNote, asSuggested, suggestionLabel } from './suggest'
   import { peopleTab } from './tab.svelte'
+  import ShallowNote from '../ShallowNote.svelte'
 
   // Re-read when the repository changes on disk, such as a .mailmap edited elsewhere.
   $effect(() => {
@@ -185,6 +186,8 @@
       <header class="head">
         <h1>{sourceLabel(t.source.source)}</h1>
         <span class="note">{sourceNote(t.source)}</span>
+        <!-- A shallow clone names only the people of the history it has (#1006). -->
+        <ShallowNote path={t.repo} />
         <span class="spacer"></span>
         <div class="seg" role="group" aria-label="Show">
           <button aria-pressed={t.view === 'people'} onclick={() => (t.view = 'people')}>People</button>

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -19,6 +20,38 @@ func shallowSource(t *testing.T) string {
 	src.Checkout("main")
 	src.Git("config", "uploadpack.allowFilter", "true")
 	return "file://" + filepath.ToSlash(src.Dir)
+}
+
+// #1006: an edge commit's parent wasn't fetched, so its files are all its own, as a first
+// commit's are, and the panel says its parent isn't here.
+func TestAShallowEdgeCommitOpens(t *testing.T) {
+	isolateGit(t)
+	a := newTestApp(t)
+	dir, err := a.Clone(shallowSource(t), t.TempDir(), "edge", git.CloneOptions{Depth: 2, Branch: "main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tab, err := a.OpenRepo(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := a.openRepo(tab.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	edge, _ := r.Git.ReadString(context.Background(), "rev-parse", "HEAD~1")
+	tip, _ := r.Git.ReadString(context.Background(), "rev-parse", "HEAD")
+	info, err := a.CommitDetail(tab.Path, edge)
+	if err != nil {
+		t.Fatalf("the edge commit didn't open: %v", err)
+	}
+	if !info.Edge || len(info.Commit.Parents) != 1 || len(info.Files) != 1 || info.Files[0].Status != "A" {
+		t.Fatalf("edge %v, parents %v, files %+v; want its one file as added", info.Edge, info.Commit.Parents, info.Files)
+	}
+	head, err := a.CommitDetail(tab.Path, tip)
+	if err != nil || head.Edge || len(head.Files) != 1 || head.Files[0].Status != "M" {
+		t.Fatalf("HEAD: %+v, %v", head, err)
+	}
 }
 
 func TestThisCloneSaysWhatsMissingAndFetchesIt(t *testing.T) {

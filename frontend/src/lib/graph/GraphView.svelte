@@ -16,6 +16,7 @@
   import Icon from '../ui/Icon.svelte'
   import { DUR, easeInk, fadeUp, labelsFold, labelsUnfold, menuOut, reducedMotion, stagger } from '../ui/motion'
   import KindFilter from './KindFilter.svelte'
+  import { day } from '../thisClone'
   import Lazy from '../ui/Lazy.svelte'
   import type { MapNode } from './mapLayout'
   import ViewMenu from './ViewMenu.svelte'
@@ -23,7 +24,7 @@
   import RefChip from './RefChip.svelte'
   import SearchSuggest from './SearchSuggest.svelte'
   import { completion, isKey, stepRow, type Suggestion, type Suggestions } from './suggest'
-  import { bisectRow, chipId, chipName, chipValue, type ChipSpan, DAY_H, dayBounds, dayCountLabel, dayLineLabel, dayLineSpoken, drawDayLine, drawFoldLine, drawRow, authorSpan, FOLD_H, FOLLOWER_H, gapLabel, sameDay, sealOf, startsRun, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
+  import { bisectRow, chipId, chipName, chipValue, type ChipSpan, DAY_H, dayBounds, dayCountLabel, dayLineLabel, dayLineSpoken, drawDayLine, drawFoldLine, drawRow, authorSpan, FOLD_H, FOLLOWER_H, TAIL_H, gapLabel, sameDay, sealOf, startsRun, graphWidth, LABEL_COLUMN, LABEL_FONT, labelColumnNeed, LANE_COUNT, laneCapacity, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, noteMarkSpan, refColumnWidth, refLabels, setLaneColors, type LabelSpan, type Layout, type RefLabel, type Theme } from './draw'
   import { branchMove, headAway, headLabel, isOwnMove, LANDING, moveAnnouncement, tipsOf, type Tips } from './follow'
   import { loadLabelWidth, nextLabelWidth, REFIT_AFTER_MS, saveLabelWidth } from './labelColumn'
   import { RowCache, type Page, type Ref, type Row } from './rowCache'
@@ -53,6 +54,8 @@
     onHistorySearch,
     history = null,
     lead,
+    tail,
+    historySince = 0,
     wip,
     toolsHost,
     squeeze,
@@ -72,6 +75,12 @@
      * with the history, and is told where the first lane and the messages are so it can line
      * up with them. */
     lead?: Snippet<[{ nodeX: number; textX: number }]>
+    /** A row of the caller's own after the last commit, TAIL_H tall: where a shallow clone's
+     * history stops (#1006). It scrolls with the history, and the lanes running on reach it. */
+    tail?: Snippet
+    /** Where a shallow clone's history starts, Unix seconds, or 0 for a whole one: the count
+     * says "since" then. */
+    historySince?: number
     /** The working tree, for a view that draws it itself where the rows use `lead`: how many
      * files have changed (null until known), whether its panel is showing, and how to show it. */
     wip?: { changes: number | null; active: boolean; open: () => void }
@@ -606,9 +615,11 @@
 
   /** Rows above the first commit: the caller's lead row, if it gave one. */
   let leadRows = $derived(lead ? 1 : 0)
+  /** Rows after the last commit: the caller's tail, if it gave one. */
+  let tailRows = $derived(tail ? 1 : 0)
   /** The scroll area's height: every row at the density's height, which is what a row is until
    * it's loaded and its neighbours say otherwise. */
-  let map = $derived(scrollMap((span + leadRows) * rowH, viewH))
+  let map = $derived(scrollMap((span + leadRows) * rowH + tailRows * TAIL_H, viewH))
 
   /**
    * The graph's rows, as slots (see rows.ts): the caller's lead row, if any, then one slot a
@@ -616,9 +627,10 @@
    * another height, or one that isn't a commit, is said.
    */
   let slotRows: { h: number; lead: SlotRow[]; rows: SlotRow[][] } | null = null
+  const tailSlot: SlotRow[] = [{ kind: 'tail', h: TAIL_H }]
   const slots: Slots = {
     get count() {
-      return span + leadRows
+      return span + leadRows + tailRows
     },
     rows(s: number) {
       if (slotRows?.h !== rowH) {
@@ -636,6 +648,7 @@
         slotRows = { h: rowH, lead: [{ kind: 'lead', h: rowH }], rows }
       }
       if (leadRows && s === 0) return slotRows.lead
+      if (tailRows && s === span + leadRows) return tailSlot
       const i = s - leadRows
       const own = isHidden(i) ? 2 : isFollower(i) ? 1 : 0
       return slotRows.rows[own * 4 + (startsDay(i) ? 1 : 0) + (foldOf(i)?.head === i ? 2 : 0)]
@@ -917,6 +930,8 @@
   /** Where the lead row is as of the last paint (null when out of view), and how wide rows are. */
   let leadY = $state<number | null>(0)
   let leadWidth = $state(0)
+  /** Where the tail row is as of the last paint, null when out of view. */
+  let tailY = $state<number | null>(null)
   /** The scrollTop last set from the anchor, so the scroll event that causes isn't read back.
    * Null when the next scroll isn't ours. */
   let setScroll: number | null = null
@@ -1584,8 +1599,10 @@
     let first = -1
     let last = 0
     let leadAt: number | null = null
+    let tailAt: number | null = null
     for (const r of viewRows) {
       if (r.kind === 'lead') leadAt = Math.round(r.y)
+      if (r.kind === 'tail') tailAt = Math.round(r.y)
       if (r.kind !== 'commit') continue
       const i = commitOf(r.slot)
       rowTops.set(i, r.y)
@@ -1593,10 +1610,11 @@
       last = i + 1
     }
     if (first < 0) first = last = Math.max(0, Math.min(span, commitOf(anchor.index)))
-    if (lead) {
+    if (lead || tail) {
       if (leadAt !== leadY) leadY = leadAt
       if (w !== leadWidth) leadWidth = w
     }
+    if (tailAt !== tailY) tailY = tailAt
     cache.ensure(first - OVERSCAN, last + OVERSCAN)
 
     let minCol = Infinity
@@ -2184,7 +2202,7 @@
 <div class="graph" bind:clientWidth={ownWidth}>
   <div class="status" class:searching={searchIconOnly && (searchOpen || !!query.trim())} use:hosted={toolsHost}>
     {#if mapView}
-      {#if level < SQUEEZE.count}<span class="meta">{mapSummary}</span>{/if}
+      {#if level < SQUEEZE.count}<span class="meta">{mapSummary}{historySince ? ` · since ${day(historySince)}` : ''}</span>{/if}
     {:else if error || rowError}
       <span class="error">Couldn't read history: {error || rowError}</span>
     {:else if level >= SQUEEZE.count}
@@ -2196,7 +2214,10 @@
     {:else if loading}
       <span class="meta">Loading history… {total.toLocaleString()} commits</span>
     {:else}
-      <span class="meta">{total.toLocaleString()} commits</span>
+      <!-- A shallow clone's count is of what it has: since its edge, not since the start (#1006). -->
+      <span class="meta" title={historySince ? 'A shallow clone: its older history is on the server only' : undefined}
+        >{total.toLocaleString()} commits{historySince ? ` since ${day(historySince)}` : ''}</span
+      >
     {/if}
     {#if kindRows.length}<KindFilter rows={kindRows} onToggle={setKindView} iconOnly={level >= SQUEEZE.network} />{/if}
     {#if level < SQUEEZE.density}
@@ -2233,7 +2254,7 @@
         aria-controls={suggestShown ? suggestId : undefined}
         aria-activedescendant={suggestShown ? `${suggestId}-${suggestAt}` : undefined}
         type="search"
-        placeholder={searchPlaceholder(level, total, loading)}
+        placeholder={searchPlaceholder(level, total, loading, historySince ? day(historySince) : '')}
         title="Search subjects, authors and SHAs, or a trailer such as Co-authored-by: name or Closes: #12. has:reviewed-by finds any value of a trailer, a leading - finds the commits that don’t match, and has:note finds commits with a note."
         aria-label="Search commits"
       />
@@ -2310,6 +2331,12 @@
     {#if lead && columns && leadY !== null}
       <div class="lead" style:top="{leadY}px" style:height="{rowH}px" style:width="{leadWidth}px" onwheel={(e) => scrollBy(e.deltaY)}>
         {@render lead({ nodeX: columns.refW + laneX(-columns.firstLane, columns.m), textX: columns.textX })}
+      </div>
+    {/if}
+    <!-- The caller's row after the last commit, placed where it scrolls to. -->
+    {#if tail && tailY !== null}
+      <div class="tail" style:top="{tailY}px" style:height="{TAIL_H}px" style:width="{leadWidth}px" onwheel={(e) => scrollBy(e.deltaY)}>
+        {@render tail()}
       </div>
     {/if}
     <div
@@ -2853,7 +2880,8 @@
     pointer-events: none;
   }
 
-  .lead {
+  .lead,
+  .tail {
     position: absolute;
     z-index: 1;
     left: 0;

@@ -37,6 +37,11 @@ describe('searchPlaceholder', () => {
     expect(searchPlaceholder(SQUEEZE.count, 12345, false)).toBe(`Search ${(12345).toLocaleString()} commits`)
   })
 
+  it('says since when in a shallow clone', () => {
+    expect(searchPlaceholder(SQUEEZE.count, 411, false, 'Nov 26, 2025')).toBe('Search 411 commits since Nov 26, 2025')
+    expect(searchPlaceholder(0, 411, false, 'Nov 26, 2025')).toBe('Search message, author or SHA')
+  })
+
   it('says there are more while the history is still loading', () => {
     expect(searchPlaceholder(SQUEEZE.count, 2000, true)).toBe(`Search ${(2000).toLocaleString()}+ commits`)
     expect(searchPlaceholder(SQUEEZE.count, 1, true)).toBe('Search 1+ commits')
