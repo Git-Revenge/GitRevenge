@@ -385,8 +385,6 @@ func historyProblem(err error, backTo int64) string {
 			where += " at " + time.Unix(backTo, 0).UTC().Format("Jan 2, 2006")
 		}
 		return where + ". A search never downloads anything."
-	case errors.Is(err, git.ErrLazyFetch):
-		return "This is a partial clone, and your git, older than 2.44, would download old files to search them. Update git to search the history."
 	case errors.Is(err, git.ErrFindText):
 		return "The history search looks for text within one line."
 	}

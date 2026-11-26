@@ -35,6 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Changed
 
+- **Git Revenge now needs git 2.50 or newer** (it needed 2.40), for partial clones: 2.44 is the first git that can be told not to download, and 2.49 the first that can download what a partial clone is missing in batches. RHEL 9 and 10 already ship git 2.52. On Ubuntu 24.04, whose git is 2.43, add the Git maintainers' PPA (`sudo add-apt-repository ppa:git-core/ppa`) before upgrading. Debian 13's git is 2.47 and no newer one is packaged for it, so Debian is supported again from its next release. On Windows and macOS, install a newer git from git-scm.com, winget or Homebrew. The Linux packages and the winget package ask for git 2.50. (#1001)
 - Diffs are worked out by the app's Go side rather than in the window, and kept for the files you go back to, so a large file's diff no longer holds up the view while it's compared. (#944)
 - A line indented again where it stood is no longer called a move to where it already was. (#945)
 - The app is about 11 MB larger, and its Windows installer about 5 MB, for the grammars it reads code with. (#945)

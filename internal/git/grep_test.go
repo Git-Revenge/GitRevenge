@@ -309,11 +309,7 @@ func stillMissing(t *testing.T, repo *Repo) bool {
 func TestGrepInAPartialCloneDownloadsNothing(t *testing.T) {
 	t.Parallel()
 	dest := partialClone(t)
-	runner := newTestRunner(t)
-	if runner.version().Less(noLazyFetch) {
-		t.Skip("git older than 2.44: TestGrepWithAnOlderGitRefusesToDownload covers it")
-	}
-	repo := OpenRepo(runner, dest)
+	repo := OpenRepo(newTestRunner(t), dest)
 	if _, err := repo.Grep(context.Background(), GrepOptions{Text: "km/h", Rev: "HEAD~1"}, 0, func(GrepLine) {}); !errors.Is(err, ErrNotDownloaded) {
 		t.Fatalf("err = %v", err)
 	}
@@ -324,23 +320,5 @@ func TestGrepInAPartialCloneDownloadsNothing(t *testing.T) {
 	got, _ := grepAll(t, repo, GrepOptions{Text: "knots"}, 0)
 	if len(got) != 1 || got[0].File != "old.txt" {
 		t.Fatalf("working tree = %+v", got)
-	}
-}
-
-func TestGrepWithAnOlderGitRefusesToDownload(t *testing.T) {
-	t.Parallel()
-	dest := partialClone(t)
-	runner := newTestRunner(t)
-	// A git that can't be told not to fetch.
-	runner.verOnce.Do(func() { runner.ver = Version{2, 43, 0} })
-	repo := OpenRepo(runner, dest)
-	if _, err := repo.Grep(context.Background(), GrepOptions{Text: "km/h", Rev: "HEAD~1"}, 0, func(GrepLine) {}); !errors.Is(err, ErrLazyFetch) {
-		t.Fatalf("err = %v", err)
-	}
-	if !stillMissing(t, repo) {
-		t.Fatal("the search downloaded old.txt")
-	}
-	if _, err := repo.GrepCount(context.Background(), GrepOptions{Text: "knots"}); err != nil {
-		t.Fatalf("the working tree can still be searched: %v", err)
 	}
 }

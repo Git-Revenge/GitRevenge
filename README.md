@@ -42,13 +42,13 @@ Install with a package manager, or grab the Windows installer or the macOS disk 
 
 - **Windows:** `winget install GitRevenge.GitRevenge`. The installer on the release is signed too, but SmartScreen may warn you about a new release while its signature builds up a reputation; choose **More info**, then **Run anyway**.
 - **macOS:** the disk image is signed and notarized. With Homebrew: `brew install --cask git-revenge/tap/gitrevenge`.
-- **Linux:** Ubuntu 24.04, Debian 13, RHEL 9, and RHEL 10 with EPEL, or newer. Install with `apt` or `dnf` from the signed repositories at [packages.gitrevenge.com](https://packages.gitrevenge.com); the [install guide](docs/guide/install.md#linux) has the commands. The `.deb` and `.rpm` files are on each release too.
+- **Linux:** Ubuntu 24.04 (with the Git PPA), RHEL 9, and RHEL 10 with EPEL, or newer. Install with `apt` or `dnf` from the signed repositories at [packages.gitrevenge.com](https://packages.gitrevenge.com); the [install guide](docs/guide/install.md#linux) has the commands. The `.deb` and `.rpm` files are on each release too.
 
 Installing also gives you a `gitrevenge` command that opens the app [from a terminal](docs/guide/install.md#from-a-terminal).
 
 ## Requirements
 
-- `git` 2.40 or newer.
+- `git` 2.50 or newer.
 - `git-lfs`, if you want the LFS features.
 - For very large repositories, a commit-graph file makes the first screen of the graph much faster. Run `git commit-graph write --reachable` once, or set `fetch.writeCommitGraph=true` to keep it up to date.
 

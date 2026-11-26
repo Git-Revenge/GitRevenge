@@ -120,8 +120,6 @@ A partial clone, made with `git clone --filter=blob:none`, downloads a file's co
 - **Find** searches the working tree as usual. At a commit whose files were never downloaded, it says so instead of searching.
 - **The history search** stops at the first commit whose files were never downloaded, says where, and keeps what it found. That line is information, not an error.
 
-Both need git 2.44 or newer for this, the first that can be told not to download. With an older git, Find searches only the working tree of a partial clone, and the history search asks you to update git.
-
 ## What leaves your machine
 
 Nothing. Both searches run your own `git` over the repository on your disk, and neither downloads anything, even from a partial clone's remote. See [what leaves your machine](install.md#what-leaves-your-machine).

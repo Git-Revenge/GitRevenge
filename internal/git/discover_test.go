@@ -40,7 +40,8 @@ func TestVersionLess(t *testing.T) {
 		want bool
 	}{
 		{Version{2, 39, 5}, MinVersion, true},
-		{Version{2, 40, 0}, MinVersion, false},
+		{Version{2, 49, 1}, MinVersion, true},
+		{Version{2, 50, 0}, MinVersion, false},
 		{Version{2, 56, 0}, MinVersion, false},
 		{Version{1, 99, 99}, MinVersion, true},
 		{Version{3, 0, 0}, MinVersion, false},

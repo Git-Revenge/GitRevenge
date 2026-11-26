@@ -19,8 +19,8 @@ This document records the decisions from the initial requirements session (2026-
 
 ## Platforms
 
-- **Windows, macOS and Linux are first-class.** Linux means Ubuntu 24.04, Debian 13, RHEL 9, and RHEL 10 with EPEL, or newer ([ADR-0010](adr/0010-linux-first-class.md)).
-- Requires a system `git` **>= 2.40**. `git-lfs` is required for LFS features.
+- **Windows, macOS and Linux are first-class.** Linux means Ubuntu 24.04 with the Git PPA, RHEL 9, and RHEL 10 with EPEL, or newer ([ADR-0010](adr/0010-linux-first-class.md)). Debian is supported again from its next release, whose own git meets the minimum.
+- Requires a system `git` **>= 2.50** (2.40 before 1.2.0). `git-lfs` is required for LFS features.
 
 ## Architecture
 
@@ -182,7 +182,7 @@ From 1.0.0, Git Revenge follows [semantic versioning](https://semver.org/). It's
 
 - **Your settings.** A newer 1.x reads the `settings.json` an older one wrote, keeping your settings, project groups, recent repositories and open tabs. A 1.x may add settings; it doesn't drop or reinterpret one.
 - **Repository settings in git config.** The `gitrevenge.*` keys (branch kinds, hidden branches, smart links, cleanup and notes options) keep their names and meaning, so a repository set up by one 1.x works the same in the next, and so do teammates on different 1.x versions.
-- **What it runs on.** The systems under [Platforms](#platforms) and the minimum git (2.40). Dropping one waits for a major version, unless its vendor has ended support for it.
+- **What it runs on.** The systems under [Platforms](#platforms) and the minimum git. Dropping one waits for a major version, unless its vendor has ended support for it. One exception, decided on 2026-11-26: 1.2.0 raises the minimum git from 2.40 to 2.50, for partial clones. That leaves Debian 13, whose git is 2.47, until its next release, and Ubuntu 24.04 needs the Git PPA.
 - **How git is used.** Git Revenge keeps running your own `git`, with your config, hooks, credential helpers and SSH agent.
 - **Where it installs.** The install locations, the package names (`gitrevenge` in apt, dnf and Homebrew), and the repository and signing key at packages.gitrevenge.com.
 

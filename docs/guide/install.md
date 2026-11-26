@@ -36,7 +36,7 @@ The command opens the app as its icon does, with the tabs you had open. It doesn
 
 ## What you need
 
-- **git 2.40 or newer.** Git Revenge doesn't bundle git. It finds the one on your `PATH`, or you can point it at a specific one in [Settings](settings.md).
+- **git 2.50 or newer.** Git Revenge doesn't bundle git. It finds the one on your `PATH`, or you can point it at a specific one in [Settings](settings.md).
 - **git-lfs**, if you want the [LFS features](remotes.md#lfs).
 
 Check your version with:
@@ -47,11 +47,19 @@ git --version
 
 ## Linux
 
-Git Revenge supports Ubuntu 24.04, Debian 13, RHEL 9, and RHEL 10 with EPEL, or newer, on x86-64. Older Ubuntu and Debian releases ship a `git` older than 2.40.
+Git Revenge supports Ubuntu 24.04, RHEL 9, and RHEL 10 with EPEL, or newer, on x86-64. RHEL 9 and 10 ship git 2.52. Ubuntu 24.04 ships 2.43, so it needs a newer git from the Git maintainers' PPA (below). Debian 13 ships 2.47 and no newer git is packaged for it, so Git Revenge 1.2 and later need Debian's next release.
 
 The project keeps signed apt and dnf repositories at [packages.gitrevenge.com](https://packages.gitrevenge.com). Add one once, and Git Revenge updates along with the rest of your system. Installing also brings in what the app needs, including `git`.
 
 ### Ubuntu and Debian
+
+On Ubuntu 24.04, add the Git maintainers' PPA first, so `apt` can install a git that's new enough:
+
+```sh
+sudo add-apt-repository ppa:git-core/ppa
+```
+
+Then:
 
 ```sh
 sudo install -d -m 0755 /etc/apt/keyrings

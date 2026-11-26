@@ -148,8 +148,6 @@ func findError(err error, rev string) error {
 		return userError("There's no branch, tag or commit called “" + rev + "”.")
 	case errors.Is(err, git.ErrNotDownloaded):
 		return userError("This is a partial clone, and some of " + rev + "'s files were never downloaded, so it can't be searched. A search never downloads anything.")
-	case errors.Is(err, git.ErrLazyFetch):
-		return userError("This is a partial clone, and your git, older than 2.44, would download " + rev + "'s files to search them. Search the working tree, or update git.")
 	case errors.Is(err, git.ErrFindText):
 		return userError("Find looks for text within one line.")
 	}
