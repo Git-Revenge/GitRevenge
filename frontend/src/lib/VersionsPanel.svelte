@@ -11,6 +11,8 @@
     oldLabel,
     onClose,
     onShow,
+    onOpen,
+    current = -1,
   }: {
     compared: app.VersionsCompared
     /** The branch, or "" when the versions aren't one branch's. */
@@ -20,17 +22,27 @@
     onClose: () => void
     /** Selects a commit in the graph. */
     onShow: (id: string) => void
+    /** Opens a pair that changed, by its place, in the diff area (#1039). */
+    onOpen?: (index: number) => void
+    /** The pair open in the diff area, or -1. */
+    current?: number
   } = $props()
 
   let hideSame = $state(false)
-  let picked = $state(-1)
+  let clicked = $state(-1)
+  let picked = $derived(current >= 0 ? current : clicked)
   let copied = $state(false)
   let shown = $derived(compared.pairs.map((p, i) => ({ p, i })).filter(({ p }) => !(hideSame && isSame(p))))
   let hidden = $derived(compared.pairs.length - shown.length)
   const short = (id: string) => id.slice(0, 7)
 
+  /** A pair that changed opens to be read; any other shows its commit in the graph. */
   function pick(i: number, p: git.RangePair) {
-    picked = i
+    clicked = i
+    if (onOpen && (p.kind === 'changed' || p.kind === 'message' || p.kind === 'around')) {
+      onOpen(i)
+      return
+    }
     const id = p.newId || p.oldId
     if (id) onShow(id)
   }

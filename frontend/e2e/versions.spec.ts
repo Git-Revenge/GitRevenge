@@ -12,6 +12,27 @@ const reflog = [
   { selector: 'feature/offline-cache@{0}', commit: id('e'), action: 'rebase (finish): refs/heads/feature/offline-cache onto ' + id('c'), time: now - 240 },
   { selector: 'feature/offline-cache@{1}', commit: id('2'), action: 'commit: debugging', time: now - 3600 },
 ]
+// The demo's two changed pairs, as range-diff wrote them.
+const CHANGED = [
+  '1:  1637a6b ! 1:  f6df5ac Cache the last reading from each station',
+  '    @@ src/cache.js (new)',
+  '     +const cache = new Map()',
+  '     +',
+  '     +export function remember(id, reading) {',
+  '    -+  cache.set(id, { reading, at: Date.now() })',
+  '    ++  if (reading) cache.set(id, { reading, at: Date.now() })',
+  '     +}',
+].join('\n')
+const AROUND = [
+  '2:  eda7bec ! 2:  f16c299 wip',
+  '    @@ Commit message',
+  '      ## src/cache.js ##',
+  '     @@ src/cache.js: const cache = new Map()',
+  '      export function remember(id, reading) {',
+  '    -   cache.set(id, { reading, at: Date.now() })',
+  '    +   if (reading) cache.set(id, { reading, at: Date.now() })',
+  '      }',
+].join('\n')
 const pair = (old: number, nw: number, kind: string, subject: string, more: object = {}) => ({ old, new: nw, oldId: old ? id(String(old)) : '', newId: nw ? id('a') : '', subject, kind, text: `${old || '-'}:  x ${kind} ${nw || '-'}:  y ${subject}`, ...more })
 const compared = {
   old: { base: id('c'), tip: id('2') },
@@ -19,8 +40,8 @@ const compared = {
   oldCount: { commits: 5, merges: 0 },
   newCount: { commits: 4, merges: 0 },
   pairs: [
-    pair(1, 1, 'changed', 'Cache the last reading from each station'),
-    pair(2, 2, 'around', 'wip'),
+    pair(1, 1, 'changed', 'Cache the last reading from each station', { text: CHANGED }),
+    pair(2, 2, 'around', 'wip', { text: AROUND }),
     pair(3, 0, 'folded', 'fixup! Cache the last reading from each station', { into: 1 }),
     pair(4, 3, 'same', 'Fall back to the cached reading when a station is down'),
     pair(5, 4, 'same', 'debugging'),
@@ -79,8 +100,9 @@ test.describe('two versions of a branch', () => {
     await panel(page).getByLabel('Hide the same').check()
     await expect(rows(page).locator('.pill')).toHaveText(['changed', 'folded into 1'])
     await expect(panel(page)).toContainText('3 the same, hidden.')
-    await rows(page).first().getByRole('button').click()
-    await expect.poll(async () => (await calls(page, 'CommitRow')).at(-1)).toEqual(['/r', id('a')])
+    // The folded fixup has no new commit: its old one shows in the graph.
+    await rows(page).nth(1).getByRole('button').click()
+    await expect.poll(async () => (await calls(page, 'CommitRow')).at(-1)).toEqual(['/r', id('3')])
     await panel(page).getByRole('button', { name: 'Copy as text' }).click()
     await expect(panel(page).getByRole('button', { name: 'Copied' })).toBeVisible()
     await panel(page).getByRole('button', { name: 'Close the comparison' }).click()
@@ -96,5 +118,60 @@ test.describe('two versions of a branch', () => {
     await d.getByLabel('Since').nth(1).fill('main')
     await d.getByRole('button', { name: 'Compare' }).click()
     await expect(d.getByRole('alert')).toHaveText('“nowhere” isn\'t a branch, tag or commit here.')
+  })
+})
+
+test.describe('a changed pair, read', () => {
+  async function compare(page: Page) {
+    await open(page, 'patchSources', scenario())
+    const d = await openDialog(page)
+    await expect(d).toContainText('5 commits, no merges')
+    await d.getByRole('button', { name: 'Compare' }).click()
+    await expect(rows(page)).toHaveCount(5)
+  }
+  const view = (page: Page) => page.getByRole('region', { name: /^Pair \d+:/ })
+
+  test('Marked marks what is new and what is gone, and the words that changed', async ({ page }) => {
+    await compare(page)
+    await rows(page).first().getByRole('button').click()
+    const v = view(page)
+    await expect(v).toContainText('pair 1 of 5')
+    await expect(v.getByRole('heading', { name: 'Cache the last reading from each station' })).toBeVisible()
+    await expect(v).toContainText('the message is the same · 1 line differs')
+    // As written: the app's global .meta would set it in capitals.
+    await expect(v.locator('.said').first()).toHaveCSS('text-transform', 'none')
+    const marked = v.getByRole('table', { name: 'src/cache.js, marked' })
+    await expect(marked.locator('.row.gone .mark')).toHaveText('gone')
+    await expect(marked.locator('.row.new .mark')).toHaveText('new')
+    await expect(marked.locator('.row.new mark')).toHaveText('if (reading) ')
+    await expect(marked.locator('.row.gone .text')).toHaveCSS('text-decoration-line', 'line-through')
+    await expect(rows(page).first().getByRole('button')).toHaveClass(/picked/)
+  })
+
+  test('Side by side sets the old beside the new, and stays chosen', async ({ page }) => {
+    await compare(page)
+    await rows(page).first().getByRole('button').click()
+    await view(page).getByRole('button', { name: 'Side by side' }).click()
+    const side = view(page).getByRole('table', { name: 'src/cache.js, side by side' })
+    await expect(side.locator('.half.gone .text')).toHaveText('  cache.set(id, { reading, at: Date.now() })')
+    await expect(side.locator('.half.new .text')).toHaveText('  if (reading) cache.set(id, { reading, at: Date.now() })')
+    await view(page).getByRole('button', { name: 'Close the pair' }).click()
+    await rows(page).first().getByRole('button').click()
+    await expect(view(page).getByRole('button', { name: 'Side by side' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('steps through the pairs that changed, and says what moved the lines around one', async ({ page }) => {
+    await compare(page)
+    await rows(page).first().getByRole('button').click()
+    await expect(view(page).getByRole('button', { name: '← Previous pair' })).toBeDisabled()
+    await view(page).getByRole('button', { name: 'Next pair →' }).click()
+    await expect(view(page)).toContainText('pair 2 of 5')
+    await expect(view(page)).toContainText('Its own lines are the same in both. Only lines around it differ, because pair 1 changed them: Cache the last reading from each station.')
+    await expect(view(page).getByRole('button', { name: 'Next pair →' })).toBeDisabled()
+    await expect(rows(page).nth(1).getByRole('button')).toHaveClass(/picked/)
+    await view(page).getByRole('button', { name: 'Cache the last reading from each station' }).click()
+    await expect(view(page)).toContainText('pair 1 of 5')
+    await view(page).getByRole('button', { name: 'Copy as text' }).click()
+    await expect(view(page).getByRole('button', { name: 'Copied' })).toBeVisible()
   })
 })
