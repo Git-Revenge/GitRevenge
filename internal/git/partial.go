@@ -320,3 +320,23 @@ func (r *Repo) FileVersions(ctx context.Context, path, rev string) ([]string, er
 	slices.Sort(ids)
 	return slices.Compact(ids), nil
 }
+
+// MissingAt lists the versions of paths at rev that a partial clone hasn't got: what reading
+// them as rev has them would download. Elsewhere it's nil.
+func (r *Repo) MissingAt(ctx context.Context, rev string, paths []string) ([]string, error) {
+	if len(paths) == 0 || !r.Partial(ctx) {
+		return nil, nil
+	}
+	if err := CheckRevs(rev); err != nil {
+		return nil, err
+	}
+	set := map[string]bool{}
+	for _, p := range paths {
+		set[p] = true
+	}
+	ids, err := r.blobsAt(ctx, rev, set)
+	if err != nil {
+		return nil, err
+	}
+	return r.missingOf(ctx, ids)
+}

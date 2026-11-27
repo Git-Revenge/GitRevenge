@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import { CarryOnHistorySearch, CloneShape, CommitRow, SetHistorySearch, SquashOffer, SetTrailerFilter, SetTrailerPin, StopHistorySearch, TrailerFilter, TrailerFilterRows, TrailerFilterStep, TrailerPins } from '../../wailsjs/go/app/App.js'
+  import { CarryOnHistorySearch, ChoosePatchFile, CloneShape, CommitRow, ReadPatches, SetHistorySearch, SquashOffer, SetTrailerFilter, SetTrailerPin, StopHistorySearch, TrailerFilter, TrailerFilterRows, TrailerFilterStep, TrailerPins } from '../../wailsjs/go/app/App.js'
   import ShallowBand from './ShallowBand.svelte'
   import type { app } from '../../wailsjs/go/models'
   import { onBackend } from './events'
@@ -23,6 +23,7 @@
   import { selectionMenu, type SquashState } from './selectionMenu'
   import type { Selected } from './graph/selection'
   import type { PatchStart } from './patches'
+  import { toasts } from './toasts.svelte'
   import type { DiffTarget } from './diff/DiffView.svelte'
   import { ofCommits } from './diff/target'
   import Lazy from './ui/Lazy.svelte'
@@ -314,6 +315,20 @@
   let reflogRef = $state('')
   /** Where Save as patches starts, while it's open (#1021). */
   let patchesStart = $state<PatchStart | null>(null)
+  /** A file of patches being previewed to apply (#1022). */
+  let patchFile = $state<app.PatchFile | null>(null)
+
+  /** Apply patches or a diff…: a file picked, read, and shown for what it is. Mail opens the
+   * preview; a plain diff and anything else say what they are. */
+  async function applyPatches() {
+    const file = await session.run(() => ChoosePatchFile())
+    if (!file) return
+    const read = await session.run(() => ReadPatches(path, file))
+    if (!read) return
+    if (read.kind === 'mail') patchFile = read
+    else if (read.kind === 'diff') toasts.show(`${read.name} is a plain diff. Applying one to your files isn’t in the app yet: git apply does it.`)
+    else toasts.show(`${read.name} isn’t a patch or a diff.`)
+  }
   const ctx: MenuContext = {
     get path() {
       return path
@@ -349,6 +364,7 @@
     ...(diff ? [{ id: 'view.close', group: 'View', title: 'Back to the graph', keywords: 'close diff', shortcut: 'Escape', run: () => (diff = null) }] : []),
     { id: 'repo.remotes', group: 'Repository', title: 'Manage remotes…', keywords: 'origin url', run: () => (remotesOpen = true) },
     { id: 'repo.reflog', group: 'Repository', title: 'Show the reflog…', keywords: 'history head moves recover lost commit', run: () => (reflogRef = 'HEAD') },
+    { id: 'repo.applyPatches', group: 'Repository', title: 'Apply patches or a diff…', keywords: 'am mbox mailbox format-patch import mail', run: () => void applyPatches() },
     { id: 'repo.worktrees', group: 'Repository', title: 'Manage worktrees…', keywords: 'worktree checkout folder parallel', run: () => (worktreesOpen = true) },
     {
       id: 'view.rightPanel',
@@ -685,6 +701,9 @@
 {/if}
 {#if patchesStart}
   <Lazy load={() => import('./SavePatchesDialog.svelte')} {path} start={patchesStart} onClose={() => (patchesStart = null)} />
+{/if}
+{#if patchFile}
+  <Lazy load={() => import('./ApplyPatchesDialog.svelte')} {path} file={patchFile} onClose={() => (patchFile = null)} />
 {/if}
 {#if bisect.starting?.path === path}
   <Lazy load={() => import('./BisectDialog.svelte')} {path} bad={bisect.starting.bad} onClose={() => (bisect.starting = null)} />

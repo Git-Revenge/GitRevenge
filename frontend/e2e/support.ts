@@ -18,6 +18,8 @@ export interface Scenario {
   graphData?: unknown[]
   /** Where Save as patches starts (#1021). */
   patchStart?: unknown
+  /** The file of patches the apply preview opens on (#1022). */
+  patchFile?: unknown
   /** The refs on each commit in the graph, by commit id. */
   graphRefs?: Record<string, unknown[]>
   selectedCommit?: string
