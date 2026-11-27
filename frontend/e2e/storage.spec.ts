@@ -20,7 +20,7 @@ test('says what the objects take, and offers maintenance without pressing it', a
   await expect(s).toContainText('Not on git’s maintenance schedule')
 })
 
-test('suggests maintenance when git’s own thresholds are passed, and runs it with Stop in the toolbar', async ({ page }) => {
+test('suggests maintenance when git’s own thresholds are passed, and runs it with Cancel in the toolbar', async ({ page }) => {
   await open(page, 'repoPanel', { responses: { ...base, RepoStorage: { ...tidy, loose: 9000, due: true }, RunMaintenance: null }, delays: { RunMaintenance: 10_000 } })
   const s = section(page)
   await expect(s).toContainText('More than 6,700 objects are loose (gc.auto), so git would pack them.')
