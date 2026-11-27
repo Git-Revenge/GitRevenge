@@ -114,6 +114,11 @@ const features = [
     to: '/docs/guide/branch-care',
   },
   {
+    title: 'Patches, previewed',
+    body: 'Save commits as patches with every option format-patch has. Drop a series or a diff on the window and see what fits, what merges and what conflicts before git am or git apply changes anything.',
+    to: '/docs/guide/patches',
+  },
+  {
     title: 'Diffs that read the code',
     body: 'In 47 languages, a diff tells changes from formatting, renames and moved code, so a tidy-up doesn’t bury the line that matters. A ribbon joins each change across the split view.',
     to: '/docs/guide/diffs',
