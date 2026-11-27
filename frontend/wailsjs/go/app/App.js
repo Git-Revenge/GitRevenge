@@ -26,6 +26,10 @@ export function AnswerTrailerSlips(arg1, arg2, arg3) {
   return window['go']['app']['App']['AnswerTrailerSlips'](arg1, arg2, arg3);
 }
 
+export function ApplyPatches(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['app']['App']['ApplyPatches'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function ArrivedCommits(arg1, arg2, arg3) {
   return window['go']['app']['App']['ArrivedCommits'](arg1, arg2, arg3);
 }
@@ -126,6 +130,10 @@ export function ChooseFolder(arg1) {
   return window['go']['app']['App']['ChooseFolder'](arg1);
 }
 
+export function ChoosePatchFile() {
+  return window['go']['app']['App']['ChoosePatchFile']();
+}
+
 export function Clone(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['Clone'](arg1, arg2, arg3, arg4);
 }
@@ -156,6 +164,10 @@ export function CloneShape(arg1) {
 
 export function CloseGitConfig(arg1) {
   return window['go']['app']['App']['CloseGitConfig'](arg1);
+}
+
+export function ClosePatches(arg1) {
+  return window['go']['app']['App']['ClosePatches'](arg1);
 }
 
 export function CloseRepo(arg1) {
@@ -638,6 +650,10 @@ export function ReadMailmapFile(arg1, arg2) {
   return window['go']['app']['App']['ReadMailmapFile'](arg1, arg2);
 }
 
+export function ReadPatches(arg1, arg2) {
+  return window['go']['app']['App']['ReadPatches'](arg1, arg2);
+}
+
 export function RebasePlan(arg1, arg2) {
   return window['go']['app']['App']['RebasePlan'](arg1, arg2);
 }
@@ -1112,6 +1128,10 @@ export function TrustRepo(arg1) {
 
 export function TryLinkRule(arg1, arg2) {
   return window['go']['app']['App']['TryLinkRule'](arg1, arg2);
+}
+
+export function TryPatches(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['TryPatches'](arg1, arg2, arg3, arg4);
 }
 
 export function Undo(arg1) {

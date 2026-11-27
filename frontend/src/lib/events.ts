@@ -31,6 +31,8 @@ export interface BackendEvents {
   'gitconfig:changed': { path: string }
   /** GraphProgress: how far a repository's commit graph has loaded. */
   'graph:progress': GraphProgress
+  /** PatchTry: one patch's row in the apply preview, once its try finishes (#1022). */
+  'patches:tried': app.PatchTry
   /** TrailerProgress: how far reading a repository's trailers has got. */
   'trailers:progress': TrailerStatus & { path: string }
   /** The chips of pinned trailer keys on a repository's graph rows may have changed: its path. */

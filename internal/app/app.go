@@ -40,6 +40,8 @@ type App struct {
 	trustAsk trustQuestions
 	// chosen holds the files picked in a file dialog (see chosenFiles).
 	chosen chosenFiles
+	// patches holds the files of patches open in previews (#1022).
+	patches patchSets
 	// promptHook answers credential prompts in tests instead of the UI.
 	promptHook func(text string, kind askpass.Kind) (string, bool)
 	// emitHook receives events in tests, where there is no Wails runtime to send them to.

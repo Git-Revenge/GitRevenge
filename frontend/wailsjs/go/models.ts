@@ -1804,6 +1804,48 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class PatchFile {
+	    token: string;
+	    name: string;
+	    kind: string;
+	    messages: git.MailMessage[];
+	    staged: boolean;
+	    branch: string;
+	    missing?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.token = source["token"];
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.messages = this.convertValues(source["messages"], git.MailMessage);
+	        this.staged = source["staged"];
+	        this.branch = source["branch"];
+	        this.missing = source["missing"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class PatchSeries {
 	    commits: git.PatchCommit[];
 	    count: number;
@@ -1843,6 +1885,32 @@ export namespace app {
 		    }
 		    return a;
 		}
+	}
+	export class PatchTry {
+	    token: string;
+	    run: number;
+	    index: number;
+	    status: string;
+	    files?: string[];
+	    error?: string;
+	    already?: string;
+	    waits?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchTry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.token = source["token"];
+	        this.run = source["run"];
+	        this.index = source["index"];
+	        this.status = source["status"];
+	        this.files = source["files"];
+	        this.error = source["error"];
+	        this.already = source["already"];
+	        this.waits = source["waits"];
+	    }
 	}
 	export class PersonIdentity {
 	    name: string;
@@ -4553,6 +4621,72 @@ export namespace git {
 	        this.path = source["path"];
 	    }
 	}
+	export class NumStat {
+	    path: string;
+	    added: number;
+	    deleted: number;
+	    binary?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new NumStat(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.added = source["added"];
+	        this.deleted = source["deleted"];
+	        this.binary = source["binary"];
+	    }
+	}
+	export class MailMessage {
+	    author: string;
+	    email: string;
+	    date: string;
+	    subject: string;
+	    number: number;
+	    total: number;
+	    version: number;
+	    cover: boolean;
+	    hasPatch: boolean;
+	    files: NumStat[];
+	
+	    static createFrom(source: any = {}) {
+	        return new MailMessage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.author = source["author"];
+	        this.email = source["email"];
+	        this.date = source["date"];
+	        this.subject = source["subject"];
+	        this.number = source["number"];
+	        this.total = source["total"];
+	        this.version = source["version"];
+	        this.cover = source["cover"];
+	        this.hasPatch = source["hasPatch"];
+	        this.files = this.convertValues(source["files"], NumStat);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class MailmapNote {
 	    line: number;
 	    kind: string;
@@ -4651,6 +4785,7 @@ export namespace git {
 	        this.text = source["text"];
 	    }
 	}
+	
 	
 	
 	export class PatchCommit {

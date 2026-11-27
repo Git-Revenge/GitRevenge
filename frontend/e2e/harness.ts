@@ -325,6 +325,12 @@ const mounts = {
     Object.assign(win, { __sessionError: () => session.error })
     mount(ContextMenu, { target: host, props: { x: scenario.menuX ?? 200, y: 100, items, onClose: record('close') } })
   },
+  async applyPatches() {
+    const { default: ApplyPatchesDialog } = await import('../src/lib/ApplyPatchesDialog.svelte')
+    mount(ApplyPatchesDialog, { target: host, props: { path: '/r', file: scenario.patchFile as never, onClose: record('close') } })
+    const { default: Toasts } = await import('../src/lib/ui/Toasts.svelte')
+    mount(Toasts, { target: document.body })
+  },
   async savePatches() {
     const { default: SavePatchesDialog } = await import('../src/lib/SavePatchesDialog.svelte')
     mount(SavePatchesDialog, { target: host, props: { path: '/r', start: scenario.patchStart as never, onClose: record('close') } })
@@ -648,6 +654,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'commitMenu':
     await mounts.commitMenu()
+    break
+  case 'applyPatches':
+    await mounts.applyPatches()
     break
   case 'savePatches':
     await mounts.savePatches()

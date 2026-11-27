@@ -21,6 +21,8 @@ export function AnswerTrailerQuestion(arg1:string,arg2:string,arg3:string,arg4:b
 
 export function AnswerTrailerSlips(arg1:string,arg2:string,arg3:Array<string>):Promise<app.TrailerCare>;
 
+export function ApplyPatches(arg1:string,arg2:string,arg3:Array<number>,arg4:string,arg5:boolean):Promise<void>;
+
 export function ArrivedCommits(arg1:string,arg2:string,arg3:string):Promise<app.Arrived>;
 
 export function AuthorCard(arg1:string,arg2:string):Promise<app.AuthorCard>;
@@ -71,6 +73,8 @@ export function ChooseFile(arg1:string):Promise<string>;
 
 export function ChooseFolder(arg1:string):Promise<string>;
 
+export function ChoosePatchFile():Promise<string>;
+
 export function Clone(arg1:string,arg2:string,arg3:string,arg4:git.CloneOptions):Promise<string>;
 
 export function CloneAbandon(arg1:string):Promise<void>;
@@ -86,6 +90,8 @@ export function CloneName(arg1:string):Promise<string>;
 export function CloneShape(arg1:string):Promise<git.CloneShape>;
 
 export function CloseGitConfig(arg1:string):Promise<void>;
+
+export function ClosePatches(arg1:string):Promise<void>;
 
 export function CloseRepo(arg1:string):Promise<void>;
 
@@ -327,6 +333,8 @@ export function ReadIgnoreFile(arg1:string,arg2:string):Promise<string>;
 
 export function ReadMailmapFile(arg1:string,arg2:string):Promise<string>;
 
+export function ReadPatches(arg1:string,arg2:string):Promise<app.PatchFile>;
+
 export function RebasePlan(arg1:string,arg2:string):Promise<Array<git.RebaseItem>>;
 
 export function RebaseStack(arg1:string,arg2:Array<string>,arg3:string):Promise<void>;
@@ -564,6 +572,8 @@ export function TrailerValues(arg1:string,arg2:string,arg3:string,arg4:number,ar
 export function TrustRepo(arg1:string):Promise<void>;
 
 export function TryLinkRule(arg1:string,arg2:links.Rule):Promise<app.LinkTry>;
+
+export function TryPatches(arg1:string,arg2:string,arg3:Array<number>,arg4:number):Promise<Array<app.PatchTry>>;
 
 export function Undo(arg1:string):Promise<void>;
 
