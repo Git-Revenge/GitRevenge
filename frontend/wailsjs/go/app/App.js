@@ -246,6 +246,10 @@ export function CurrentPatch(arg1) {
   return window['go']['app']['App']['CurrentPatch'](arg1);
 }
 
+export function DeclineRerere(arg1) {
+  return window['go']['app']['App']['DeclineRerere'](arg1);
+}
+
 export function DeletableBranches(arg1, arg2) {
   return window['go']['app']['App']['DeletableBranches'](arg1, arg2);
 }
@@ -332,6 +336,10 @@ export function FindInFiles(arg1, arg2, arg3) {
 
 export function ForcePushLoss(arg1) {
   return window['go']['app']['App']['ForcePushLoss'](arg1);
+}
+
+export function ForgetResolution(arg1, arg2) {
+  return window['go']['app']['App']['ForgetResolution'](arg1, arg2);
 }
 
 export function FormattingOnly(arg1, arg2, arg3, arg4) {
@@ -1188,6 +1196,10 @@ export function TryLinkRule(arg1, arg2) {
 
 export function TryPatches(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['TryPatches'](arg1, arg2, arg3, arg4);
+}
+
+export function TurnOnRerere(arg1) {
+  return window['go']['app']['App']['TurnOnRerere'](arg1);
 }
 
 export function Undo(arg1) {

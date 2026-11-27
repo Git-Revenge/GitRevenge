@@ -32,7 +32,7 @@ After that, the guide covers each part of the app in turn:
 | [Changes and commits](changes.md) | Staging, committing, stashing, and undo. |
 | [Ignoring files](ignoring.md) | Ignoring a file from its menu, and the Ignore rules tab. |
 | [Branches, merges and rebases](branches.md) | Merging, rebasing, previews and interactive rebase. |
-| [Resolving conflicts](conflicts.md) | The conflict tool, suggestions where code can be combined, and merge drivers. |
+| [Resolving conflicts](conflicts.md) | The conflict tool, suggestions where code can be combined, resolutions git reuses (rerere), and merge drivers. |
 | [Branch care](branch-care.md) | Branch kinds, hiding, cleaning up merged branches, and stacks. |
 | [Patches](patches.md) | Saving commits as patches, applying a series with `git am` or a plain diff with `git apply`, previewed first, from a file, a drop or the clipboard, and saving a commit's files as a zip or tar archive. |
 | [Two versions of a branch](two-versions.md) | What became of each commit after a rebase, an amend or a reset, with `git range-diff`: changed, the same, folded in, dropped or new, and each changed pair read Marked or Side by side. |

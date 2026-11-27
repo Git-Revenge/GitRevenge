@@ -131,6 +131,8 @@ export function CountVersion(arg1:string,arg2:string,arg3:string):Promise<app.Ve
 
 export function CurrentPatch(arg1:string):Promise<string>;
 
+export function DeclineRerere(arg1:string):Promise<void>;
+
 export function DeletableBranches(arg1:string,arg2:Array<string>):Promise<Array<string>>;
 
 export function DeleteBranchAndWorktree(arg1:string,arg2:string,arg3:boolean,arg4:boolean):Promise<string>;
@@ -174,6 +176,8 @@ export function FindCount(arg1:string,arg2:git.GrepOptions):Promise<app.FindCoun
 export function FindInFiles(arg1:string,arg2:string,arg3:git.GrepOptions):Promise<app.FindResult>;
 
 export function ForcePushLoss(arg1:string):Promise<app.SharedCommits>;
+
+export function ForgetResolution(arg1:string,arg2:string):Promise<void>;
 
 export function FormattingOnly(arg1:string,arg2:string,arg3:string,arg4:Array<string>):Promise<Array<string>>;
 
@@ -602,6 +606,8 @@ export function TryDiff(arg1:string,arg2:string,arg3:boolean):Promise<Array<app.
 export function TryLinkRule(arg1:string,arg2:links.Rule):Promise<app.LinkTry>;
 
 export function TryPatches(arg1:string,arg2:string,arg3:Array<number>,arg4:number):Promise<Array<app.PatchTry>>;
+
+export function TurnOnRerere(arg1:string):Promise<void>;
 
 export function Undo(arg1:string):Promise<void>;
 

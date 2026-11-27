@@ -12,10 +12,11 @@
   import { EditorState } from '@codemirror/state'
   import { EditorView, lineNumbers } from '@codemirror/view'
   import { classHighlighter } from '@lezer/highlight'
-  import { ConflictContext, ConflictFile, ConflictOrigin, ConflictStop, ConflictSuggestions, OpenMergeTool, RepoState, ResolveConflict, TakeConflictSide } from '../../../wailsjs/go/app/App.js'
+  import { ConflictContext, ConflictFile, ConflictOrigin, ConflictStop, ConflictSuggestions, DeclineRerere, ForgetResolution, OpenMergeTool, RepoState, ResolveConflict, TakeConflictSide, TurnOnRerere } from '../../../wailsjs/go/app/App.js'
   import type { app, git } from '../../../wailsjs/go/models'
   import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
   import { session } from '../session.svelte'
+  import { toasts } from '../toasts.svelte'
   import Icon from '../ui/Icon.svelte'
   import Loading from '../ui/Loading.svelte'
   import { highlightLines, languageFor, type Token } from './highlight'
@@ -291,6 +292,41 @@
     current = parsed.places.length ? 0 : -1
   }
 
+  /** Files rerere settled with a resolution recorded before (#938): still to mark resolved, or
+   * staged with rerere.autoUpdate, when they'd read as merged cleanly. */
+  let reused = $derived(around?.rerere?.resolved ?? [])
+  /** Those rerere staged, which aren't among the files to settle. */
+  let reusedStaged = $derived(reused.filter((f) => !conflicted.includes(f)))
+
+  /** Throws away the resolution rerere reused for f and opens its conflict again. */
+  async function forget(f: string) {
+    const done = await session.run(async () => {
+      await ForgetResolution(path, f)
+      return true
+    })
+    if (!done) return
+    await refreshFiles()
+    if (f === file) await load()
+    else onOpen?.(f)
+  }
+
+  // The offer to turn rerere on, for a conflict resolved here before: made once.
+  let offerGone = $state(false)
+  let recurring = $derived(offerGone || around?.rerere?.on ? [] : (around?.rerere?.recurring ?? []))
+  async function rerereOn() {
+    offerGone = true
+    const done = await session.run(async () => {
+      await TurnOnRerere(path)
+      return true
+    })
+    if (done) toasts.show('rerere is on for this repository: git will reuse your resolutions when a conflict comes back.')
+    await refreshFiles()
+  }
+  function noRerere() {
+    offerGone = true
+    void DeclineRerere(path).catch(() => {})
+  }
+
   async function mergeTool() {
     inTool = true
     await session.run(() => OpenMergeTool(path, file))
@@ -465,7 +501,13 @@
           <li class:on={f === file}>
             <span class="ic warn"><Icon name="warning" size={16} /></span>
             {#if f === file || !onOpen}<span class="mono name" title={f}>{f}</span>{:else}<button class="btn sm text name" title="Open {f}" onclick={() => onOpen(f)}>{f}</button>{/if}
-            {#if f === file && !wholeOnly && total}<span class="note">{total - left} of {count(total, 'place', 'places')}</span>{:else if f !== file && fileNote(f)}<span class="note">{fileNote(f)}</span>{/if}
+            {#if reused.includes(f)}<span class="note" title="git's rerere resolved it as this conflict was resolved before">resolved as before</span>{:else if f === file && !wholeOnly && total}<span class="note">{total - left} of {count(total, 'place', 'places')}</span>{:else if f !== file && fileNote(f)}<span class="note">{fileNote(f)}</span>{/if}
+          </li>
+        {/each}
+        {#each reusedStaged as f (f)}
+          <li title="git's rerere resolved it as this conflict was resolved before, and staged it">
+            <span class="ic ok"><Icon name="check" size={16} /></span><span class="mono name" title={f}>{f}</span><span class="note">resolved as before</span>
+            <button class="btn sm text" disabled={busy} onclick={() => void forget(f)} title="Forget the recorded resolution and resolve {f} again">Forget</button>
           </li>
         {/each}
         {#each settled as f (f)}
@@ -475,6 +517,28 @@
           <li title="git ran this file's merge driver, set in .gitattributes, and it left no conflict"><span class="ic ok"><Icon name="check" size={16} /></span><span class="mono name">{d.path}</span><span class="driver">merged by {d.driver}</span></li>
         {/each}
       </ul>
+
+      {#if recurring.length}
+        <div class="card offer" role="status">
+          <span class="meta">Seen before</span>
+          <p>
+            You’ve resolved {recurring.length === 1 ? `${recurring[0]}’s conflict` : `the conflicts in ${count(recurring.length, 'file', 'files')}`} before. Turn on rerere and git reuses a resolution
+            when the same conflict comes back.
+          </p>
+          <div class="pair">
+            <button class="btn sm secondary" disabled={busy} onclick={() => void rerereOn()} title="Sets rerere.enabled in this repository's git config">Turn on rerere</button>
+            <button class="btn sm text" onclick={noRerere}>No thanks</button>
+          </div>
+        </div>
+      {/if}
+
+      {#if cf && reused.includes(file)}
+        <div class="card reused">
+          <span class="meta">Resolved as before</span>
+          <p>git’s rerere resolved this file as this conflict was resolved before. Check it, then mark it resolved.</p>
+          <button class="btn sm text" disabled={busy} onclick={() => void forget(file)} title="Forget the recorded resolution, and resolve the conflict again">Forget that resolution</button>
+        </div>
+      {/if}
 
       {#if cf}
         <div class="card">
@@ -1076,6 +1140,19 @@
     padding: 12px 14px;
     border-radius: var(--r-md);
     background: var(--paper-warm);
+  }
+
+  /* rerere's part (#938): a resolution reused, and the offer to turn it on. */
+  .card p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+  }
+
+  .card.offer,
+  .card.reused {
+    border-left: 3px solid var(--accent-b);
   }
 
   .driver {
