@@ -1804,6 +1804,46 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class PatchSeries {
+	    commits: git.PatchCommit[];
+	    count: number;
+	    merges: number;
+	    edge: boolean;
+	    missing?: string[];
+	    base: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchSeries(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.commits = this.convertValues(source["commits"], git.PatchCommit);
+	        this.count = source["count"];
+	        this.merges = source["merges"];
+	        this.edge = source["edge"];
+	        this.missing = source["missing"];
+	        this.base = source["base"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class PersonIdentity {
 	    name: string;
 	    email: string;
@@ -2517,6 +2557,22 @@ export namespace app {
 		    }
 		    return a;
 		}
+	}
+	export class SavedPatches {
+	    files: string[];
+	    folder: string;
+	    exists?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SavedPatches(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.files = source["files"];
+	        this.folder = source["folder"];
+	        this.exists = source["exists"];
+	    }
 	}
 	export class Selection {
 	    ids: string[];
@@ -4597,6 +4653,70 @@ export namespace git {
 	}
 	
 	
+	export class PatchCommit {
+	    id: string;
+	    subject: string;
+	    author: string;
+	    first: string;
+	    edge?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchCommit(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.subject = source["subject"];
+	        this.author = source["author"];
+	        this.first = source["first"];
+	        this.edge = source["edge"];
+	    }
+	}
+	export class PatchOptions {
+	    prefix: string;
+	    version: number;
+	    numbered: boolean;
+	    cover: boolean;
+	    coverSubject: string;
+	    coverText: string;
+	    signoff: boolean;
+	    base: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.prefix = source["prefix"];
+	        this.version = source["version"];
+	        this.numbered = source["numbered"];
+	        this.cover = source["cover"];
+	        this.coverSubject = source["coverSubject"];
+	        this.coverText = source["coverText"];
+	        this.signoff = source["signoff"];
+	        this.base = source["base"];
+	    }
+	}
+	export class PatchRevs {
+	    since: string;
+	    tip: string;
+	    last: number;
+	    ids: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchRevs(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.since = source["since"];
+	        this.tip = source["tip"];
+	        this.last = source["last"];
+	        this.ids = source["ids"];
+	    }
+	}
 	export class PlaceOrigin {
 	    commit: string;
 	    author: string;

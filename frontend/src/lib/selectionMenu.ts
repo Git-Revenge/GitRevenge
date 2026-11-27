@@ -1,9 +1,10 @@
 import { Integrate } from '../../wailsjs/go/app/App.js'
-import type { app } from '../../wailsjs/go/models'
+import type { app, git } from '../../wailsjs/go/models'
 import { ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
 import type { MenuItem } from './ContextMenu.svelte'
 import { errorText } from './errors'
 import type { MenuContext } from './menus'
+import { copyAsPatches, EDGE_REASON, type PatchStart } from './patches'
 import { session } from './session.svelte'
 import { toasts } from './toasts.svelte'
 
@@ -39,6 +40,16 @@ export function selectionActions(sel: app.Selection, ctx: MenuContext, squash?: 
   const n = sel.ids.length
   const cur = ctx.current()
   const items: MenuItem[] = []
+  if (ctx.openPatches) {
+    // A line with no merges goes as a range, so any number fits; others are named one by one.
+    const start: PatchStart = sel.line && sel.base && !sel.merges ? { kind: 'range', since: sel.base, tip: sel.ids[n - 1] } : { kind: 'ids', ids: sel.ids }
+    const revs = (start.kind === 'range' ? { since: start.since, tip: start.tip, last: 0, ids: [] } : { since: '', tip: '', last: 0, ids: sel.ids }) as git.PatchRevs
+    const off = sel.commits.some((c) => c.edge) ? { disabled: true, hint: EDGE_REASON } : {}
+    items.push(
+      { label: 'Copy as patches', icon: 'copy', ...off, run: () => copyAsPatches(ctx.path, revs, commitCount(n), ctx.openDialog) },
+      { label: 'Save as patches…', icon: 'file', ...off, run: () => ctx.openPatches?.(start) },
+    )
+  }
   if (cur) {
     items.push({
       label: `Cherry-pick ${n.toLocaleString()} onto ${cur}`,

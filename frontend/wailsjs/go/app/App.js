@@ -78,6 +78,10 @@ export function BranchMergeState(arg1, arg2) {
   return window['go']['app']['App']['BranchMergeState'](arg1, arg2);
 }
 
+export function BranchPatchBase(arg1, arg2, arg3) {
+  return window['go']['app']['App']['BranchPatchBase'](arg1, arg2, arg3);
+}
+
 export function BranchWebLinks(arg1, arg2, arg3) {
   return window['go']['app']['App']['BranchWebLinks'](arg1, arg2, arg3);
 }
@@ -204,6 +208,10 @@ export function ConflictStop(arg1) {
 
 export function ConflictSuggestions(arg1, arg2, arg3) {
   return window['go']['app']['App']['ConflictSuggestions'](arg1, arg2, arg3);
+}
+
+export function CopyPatches(arg1, arg2, arg3) {
+  return window['go']['app']['App']['CopyPatches'](arg1, arg2, arg3);
 }
 
 export function DeletableBranches(arg1, arg2) {
@@ -530,6 +538,10 @@ export function OwnMoveAge(arg1) {
   return window['go']['app']['App']['OwnMoveAge'](arg1);
 }
 
+export function PatchSeries(arg1, arg2) {
+  return window['go']['app']['App']['PatchSeries'](arg1, arg2);
+}
+
 export function People(arg1, arg2) {
   return window['go']['app']['App']['People'](arg1, arg2);
 }
@@ -798,6 +810,10 @@ export function SaveMailmap(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['SaveMailmap'](arg1, arg2, arg3, arg4);
 }
 
+export function SavePatches(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['app']['App']['SavePatches'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
 export function SearchGraph(arg1, arg2) {
   return window['go']['app']['App']['SearchGraph'](arg1, arg2);
 }
@@ -952,6 +968,10 @@ export function SetWebLinks(arg1, arg2) {
 
 export function SetWorkTreeContent(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['SetWorkTreeContent'](arg1, arg2, arg3, arg4);
+}
+
+export function ShowFolder(arg1) {
+  return window['go']['app']['App']['ShowFolder'](arg1);
 }
 
 export function ShowRemoteFolder(arg1, arg2) {

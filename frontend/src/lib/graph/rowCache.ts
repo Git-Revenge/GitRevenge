@@ -24,6 +24,8 @@ export interface Row {
   match?: boolean
   /** The commit's values for the trailer keys pinned to rows, if it has any. */
   chips?: RowChip[]
+  /** A shallow clone's edge commit: its parents weren't fetched (#1006). */
+  edge?: boolean
   id: string
   parents: number
   author: string
