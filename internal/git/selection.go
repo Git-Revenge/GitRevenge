@@ -3,6 +3,7 @@ package git
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -17,6 +18,22 @@ func (r *Repo) RevertAll(ctx context.Context, commits ...string) error {
 		return err
 	}
 	return r.conflictAware(ctx, Cmd{Args: append([]string{"revert", "--no-edit"}, commits...), Env: []string{"GIT_EDITOR=true"}})
+}
+
+// Diverged counts the commits each of a and b has that the other hasn't: `rev-list
+// --left-right --count a...b`. In a shallow clone it counts what's here.
+func (r *Repo) Diverged(ctx context.Context, a, b string) (onlyA, onlyB int, err error) {
+	if err := CheckRevs(a, b); err != nil {
+		return 0, 0, err
+	}
+	out, err := r.ReadString(ctx, "rev-list", "--left-right", "--count", a+"..."+b)
+	if err != nil {
+		return 0, 0, err
+	}
+	if _, err := fmt.Sscanf(out, "%d %d", &onlyA, &onlyB); err != nil {
+		return 0, 0, fmt.Errorf("reading rev-list's counts %q: %w", out, err)
+	}
+	return onlyA, onlyB, nil
 }
 
 // FilesByCommit returns the files each commit changes against its parent, by commit ID, from

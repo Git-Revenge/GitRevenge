@@ -21,7 +21,23 @@ const (
 	DiffStaged = "staged"
 	// DiffUnstaged compares the index with the work tree.
 	DiffUnstaged = "unstaged"
+	// DiffCompare compares one commit's file with another's (#1019). Its commit is
+	// "FROM..TO"; FROM "" is nothing, for a line of commits that starts at a first commit or
+	// a shallow clone's edge.
+	DiffCompare = "compare"
 )
+
+// compareRevs splits a DiffCompare commit, "FROM..TO", into its two commits.
+func compareRevs(commit string) (from, to string, err error) {
+	from, to, ok := strings.Cut(commit, "..")
+	if !ok || to == "" {
+		return "", "", userError("A comparison needs two commits, as FROM..TO.")
+	}
+	if err := git.CheckRevs(from, to); err != nil {
+		return "", "", userError(err.Error())
+	}
+	return from, to, nil
+}
 
 // FileContents returns both versions of a file for the diff viewer. commit is used in
 // commit mode; oldPath is the source of a rename, if any. force loads files over the
@@ -46,6 +62,15 @@ func (a *App) FileContents(path, mode, commit, file, oldPath string, force bool)
 			from = git.FileRef{Rev: c.Parents[0], Path: oldPath}
 		}
 		to = git.FileRef{Rev: c.ID, Path: file}
+	case DiffCompare:
+		a, b, err := compareRevs(commit)
+		if err != nil {
+			return git.FileContents{}, err
+		}
+		if a != "" {
+			from = git.FileRef{Rev: a, Path: oldPath}
+		}
+		to = git.FileRef{Rev: b, Path: file}
 	case DiffStaged:
 		from, to = git.FileRef{Rev: "HEAD", Path: oldPath}, git.IndexVersion(file)
 	case DiffUnstaged:
@@ -324,6 +349,10 @@ func versionRef(mode, commit, file string) (git.FileRef, bool) {
 	switch mode {
 	case DiffCommit:
 		return git.FileRef{Rev: commit, Path: file}, true
+	case DiffCompare:
+		// The version shown is the one compared to.
+		_, to, err := compareRevs(commit)
+		return git.FileRef{Rev: to, Path: file}, err == nil
 	case DiffStaged:
 		return git.IndexVersion(file), true
 	case DiffUnstaged:

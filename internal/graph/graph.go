@@ -453,6 +453,11 @@ type Commit struct {
 	Author     string `json:"author"`
 	AuthorTime int64  `json:"authorTime"`
 	Subject    string `json:"subject"`
+	// First is the commit's first parent, or "" for a first commit. A shallow clone's edge
+	// commit names the parent its object does, which isn't here (#1006).
+	First string `json:"first,omitempty"`
+	// Edge marks a shallow clone's edge commit.
+	Edge bool `json:"edge,omitempty"`
 }
 
 // Commits returns the commits of up to count rows starting at start. Without the lanes it
@@ -467,14 +472,21 @@ func (g *Graph) Commits(start, count int) []Commit {
 	}
 	out := make([]Commit, 0, end-start)
 	for i := start; i < end; i++ {
-		out = append(out, Commit{
+		c := Commit{
 			Index:      i,
 			ID:         hex.EncodeToString(g.ids[i][:g.hashLen]),
 			Parents:    int(g.parentStart[i+1] - g.parentStart[i]),
 			Author:     g.authors[g.authorIdx[i]].name,
 			AuthorTime: g.times[i],
 			Subject:    g.subjects[i],
-		})
+		}
+		if c.Parents > 0 {
+			c.First = hex.EncodeToString(g.parents[g.parentStart[i]][:g.hashLen])
+		}
+		if _, ok := g.cfg.edge[g.ids[i]]; ok && g.cfg.shallow != 0 {
+			c.Edge = true
+		}
+		out = append(out, c)
 	}
 	return out
 }

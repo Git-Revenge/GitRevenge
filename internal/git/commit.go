@@ -119,6 +119,26 @@ func (r *Repo) ChangedFiles(ctx context.Context, c CommitDetail) (changes []File
 	if len(c.Parents) > 0 {
 		commits = []string{c.Parents[0], c.ID}
 	}
+	return r.changesOf(ctx, commits)
+}
+
+// ChangesBetween lists what changed from one commit's files to another's, as ChangedFiles
+// does for a commit and its parent (#1019). from "" is for a commit with no parent here, a
+// first commit or a shallow clone's edge commit: everything in to is added.
+func (r *Repo) ChangesBetween(ctx context.Context, from, to string) (changes []FileChange, missing []string, err error) {
+	commits := []string{"--root", to}
+	if from != "" {
+		commits = []string{from, to}
+	}
+	if err := CheckRevs(from, to); err != nil {
+		return nil, nil, err
+	}
+	return r.changesOf(ctx, commits)
+}
+
+// changesOf lists the changes diff-tree finds for commits: a commit and its parent, or two
+// commits.
+func (r *Repo) changesOf(ctx context.Context, commits []string) (changes []FileChange, missing []string, err error) {
 	if r.Partial(ctx) {
 		if missing, err = r.changeContentsMissing(ctx, commits); err != nil {
 			return nil, nil, err

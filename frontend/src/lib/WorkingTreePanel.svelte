@@ -41,6 +41,7 @@
   import { ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
   import type { app, git } from '../../wailsjs/go/models'
   import type { DiffTarget } from './diff/DiffView.svelte'
+  import { ofCommits } from './diff/target'
   import { provideCommands } from './commands.svelte'
   import { adjacentFile, FILTER_FROM, fileName, fileRows, readTreeChoice, type FileRow } from './fileList'
   import FileListTools from './FileListTools.svelte'
@@ -98,7 +99,7 @@
     if (ok) {
       stashing = false
       stashMessage = ''
-      if (current?.mode !== 'commit') openFile(null)
+      if (!ofCommits(current?.mode)) openFile(null)
     }
     await refresh()
   }
@@ -593,7 +594,7 @@
       amend = false
       stash = null
       drafts.delete(path)
-      if (current?.mode !== 'commit') openFile(null)
+      if (!ofCommits(current?.mode)) openFile(null)
       onCommitted?.(id)
     }
     await refresh()

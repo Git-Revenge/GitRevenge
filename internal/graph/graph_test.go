@@ -103,6 +103,13 @@ func TestShallowEdgeLanesRunOn(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// An edge commit says so, and names the parent its object does.
+	if cs := g.Commits(1, 1); len(cs) != 1 || !cs[0].Edge || cs[0].First != fakeID(100) {
+		t.Fatalf("edge commit = %+v, want Edge and its parent 100", cs)
+	}
+	if cs := g.Commits(0, 1); cs[0].Edge {
+		t.Fatalf("commit 0 isn't at the edge: %+v", cs[0])
+	}
 	rows := g.Rows(0, 4)
 	kinds := func(segs []Seg) (out []string) {
 		for _, s := range segs {
@@ -267,9 +274,9 @@ func TestCommits(t *testing.T) {
 	g := build(t, [][]int{{1, 2}, {3}, {3}, {}})
 	got := g.Commits(-1, 3)
 	want := []Commit{
-		{Index: 0, ID: fakeID(0), Parents: 2, Author: "a", Subject: "0"},
-		{Index: 1, ID: fakeID(1), Parents: 1, Author: "a", Subject: "1"},
-		{Index: 2, ID: fakeID(2), Parents: 1, Author: "a", Subject: "2"},
+		{Index: 0, ID: fakeID(0), Parents: 2, Author: "a", Subject: "0", First: fakeID(1)},
+		{Index: 1, ID: fakeID(1), Parents: 1, Author: "a", Subject: "1", First: fakeID(3)},
+		{Index: 2, ID: fakeID(2), Parents: 1, Author: "a", Subject: "2", First: fakeID(3)},
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("Commits(-1, 3) = %+v, want %+v", got, want)

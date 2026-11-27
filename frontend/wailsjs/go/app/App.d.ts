@@ -99,6 +99,8 @@ export function CommitRows(arg1:string,arg2:Array<string>):Promise<Array<number>
 
 export function CommitSignatures(arg1:string,arg2:Array<string>):Promise<Array<git.SignatureCheck>>;
 
+export function CompareCommits(arg1:string,arg2:string,arg3:string):Promise<app.Comparison>;
+
 export function ConflictContext(arg1:string):Promise<app.ConflictContext>;
 
 export function ConflictFile(arg1:string,arg2:string):Promise<git.ConflictFile>;

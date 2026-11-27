@@ -23,6 +23,7 @@
   import { selectionMenu } from './selectionMenu'
   import type { Selected } from './graph/selection'
   import type { DiffTarget } from './diff/DiffView.svelte'
+  import { ofCommits } from './diff/target'
   import Lazy from './ui/Lazy.svelte'
   import { findAsk } from './find/findAsk.svelte'
   import GraphView from './graph/GraphView.svelte'
@@ -104,7 +105,7 @@
   function openWip() {
     view = 'wip'
     right.hidden = false
-    if (diff?.mode === 'commit') diff = null
+    if (ofCommits(diff?.mode)) diff = null
   }
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
   let sidebar = $state<Sidebar>()
@@ -343,7 +344,7 @@
       run: () => {
         view = 'wip'
         right.hidden = false
-        if (diff?.mode === 'commit') diff = null
+        if (ofCommits(diff?.mode)) diff = null
       },
     },
   ])

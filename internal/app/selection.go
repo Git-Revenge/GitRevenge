@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 
+	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/graph"
 )
 
@@ -46,6 +47,13 @@ type Selection struct {
 	Merges int `json:"merges"`
 	// Head says the checked-out commit is one of them.
 	Head bool `json:"head"`
+	// Line says each is the first parent of the next, oldest first: one line of history,
+	// whose changes together are a diff from Base to the newest (#1019).
+	Line bool `json:"line"`
+	// Base is the oldest one's first parent, or "" when it has none here: a first commit,
+	// or a shallow clone's edge commit, which BaseEdge marks.
+	Base     string `json:"base"`
+	BaseEdge bool   `json:"baseEdge,omitempty"`
 	// Stale says the graph changed under the picks: its rows aren't the ones picked. The graph
 	// finds its commits again once its reload arrives.
 	Stale bool `json:"stale"`
@@ -76,7 +84,7 @@ func (a *App) SelectedCommits(path string, picks []SelectionPick) (Selection, er
 			head = ref.Commit
 		}
 	}
-	out := Selection{IDs: []string{}, Commits: []graph.Commit{}}
+	out := Selection{IDs: []string{}, Commits: []graph.Commit{}, Line: true}
 	authors := map[string]bool{}
 	seen := map[int]bool{}
 	for _, p := range picks {
@@ -87,6 +95,15 @@ func (a *App) SelectedCommits(path string, picks []SelectionPick) (Selection, er
 				continue
 			}
 			seen[c.Index] = true
+			if len(out.IDs) == 0 {
+				if c.Edge {
+					out.BaseEdge = true
+				} else {
+					out.Base = c.First
+				}
+			} else if c.First != out.IDs[len(out.IDs)-1] {
+				out.Line = false
+			}
 			out.IDs = append(out.IDs, c.ID)
 			if len(out.Commits) < maxSelectionListed {
 				out.Commits = append(out.Commits, c)
@@ -106,6 +123,44 @@ func (a *App) SelectedCommits(path string, picks []SelectionPick) (Selection, er
 	out.Authors = len(authors)
 	if out.Authors != 1 {
 		out.Author = ""
+	}
+	out.Line = out.Line && len(out.IDs) > 1
+	return out, nil
+}
+
+// Comparison is what changed from one commit's files to another's (#1019).
+type Comparison struct {
+	Files []git.FileChange `json:"files"`
+	// CountsMissing, in a partial clone, lists the file versions the line counts and renames
+	// need that were never downloaded (#1010), as a commit's do.
+	CountsMissing []string `json:"countsMissing,omitempty"`
+	// OnlyFrom and OnlyTo count the commits each has that the other hasn't. Both are 0 when
+	// from is "".
+	OnlyFrom int `json:"onlyFrom"`
+	OnlyTo   int `json:"onlyTo"`
+}
+
+// CompareCommits reads what changed from one commit's files to another's: two commits
+// selected, or a line of them from its base. from "" is nothing, for a line that starts at a
+// first commit or a shallow clone's edge: everything in to is added.
+func (a *App) CompareCommits(path, from, to string) (Comparison, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return Comparison{}, err
+	}
+	ctx := context.Background()
+	files, missing, err := r.Git.ChangesBetween(ctx, from, to)
+	if err != nil {
+		return Comparison{}, writeErr(err)
+	}
+	out := Comparison{Files: files, CountsMissing: missing}
+	if out.Files == nil {
+		out.Files = []git.FileChange{}
+	}
+	if from != "" {
+		if out.OnlyFrom, out.OnlyTo, err = r.Git.Diverged(ctx, from, to); err != nil {
+			return Comparison{}, writeErr(err)
+		}
 	}
 	return out, nil
 }

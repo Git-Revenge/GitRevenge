@@ -136,6 +136,7 @@ const behaviours: Record<string, (...args: never[]) => unknown> = {
   SelectedCommits: (_path: string, picks: { lo: number; hi: number }[]) => {
     if ('SelectedCommits' in responses) return responses.SelectedCommits
     type Stub = { index: number; id: string; parents: number; author: string; authorTime: number; subject: string }
+    const total = scenario.graphData?.length ?? scenario.graphRows ?? 0
     const rows = [...new Set(picks.flatMap((p) => Array.from({ length: p.hi - p.lo + 1 }, (_, k) => p.lo + k)))].sort((a, b) => b - a)
     const commits = rows.map((i) => {
       const r = (scenario.graphData?.[i] ?? graphRow(i)) as Stub
@@ -153,9 +154,13 @@ const behaviours: Record<string, (...args: never[]) => unknown> = {
       merges: commits.filter((c) => c.parents > 1).length,
       head: false,
       stale: false,
+      // The stub draws one straight lane: each row's parent is the row below it.
+      line: rows.length > 1 && rows.every((r, k) => k === 0 || r === rows[k - 1] - 1),
+      base: rows[0] + 1 < total ? ((scenario.graphData?.[rows[0] + 1] ?? graphRow(rows[0] + 1)) as Stub).id : '',
     }
   },
   SelectionFiles: (_path: string, ids: string[]) => ('SelectionFiles' in responses ? responses.SelectionFiles : { files: [], total: 0, read: ids.length }),
+  CompareCommits: () => ('CompareCommits' in responses ? responses.CompareCommits : { files: [], onlyFrom: 0, onlyTo: 0 }),
   // The stub's commits are numbered, so a commit's row is its number.
   CommitRows: (_path: string, ids: string[]) => {
     if ('CommitRows' in responses) return responses.CommitRows
