@@ -4,6 +4,7 @@ import (
 	"os"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
@@ -127,5 +128,152 @@ func TestIntegrateRevertsSeveral(t *testing.T) {
 	}
 	if got := commitsLabel([]string{first, second}); got != "2 commits" {
 		t.Fatalf("label = %q", got)
+	}
+}
+
+func TestSelectionIsALineWhenEachIsTheNextsParent(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	base := fx.CommitFile("a.txt", "1\n", "base")
+	fx.CommitFile("a.txt", "2\n", "two")
+	fx.CommitFile("a.txt", "3\n", "three")
+	fx.CommitFile("a.txt", "4\n", "four")
+	path := openForMap(t, a, fx)
+	graphRows(t, a, path, 4)
+
+	line, err := a.SelectedCommits(path, []SelectionPick{{Lo: 0, Hi: 2}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !line.Line || line.Base != base || line.BaseEdge {
+		t.Fatalf("rows 0-2 should be a line from base: %+v", line)
+	}
+	gap, err := a.SelectedCommits(path, []SelectionPick{{Lo: 0, Hi: 0}, {Lo: 2, Hi: 2}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gap.Line {
+		t.Fatalf("rows 0 and 2 skip one: not a line: %+v", gap)
+	}
+	// The whole history starts at a first commit: its base is nothing.
+	all, err := a.SelectedCommits(path, []SelectionPick{{Lo: 0, Hi: 3}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !all.Line || all.Base != "" {
+		t.Fatalf("the whole history is a line from nothing: %+v", all)
+	}
+}
+
+func TestCompareCommits(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	base := fx.CommitFile("a.txt", "one\n", "base")
+	fx.Git("checkout", "-q", "-b", "side")
+	side := fx.CommitFile("s.txt", "s\n", "side")
+	fx.Git("checkout", "-q", "-")
+	fx.CommitFile("a.txt", "one\ntwo\n", "main one")
+	main := fx.CommitFile("m.txt", "m\n", "main two")
+	path := openForMap(t, a, fx)
+
+	got, err := a.CompareCommits(path, side, main)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.OnlyFrom != 1 || got.OnlyTo != 2 {
+		t.Fatalf("side has 1 the other hasn't, main 2: %+v", got)
+	}
+	paths := map[string]string{}
+	for _, f := range got.Files {
+		paths[f.Path] = f.Status
+	}
+	if paths["s.txt"] != "D" || paths["m.txt"] != "A" || paths["a.txt"] != "M" {
+		t.Fatalf("files = %v", paths)
+	}
+
+	// A file's two versions, in the comparison's mode.
+	c, err := a.FileContents(path, DiffCompare, side+".."+main, "a.txt", "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Old.Text != "one\n" || c.New.Text != "one\ntwo\n" {
+		t.Fatalf("a.txt from side to main = %q → %q", c.Old.Text, c.New.Text)
+	}
+	// From nothing, the file is all new.
+	fresh, err := a.FileContents(path, DiffCompare, ".."+base, "a.txt", "", false)
+	if err != nil || fresh.Old.Exists || fresh.New.Text != "one\n" {
+		t.Fatalf("from nothing = %+v, %v", fresh, err)
+	}
+	if _, err := a.FileContents(path, DiffCompare, main, "a.txt", "", false); err == nil {
+		t.Fatal("a comparison with one commit should be refused")
+	}
+	nothing, err := a.CompareCommits(path, "", base)
+	if err != nil || len(nothing.Files) != 1 || nothing.OnlyFrom != 0 || nothing.OnlyTo != 0 {
+		t.Fatalf("from nothing = %+v, %v", nothing, err)
+	}
+}
+
+func TestCompareModeRenamesDeletesAndBinaries(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	base := fx.CommitFile("a.txt", "one\ntwo\n", "base")
+	fx.CommitFile("gone.txt", "bye\n", "add gone")
+	fx.WriteFile("pic.bin", "\x00\x01\x02binary")
+	fx.Git("add", "pic.bin")
+	fx.Git("commit", "-q", "-m", "add a binary")
+	from := fx.Head()
+	fx.Git("mv", "a.txt", "c.txt")
+	fx.Git("rm", "-q", "gone.txt")
+	fx.WriteFile("pic.bin", "\x00\x03\x04binary")
+	fx.Git("add", "-A")
+	fx.Git("commit", "-q", "-m", "rename, delete, change the binary")
+	to := fx.Head()
+	path := openForMap(t, a, fx)
+	commits := from + ".." + to
+
+	renamed, err := a.FileContents(path, DiffCompare, commits, "c.txt", "a.txt", false)
+	if err != nil || renamed.Old.Text != "one\ntwo\n" || renamed.New.Text != "one\ntwo\n" {
+		t.Fatalf("renamed = %+v, %v", renamed, err)
+	}
+	gone, err := a.FileContents(path, DiffCompare, commits, "gone.txt", "", false)
+	if err != nil || !gone.Old.Exists || gone.New.Exists {
+		t.Fatalf("deleted = %+v, %v", gone, err)
+	}
+	bin, err := a.FileContents(path, DiffCompare, commits, "pic.bin", "", false)
+	if err != nil || bin.Kind != "binary" {
+		t.Fatalf("binary = kind %q, %v", bin.Kind, err)
+	}
+	// The version a preview shows is the second commit's.
+	if at, ok := versionRef(DiffCompare, base+".."+to, "c.txt"); !ok || at.Rev != to {
+		t.Fatalf("versionRef = %+v, %v", at, ok)
+	}
+}
+
+func TestCompareInAPartialCloneSaysWhatsMissing(t *testing.T) {
+	isolateGit(t)
+	a := newTestApp(t)
+	path, head := partialTab(t, a)
+	page, err := a.GraphRows(path, 0, 2)
+	for deadline := time.Now().Add(10 * time.Second); (err != nil || len(page.Rows) < 2) && time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		page, err = a.GraphRows(path, 0, 2)
+	}
+	if len(page.Rows) < 2 {
+		t.Fatalf("rows = %+v, %v", page.Rows, err)
+	}
+	first := page.Rows[1].ID
+
+	cmp, err := a.CompareCommits(path, first, head)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cmp.Files) != 1 || cmp.Files[0].Path != "notes.txt" || len(cmp.CountsMissing) == 0 {
+		t.Fatalf("comparison = %+v; want notes.txt named, its counts missing", cmp)
+	}
+	fc, err := a.FileContents(path, DiffCompare, first+".."+head, "notes.txt", "", false)
+	if err != nil || fc.Kind != "missing" || len(fc.Missing) != 1 {
+		t.Fatalf("file = kind %q, missing %v, %v; want the first version missing", fc.Kind, fc.Missing, err)
 	}
 }

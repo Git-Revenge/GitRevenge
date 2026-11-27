@@ -129,18 +129,20 @@ test.describe('several commits selected', () => {
   })
 
   test('the panel takes one out, shows one alone, and opens a file in one of them', async ({ page }) => {
-    const files = { files: [{ path: 'src/feed.js', commits: [id(3), id(1)] }, { path: 'README.md', commits: [id(2)] }], total: 2, read: 3 }
+    const files = { files: [{ path: 'src/feed.js', commits: [id(5), id(1)] }, { path: 'README.md', commits: [id(3)] }], total: 2, read: 3 }
     await open(page, 'repoView', { graphData: rows(8), responses: { ...base, SelectionFiles: files } })
+    // Picked here and there: a line would show as one change instead.
     await click(page, 1)
-    await click(page, 3, ['Shift'])
+    await click(page, 3, ['ControlOrMeta'])
+    await click(page, 5, ['ControlOrMeta'])
     const changed = panel(page).getByRole('region', { name: 'Files they change' })
     await expect(changed.getByRole('button', { name: /src\/feed\.js/ })).toContainText('2 of 3')
     await changed.getByRole('button', { name: /src\/feed\.js/ }).click()
-    await changed.getByRole('button', { name: /Commit 3$/ }).click()
-    await expect.poll(async () => (await calls(page, 'FileDiff')).at(-1)?.slice(0, 4)).toEqual(['/r', 'commit', id(3), 'src/feed.js'])
+    await changed.getByRole('button', { name: /Commit 5$/ }).click()
+    await expect.poll(async () => (await calls(page, 'FileDiff')).at(-1)?.slice(0, 4)).toEqual(['/r', 'commit', id(5), 'src/feed.js'])
 
-    await panel(page).getByRole('button', { name: 'Take Commit 2 out of the selection' }).click()
-    await expect(commitsIn(page)).toHaveText(['Commit 3', 'Commit 1'])
+    await panel(page).getByRole('button', { name: 'Take Commit 3 out of the selection' }).click()
+    await expect(commitsIn(page)).toHaveText(['Commit 5', 'Commit 1'])
     await panel(page).getByRole('region', { name: 'The commits' }).getByRole('button', { name: /Commit 1$/ }).click()
     await expect(panel(page)).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Commit 1' })).toBeVisible()
@@ -159,5 +161,84 @@ test.describe('several commits selected', () => {
       { lo: 2, hi: 2, loId: id(2), hiId: id(2) },
       { lo: 4, hi: 4, loId: id(4), hiId: id(4) },
     ])
+  })
+})
+
+test.describe('two commits, and a line of them (#1019)', () => {
+  test.use({ timezoneId: 'UTC' })
+  const compared = {
+    files: [
+      { path: 'src/feed.js', status: 'M', added: 3, deleted: 1 },
+      { path: 'old.js', status: 'D', added: 0, deleted: 5 },
+    ],
+    onlyFrom: 0,
+    onlyTo: 3,
+  }
+  const panelHead = (page: Page) => panel(page).locator('header')
+
+  test('two are compared: their difference, which way round, and Swap sides', async ({ page }) => {
+    await open(page, 'repoView', { graphData: rows(8), responses: { ...base, CompareCommits: compared } })
+    await click(page, 1)
+    await click(page, 4, ['ControlOrMeta'])
+    await expect(panelHead(page)).toContainText('two, side by side')
+    await expect(panelHead(page)).toContainText('is 3 commits after')
+    // Oldest first: from row 4's commit to row 1's.
+    await expect.poll(async () => (await calls(page, 'CompareCommits')).at(-1)).toEqual(['/r', id(4), id(1)])
+    const diff = panel(page).getByRole('region', { name: 'Their difference' })
+    await expect(diff.getByRole('button')).toHaveText([/src\/feed\.js\s*\+3\s*−1/, /old\.js\s*deleted/])
+    await diff.getByRole('button', { name: /src\/feed\.js/ }).click()
+    await expect.poll(async () => (await calls(page, 'FileDiff')).at(-1)?.slice(0, 4)).toEqual(['/r', 'compare', `${id(4)}..${id(1)}`, 'src/feed.js'])
+
+    await panel(page).getByRole('button', { name: 'Swap sides' }).click()
+    await expect.poll(async () => (await calls(page, 'CompareCommits')).at(-1)).toEqual(['/r', id(1), id(4)])
+    // The ones selected are still there to act on.
+    await expect(panel(page).getByRole('button', { name: 'Cherry-pick 2 onto main' })).toHaveCount(0)
+    await expect(panel(page).getByRole('button', { name: 'Revert 2…' })).toBeVisible()
+  })
+
+  test('a line of three shows as one change, from before the oldest', async ({ page }) => {
+    await open(page, 'repoView', { graphData: rows(8), responses: { ...base, CompareCommits: compared } })
+    await click(page, 1)
+    await click(page, 3, ['Shift'])
+    await expect(panelHead(page)).toContainText('one line of history')
+    await expect(panel(page).getByRole('region', { name: 'Changed, all together' })).toContainText('src/feed.js')
+    await expect(panel(page)).toContainText('what squashing them would make')
+    // From row 3's parent, row 4, to the newest, row 1.
+    await expect.poll(async () => (await calls(page, 'CompareCommits')).at(-1)).toEqual(['/r', id(4), id(1)])
+    await panel(page).getByRole('region', { name: 'Changed, all together' }).getByRole('button', { name: /old\.js/ }).click()
+    await expect.poll(async () => (await calls(page, 'FileDiff')).at(-1)?.slice(0, 4)).toEqual(['/r', 'compare', `${id(4)}..${id(1)}`, 'old.js'])
+    expect(await calls(page, 'SelectionFiles')).toEqual([])
+  })
+
+  test('a line from the first commit compares from nothing, and says so', async ({ page }) => {
+    await open(page, 'repoView', { graphData: rows(8), responses: { ...base, CompareCommits: compared } })
+    await click(page, 5)
+    await click(page, 7, ['Shift'])
+    await expect(panel(page)).toContainText('the history’s first commit')
+    await expect.poll(async () => (await calls(page, 'CompareCommits')).at(-1)).toEqual(['/r', '', id(5)])
+  })
+
+  test('commits picked here and there list the files each changes, and compare nothing', async ({ page }) => {
+    await open(page, 'repoView', { graphData: rows(8), responses: { ...base, CompareCommits: compared } })
+    await click(page, 0)
+    await click(page, 2, ['ControlOrMeta'])
+    await click(page, 4, ['ControlOrMeta'])
+    await expect(panelHead(page)).toContainText('picked here and there')
+    await expect(panel(page).getByRole('region', { name: 'Files they change' })).toBeVisible()
+    // Two picked on the way there compared; the three don't.
+    expect((await calls(page, 'CompareCommits')).some((c) => c.includes(id(4)))).toBe(false)
+  })
+
+  test('in a partial clone the line counts download by themselves, with Stop', async ({ page }) => {
+    await open(page, 'repoView', { graphData: rows(8), responses: { ...base, CompareCommits: { ...compared, countsMissing: ['a'.repeat(40)] } }, delays: { DownloadFiles: 10_000 } })
+    await click(page, 1)
+    await click(page, 2, ['ControlOrMeta'])
+    const note = panel(page).getByRole('status').filter({ hasText: 'line counts' })
+    await expect(note).toContainText('Downloading the files for their line counts…')
+    expect((await calls(page, 'DownloadFiles')).at(-1)?.[2]).toEqual(['a'.repeat(40)])
+    await note.getByRole('button', { name: 'Stop' }).click()
+    await expect(note).toContainText('hasn’t got yet')
+    await expect(note.getByRole('button', { name: 'Download' })).toBeVisible()
+    expect(await calls(page, 'CancelDownload')).toHaveLength(1)
   })
 })

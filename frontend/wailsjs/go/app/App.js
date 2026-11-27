@@ -182,6 +182,10 @@ export function CommitSignatures(arg1, arg2) {
   return window['go']['app']['App']['CommitSignatures'](arg1, arg2);
 }
 
+export function CompareCommits(arg1, arg2, arg3) {
+  return window['go']['app']['App']['CompareCommits'](arg1, arg2, arg3);
+}
+
 export function ConflictContext(arg1) {
   return window['go']['app']['App']['ConflictContext'](arg1);
 }

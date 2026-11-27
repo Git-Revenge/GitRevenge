@@ -4,10 +4,12 @@
   /** What to compare. Opened from the commit panel or the working tree panel. */
   export interface DiffTarget {
     /** 'conflict' opens the conflict tool instead of a diff; 'found' a file Find in files found
-     * something in, whole (#980). */
-    mode: 'commit' | 'staged' | 'unstaged' | 'conflict' | 'history' | 'blame' | 'found'
+     * something in, whole (#980). 'compare' is one commit's file against another's (#1019). */
+    mode: 'commit' | 'compare' | 'staged' | 'unstaged' | 'conflict' | 'history' | 'blame' | 'found'
     file: string
     oldPath?: string
+    /** The commit, or for 'compare' the two as "FROM..TO" (FROM "" is nothing: every line is
+     * new). */
     commit?: string
     /** The line to open at (1-based): a found line, or a blame's line. */
     line?: number
@@ -18,6 +20,7 @@
 
 <script lang="ts">
   import Loading from '../ui/Loading.svelte'
+  import { newSideCommit, ofCommits } from './target'
   import { FileData, FileDiff, FileImage, SetStagedContent, SetWorkTreeContent } from '../../../wailsjs/go/app/App.js'
   import type { app } from '../../../wailsjs/go/models'
   import { prefs } from '../prefs.svelte'
@@ -142,7 +145,7 @@
   const openRelated = (file: string) => onOpen?.({ mode: target.mode, file, commit: target.commit })
   /** This file's bytes at the version shown (or its last version when deleted). */
   const loadData = () =>
-    contents?.new.exists === false && target.mode === 'commit'
+    contents?.new.exists === false && ofCommits(target.mode)
       ? Promise.resolve('')
       : FileData(path, target.mode, target.commit ?? '', target.file)
 
@@ -203,12 +206,12 @@
     void anyway
     void prefs.diffAlgorithm
     void prefs.diffMoves
-    if (target.mode !== 'commit') void session.revision[path]
+    if (!ofCommits(target.mode)) void session.revision[path]
     void load()
   })
 
   /** Formatting hides only where nothing is staged: staging shows what will be written. */
-  let stages = $derived(target.mode !== 'commit')
+  let stages = $derived(!ofCommits(target.mode))
   let hiding = $derived(hide && !stages && diff?.engine === 'code')
 
   // The changes to step through. Opening another file starts again from none.
@@ -326,7 +329,13 @@
     return {}
   })
 
-  const modeLabel = { commit: '', staged: 'Staged', unstaged: 'Unstaged', conflict: 'Conflict', history: '', blame: '', found: '' }
+  const modeLabel = { commit: '', compare: '', staged: 'Staged', unstaged: 'Unstaged', conflict: 'Conflict', history: '', blame: '', found: '' }
+  /** A comparison names its two commits beside the file: "df840f3 → c0e582a". */
+  let compareLabel = $derived.by(() => {
+    if (target.mode !== 'compare') return ''
+    const [from, to] = (target.commit ?? '').split('..')
+    return `${from ? from.slice(0, 7) : 'nothing'} → ${(to ?? '').slice(0, 7)}`
+  })
 </script>
 
 <div class="diffview">
@@ -336,6 +345,7 @@
       >{target.oldPath && target.oldPath !== target.file ? `${target.oldPath} → ` : ''}{target.file}</span
     >
     {#if modeLabel[target.mode]}<span class="view-badge">{modeLabel[target.mode]}</span>{/if}
+    {#if compareLabel}<span class="view-badge ids" title="From the first commit’s files to the second’s">{compareLabel}</span>{/if}
     {#if contents?.kind === 'text' && engine && layout !== 'file'}
       <span class="engine {engine.kind}" title={engine.title}
         >{#if engine.kind === 'reading'}<span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>{:else}<span
@@ -350,7 +360,7 @@
       <button
         class="btn quiet"
         onclick={() =>
-          onOpen({ mode: 'blame', file: target.file, commit: target.mode === 'commit' ? target.commit : undefined })}
+          onOpen({ mode: 'blame', file: target.file, commit: newSideCommit(target) })}
         >Blame</button
       >
     {/if}
@@ -495,7 +505,7 @@
         onPick={pick}
         onCompare={(k) => (comparing = k)}
       />
-      {#if target.mode !== 'commit'}
+      {#if !ofCommits(target.mode)}
         <p class="muted hint">Switch to Unified to stage or discard individual hunks and lines.</p>
       {/if}
     {:else if diff}
@@ -528,6 +538,12 @@
 </div>
 
 <style>
+  /* Commit ids keep their case, which the badge would raise. */
+  .view-badge.ids {
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
   .diffview {
     display: flex;
     flex-direction: column;

@@ -55,6 +55,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
   - **The panel:** beside the graph, it says who wrote them and when, lists the files they change with how many of them change each, and lists the commits oldest first, each with × to take it out. A file opens to the commits that changed it, each with its own diff. It lists the first 100 commits and reads files from the first 500.
   - **The menu:** right-click a selected row to cherry-pick them all onto your branch, oldest first, revert them, newest first, or copy their ids. Actions on more than 100 commits ask first.
   - **Through a reload:** a selection follows its commits to their new rows. Commits that are gone, after a rebase or a reset, or that a filter hides, drop out of it.
+- Two commits selected are compared, and a line of them shows as one change (#1019).
+  - **Two commits:** the panel shows their difference, from the older one's files to the newer one's as `git diff A B` does, with how they stand to each other ("c0e582a is 3 commits after df840f3") and **Swap sides**.
+  - **A line of three or more,** each the parent of the next: the panel shows them **all together**, one diff from before the oldest to the newest, which is what squashing them would make. A line that starts at the first commit, or at a shallow clone's edge, shows its files as added.
+  - **The diff view:** each file opens there as one commit's file against the other's, with the code read, moves found and pictures shown as in any diff, and the two commits named beside the file. In a partial clone the names come at once and the line counts download by themselves, with Stop.
 
 ### Changed
 

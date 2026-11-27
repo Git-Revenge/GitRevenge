@@ -5,11 +5,13 @@
   import type { Selected } from './graph/selection'
   import type { MenuContext } from './menus'
   import { commitCount, selectionActions } from './selectionMenu'
+  import ComparisonFiles from './ComparisonFiles.svelte'
   import Icon from './ui/Icon.svelte'
   import Loading from './ui/Loading.svelte'
 
   /** The right-hand panel with several commits selected in the graph (#1018): who and when,
-   * the files they change, the commits, and what can be done with them all. */
+   * the files they change, the commits, and what can be done with them all. Two commits are
+   * compared, and a line of them shows as one change (#1019). */
   let {
     path,
     selected,
@@ -33,20 +35,30 @@
   const FIRST_FILES = 12
 
   let info = $derived(selected.info)
+  /** Two commits are compared; three or more that are one line show as one change; any
+   * others are picked here and there. */
+  let kind = $derived<'two' | 'line' | 'scattered' | null>(info ? (info.ids.length === 2 ? 'two' : info.line ? 'line' : 'scattered') : null)
+  /** Two commits compared the other way round: from the newer to the older. */
+  let swapped = $state(false)
+  let pair = $derived(info && kind === 'two' ? (swapped ? [info.ids[1], info.ids[0]] : [info.ids[0], info.ids[1]]) : ['', ''])
+  let comparison = $state<app.Comparison | null>(null)
+  let newest = $derived(info?.ids[info.ids.length - 1] ?? '')
   let files = $state<app.SelectionFiles | null>(null)
   let filesError = $state('')
   let allFiles = $state(false)
   /** The file whose commits are open under it, or "". */
   let opened = $state('')
 
-  // The files are read once the commits are, and again whenever they change.
+  // The files are read once the commits are, and again whenever they change. Commits picked
+  // here and there are read for which files each changes; the other kinds compare.
   $effect(() => {
     const sel = info
     files = null
     filesError = ''
     allFiles = false
     opened = ''
-    if (!sel) return
+    swapped = false
+    if (!sel || kind !== 'scattered') return
     void SelectionFiles(path, sel.ids)
       .then((f) => {
         if (sel === info) files = f
@@ -66,20 +78,57 @@
     const [a, b] = [date(sel.first), date(sel.last)]
     return a === b ? `on ${a}` : `${a} to ${b}`
   }
+  /** How two commits stand to each other: one after the other, or apart. */
+  function relation(c: app.Comparison, from: string, to: string): string {
+    const [f, t] = [short(from), short(to)]
+    if (!c.onlyFrom && c.onlyTo) return `${t} is ${commitCount(c.onlyTo)} after ${f}.`
+    if (!c.onlyTo && c.onlyFrom) return `${t} is ${commitCount(c.onlyFrom)} before ${f}.`
+    return `${t} has ${commitCount(c.onlyTo)} that ${f} doesn’t, and ${f} has ${commitCount(c.onlyFrom)} that ${t} doesn’t.`
+  }
+  const KICKER = { two: 'two, side by side', line: 'one line of history', scattered: 'picked here and there' }
 </script>
 
 <aside class="panel" aria-label="Several commits selected">
   <header>
-    <span class="hand">several at once</span>
-    <h2>{commitCount(info?.ids.length ?? selected.count)}</h2>
+    <span class="hand">{kind ? KICKER[kind] : 'several at once'}</span>
+    {#if kind === 'two'}
+      <h2><span class="mono id">{short(pair[0])}</span> to <span class="mono id">{short(pair[1])}</span></h2>
+    {:else}
+      <h2>{commitCount(info?.ids.length ?? selected.count)}</h2>
+    {/if}
     {#if info}
       <p class="who">{info.authors === 1 ? info.author : `${info.authors.toLocaleString()} authors`} · {when(info)}{#if info.merges} · {info.merges === 1 ? '1 merge' : `${info.merges.toLocaleString()} merges`}{/if}</p>
+    {/if}
+    {#if kind === 'two' && comparison}
+      <p class="who">{relation(comparison, pair[0], pair[1])}</p>
     {/if}
   </header>
 
   {#if !info}
     <Loading label="Reading them…" />
-  {:else}
+  {:else if kind === 'two'}
+    <div class="compare">
+      <button class="btn sm text swap" onclick={() => (swapped = !swapped)}>Swap sides</button>
+      <ComparisonFiles {path} from={pair[0]} to={pair[1]} title="Their difference" {openFile} bind:comparison />
+      <p class="more">From {short(pair[0])}’s files to {short(pair[1])}’s, as <code>git diff {short(pair[0])} {short(pair[1])}</code> shows them.</p>
+    </div>
+  {:else if kind === 'line'}
+    <div class="compare">
+      <ComparisonFiles {path} from={info.base} to={newest} title="Changed, all together" {openFile} />
+      <p class="more">
+        {#if info.baseEdge}
+          The oldest is where this shallow clone’s history stops: its parent wasn’t fetched, so its files show as added.
+        {:else if !info.base}
+          The oldest is the history’s first commit, so its files show as added.
+        {:else}
+          One diff, from before {short(info.ids[0])} to {short(newest)}: what squashing them would make.
+        {/if}
+      </p>
+    </div>
+  {/if}
+
+  {#if info}
+    {#if kind === 'scattered'}
     <section aria-label="Files they change">
       <h3 class="meta">{files ? `Files they change · ${files.total.toLocaleString()}` : 'Files they change'}</h3>
       {#if filesError}
@@ -122,6 +171,7 @@
         {/if}
       {/if}
     </section>
+    {/if}
 
     <section aria-label="The commits">
       <h3 class="meta">The commits, oldest first</h3>
@@ -204,6 +254,27 @@
   .mono {
     font-family: var(--font-mono);
     font-size: 13px;
+  }
+
+  h2 .id {
+    font-size: 17px;
+    color: var(--accent-b);
+  }
+
+  .compare {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .swap {
+    align-self: flex-end;
+    margin-bottom: -28px;
+  }
+
+  .more code {
+    font-family: var(--font-mono);
+    font-size: 12px;
   }
 
   .files,
