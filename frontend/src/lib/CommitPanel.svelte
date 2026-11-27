@@ -1,6 +1,6 @@
 <script lang="ts">
   import { errorText } from './errors'
-  import { CancelDownload, CommitDetail, CommitNotes, CommitSignatures, DownloadFiles, FormattingOnly, HistoryChanges, SetCommitNote, TrailerFilterLines } from '../../wailsjs/go/app/App.js'
+  import { CancelDownload, CommitDetail, CommitNotes, CommitSignatures, DescribeCommit, DownloadFiles, FormattingOnly, HistoryChanges, SetCommitNote, TrailerFilterLines } from '../../wailsjs/go/app/App.js'
   import Busy from './ui/Busy.svelte'
   import { fileMark, type HistoryChange, type HistoryOptions } from './filters/history'
   import type { FindOptions } from './find/find'
@@ -17,6 +17,7 @@
   import { ListWindow } from './listWindow.svelte'
   import { TWO_COLUMNS } from './rightPanel'
   import { formatTime, type RefLabel } from './graph/draw'
+  import { afterSaid, firstInSaid } from './describe'
   import RefChip from './graph/RefChip.svelte'
   import type { DiffTarget } from './diff/DiffView.svelte'
   import { session } from './session.svelte'
@@ -285,6 +286,31 @@
       // The signature is decoration: a failure just means no mark.
       .catch(() => {})
   })
+
+  // Where the commit stands among the tags (#940). Read only while Details shows it: on the
+  // kernel it takes about a second, and the backend stops the last one when a newer comes.
+  let described = $state<git.Described | null>(null)
+  let describeFailed = $state(false)
+  $effect(() => {
+    const id = commitId
+    described = null
+    describeFailed = false
+    if (tab !== 'details' || !id) return
+    void DescribeCommit(path, id)
+      .then((d) => {
+        if (id === commitId) described = d
+      })
+      .catch(() => {
+        if (id === commitId) describeFailed = true
+      })
+  })
+  let copiedTag = $state('')
+  async function copyTag(text: string) {
+    copiedTag = (await ClipboardSetText(text).catch(() => false)) === false ? '' : text
+    setTimeout(() => {
+      if (copiedTag === text) copiedTag = ''
+    }, 1500)
+  }
 
   const SIG_TEXT: Record<string, string> = {
     good: 'Verified',
@@ -697,6 +723,40 @@
                 <span class="when">{formatTime(c.committer.time)}</span>
               </dd>
             {/if}
+            <dt class="meta">Describe</dt>
+            <dd class="described">
+              {#if describeFailed}
+                <span class="muted">Couldn’t read the tags.</span>
+              {:else if !described}
+                <span class="muted">Looking…</span>
+              {:else}
+                {#if described.name}
+                  <span class="tag-line"
+                    ><code>{described.name}</code><button class="btn sm quiet icon" aria-label="Copy {described.name}" title="Copy" onclick={() => copyTag(described!.name)}
+                      ><Icon name={copiedTag === described.name ? 'check' : 'copy'} size={13} /></button
+                    ></span
+                  >
+                {/if}
+                <span class="says">{afterSaid(described)}</span>
+              {/if}
+            </dd>
+            <dt class="meta">First in</dt>
+            <dd class="described">
+              {#if describeFailed}
+                <span class="muted">Couldn’t read the tags.</span>
+              {:else if !described}
+                <span class="muted">Looking…</span>
+              {:else if described.firstIn}
+                <span class="tag-line"
+                  ><code>{described.firstIn}</code><button class="btn sm quiet icon" aria-label="Copy {described.firstIn}" title="Copy" onclick={() => copyTag(described!.firstIn)}
+                    ><Icon name={copiedTag === described.firstIn ? 'check' : 'copy'} size={13} /></button
+                  ></span
+                >
+                {#if described.contains !== described.firstIn}<span class="says" title="git describe --contains">git names it {described.contains}</span>{/if}
+              {:else}
+                <span class="muted">{firstInSaid(described)}</span>
+              {/if}
+            </dd>
             <dt class="meta">Notes</dt>
             <dd class="notes" bind:this={notesEl}>
               {#if notesError}<p class="muted" role="alert">Couldn't read notes: {notesError}</p>{/if}
@@ -786,6 +846,13 @@
     margin: 0;
     font-size: 13px;
     color: var(--ink-mute);
+  }
+
+  /* A tag name with its copy button (#940). */
+  .tag-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
   }
 
   /* The name and address stay together: on the line after the words when they don't fit
