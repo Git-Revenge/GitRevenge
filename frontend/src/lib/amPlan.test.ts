@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { branchNameOf, fileSummary, seriesOf, titleOf } from './amPlan'
+import { branchNameOf, fileSummary, patchLines, seriesOf, titleOf } from './amPlan'
 
 const msg = (subject: string, number = 0, total = 0, version = 1, kind: 'patch' | 'cover' | 'reply' = 'patch') => ({
   subject,
@@ -56,5 +56,49 @@ describe('a file of patches as a series', () => {
     expect(fileSummary(thread, s, s.versions[1])).toBe('7 messages: a cover letter, 3 patches, 2 messages of other versions and 1 reply left out')
     const one = [msg('Fix it')]
     expect(fileSummary(one, seriesOf(one), seriesOf(one).versions[0])).toBe('1 message: 1 patch')
+  })
+})
+
+describe('patchLines', () => {
+  const patch = [
+    'diff --git a/src/feed.js b/src/feed.js',
+    'index 1234567..89abcde 100644',
+    '--- a/src/feed.js',
+    '+++ b/src/feed.js',
+    '@@ -1,3 +1,3 @@',
+    ' const a = 1',
+    '-const b = 2',
+    '+const b = 3',
+    '\\ No newline at end of file',
+    'diff --git a/README.md b/README.md',
+    '--- a/README.md',
+    '+++ b/README.md',
+    '@@ -1 +1 @@',
+    '-old',
+    '+new',
+    '',
+  ].join('\n')
+
+  it("reads each file's header, its hunks and their lines", () => {
+    const { lines, more } = patchLines(patch)
+    expect(more).toBe(0)
+    expect(lines.map((l) => l.kind)).toEqual(['file', 'meta', 'meta', 'meta', 'hunk', 'same', 'del', 'add', 'meta', 'file', 'meta', 'meta', 'hunk', 'del', 'add'])
+  })
+
+  it('counts the lines past the cap', () => {
+    const { lines, more } = patchLines(patch, 5)
+    expect(lines).toHaveLength(5)
+    expect(more).toBe(10)
+  })
+
+  it("leaves out the mail's separator at the top", () => {
+    expect(patchLines(`---\n${patch}`).lines[0]).toEqual({ kind: 'file', text: 'diff --git a/src/feed.js b/src/feed.js' })
+  })
+
+  it('reads Windows line ends', () => {
+    expect(patchLines('@@ -1 +1 @@\r\n+new\r\n').lines).toEqual([
+      { kind: 'hunk', text: '@@ -1 +1 @@' },
+      { kind: 'add', text: '+new' },
+    ])
   })
 })

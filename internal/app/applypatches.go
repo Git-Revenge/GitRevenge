@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -286,11 +287,18 @@ func (a *App) ApplyPatches(path, token string, picked []int, branch string, sign
 	}
 	err = a.record(r, label, kindMove, "", func() error {
 		if branch != "" {
+			was := r.Git.Head(ctx)
 			if err := r.Git.CreateBranch(ctx, branch, "", true); err != nil {
 				return err
 			}
+			// Noted, so aborting the patches takes the branch made for them too (#1023).
+			_ = writeSeriesBranch(r.GitDir, seriesBranch{name: branch, start: was.Commit, from: was.Branch})
 		}
-		return r.Git.Am(ctx, file, signoff)
+		if err := r.Git.Am(ctx, file, signoff); err != nil {
+			return err
+		}
+		clearSeriesBranch(r.GitDir)
+		return nil
 	})
 	if errors.Is(err, git.ErrConflicts) {
 		return userError("A patch stopped on a conflict. Resolve the files, stage them, then Continue in the banner; or Skip that patch, or Abort.")
@@ -308,4 +316,54 @@ func (a *App) ApplyPatches(path, token string, picked []int, branch string, sign
 // ClosePatches forgets a file of patches when its preview closes, stopping any try.
 func (a *App) ClosePatches(token string) {
 	a.patches.drop(token)
+}
+
+// seriesBranchFile, in the git folder, notes a branch ApplyPatches made for a series while
+// git am is applying it: its name, the commit it started at, and the branch checked out
+// before ("" for a detached HEAD). Aborting the patches takes the branch away too.
+const seriesBranchFile = "gitrevenge-am-branch"
+
+type seriesBranch struct{ name, start, from string }
+
+func readSeriesBranch(gitDir string) (seriesBranch, bool) {
+	data, err := os.ReadFile(filepath.Join(gitDir, seriesBranchFile))
+	if err != nil {
+		return seriesBranch{}, false
+	}
+	f := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	if len(f) < 3 || f[0] == "" || f[1] == "" {
+		return seriesBranch{}, false
+	}
+	return seriesBranch{name: f[0], start: f[1], from: f[2]}, true
+}
+
+func writeSeriesBranch(gitDir string, b seriesBranch) error {
+	return os.WriteFile(filepath.Join(gitDir, seriesBranchFile), []byte(b.name+"\n"+b.start+"\n"+b.from+"\n"), 0o644)
+}
+
+func clearSeriesBranch(gitDir string) {
+	_ = os.Remove(filepath.Join(gitDir, seriesBranchFile))
+}
+
+// dropSeriesBranch, once git am is aborted, goes back to where the person was and removes the
+// branch made for the series, as long as it's still checked out with nothing on it: aborting
+// put it back at the commit it started from.
+func dropSeriesBranch(ctx context.Context, repo *git.Repo, gitDir string) {
+	b, ok := readSeriesBranch(gitDir)
+	clearSeriesBranch(gitDir)
+	if !ok {
+		return
+	}
+	head := repo.Head(ctx)
+	if head.Branch != b.name || head.Commit != b.start {
+		return
+	}
+	back := []string{"switch", "--detach", b.start}
+	if b.from != "" {
+		back = []string{"switch", b.from}
+	}
+	if _, err := repo.Write(ctx, git.Cmd{Args: back}); err != nil {
+		return
+	}
+	_ = repo.DeleteBranch(ctx, b.name, true)
 }

@@ -74,3 +74,39 @@ export function fileSummary(messages: Message[], s: Series, v: Version | undefin
   const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : (parts[0] ?? 'nothing to apply')
   return `${count(messages.length, 'message', 'messages')}: ${list}`
 }
+
+/** A line of a patch as Show the patch draws it (#1023). */
+export type PatchLine = { kind: 'file' | 'meta' | 'hunk' | 'add' | 'del' | 'same'; text: string }
+
+/** The most lines Show the patch draws; the rest are counted. */
+export const PATCH_LINES = 4000
+
+/** Reads a patch's text into lines to draw: each file's header, its hunks, and their added,
+ * removed and unchanged lines. */
+export function patchLines(text: string, cap = PATCH_LINES): { lines: PatchLine[]; more: number } {
+  // git am keeps the mail's "---" separator at the top: it says nothing here.
+  const all = text.replace(/(\r?\n)+$/, '').replace(/^---\r?\n/, '').split('\n')
+  const lines: PatchLine[] = []
+  let inHunk = false
+  for (const raw of all.slice(0, cap)) {
+    const t = raw.replace(/\r$/, '')
+    if (t.startsWith('diff --git ')) {
+      inHunk = false
+      lines.push({ kind: 'file', text: t })
+    } else if (t.startsWith('@@')) {
+      inHunk = true
+      lines.push({ kind: 'hunk', text: t })
+    } else if (!inHunk) {
+      lines.push({ kind: 'meta', text: t })
+    } else if (t.startsWith('+')) {
+      lines.push({ kind: 'add', text: t })
+    } else if (t.startsWith('-')) {
+      lines.push({ kind: 'del', text: t })
+    } else if (t.startsWith('\\')) {
+      lines.push({ kind: 'meta', text: t })
+    } else {
+      lines.push({ kind: 'same', text: t })
+    }
+  }
+  return { lines, more: Math.max(0, all.length - cap) }
+}

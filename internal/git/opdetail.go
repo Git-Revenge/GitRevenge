@@ -107,10 +107,52 @@ func (r *Repo) describe(ctx context.Context, gitDir string, st *OperationState) 
 		} else {
 			st.Commit = r.pseudoref(ctx, gitDir, "REVERT_HEAD")
 		}
+	case Am:
+		r.describeAm(ctx, gitDir, branch, st)
+		return
 	default:
 		return
 	}
 	if st.Commit != "" {
 		st.Subject, _ = r.ReadString(ctx, "log", "-1", "--format=%s", st.Commit, "--")
 	}
+}
+
+// describeAm reads git am's patch in hand (#1023): who wrote it and its subject, from what
+// mailinfo left in rebase-apply/info, and whether it stopped with nothing to resolve.
+func (r *Repo) describeAm(ctx context.Context, gitDir, branch string, st *OperationState) {
+	st.Ours = branch
+	// git am sets ORIG_HEAD as it starts. What's on top of it since are the patches applied:
+	// the rest of the steps behind were skipped.
+	st.OrigHead = r.pseudoref(ctx, gitDir, "ORIG_HEAD")
+	if st.OrigHead != "" {
+		if n, err := r.ReadString(ctx, "rev-list", "--count", st.OrigHead+"..HEAD"); err == nil {
+			st.Applied, _ = strconv.Atoi(n)
+		}
+	}
+	if info, err := os.ReadFile(filepath.Join(gitDir, "rebase-apply", "info")); err == nil {
+		for line := range strings.SplitSeq(string(info), "\n") {
+			k, v, _ := strings.Cut(strings.TrimRight(line, "\r"), ": ")
+			switch k {
+			case "Author":
+				st.Author = v
+			case "Subject":
+				st.Subject = v
+			}
+		}
+	}
+	if len(st.Conflicts) > 0 || r.HasStaged(ctx) {
+		return
+	}
+	st.Stuck = true
+	patch := filepath.Join(gitDir, "rebase-apply", "patch")
+	if _, err := r.readCmd(ctx, Cmd{Args: []string{"apply", "--check", patch}, Env: noLazyFetch}); err != nil {
+		st.StuckReason = firstLine(err)
+	}
+}
+
+// CurrentPatch is the patch git am has in hand, as `am --show-current-patch=diff` shows it.
+func (r *Repo) CurrentPatch(ctx context.Context) (string, error) {
+	out, err := r.readCmd(ctx, Cmd{Args: []string{"am", "--show-current-patch=diff"}})
+	return string(out), err
 }

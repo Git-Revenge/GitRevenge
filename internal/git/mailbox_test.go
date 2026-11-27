@@ -218,3 +218,57 @@ func TestAmAppliesAsCommitsAndStopsOnAConflict(t *testing.T) {
 		t.Fatal("a staged change should count")
 	}
 }
+
+func TestAmStateNamesThePatchAndSaysWhenItsStuck(t *testing.T) {
+	t.Parallel()
+	fx, patches, _ := trialRepo(t)
+	repo := OpenRepo(newTestRunner(t), fx.Dir)
+	ctx := context.Background()
+	gitDir := filepath.Join(fx.Dir, ".git")
+	start := fx.Head()
+	third, _ := os.ReadFile(patches[2])
+	mbox := filepath.Join(t.TempDir(), "third.mbox")
+	if err := os.WriteFile(mbox, third, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Am(ctx, mbox, false); !errors.Is(err, ErrConflicts) {
+		t.Fatalf("err = %v, want a conflict", err)
+	}
+	st, err := repo.OperationState(ctx, gitDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Op != Am || st.Step != 1 || st.Total != 1 || st.Subject != "Change line 6" || st.Author == "" || st.Ours != "main" || st.OrigHead != start {
+		t.Fatalf("state = %+v", st)
+	}
+	if st.Stuck || len(st.Conflicts) != 1 {
+		t.Fatalf("a conflict is to resolve, not stuck: %+v", st)
+	}
+	fx.Git("am", "--abort")
+
+	// A patch for a file this repository never had: nothing to resolve.
+	bad := filepath.Join(t.TempDir(), "bad.mbox")
+	if err := os.WriteFile(bad, []byte("From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001\nFrom: A <a@example.com>\nSubject: [PATCH] Touch nowhere\nDate: Mon, 1 Jan 2026 00:00:00 +0000\n\n---\ndiff --git a/nowhere.txt b/nowhere.txt\nindex 1234567..89abcde 100644\n--- a/nowhere.txt\n+++ b/nowhere.txt\n@@ -1 +1 @@\n-x\n+y\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Am(ctx, bad, false); err == nil {
+		t.Fatal("a patch for nothing should stop")
+	}
+	st, err = repo.OperationState(ctx, gitDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Op != Am || !st.Stuck || !strings.Contains(st.StuckReason, "nowhere.txt") || st.Subject != "Touch nowhere" {
+		t.Fatalf("state = %+v, want stuck, saying nowhere.txt", st)
+	}
+	patch, err := repo.CurrentPatch(ctx)
+	if err != nil || !strings.Contains(patch, "diff --git a/nowhere.txt b/nowhere.txt") {
+		t.Fatalf("current patch = %q, %v", patch, err)
+	}
+	// Changed by hand and staged, it isn't stuck: Continue commits it.
+	fx.WriteFile("nowhere.txt", "y\n")
+	fx.Git("add", "nowhere.txt")
+	if st, _ = repo.OperationState(ctx, gitDir); st.Stuck {
+		t.Fatalf("with the change staged, it isn't stuck: %+v", st)
+	}
+}

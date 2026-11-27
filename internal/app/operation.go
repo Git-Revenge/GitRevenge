@@ -27,6 +27,18 @@ type RepoState struct {
 	OrigHead string `json:"origHead"`
 	// Written are the commits a rebase has written so far, newest first.
 	Written []string `json:"written"`
+	// Author, for git am, wrote the patch in hand (#1023). Applied counts the patches before it
+	// that went in; the rest before it were skipped.
+	Author  string `json:"author"`
+	Applied int    `json:"applied"`
+	// Stuck says git am stopped on a patch it couldn't apply at all, StuckReason why. Continue
+	// isn't offered then: there's nothing to resolve, and nothing to commit until the change
+	// is made by hand and staged.
+	Stuck       bool   `json:"stuck"`
+	StuckReason string `json:"stuckReason"`
+	// MadeBranch names the branch the apply preview made for the series (#1022), which
+	// aborting removes too, when nothing else is on it.
+	MadeBranch string `json:"madeBranch"`
 }
 
 // RepoState returns the operation in progress in the repository at path, if any.
@@ -46,14 +58,36 @@ func (a *App) RepoState(path string) (RepoState, error) {
 	out := RepoState{
 		Operation: string(st.Op), Step: st.Step, Total: st.Total, Conflicts: st.Conflicts, Actions: []string{},
 		Ours: st.Ours, Theirs: st.Theirs, Commit: st.Commit, Subject: st.Subject, OrigHead: st.OrigHead, Written: st.Written,
+		Author: st.Author, Applied: st.Applied, Stuck: st.Stuck, StuckReason: st.StuckReason,
 	}
 	if out.Written == nil {
 		out.Written = []string{}
 	}
 	for _, act := range st.Op.Actions() {
+		if st.Stuck && act == git.Continue {
+			continue
+		}
 		out.Actions = append(out.Actions, string(act))
 	}
+	if st.Op == git.Am {
+		if b, ok := readSeriesBranch(r.GitDir); ok && b.name == st.Ours {
+			out.MadeBranch = b.name
+		}
+	}
 	return out, nil
+}
+
+// CurrentPatch is the patch git am has in hand, for Show the patch when one didn't apply.
+func (a *App) CurrentPatch(path string) (string, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return "", err
+	}
+	text, err := r.Git.CurrentPatch(context.Background())
+	if err != nil {
+		return "", patchError(err)
+	}
+	return text, nil
 }
 
 // RunOperationAction continues, skips or aborts the operation in progress.
@@ -77,12 +111,19 @@ func (a *App) RunOperationAction(path, action string) error {
 	if errors.As(err, &notAllowed) {
 		return userError("Can't " + action + ": " + notAllowed.Error() + ".")
 	}
+	if before.Op == git.Am && git.Action(action) == git.Abort && err == nil {
+		dropSeriesBranch(ctx, r.Git, r.GitDir)
+	}
 	if git.Action(action) == git.Abort || before.Op == git.Bisect {
 		return err
 	}
 	after, serr := r.Git.OperationState(ctx, r.GitDir)
 	if serr != nil {
 		return err
+	}
+	if after.Op == git.None && before.Op == git.Am {
+		// Every patch is in: the branch made for them stays, and isn't the preview's to remove.
+		clearSeriesBranch(r.GitDir)
 	}
 	if after.Op != git.None {
 		// Still going. Stopped on a later commit's conflicts: the strip shows them.
@@ -111,6 +152,8 @@ func operationLabel(st git.OperationState) string {
 		return "Cherry-pick " + shortRef(st.Commit)
 	case git.Revert:
 		return "Revert " + shortRef(st.Commit)
+	case git.Am:
+		return "Apply patches"
 	}
 	return string(st.Op)
 }

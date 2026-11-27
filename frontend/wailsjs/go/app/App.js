@@ -226,6 +226,10 @@ export function CopyPatches(arg1, arg2, arg3) {
   return window['go']['app']['App']['CopyPatches'](arg1, arg2, arg3);
 }
 
+export function CurrentPatch(arg1) {
+  return window['go']['app']['App']['CurrentPatch'](arg1);
+}
+
 export function DeletableBranches(arg1, arg2) {
   return window['go']['app']['App']['DeletableBranches'](arg1, arg2);
 }
