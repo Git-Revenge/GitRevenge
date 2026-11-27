@@ -76,7 +76,9 @@ func TestSaveArchiveSaysWhatsWrong(t *testing.T) {
 		want         string
 	}{
 		{filepath.Join(dir, "nowhere"), "a.zip", zipped, "That folder doesn't exist"},
+		// Either slash, on every system: Linux would take the backslash as part of a name.
 		{dir, `sub\a.zip`, zipped, "a file's name, without a folder"},
+		{dir, "sub/a.zip", zipped, "a file's name, without a folder"},
 		{dir, "a.zip", git.ArchiveOptions{Format: "zip", Sub: "src/app.js"}, "“src/app.js” isn't a folder in that commit."},
 	} {
 		if _, err := a.SaveArchive(path, "v1.0", c.o, c.folder, c.name, false); err == nil || !strings.Contains(err.Error(), c.want) {

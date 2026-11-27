@@ -60,7 +60,9 @@ func (a *App) SaveArchive(path, rev string, o git.ArchiveOptions, folder, name s
 		return SavedArchive{}, userError("That folder doesn't exist: " + folder)
 	}
 	name = strings.TrimSpace(name)
-	if name == "" || filepath.Base(name) != name || name == "." || name == ".." {
+	// Neither slash, on any system: Linux takes a backslash in a name, but one typed here is
+	// meant as a folder, and such a file couldn't be opened on Windows.
+	if name == "" || strings.ContainsAny(name, `/\`) || name == "." || name == ".." {
 		return SavedArchive{}, userError("The archive's name is a file's name, without a folder.")
 	}
 	out := SavedArchive{File: name, Folder: folder}
