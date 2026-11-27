@@ -47,6 +47,8 @@ export function BranchMapGroup(arg1:string,arg2:string):Promise<app.MapGroup>;
 
 export function BranchMergeState(arg1:string,arg2:string):Promise<git.BranchMerge>;
 
+export function BranchPatchBase(arg1:string,arg2:string,arg3:string):Promise<string>;
+
 export function BranchWebLinks(arg1:string,arg2:string,arg3:string):Promise<app.BranchWeb>;
 
 export function BuiltWith():Promise<app.BuiltWith>;
@@ -110,6 +112,8 @@ export function ConflictOrigin(arg1:string,arg2:string,arg3:string,arg4:number,a
 export function ConflictStop(arg1:string):Promise<app.ConflictStop>;
 
 export function ConflictSuggestions(arg1:string,arg2:string,arg3:Array<app.ConflictPlace>):Promise<app.ConflictReading>;
+
+export function CopyPatches(arg1:string,arg2:git.PatchRevs,arg3:git.PatchOptions):Promise<string>;
 
 export function DeletableBranches(arg1:string,arg2:Array<string>):Promise<Array<string>>;
 
@@ -273,6 +277,8 @@ export function OpenRepo(arg1:string):Promise<app.RepoTab>;
 
 export function OwnMoveAge(arg1:string):Promise<number>;
 
+export function PatchSeries(arg1:string,arg2:git.PatchRevs):Promise<app.PatchSeries>;
+
 export function People(arg1:string,arg2:app.PeopleRequest):Promise<app.PeopleList>;
 
 export function PeopleSuggestions(arg1:string,arg2:app.MailmapText):Promise<app.Suggestions>;
@@ -407,6 +413,8 @@ export function SaveLinkRule(arg1:string,arg2:links.Rule,arg3:string):Promise<vo
 
 export function SaveMailmap(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<void>;
 
+export function SavePatches(arg1:string,arg2:git.PatchRevs,arg3:git.PatchOptions,arg4:string,arg5:string,arg6:boolean):Promise<app.SavedPatches>;
+
 export function SearchGraph(arg1:string,arg2:string):Promise<graph.SearchResult>;
 
 export function SelectedCommits(arg1:string,arg2:Array<app.SelectionPick>):Promise<app.Selection>;
@@ -484,6 +492,8 @@ export function SetUpdateChecks(arg1:boolean):Promise<void>;
 export function SetWebLinks(arg1:string,arg2:boolean):Promise<void>;
 
 export function SetWorkTreeContent(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
+export function ShowFolder(arg1:string):Promise<void>;
 
 export function ShowRemoteFolder(arg1:string,arg2:string):Promise<void>;
 

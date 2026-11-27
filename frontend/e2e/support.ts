@@ -16,6 +16,8 @@ export interface Scenario {
   graphRows?: number
   /** The graph's rows as given, for a test about lanes; graphRows draws one straight lane. */
   graphData?: unknown[]
+  /** Where Save as patches starts (#1021). */
+  patchStart?: unknown
   /** The refs on each commit in the graph, by commit id. */
   graphRefs?: Record<string, unknown[]>
   selectedCommit?: string

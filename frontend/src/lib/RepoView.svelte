@@ -22,6 +22,7 @@
   import SelectionPanel from './SelectionPanel.svelte'
   import { selectionMenu, type SquashState } from './selectionMenu'
   import type { Selected } from './graph/selection'
+  import type { PatchStart } from './patches'
   import type { DiffTarget } from './diff/DiffView.svelte'
   import { ofCommits } from './diff/target'
   import Lazy from './ui/Lazy.svelte'
@@ -311,6 +312,8 @@
   let preview = $state<{ kind: 'merge' | 'rebase'; target: string; label: string } | null>(null)
   /** The ref whose reflog is open, or "" when closed. */
   let reflogRef = $state('')
+  /** Where Save as patches starts, while it's open (#1021). */
+  let patchesStart = $state<PatchStart | null>(null)
   const ctx: MenuContext = {
     get path() {
       return path
@@ -337,6 +340,7 @@
     },
     openPreview: (kind, target, label) => (preview = { kind, target, label }),
     openReflog: (ref) => (reflogRef = ref),
+    openPatches: (start) => (patchesStart = start),
   }
 
   provideCommands(() => [
@@ -678,6 +682,9 @@
 {/if}
 {#if preview}
   <Lazy load={() => import('./PreviewDialog.svelte')} {path} {...preview} current={ctx.current()} onClose={() => (preview = null)} onEdit={ctx.openRebase} />
+{/if}
+{#if patchesStart}
+  <Lazy load={() => import('./SavePatchesDialog.svelte')} {path} start={patchesStart} onClose={() => (patchesStart = null)} />
 {/if}
 {#if bisect.starting?.path === path}
   <Lazy load={() => import('./BisectDialog.svelte')} {path} bad={bisect.starting.bad} onClose={() => (bisect.starting = null)} />

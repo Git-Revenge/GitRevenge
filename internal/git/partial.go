@@ -242,7 +242,17 @@ func (r *Repo) blobsAt(ctx context.Context, rev string, paths map[string]bool) (
 // versionsAlong lists both sides of every change to paths (every path when nil) in a range's
 // commits, merges too.
 func (r *Repo) versionsAlong(ctx context.Context, revRange string, paths map[string]bool) ([]string, error) {
-	out, err := r.readCmd(ctx, Cmd{Args: []string{"log", "-m", "-z", "--format=", "--raw", "--no-abbrev", "--no-renames", revRange}, Env: noLazyFetch})
+	return r.versionsIn(ctx, []string{revRange}, paths)
+}
+
+// versionsOf lists both sides of every change in the commits revs name, as log takes them:
+// what their patches read (#1021).
+func (r *Repo) versionsOf(ctx context.Context, revs []string) ([]string, error) {
+	return r.versionsIn(ctx, revs, nil)
+}
+
+func (r *Repo) versionsIn(ctx context.Context, revs []string, paths map[string]bool) ([]string, error) {
+	out, err := r.readCmd(ctx, Cmd{Args: append([]string{"log", "-m", "-z", "--format=", "--raw", "--no-abbrev", "--no-renames"}, revs...), Env: noLazyFetch})
 	if err != nil {
 		return nil, err
 	}

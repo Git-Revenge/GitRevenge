@@ -97,7 +97,7 @@ test.describe('several commits selected', () => {
     await expect(panel(page).getByRole('button', { name: 'Squash into one…' })).toBeEnabled()
     await click(page, 2, [], 'right')
     const menu = page.getByRole('menu')
-    await expect(menu.getByRole('menuitem')).toHaveText(['Cherry-pick 3 onto main', 'Revert 3…', 'Squash into one…', 'Copy their ids'])
+    await expect(menu.getByRole('menuitem')).toHaveText(['Copy as patches', 'Save as patches…', 'Cherry-pick 3 onto main', 'Revert 3…', 'Squash into one…', 'Copy their ids'])
     await menu.getByRole('menuitem', { name: /^Cherry-pick 3 onto main/ }).click()
     await expect.poll(() => calls(page, 'Integrate')).toEqual([['/r', 'cherry-pick', [id(3), id(2), id(1)]]])
 

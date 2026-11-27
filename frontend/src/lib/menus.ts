@@ -10,6 +10,7 @@ import { toasts } from './toasts.svelte'
 import { BrowserOpenURL, ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
 import { remoteBranchHint, type RefExtras } from './branchWeb'
 import { linkStore } from './links/links.svelte'
+import { copyAsPatches, EDGE_REASON, type PatchStart } from './patches'
 
 /** What the menus need from the view that opens them. */
 export interface MenuContext {
@@ -30,6 +31,20 @@ export interface MenuContext {
   openBisect?: (bad: string) => void
   /** Opens the card about a commit's author; absent where there's no graph to put it by. */
   openAuthor?: (row: Row) => void
+  /** Opens Save as patches (#1021); absent where there's no dialog to open. */
+  openPatches?: (start: PatchStart) => void
+}
+
+/** Copy as a patch and Save as patches, up to here, for one commit (#1021). A merge offers
+ * neither: format-patch leaves merges out. A shallow clone's edge commit says why not. */
+function patchItems(row: Row, ctx: MenuContext): MenuItem[] {
+  if (row.parents > 1 || !ctx.openPatches) return []
+  const short = row.id.slice(0, 7)
+  const edge = row.edge ? { disabled: true, hint: EDGE_REASON } : {}
+  return [
+    { label: 'Copy as a patch', icon: 'copy', separator: true, ...edge, run: () => copyAsPatches(ctx.path, { since: '', tip: row.id, last: 1, ids: [] } as git.PatchRevs, short, ctx.openDialog) },
+    { label: 'Save as patches, up to here…', icon: 'file', ...edge, run: () => ctx.openPatches?.({ kind: 'commit', tip: row.id, subject: row.subject }) },
+  ]
 }
 
 /** Joins groups of items, drawing a rule between non-empty groups. */
@@ -379,6 +394,7 @@ export function refItems(ref: Ref, ctx: MenuContext, extras?: RefExtras): MenuIt
             },
           },
         ],
+        ctx.openPatches ? [{ label: `Save ${ref.short} as patches…`, icon: 'file', run: () => ctx.openPatches?.({ kind: 'branch', branch: ref.short, stackParent: ref.stackParent }) }] : [],
         // Restacking is for work still to land: a branch already merged only needs deleting.
         ref.stackParentMerged && !session.merged[path]?.[ref.short]
           ? [{ label: `Restack ${ref.short} (${ref.stackParent} was merged)`, icon: 'rebase', run: () => session.run(() => Restack(ctx.path, ref.short)) }]
@@ -511,6 +527,7 @@ export function commitItems(row: Row, refs: Ref[], ctx: MenuContext): MenuItem[]
       ? [{ label: `Interactive rebase ${ctx.current()} from here…`, icon: 'rebase' as const, run: () => ctx.openRebase(row.id) }]
       : []),
     ...(ctx.openBisect ? [{ label: 'Find what broke it, up to here…', icon: 'search' as const, run: () => ctx.openBisect?.(row.id) }] : []),
+    ...patchItems(row, ctx),
     {
       label: `Reset ${ctx.current() || 'HEAD'} to ${short}…`,
       icon: 'reset',
