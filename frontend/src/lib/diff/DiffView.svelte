@@ -373,19 +373,19 @@
           <button aria-pressed={readAs === 'code'} onclick={() => (readAs = 'code')} title="Compare the code: tokens, formatting and renames">Code</button>
           <button aria-pressed={readAs === 'lines'} onclick={() => (readAs = 'lines')} title="Compare whole lines, as git does">Lines</button>
         </span>
-        <button
-          class="switch"
-          role="switch"
-          aria-checked={hiding}
-          disabled={stages || diff.engine !== 'code'}
-          onclick={() => (hide = !hide)}
+        <!-- The app's switch (style.css): a checkbox, its track drawn after it (#1032). -->
+        <label
+          class="switch hide"
           title={stages
             ? 'Off while you stage: you see exactly what will be written'
             : diff.engine !== 'code'
               ? 'Lines show every change'
               : 'Hide changes that only touch whitespace, line breaks or how a value is written'}
-          ><span class="track" aria-hidden="true"><span class="knob"></span></span>Hide formatting{#if stages}<Icon name="lock" size={13} />{/if}</button
         >
+          <input type="checkbox" role="switch" checked={hiding} disabled={stages || diff.engine !== 'code'} onchange={() => (hide = !hide)} />
+          <span class="track" aria-hidden="true"></span>
+          Hide formatting{#if stages}<Icon name="lock" size={13} />{/if}
+        </label>
       {/if}
       <span class="segmented" role="group" aria-label="Diff layout">
         <button aria-pressed={layout === 'unified'} onclick={() => setLayout('unified')}>Unified</button>
@@ -714,50 +714,17 @@
     }
   }
 
-  .switch {
-    display: inline-flex;
-    align-items: center;
+  /* The app's switch, set in the toolbar's type; it draws itself (style.css). */
+  .hide {
     gap: 8px;
     padding: 4px 6px;
-    border: 0;
-    border-radius: 8px;
-    background: none;
-    color: var(--ink);
-    font: inherit;
     font-size: 13px;
-    cursor: pointer;
+    color: var(--ink);
   }
 
-  .switch:disabled {
+  .hide:has(input:disabled) {
     color: var(--ink-mute);
     cursor: default;
-  }
-
-  .track {
-    position: relative;
-    width: 30px;
-    height: 18px;
-    border-radius: 999px;
-    background: var(--paper-edge);
-  }
-
-  .knob {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: var(--paper);
-    transition: left 0.12s;
-  }
-
-  .switch[aria-checked='true'] .track {
-    background: var(--accent);
-  }
-
-  .switch[aria-checked='true'] .knob {
-    left: 14px;
   }
 
   .fallback {
