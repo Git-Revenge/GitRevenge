@@ -78,6 +78,9 @@ type App struct {
 	// historyChunkSize overrides historyChunk; tests set it, for searches that run long
 	// enough to stop.
 	historyChunkSize int
+	// historyCountHold, when set, holds a history search's count until it's closed or the
+	// search ends: tests use it to end a search before its count (#1052).
+	historyCountHold chan struct{}
 	// trailerPins keeps what each open repository's config says about its trailer keys.
 	trailerPins trailerPins
 	// trailerCares keeps the questions each open repository's trailers raise.

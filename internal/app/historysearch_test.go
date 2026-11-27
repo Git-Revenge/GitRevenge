@@ -76,6 +76,23 @@ func TestHistorySearchFiltersTheGraphToWhatItFinds(t *testing.T) {
 	}
 }
 
+// #1052: on a small history the search can end before the count beside it, and ending stops
+// the count. A search that went through everything still says how many there were.
+func TestAHistorySearchThatEndsFirstStillHasItsTotal(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	// The count never gets to run: the search always ends first.
+	a.historyCountHold = make(chan struct{})
+	_, path := unitsTab(t, a)
+	if _, err := a.SetHistorySearch(path, git.HistoryOptions{Text: "km/h"}); err != nil {
+		t.Fatal(err)
+	}
+	h := historyDone(t, a, path).History
+	if h.Searched != 6 || h.Total != 6 || h.Stopped {
+		t.Fatalf("done = %+v", h)
+	}
+}
+
 func TestHistorySearchAndATrailerMustBothHold(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
