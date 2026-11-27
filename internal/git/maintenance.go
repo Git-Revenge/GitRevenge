@@ -54,22 +54,25 @@ func (r *Repo) Storage(ctx context.Context) (Storage, error) {
 	}
 	for line := range strings.SplitSeq(out, "\n") {
 		key, val, _ := strings.Cut(strings.TrimSpace(line), ": ")
-		n, _ := strconv.ParseInt(strings.TrimSpace(val), 10, 64)
+		val = strings.TrimSpace(val)
+		// Counts are read as ints, sizes (in KiB) as 64-bit: no narrowing on the way.
+		count, _ := strconv.Atoi(val)
+		kib, _ := strconv.ParseInt(val, 10, 64)
 		switch key {
 		case "count":
-			s.Loose = int(n)
+			s.Loose = count
 		case "size":
-			s.LooseBytes = n * 1024
+			s.LooseBytes = kib * 1024
 		case "packs":
-			s.Packs = int(n)
+			s.Packs = count
 		case "size-pack":
-			s.PackBytes = n * 1024
+			s.PackBytes = kib * 1024
 		case "garbage":
-			s.Garbage = int(n)
+			s.Garbage = count
 		case "size-garbage":
-			s.GarbageBytes = n * 1024
+			s.GarbageBytes = kib * 1024
 		case "prune-packable":
-			s.PrunePackable = int(n)
+			s.PrunePackable = count
 		}
 	}
 	// One read for the thresholds and the schedule: keys come back in lower case.
