@@ -962,6 +962,10 @@ export function ShowingHidden(arg1) {
   return window['go']['app']['App']['ShowingHidden'](arg1);
 }
 
+export function SquashOffer(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SquashOffer'](arg1, arg2, arg3);
+}
+
 export function StackDeletePlan(arg1, arg2) {
   return window['go']['app']['App']['StackDeletePlan'](arg1, arg2);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actionForKey, autosquashOf, isCommitId, changed, foldable, foldIn, foldTarget, move, newPlan, outcome, problem, setAction, toRun } from './rebasePlan'
+import { actionForKey, autosquashOf, isCommitId, changed, foldable, foldIn, foldTarget, move, newPlan, outcome, presetSquash, problem, setAction, toRun } from './rebasePlan'
 
 const commit = (id: string, subject: string) => ({ commit: id.repeat(40), subject, message: subject })
 const plan = () =>
@@ -131,5 +131,38 @@ describe('isCommitId', () => {
     expect(isCommitId('A'.repeat(40))).toBe(false)
     expect(isCommitId('origin/main')).toBe(false)
     expect(isCommitId('v1.0.0')).toBe(false)
+  })
+})
+
+describe('a line selected in the graph, squashed into one (#1020)', () => {
+  it('folds the rest into the oldest, keeping their messages, and leaves the others kept', () => {
+    const items = presetSquash(plan(), ['b'.repeat(40), 'c'.repeat(40), 'd'.repeat(40)])
+    expect(items.map((it) => it.action)).toEqual(['pick', 'pick', 'squash', 'squash', 'pick'])
+    expect(items[2].message).toContain('wip')
+    expect(outcome(items).commits).toHaveLength(3)
+    expect(problem(items)).toBe('')
+  })
+
+  it('changes nothing for one commit, or commits the plan hasn’t got', () => {
+    expect(presetSquash(plan(), ['b'.repeat(40)]).map((it) => it.action)).toEqual(['pick', 'pick', 'pick', 'pick', 'pick'])
+    expect(presetSquash(plan(), ['z'.repeat(40)]).every((it) => it.action === 'pick')).toBe(true)
+  })
+})
+
+describe('squashes in a row', () => {
+  it('each starts from the message so far, so the last holds them all', () => {
+    let items = setAction(plan(), 1, 'squash')
+    items = setAction(items, 2, 'squash')
+    expect(items[2].message).toBe('Cache the last reading\n\nwip\n\nfixup! Cache the last reading')
+    // A fixup between keeps its message out, as git's does.
+    let fixed = setAction(plan(), 1, 'squash')
+    fixed = setAction(fixed, 2, 'fixup')
+    fixed = setAction(fixed, 3, 'squash')
+    expect(fixed[3].message).toBe('Cache the last reading\n\nwip\n\nFall back to the cached reading')
+  })
+
+  it('a line squashed from the graph keeps every message', () => {
+    const items = presetSquash(plan(), ['b'.repeat(40), 'c'.repeat(40), 'd'.repeat(40)])
+    expect(items[3].message).toBe('wip\n\nfixup! Cache the last reading\n\nFall back to the cached reading')
   })
 })

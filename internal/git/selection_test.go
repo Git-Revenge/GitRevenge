@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/git-revenge/gitrevenge/internal/gittest"
@@ -121,5 +122,30 @@ func TestDiverged(t *testing.T) {
 	onlySide, onlyMain, err := repo.Diverged(context.Background(), side, main)
 	if err != nil || onlySide != 1 || onlyMain != 2 {
 		t.Fatalf("diverged = %d, %d, %v; want 1, 2", onlySide, onlyMain, err)
+	}
+}
+
+func TestBranchesContainingAndIsAncestor(t *testing.T) {
+	t.Parallel()
+	local, _ := gittest.WithRemote(t, 2)
+	first := local.Git("rev-list", "--max-parents=0", "HEAD")
+	local.Git("checkout", "-q", "-b", "side")
+	side := local.CommitFile("s.txt", "s\n", "side")
+	repo := OpenRepo(newTestRunner(t), local.Dir)
+	ctx := context.Background()
+
+	all, err := repo.BranchesContaining(ctx, first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(all, "side") || !slices.Contains(all, "origin/main") || slices.ContainsFunc(all, func(n string) bool { return n == "origin" || strings.HasSuffix(n, "/HEAD") }) {
+		t.Fatalf("branches holding the first commit = %v", all)
+	}
+	only, err := repo.BranchesContaining(ctx, side)
+	if err != nil || !slices.Equal(only, []string{"side"}) {
+		t.Fatalf("branches holding side's commit = %v, %v", only, err)
+	}
+	if !repo.IsAncestor(ctx, first, side) || repo.IsAncestor(ctx, side, first) || repo.IsAncestor(ctx, "--all", side) {
+		t.Fatal("IsAncestor got the order wrong, or took an option")
 	}
 }

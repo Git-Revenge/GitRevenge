@@ -251,3 +251,44 @@ func (a *App) CommitRows(path string, ids []string) ([]int, error) {
 	}
 	return out, nil
 }
+
+// SquashOffer says whether a line of commits, oldest to newest, can be squashed into one by an
+// interactive rebase of the checked-out branch (#1020), and why not when it can't.
+type SquashOffer struct {
+	OK bool `json:"ok"`
+	// Reason says why not, such as "Only for one line on main." or "c0e582a is on
+	// origin/knots too."
+	Reason string `json:"reason,omitempty"`
+}
+
+// SquashOffer checks a line of commits for Squash into one. They must be in the checked-out
+// branch's history, and on no other branch or remote branch: rewriting commits that are
+// somewhere else too would leave two copies of them. A branch holding any of the line holds
+// its oldest, so the oldest is the one asked about.
+func (a *App) SquashOffer(path, oldest, newest string) (SquashOffer, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return SquashOffer{}, err
+	}
+	ctx := context.Background()
+	head := r.Git.Head(ctx)
+	if head.Branch == "" {
+		return SquashOffer{Reason: "HEAD is detached: check out a branch to squash on."}, nil
+	}
+	if !r.Git.IsAncestor(ctx, newest, "HEAD") {
+		return SquashOffer{Reason: "Only for one line on " + head.Branch + "."}, nil
+	}
+	held, err := r.Git.BranchesContaining(ctx, oldest)
+	if err != nil {
+		return SquashOffer{}, writeErr(err)
+	}
+	others := slices.DeleteFunc(held, func(name string) bool { return name == head.Branch })
+	if len(others) == 0 {
+		return SquashOffer{OK: true}, nil
+	}
+	where := others[0]
+	if len(others) > 1 {
+		where += " and " + strconv.Itoa(len(others)-1) + " more"
+	}
+	return SquashOffer{Reason: shortRef(oldest) + " is on " + where + " too."}, nil
+}

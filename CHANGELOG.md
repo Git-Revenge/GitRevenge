@@ -59,6 +59,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
   - **Two commits:** the panel shows their difference, from the older one's files to the newer one's as `git diff A B` does, with how they stand to each other ("c0e582a is 3 commits after df840f3") and **Swap sides**.
   - **A line of three or more,** each the parent of the next: the panel shows them **all together**, one diff from before the oldest to the newest, which is what squashing them would make. A line that starts at the first commit, or at a shallow clone's edge, shows its files as added.
   - **The diff view:** each file opens there as one commit's file against the other's, with the code read, moves found and pictures shown as in any diff, and the two commits named beside the file. In a partial clone the names come at once and the line counts download by themselves, with Stop.
+- **Squash into one…** for a line of commits selected in the graph, from the selection's menu or the panel beside it. It opens the interactive rebase editor from the oldest one's parent, with the line marked to squash into its oldest and the commits after it kept, so you see the plan and the combined message before anything runs. It's offered for a line on the branch you're on, none of it on another branch or a remote branch; otherwise it says why, such as "c0e582a is on origin/main too." (#1020)
 
 ### Changed
 
@@ -73,6 +74,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Fixed
 
+- In the interactive rebase editor, two or more commits squashed in a row into the same commit lost the messages between the first and the last: each squash started from the kept commit's message rather than the message so far. Now each starts from the message so far, so the commit keeps them all, as git's own does. (#1020)
 - The conflict tool lost every place's original in a file where git had joined two conflicts a line or two apart into one, as git's default conflict style does: **Three-way** was off, and the file had no suggestions while the operation strip counted some. The tool now works from git's merge with the originals kept whenever the file on disk is still the same merge, so the places come apart again, each with its original. (#974)
 
 ## [1.1.0] - 2026-11-22

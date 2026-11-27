@@ -49,9 +49,21 @@ export function setAction(items: PlanItem[], i: number, action: Action): PlanIte
   if (!it || it.action === action) return out
   it.action = action
   const into = foldTarget(out, i)
-  // A squash starts from both messages, as git's does; anything else from the commit's own.
-  it.message = action === 'squash' && into >= 0 ? `${out[into].message.trim()}\n\n${it.original.trim()}` : it.original
+  // A squash starts from the message the commit it folds into has by then, as git's does:
+  // after another squash into the same commit, that one's, which holds every message so far.
+  // Anything else starts from the commit's own.
+  const sofar = into >= 0 ? (out.slice(into + 1, i).findLast((x) => x.action === 'squash') ?? out[into]).message : ''
+  it.message = action === 'squash' && into >= 0 ? `${sofar.trim()}\n\n${it.original.trim()}` : it.original
   return out
+}
+
+/** The plan with these commits squashed into the oldest of them (#1020): a line of commits
+ * selected in the graph and squashed into one. The oldest stays kept; the rest fold into it
+ * in turn, keeping their messages; commits not named stay as they are. */
+export function presetSquash(items: PlanItem[], commits: readonly string[]): PlanItem[] {
+  const wanted = new Set(commits)
+  const at = items.flatMap((it, i) => (wanted.has(it.commit) ? [i] : []))
+  return at.slice(1).reduce((out, i) => setAction(out, i, 'squash'), items)
 }
 
 /** Moves the commit at from to sit at to. */

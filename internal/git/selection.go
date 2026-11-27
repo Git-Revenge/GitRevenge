@@ -72,3 +72,38 @@ func (r *Repo) FilesByCommit(ctx context.Context, commits []string) (map[string]
 	}
 	return out, nil
 }
+
+// IsAncestor reports whether a is an ancestor of b, or the same commit.
+func (r *Repo) IsAncestor(ctx context.Context, a, b string) bool {
+	if CheckRevs(a, b) != nil {
+		return false
+	}
+	return r.isAncestor(ctx, a, b)
+}
+
+// BranchesContaining lists the branches and remote branches whose history holds commit, by
+// short name (main, origin/main), leaving out a remote's HEAD, which only names another of
+// them: `for-each-ref --contains`.
+func (r *Repo) BranchesContaining(ctx context.Context, commit string) ([]string, error) {
+	if err := CheckRevs(commit); err != nil {
+		return nil, err
+	}
+	out, err := r.ReadString(ctx, "for-each-ref", "--contains", commit, "--format=%(refname)", "refs/heads/", "refs/remotes/")
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for ref := range strings.SplitSeq(out, "\n") {
+		ref = strings.TrimSpace(ref)
+		// A remote's HEAD shortens to the remote's own name, so it's left out by its full one.
+		if ref == "" || strings.HasPrefix(ref, "refs/remotes/") && strings.HasSuffix(ref, "/HEAD") {
+			continue
+		}
+		if name, ok := strings.CutPrefix(ref, "refs/heads/"); ok {
+			names = append(names, name)
+		} else {
+			names = append(names, strings.TrimPrefix(ref, "refs/remotes/"))
+		}
+	}
+	return names, nil
+}

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import { CarryOnHistorySearch, CloneShape, CommitRow, SetHistorySearch, SetTrailerFilter, SetTrailerPin, StopHistorySearch, TrailerFilter, TrailerFilterRows, TrailerFilterStep, TrailerPins } from '../../wailsjs/go/app/App.js'
+  import { CarryOnHistorySearch, CloneShape, CommitRow, SetHistorySearch, SquashOffer, SetTrailerFilter, SetTrailerPin, StopHistorySearch, TrailerFilter, TrailerFilterRows, TrailerFilterStep, TrailerPins } from '../../wailsjs/go/app/App.js'
   import ShallowBand from './ShallowBand.svelte'
   import type { app } from '../../wailsjs/go/models'
   import { onBackend } from './events'
@@ -20,7 +20,7 @@
   import { commitMenuItems, branchAtDialog, checkoutRef, dropItems, newBranchDialog, refItems, stackItems, type MenuContext } from './menus'
   import CommitPanel from './CommitPanel.svelte'
   import SelectionPanel from './SelectionPanel.svelte'
-  import { selectionMenu } from './selectionMenu'
+  import { selectionMenu, type SquashState } from './selectionMenu'
   import type { Selected } from './graph/selection'
   import type { DiffTarget } from './diff/DiffView.svelte'
   import { ofCommits } from './diff/target'
@@ -82,6 +82,22 @@
   let selected = $state<Row | undefined>()
   /** Several commits selected in the graph (#1018), or null while one is. */
   let several = $state<Selected | null>(null)
+  /** Whether the selected line can be squashed into one (#1020): asked once it's known to be
+   * a line. */
+  let squashState = $state<SquashState | undefined>()
+  $effect(() => {
+    const info = several?.info
+    squashState = undefined
+    if (!info?.line || !info.base || !ctx.current()) return
+    squashState = 'checking'
+    void SquashOffer(path, info.ids[0], info.ids[info.ids.length - 1])
+      .then((o) => {
+        if (several?.info === info) squashState = o
+      })
+      .catch(() => {
+        if (several?.info === info) squashState = { ok: false, reason: 'Couldn’t tell whether they can be squashed.' }
+      })
+  })
   /** Which panel is on the right: uncommitted changes, or the selected commit. */
   let view = $state<'wip' | 'commit'>('commit')
   /** Files with uncommitted changes; null until the first answer, so nothing claims "clean". */
@@ -290,6 +306,8 @@
   let worktreesOpen = $state(false)
   /** Commit after which the interactive rebase editor rewrites history, or "" when closed. */
   let rebaseBase = $state('')
+  /** Commits the editor starts with squashed into the oldest of them (#1020). */
+  let rebaseSquash = $state<string[]>([])
   let preview = $state<{ kind: 'merge' | 'rebase'; target: string; label: string } | null>(null)
   /** The ref whose reflog is open, or "" when closed. */
   let reflogRef = $state('')
@@ -312,9 +330,10 @@
             bisect.starting = { path, bad }
           }
     },
-    openRebase: (base) => {
+    openRebase: (base, squash = []) => {
       diff = null
       rebaseBase = base
+      rebaseSquash = squash
     },
     openPreview: (kind, target, label) => (preview = { kind, target, label }),
     openReflog: (ref) => (reflogRef = ref),
@@ -527,7 +546,7 @@
       <ShallowBand {path} since={shallowSince} />
     {/snippet}
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} tail={shallowSince ? shallowTail : undefined} historySince={shallowSince} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filterOn} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFindInFiles={(text) => findAsk.show(path, text)} onHistorySearch={(text) => setHistory(historyOptions(text))} history={historyOn} onFilterDrop={dropLastFilter} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onSelection={(s) => (several = s)} onSelectionMenu={(x, y) => openMenu(selectionMenu(several?.count ?? 0, several?.info ?? null, ctx), x, y)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} tail={shallowSince ? shallowTail : undefined} historySince={shallowSince} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filterOn} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFindInFiles={(text) => findAsk.show(path, text)} onHistorySearch={(text) => setHistory(historyOptions(text))} history={historyOn} onFilterDrop={dropLastFilter} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onSelection={(s) => (several = s)} onSelectionMenu={(x, y) => openMenu(selectionMenu(several?.count ?? 0, several?.info ?? null, ctx, squashState), x, y)} onContext={(row, refs, x, y) =>
           void whileBusy(loadRefExtras(path, refs)).then((e) => openMenu(commitMenuItems(row, refs, ctx, e), x, y))}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
@@ -561,7 +580,7 @@
     </div>
     {#if rebaseBase}
       <div class="graph">
-        <Lazy load={() => import('./RebaseEditor.svelte')} {path} base={rebaseBase} onClose={() => (rebaseBase = '')} />
+        <Lazy load={() => import('./RebaseEditor.svelte')} {path} base={rebaseBase} squash={rebaseSquash} onClose={() => (rebaseBase = '')} />
       </div>
     {:else if diff}
       <div class="graph">
@@ -630,7 +649,7 @@
       onRevert={revertFound}
     />
   {:else if several}
-    <SelectionPanel {path} selected={several} {ctx} onUnpick={(row) => graph.unpick(row)} onShow={(row) => graph.reveal(row)} openFile={(t) => (diff = t)} />
+    <SelectionPanel {path} selected={several} {ctx} squash={squashState} onUnpick={(row) => graph.unpick(row)} onShow={(row) => graph.reveal(row)} openFile={(t) => (diff = t)} />
   {:else if selected}
     <CommitPanel {path} onMenu={openMenu} showNotes={noteAsk} {filterSig} {pinnedKeys} onPin={setPin} history={historyOn} commitId={selected.id} refs={selectedRefs} current={diff} openFile={(t) => (diff = t)} onSearch={(q) => graph?.search(q)} onAuthor={(sha, name, from) => {
         const at = from.getBoundingClientRect()

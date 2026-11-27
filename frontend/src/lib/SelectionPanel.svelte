@@ -4,7 +4,7 @@
   import type { DiffTarget } from './diff/DiffView.svelte'
   import type { Selected } from './graph/selection'
   import type { MenuContext } from './menus'
-  import { commitCount, selectionActions } from './selectionMenu'
+  import { commitCount, selectionActions, type SquashState } from './selectionMenu'
   import ComparisonFiles from './ComparisonFiles.svelte'
   import Icon from './ui/Icon.svelte'
   import Loading from './ui/Loading.svelte'
@@ -19,10 +19,13 @@
     onUnpick,
     onShow,
     openFile,
+    squash,
   }: {
     path: string
     selected: Selected
     ctx: MenuContext
+    /** Whether a line can be squashed into one (#1020), once asked. */
+    squash?: SquashState
     /** Takes a commit out of the selection, by its graph row. */
     onUnpick: (row: number) => void
     /** Shows one commit alone, by its graph row. */
@@ -69,7 +72,7 @@
   })
 
   let subjects = $derived(new Map((info?.commits ?? []).map((c) => [c.id, c])))
-  let actions = $derived(info ? selectionActions(info, ctx) : [])
+  let actions = $derived(info ? selectionActions(info, ctx, squash) : [])
   let shownFiles = $derived(files ? (allFiles ? files.files : files.files.slice(0, FIRST_FILES)) : [])
 
   const short = (id: string) => id.slice(0, 7)

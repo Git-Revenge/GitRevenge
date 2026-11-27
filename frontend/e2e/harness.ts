@@ -161,6 +161,7 @@ const behaviours: Record<string, (...args: never[]) => unknown> = {
   },
   SelectionFiles: (_path: string, ids: string[]) => ('SelectionFiles' in responses ? responses.SelectionFiles : { files: [], total: 0, read: ids.length }),
   CompareCommits: () => ('CompareCommits' in responses ? responses.CompareCommits : { files: [], onlyFrom: 0, onlyTo: 0 }),
+  SquashOffer: () => ('SquashOffer' in responses ? responses.SquashOffer : { ok: true }),
   // The stub's commits are numbered, so a commit's row is its number.
   CommitRows: (_path: string, ids: string[]) => {
     if ('CommitRows' in responses) return responses.CommitRows
