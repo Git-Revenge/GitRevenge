@@ -4295,6 +4295,38 @@ export namespace git {
 	        this.removed = source["removed"];
 	    }
 	}
+	export class DiffTool {
+	    name: string;
+	    key: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DiffTool(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.key = source["key"];
+	    }
+	}
+	export class DiffToolTarget {
+	    mode: string;
+	    file: string;
+	    oldPath: string;
+	    commit: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DiffToolTarget(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mode = source["mode"];
+	        this.file = source["file"];
+	        this.oldPath = source["oldPath"];
+	        this.commit = source["commit"];
+	    }
+	}
 	export class FetchRules {
 	    skipFetchAll: boolean;
 	    prune: boolean;

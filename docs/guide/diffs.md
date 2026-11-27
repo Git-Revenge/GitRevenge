@@ -26,6 +26,10 @@ A row above the diff counts the lines added and removed and the moves; read as c
 
 Code is syntax highlighted. Images (PNG, JPEG, GIF, WebP, AVIF, BMP, ICO and SVG) are shown as pictures and compared side by side, fitted to the view or at actual size. <kbd>Alt</kbd>+<kbd>Z</kbd> turns word wrap on and off. Press <kbd>Escape</kbd> to go back to the graph.
 
+### In your own diff tool
+
+When your git config names a diff tool, **Open in** *the tool*, such as **Open in meld**, opens the diff on screen in it with `git difftool`. It's at the top of the diff view, on a changed file's menu in the working tree, and on a file's menu in a commit's file list. It opens whichever comparison you're looking at: unstaged changes, staged changes (a file with both offers each), a commit against its first parent, or two commits compared. The tool is the one git difftool would use: `diff.guitool` if it's set, else `diff.tool`, else `merge.tool`. The button's tooltip says which key named it, and a change to your git config shows straight away. A new file, a conflict or a file's history isn't a diff git difftool opens, so they have no **Open in**. For conflicts, the [conflict tool](conflicts.md) opens your merge tool instead.
+
 ## Lines and words
 
 Every diff starts from lines, matched up as git does: by the `diff.algorithm` in your git config (Myers when it says nothing), unless you pick Myers, Minimal, Patience or Histogram in [Settings](settings.md). Inside a changed line, the words that changed are marked, so a renamed variable doesn't read as a rewritten line.

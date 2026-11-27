@@ -266,8 +266,7 @@
     margin: 0;
   }
 
-  .line input,
-  .row input {
+  .line input {
     font-size: 13px;
     font-family: var(--font-mono);
     padding: 4px 7px;
@@ -285,11 +284,6 @@
   .row {
     display: flex;
     gap: 6px;
-  }
-
-  .row input {
-    flex: 1;
-    min-width: 0;
   }
 
   .example {
