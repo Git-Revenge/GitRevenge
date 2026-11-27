@@ -55,6 +55,7 @@
   import { appendTrailer, asPerson, trailerKeyChoices } from './trailers'
   import { session } from './session.svelte'
   import { toasts } from './toasts.svelte'
+  import { diffTools, diffToolItems } from './difftool.svelte'
   import { ignoreRules } from './ignorerules/ignoreRules.svelte'
   import Icon, { type IconName } from './ui/Icon.svelte'
   import InkButton from './ui/InkButton.svelte'
@@ -381,9 +382,17 @@
     if (!onMenu) return
     e.preventDefault()
     const name = fileName(f.path)
+    // In the diff tool (#939): a new file has nothing to compare it with yet, and a file
+    // with changes both staged and not says which it opens.
+    const tool = diffTools.of(path)?.name ?? ''
+    const unstaged = isUnstaged(f) && !f.untracked && !f.conflicted
+    const staged = isStaged(f) && !f.conflicted
+    const both = unstaged && staged
     const items: MenuItem[] = [
       ...(isUnstaged(f) ? [{ label: `Stage ${name}`, icon: 'plus' as const, run: () => stage([f.path]) }] : []),
       ...(isStaged(f) ? [{ label: `Unstage ${name}`, icon: 'minus' as const, run: () => unstage([f.path]) }] : []),
+      ...(unstaged ? diffToolItems(path, { mode: 'unstaged', file: f.path }, both ? `Open the unstaged changes in ${tool}` : undefined) : []),
+      ...(staged ? diffToolItems(path, { mode: 'staged', file: f.path, oldPath: f.origPath }, both ? `Open the staged changes in ${tool}` : undefined) : []),
       { label: 'Copy path', icon: 'copy', run: () => copyPath(f.path) },
       { label: 'Ignore', icon: 'eye', separator: true, items: ignoreItems(f) },
       ...(isUnstaged(f) ? [{ label: f.untracked ? `Delete ${name}…` : `Discard changes to ${name}…`, icon: 'undo' as const, separator: true, run: () => void (confirmDiscard = [f.path]) }] : []),

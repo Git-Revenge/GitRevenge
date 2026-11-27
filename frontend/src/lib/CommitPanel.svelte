@@ -18,6 +18,7 @@
   import { TWO_COLUMNS } from './rightPanel'
   import { formatTime, type RefLabel } from './graph/draw'
   import { afterSaid, firstInSaid } from './describe'
+  import { diffToolItems } from './difftool.svelte'
   import RefChip from './graph/RefChip.svelte'
   import type { DiffTarget } from './diff/DiffView.svelte'
   import { session } from './session.svelte'
@@ -430,6 +431,20 @@
     openFile({ mode: 'commit', commit: commitId, file: f.path, oldPath: f.oldPath, find: historyFind })
   }
 
+  /** A changed file's menu (#939): its change in the diff tool, when one is set, and its path. */
+  function fileMenu(e: MouseEvent, f: git.FileChange) {
+    if (!onMenu) return
+    e.preventDefault()
+    onMenu(
+      [
+        ...diffToolItems(path, { mode: 'commit', commit: commitId, file: f.path, oldPath: f.oldPath }),
+        { label: 'Copy path', icon: 'copy', run: () => void ClipboardSetText(f.path).catch(() => false) },
+      ],
+      e.clientX,
+      e.clientY,
+    )
+  }
+
   // The files where the history search's text changed in this commit, and by how much.
   // The answer is kept with the commit and search it's for, so another commit's list never
   // shows while this one's is asked for.
@@ -569,6 +584,7 @@
               data-file-row
               class:active={current?.mode === 'commit' && current.commit === commitId && current.file === f.path}
               onclick={() => showFile(f)}
+              oncontextmenu={(e) => fileMenu(e, f)}
               title={f.oldPath ? `${f.oldPath} → ${f.path}` : f.path}
             >
               <span class="code s-{STATUS_KINDS[f.status] ?? 'modified'}" title={statusNames[f.status] ?? f.status}><Icon name={STATUS_ICONS[f.status] ?? 'st-modified'} size={14} /><span class="visually-hidden">{statusNames[f.status] ?? f.status}</span></span>

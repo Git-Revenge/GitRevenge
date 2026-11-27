@@ -29,6 +29,7 @@
   import type { DiffTarget } from './diff/DiffView.svelte'
   import { ofCommits } from './diff/target'
   import Lazy from './ui/Lazy.svelte'
+  import { diffTools } from './difftool.svelte'
   import { findAsk } from './find/findAsk.svelte'
   import GraphView from './graph/GraphView.svelte'
   import type { RefLabel } from './graph/draw'
@@ -319,6 +320,8 @@
   let patchesStart = $state<PatchStart | null>(null)
   /** What Save as an archive is saving, while it's open (#936). */
   let archiving = $state<{ rev: string; label: string } | null>(null)
+  // Which diff tool this repository opens, read before a menu needs it (#939).
+  $effect(() => void diffTools.of(path))
   /** A file of patches being previewed to apply (#1022), or a plain diff (#1024). */
   let patchFile = $state<app.PatchFile | null>(null)
   /** Two versions of a branch compared (#1038), in the panel on the right; and the branch the

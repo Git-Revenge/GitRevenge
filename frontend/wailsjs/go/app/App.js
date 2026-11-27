@@ -266,6 +266,10 @@ export function DescribeCommit(arg1, arg2) {
   return window['go']['app']['App']['DescribeCommit'](arg1, arg2);
 }
 
+export function DiffTool(arg1) {
+  return window['go']['app']['App']['DiffTool'](arg1);
+}
+
 export function DiscardFiles(arg1, arg2) {
   return window['go']['app']['App']['DiscardFiles'](arg1, arg2);
 }
@@ -556,6 +560,10 @@ export function MergedBranches(arg1) {
 
 export function NotedCommits(arg1) {
   return window['go']['app']['App']['NotedCommits'](arg1);
+}
+
+export function OpenDiffTool(arg1, arg2) {
+  return window['go']['app']['App']['OpenDiffTool'](arg1, arg2);
 }
 
 export function OpenGitConfig(arg1) {

@@ -141,6 +141,8 @@ export function DeleteStack(arg1:string,arg2:string,arg3:Array<string>,arg4:bool
 
 export function DescribeCommit(arg1:string,arg2:string):Promise<git.Described>;
 
+export function DiffTool(arg1:string):Promise<git.DiffTool>;
+
 export function DiscardFiles(arg1:string,arg2:Array<string>):Promise<void>;
 
 export function DownloadFiles(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
@@ -286,6 +288,8 @@ export function MarkBranchKind(arg1:string,arg2:string,arg3:string):Promise<void
 export function MergedBranches(arg1:string):Promise<Record<string, string>>;
 
 export function NotedCommits(arg1:string):Promise<Array<string>>;
+
+export function OpenDiffTool(arg1:string,arg2:git.DiffToolTarget):Promise<void>;
 
 export function OpenGitConfig(arg1:string):Promise<app.ConfigDoc>;
 

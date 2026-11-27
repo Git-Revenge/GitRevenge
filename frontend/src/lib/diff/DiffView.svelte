@@ -28,6 +28,7 @@
   import { formatShortcut, provideCommands } from '../commands.svelte'
   import { session } from '../session.svelte'
   import Icon from '../ui/Icon.svelte'
+  import { diffTools, openInDiffTool, toolTarget } from '../difftool.svelte'
   import FileView from './FileView.svelte'
   import ImageDiff from './ImageDiff.svelte'
   import MoveCompare from './MoveCompare.svelte'
@@ -49,6 +50,8 @@
     /** Opens another view of the same file (history or blame). */
     onOpen?: (t: DiffTarget) => void
   } = $props()
+  /** The diff tool git difftool opens here, or null: Open in it shows only with one (#939). */
+  let tool = $derived(diffTools.of(path))
 
   provideCommands(() =>
     contents?.kind === 'text'
@@ -362,6 +365,11 @@
         onclick={() =>
           onOpen({ mode: 'blame', file: target.file, commit: newSideCommit(target) })}
         >Blame</button
+      >
+    {/if}
+    {#if tool && toolTarget(target)}
+      <button class="btn quiet" onclick={() => void openInDiffTool(path, toolTarget(target)!)} title="Opens it with git difftool, in the tool {tool.key} names"
+        ><Icon name="external" />Open in {tool.name}</button
       >
     {/if}
     {#if contents?.kind === 'text'}
