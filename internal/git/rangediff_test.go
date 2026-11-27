@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -180,5 +181,34 @@ func TestRangeCountLeavesMergesOut(t *testing.T) {
 	commits, merges, err := repo.RangeCount(context.Background(), RangeSide{Base: base, Tip: fx.Head()})
 	if err != nil || commits != 2 || merges != 1 {
 		t.Fatalf("commits %d, merges %d, %v", commits, merges, err)
+	}
+}
+
+func TestRangeAtEdgeInAShallowClone(t *testing.T) {
+	t.Parallel()
+	src := gittest.New(t)
+	src.Linear(2)
+	src.Branch("side")
+	src.CommitFile("side.txt", "side\n", "side work")
+	src.Checkout("main")
+	src.Linear(2)
+	dest := t.TempDir()
+	src.Git("clone", "-q", "--depth", "2", "--no-single-branch", "file://"+filepath.ToSlash(src.Dir), dest)
+	repo := OpenRepo(newTestRunner(t), dest)
+	ctx := context.Background()
+	// main's two commits since side left it: the older is where this clone's history stops.
+	at, err := repo.RangeAtEdge(ctx, RangeSide{Base: "origin/side", Tip: "origin/main"})
+	if err != nil || !at {
+		t.Fatalf("at edge = %v, %v", at, err)
+	}
+	// main's newest alone isn't.
+	at, err = repo.RangeAtEdge(ctx, RangeSide{Base: "origin/main~1", Tip: "origin/main"})
+	if err != nil || at {
+		t.Fatalf("newest alone at edge = %v, %v", at, err)
+	}
+	// A whole clone has no edge.
+	whole := OpenRepo(newTestRunner(t), src.Dir)
+	if at, err := whole.RangeAtEdge(ctx, RangeSide{Base: "side", Tip: "main"}); err != nil || at {
+		t.Fatalf("whole clone at edge = %v, %v", at, err)
 	}
 }

@@ -121,7 +121,7 @@
     busy = true
     error = ''
     try {
-      const got = await CompareVersions(path, { base: oldSince.trim(), tip: oldTip.trim() }, { base: newSince.trim(), tip: newTip.trim() }, false)
+      const got = await CompareVersions(path, { base: oldSince.trim(), tip: oldTip.trim() }, { base: newSince.trim(), tip: newTip.trim() }, false, false)
       const picked = choices.find((c) => c.value === oldTip)
       onCompared(got, picked?.said ?? short(oldTip))
     } catch (e) {

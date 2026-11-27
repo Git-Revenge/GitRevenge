@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ago, earlierTips, isSame, kindOf, mergesNote, noteOf, placesOf, summaryOf, tipLabel } from './versions'
+import { ago, earlierTips, isSame, kindOf, looseOffer, mergesNote, nothingChanged, noteOf, placesOf, summaryOf, tipLabel, tooBigSaid } from './versions'
 
 const pair = (over: object = {}) => ({ old: 1, new: 1, kind: 'same', subject: 'Cache the last reading', oldSubject: '', into: 0, moved: false, newId: 'b'.repeat(40), ...over })
 
@@ -93,5 +93,28 @@ describe('earlierTips', () => {
     expect(earlierTips([at('b', 'commit: two', 2), at('a', 'commit: one', 1)])).toEqual([])
     expect(earlierTips([at('a', 'reset: moving to a', 3), at('a', 'commit: one', 2)])).toEqual([])
     expect(earlierTips([])).toEqual([])
+  })
+})
+
+describe('the edges', () => {
+  const c = (pairs: object[], more: object = {}) => ({ pairs: pairs as never[], old: { tip: 'a' }, new: { tip: 'b' }, loose: false, ...more })
+
+  it('offers matching more loosely when a commit was dropped and one is new', () => {
+    expect(looseOffer(c([{ kind: 'dropped' }, { kind: 'new' }]))).toBe('1 dropped and 1 new, which may be one commit reworked a lot.')
+    expect(looseOffer(c([{ kind: 'dropped' }, { kind: 'dropped' }, { kind: 'new' }]))).toBe('2 dropped and 1 new, which may be commits reworked a lot.')
+    expect(looseOffer(c([{ kind: 'dropped' }]))).toBe('')
+    expect(looseOffer(c([{ kind: 'dropped' }, { kind: 'new' }], { loose: true }))).toBe('')
+  })
+
+  it('says when nothing changed but the ids', () => {
+    expect(nothingChanged(c([{ kind: 'same' }, { kind: 'same' }]))).toBe('All 2 commits are the same in both versions: only their ids changed.')
+    expect(nothingChanged(c([{ kind: 'same' }, { kind: 'same', moved: true }]))).toBe('')
+    expect(nothingChanged(c([{ kind: 'same' }, { kind: 'around' }]))).toBe('')
+    expect(nothingChanged(c([], { old: { tip: 'a' }, new: { tip: 'a' } }))).toBe('Both versions are the same commit, so nothing changed.')
+  })
+
+  it('asks before comparing a big version', () => {
+    expect(tooBigSaid(1240, 3)).toBe('The old version has 1,240 commits. Compare them anyway?')
+    expect(tooBigSaid(3, 700)).toBe('The new version has 700 commits. Compare them anyway?')
   })
 })

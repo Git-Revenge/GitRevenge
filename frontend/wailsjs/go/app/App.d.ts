@@ -111,7 +111,7 @@ export function CommitSignatures(arg1:string,arg2:Array<string>):Promise<Array<g
 
 export function CompareCommits(arg1:string,arg2:string,arg3:string):Promise<app.Comparison>;
 
-export function CompareVersions(arg1:string,arg2:git.RangeSide,arg3:git.RangeSide,arg4:boolean):Promise<app.VersionsCompared>;
+export function CompareVersions(arg1:string,arg2:git.RangeSide,arg3:git.RangeSide,arg4:boolean,arg5:boolean):Promise<app.VersionsCompared>;
 
 export function ConflictContext(arg1:string):Promise<app.ConflictContext>;
 

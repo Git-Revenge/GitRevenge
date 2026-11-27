@@ -60,7 +60,7 @@ func TestCompareVersionsAfterARebase(t *testing.T) {
 		t.Fatalf("old count = %+v, %v", n, err)
 	}
 
-	got, err := a.CompareVersions(path, git.RangeSide{Base: oldBase, Tip: before}, git.RangeSide{Base: newBase, Tip: "topic"}, false)
+	got, err := a.CompareVersions(path, git.RangeSide{Base: oldBase, Tip: before}, git.RangeSide{Base: newBase, Tip: "topic"}, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestCompareVersionsSaysWhatIsntThere(t *testing.T) {
 	a := newTestApp(t)
 	fx, before := rebasedRepo(t)
 	path := openForMap(t, a, fx)
-	_, err := a.CompareVersions(path, git.RangeSide{Base: "main", Tip: "nowhere"}, git.RangeSide{Base: "main", Tip: "topic"}, false)
+	_, err := a.CompareVersions(path, git.RangeSide{Base: "main", Tip: "nowhere"}, git.RangeSide{Base: "main", Tip: "topic"}, false, false)
 	if err == nil || !strings.Contains(err.Error(), "“nowhere” isn't a branch, tag or commit here") {
 		t.Fatalf("err = %v", err)
 	}
@@ -109,5 +109,69 @@ func TestVersionBaseWithoutABase(t *testing.T) {
 	base, err := a.VersionBase(path, "topic", "", "topic")
 	if err != nil || base != "" {
 		t.Fatalf("base = %q, %v", base, err)
+	}
+}
+
+func TestCompareVersionsAsksFirstWhenBig(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	a.versionCap = 2
+	fx, before := rebasedRepo(t)
+	path := openForMap(t, a, fx)
+	old := git.RangeSide{Base: "main~1", Tip: before}
+	newer := git.RangeSide{Base: "main", Tip: "topic"}
+	got, err := a.CompareVersions(path, old, newer, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.TooBig || len(got.Pairs) != 0 || got.OldCount.Commits != 3 {
+		t.Fatalf("over the limit it asks first: %+v", got)
+	}
+	got, err = a.CompareVersions(path, old, newer, false, true)
+	if err != nil || got.TooBig || len(got.Pairs) == 0 {
+		t.Fatalf("anyway: %+v, %v", got, err)
+	}
+}
+
+func TestCompareVersionsSaysAPrunedTipIsGone(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx, before := rebasedRepo(t)
+	path := openForMap(t, a, fx)
+	fx.Git("reflog", "expire", "--expire=now", "--all")
+	fx.Git("gc", "-q", "--prune=now")
+	_, err := a.CompareVersions(path, git.RangeSide{Base: "main", Tip: before}, git.RangeSide{Base: "main", Tip: "topic"}, false, false)
+	if err == nil || err.Error() != before[:7]+" isn't in this repository any more, so there's nothing to compare it with." {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestCompareVersionsInAPartialCloneDownloadsFirst(t *testing.T) {
+	isolateGit(t)
+	a := newTestApp(t)
+	path, head := partialTab(t, a)
+	r, err := a.openRepo(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := r.Git.ReadString(t.Context(), "rev-parse", head+"~1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	side := git.RangeSide{Base: first, Tip: head}
+	got, err := a.CompareVersions(path, side, side, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The first notes.txt was never downloaded: nothing is compared until it is.
+	if len(got.Missing) != 1 || len(got.Pairs) != 0 {
+		t.Fatalf("missing %v, %d pairs", got.Missing, len(got.Pairs))
+	}
+	if err := a.DownloadFiles(path, "v1", got.Missing); err != nil {
+		t.Fatal(err)
+	}
+	got, err = a.CompareVersions(path, side, side, false, false)
+	if err != nil || len(got.Missing) != 0 || len(got.Pairs) != 1 || got.Pairs[0].Kind != git.PairSame {
+		t.Fatalf("after downloading: %+v, %v", got, err)
 	}
 }

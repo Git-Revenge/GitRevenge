@@ -119,3 +119,29 @@ export function tipLabel(action: string): string {
   if (a.startsWith('commit')) return 'before the next commit'
   return 'earlier'
 }
+
+type Compared = { pairs: Pick<Pair, 'kind' | 'moved'>[]; old: { tip: string }; new: { tip: string }; loose: boolean }
+
+/** When the list has a commit dropped and one new, they may be one commit reworked too much for
+ * git to pair (#1041): the line that offers matching more loosely. "" when there's nothing to
+ * offer. */
+export function looseOffer(c: Compared): string {
+  const dropped = c.pairs.filter((p) => p.kind === 'dropped').length
+  const added = c.pairs.filter((p) => p.kind === 'new').length
+  if (!dropped || !added || c.loose) return ''
+  const one = dropped === 1 && added === 1
+  return `${dropped} dropped and ${added} new, which may be ${one ? 'one commit' : 'commits'} reworked a lot.`
+}
+
+/** When nothing changed but the ids (#1041), said in one line; "" otherwise. */
+export function nothingChanged(c: Compared): string {
+  if (c.old.tip === c.new.tip) return 'Both versions are the same commit, so nothing changed.'
+  if (!c.pairs.length || c.pairs.some((p) => p.kind !== 'same' || p.moved)) return ''
+  return `All ${c.pairs.length.toLocaleString()} commits are the same in both versions: only their ids changed.`
+}
+
+/** What a version too big to compare at once says (#1041). */
+export function tooBigSaid(oldCommits: number, newCommits: number): string {
+  const which = oldCommits >= newCommits ? `The old version has ${oldCommits.toLocaleString()} commits` : `The new version has ${newCommits.toLocaleString()} commits`
+  return `${which}. Compare them anyway?`
+}

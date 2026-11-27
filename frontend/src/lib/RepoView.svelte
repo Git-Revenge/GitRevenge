@@ -321,7 +321,7 @@
   let patchFile = $state<app.PatchFile | null>(null)
   /** Two versions of a branch compared (#1038), in the panel on the right; and the branch the
    * Compare two versions dialog starts on, while it's open. */
-  let versions = $state<{ compared: app.VersionsCompared; branch: string; oldLabel: string } | null>(null)
+  let versions = $state<{ compared: app.VersionsCompared; branch: string; oldLabel: string; anyway: boolean } | null>(null)
   let comparing = $state<{ branch: string; oldTip: string } | null>(null)
 
   // A comparison asked for from a toast, the reflog or a menu (#1040): each version's start
@@ -352,7 +352,7 @@
       comparing = { branch: a.branch, oldTip }
       return
     }
-    const got = await session.run(() => CompareVersions(path, { base: oldBase, tip: oldTip }, { base: newBase, tip: a.branch }, false))
+    const got = await session.run(() => CompareVersions(path, { base: oldBase, tip: oldTip }, { base: newBase, tip: a.branch }, false, false))
     if (got) showVersions(got, a.branch, oldLabel)
   }
 
@@ -361,11 +361,21 @@
     const branch = ctx.current()
     if (branch) toasts.show(`Rebased ${branch}.`, { label: 'What changed?', run: () => versionsAsk.show({ path, branch, oldTip: '', oldLabel: '' }) })
   }
-  function showVersions(compared: app.VersionsCompared, branch: string, oldLabel: string) {
+  function showVersions(compared: app.VersionsCompared, branch: string, oldLabel: string, anyway = false) {
     comparing = null
-    versions = { compared, branch, oldLabel }
+    versions = { compared, branch, oldLabel, anyway }
     pairAt = -1
     view = 'commit'
+  }
+  /** Compares the same two versions again (#1041): matched loosely or as git does, a big one
+   * anyway, or once what a partial clone needed is here. Anyway sticks for the comparison. */
+  async function recompare(o: { loose?: boolean; anyway?: boolean }) {
+    const v = versions
+    if (!v) return
+    const loose = o.loose ?? v.compared.loose
+    const anyway = o.anyway ?? v.anyway
+    const got = await session.run(() => CompareVersions(path, v.compared.old, v.compared.new, loose, anyway))
+    if (got) showVersions(got, v.branch, v.oldLabel, anyway)
   }
   /** The pair of the comparison open in the diff area (#1039), or -1. */
   let pairAt = $state(-1)
@@ -755,6 +765,8 @@
       branch={versions.branch}
       oldLabel={versions.oldLabel}
       current={pairAt}
+      {path}
+      onRecompare={recompare}
       onClose={closeVersions}
       onOpen={(i: number) => (pairAt = i)}
       onShow={(id: string) => {

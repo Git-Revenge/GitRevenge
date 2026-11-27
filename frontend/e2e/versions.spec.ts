@@ -82,7 +82,7 @@ test.describe('two versions of a branch', () => {
     const d = await openDialog(page)
     await expect(d).toContainText('5 commits, no merges')
     await d.getByRole('button', { name: 'Compare' }).click()
-    await expect.poll(() => calls(page, 'CompareVersions')).toEqual([['/r', { base: 'ccccccc', tip: id('2') }, { base: 'ccccccc', tip: 'feature/offline-cache' }, false]])
+    await expect.poll(() => calls(page, 'CompareVersions')).toEqual([['/r', { base: 'ccccccc', tip: id('2') }, { base: 'ccccccc', tip: 'feature/offline-cache' }, false, false]])
     await expect(d).toHaveCount(0)
     const p = panel(page)
     await expect(p).toContainText('Before the rebase 2222222 → now eeeeeee')
@@ -193,7 +193,7 @@ test.describe('where it starts', () => {
     const sub = page.getByRole('menu').last()
     await expect(sub.getByRole('menuitem')).toHaveText([/^\s*Before the rebase · 4 min ago/, /^\s*origin\/feature\/offline-cache/, /^\s*Pick two versions…/])
     await sub.getByRole('menuitem', { name: /Before the rebase/ }).click()
-    await expect.poll(async () => (await calls(page, 'CompareVersions'))[0]).toEqual(['/r', { base: id('c'), tip: id('2') }, { base: id('c'), tip: 'feature/offline-cache' }, false])
+    await expect.poll(async () => (await calls(page, 'CompareVersions'))[0]).toEqual(['/r', { base: id('c'), tip: id('2') }, { base: id('c'), tip: 'feature/offline-cache' }, false, false])
     await expect(panel(page)).toContainText('Before the rebase 2222222 → now eeeeeee')
   })
 
@@ -234,5 +234,61 @@ test.describe('where it starts', () => {
     const d = page.getByRole('dialog', { name: 'Compare two versions' })
     await expect(d.locator('select')).toHaveValue(id('2'))
     expect(await calls(page, 'CompareVersions')).toEqual([])
+  })
+})
+
+test.describe('the edges', () => {
+  const respond = (page: Page, responses: object) => page.evaluate((r) => (window as unknown as { __respond: (r: object) => void }).__respond(r), responses)
+  async function compareWith(page: Page, first: object) {
+    await open(page, 'patchSources', scenario({ CompareVersions: first }))
+    const d = await openDialog(page)
+    await expect(d).toContainText('5 commits, no merges')
+    await d.getByRole('button', { name: 'Compare' }).click()
+    await expect(panel(page)).toBeVisible()
+  }
+  const lastCompare = async (page: Page) => (await calls(page, 'CompareVersions')).at(-1)
+
+  test('a big version asks first, then compares anyway', async ({ page }) => {
+    await compareWith(page, { ...compared, pairs: [], text: '', tooBig: true, missing: [], oldCount: { commits: 1240, merges: 0 } })
+    await expect(panel(page)).toContainText('The old version has 1,240 commits. Compare them anyway?')
+    await expect(rows(page)).toHaveCount(0)
+    await respond(page, { CompareVersions: compared })
+    await panel(page).getByRole('button', { name: 'Compare them' }).click()
+    await expect.poll(async () => (await lastCompare(page))?.slice(3)).toEqual([false, true])
+    await expect(rows(page)).toHaveCount(5)
+  })
+
+  test('a partial clone downloads what it needs, then compares', async ({ page }) => {
+    await compareWith(page, { ...compared, pairs: [], text: '', missing: ['a'.repeat(40), 'b'.repeat(40)] })
+    await expect(panel(page)).toContainText('Comparing them needs 2 file versions this partial clone hasn’t got.')
+    await respond(page, { CompareVersions: compared, DownloadFiles: null })
+    await panel(page).getByRole('button', { name: 'Download them' }).click()
+    await expect.poll(async () => (await calls(page, 'DownloadFiles'))[0]?.[2]).toEqual(['a'.repeat(40), 'b'.repeat(40)])
+    await expect(rows(page)).toHaveCount(5)
+  })
+
+  test('a commit reworked too much offers matching more loosely, and back', async ({ page }) => {
+    const reworked = [pair(1, 0, 'dropped', 'Cache the last reading'), pair(0, 1, 'new', 'Cache the readings')]
+    await compareWith(page, { ...compared, pairs: reworked })
+    await expect(panel(page)).toContainText('1 dropped and 1 new, which may be one commit reworked a lot.')
+    await respond(page, { CompareVersions: { ...compared, loose: true } })
+    await panel(page).getByRole('button', { name: 'Match more loosely' }).click()
+    await expect.poll(async () => (await lastCompare(page))?.slice(3)).toEqual([true, false])
+    await expect(panel(page)).toContainText('Matched loosely')
+    await panel(page).getByRole('button', { name: 'Match as git does' }).click()
+    await expect.poll(async () => (await lastCompare(page))?.slice(3)).toEqual([false, false])
+  })
+
+  test('says when nothing changed but the ids', async ({ page }) => {
+    await compareWith(page, { ...compared, pairs: [pair(1, 1, 'same', 'One'), pair(2, 2, 'same', 'Two')] })
+    await expect(panel(page)).toContainText('All 2 commits are the same in both versions: only their ids changed.')
+  })
+
+  test('a version at a shallow clone’s edge says so, and fetches more history', async ({ page }) => {
+    await compareWith(page, { ...compared, oldEdge: true })
+    await expect(panel(page)).toContainText('The old version starts where this shallow clone’s history stops, so its oldest commit shows every file as added.')
+    await panel(page).getByRole('button', { name: 'Fetch 1,000 commits more' }).click()
+    await expect.poll(async () => (await calls(page, 'FetchMoreHistory'))[0]?.[1]).toEqual({ commits: 1000, since: 0, all: false })
+    await expect.poll(async () => (await calls(page, 'CompareVersions')).length).toBe(2)
   })
 })

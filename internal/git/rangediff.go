@@ -111,6 +111,45 @@ func (r *Repo) RangeDiff(ctx context.Context, old, newer RangeSide, loose bool) 
 	return pairs, text, nil
 }
 
+// RangeNeeds lists the file versions range-diff reads for both sides (every change of their
+// commits, merges left out) that a partial clone hasn't got (#1041). nil for a whole clone.
+func (r *Repo) RangeNeeds(ctx context.Context, old, newer RangeSide) ([]string, error) {
+	if !r.Partial(ctx) {
+		return nil, nil
+	}
+	var ids []string
+	for _, side := range []RangeSide{old, newer} {
+		if err := CheckRevs(side.Base, side.Tip); err != nil {
+			return nil, err
+		}
+		got, err := r.versionsOf(ctx, []string{"--no-merges", side.spec()})
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, got...)
+	}
+	return r.missingOf(ctx, ids)
+}
+
+// RangeAtEdge says a side holds a commit at a shallow clone's edge (#1041): its parent was
+// never fetched, so range-diff reads its change as every file added.
+func (r *Repo) RangeAtEdge(ctx context.Context, side RangeSide) (bool, error) {
+	edge := r.shallowSet(ctx)
+	if len(edge) == 0 {
+		return false, nil
+	}
+	commits, err := r.rangeIDs(ctx, side)
+	if err != nil {
+		return false, err
+	}
+	for _, c := range commits {
+		if edge[c.id] {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // rangeCommit is a commit of a side: its full id and its subject.
 type rangeCommit struct{ id, subject string }
 
