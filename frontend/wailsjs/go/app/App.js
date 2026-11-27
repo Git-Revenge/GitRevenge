@@ -650,12 +650,20 @@ export function PushedUndo(arg1, arg2) {
   return window['go']['app']['App']['PushedUndo'](arg1, arg2);
 }
 
+export function ReadClipboardPatches(arg1) {
+  return window['go']['app']['App']['ReadClipboardPatches'](arg1);
+}
+
 export function ReadIgnoreFile(arg1, arg2) {
   return window['go']['app']['App']['ReadIgnoreFile'](arg1, arg2);
 }
 
 export function ReadMailmapFile(arg1, arg2) {
   return window['go']['app']['App']['ReadMailmapFile'](arg1, arg2);
+}
+
+export function ReadPatchFiles(arg1, arg2) {
+  return window['go']['app']['App']['ReadPatchFiles'](arg1, arg2);
 }
 
 export function ReadPatches(arg1, arg2) {

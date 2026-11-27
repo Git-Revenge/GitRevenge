@@ -44,10 +44,15 @@ func main() {
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 26, G: 22, B: 20, A: 1},
-		Linux:            linuxOptions(),
-		OnStartup:        a.Startup,
-		OnBeforeClose:    beforeClose,
-		OnShutdown:       a.Shutdown,
+		// Files dropped on the window open the patches preview (#1025). Not DisableWebViewDrop:
+		// on Windows it turns WebView2's AllowExternalDrop off, which refuses every file dropped
+		// from outside. The page never navigates to a dropped file anyway (linkGuard.ts, and
+		// Wails' own drop handler).
+		DragAndDrop:   &options.DragAndDrop{EnableFileDrop: true},
+		Linux:         linuxOptions(),
+		OnStartup:     a.Startup,
+		OnBeforeClose: beforeClose,
+		OnShutdown:    a.Shutdown,
 		Bind: []any{
 			a,
 		},

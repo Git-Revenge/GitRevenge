@@ -392,6 +392,23 @@ const mounts = {
     const { peopleTab } = await import('../src/lib/people/tab.svelte')
     Object.assign(win, { __peopleTab: () => ({ open: peopleTab.open, repo: peopleTab.repo, ask: peopleTab.ask && JSON.parse(JSON.stringify(peopleTab.ask)) }) })
   },
+  // Patches from a dropped file or the clipboard (#1025): the repository view on screen, with
+  // the drop overlay and toasts. scenario.tabs 'none' has no repository open, 'other' has one
+  // that isn't on screen.
+  async patchSources() {
+    await mounts.repoView()
+    const { session } = await import('../src/lib/session.svelte')
+    session.active = '/r'
+    if (scenario.tabs === 'none') session.tabs = []
+    if (scenario.tabs === 'none' || scenario.tabs === 'other') session.active = 'gitrevenge:gitconfig'
+    const { default: Toasts } = await import('../src/lib/ui/Toasts.svelte')
+    mount(Toasts, { target: document.body })
+    const { default: DropOverlay } = await import('../src/lib/DropOverlay.svelte')
+    mount(DropOverlay, { target: document.body })
+    // Runs a command by its id, as picking it in the palette does.
+    const { commands } = await import('../src/lib/commands.svelte')
+    Object.assign(win, { __runCommand: (id: string) => commands.all().find((c) => c.id === id)?.run() })
+  },
   // Trailer care, the dialog where a repository says how its trailers are read.
   async trailerCare() {
     const { default: TrailerCare } = await import('../src/lib/filters/TrailerCare.svelte')
@@ -687,6 +704,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'repoView':
     await mounts.repoView()
+    break
+  case 'patchSources':
+    await mounts.patchSources()
     break
   case 'people':
     await mounts.people()

@@ -4,6 +4,7 @@
   import type { app } from '../wailsjs/go/models'
   import { BrowserOpenURL } from '../wailsjs/runtime/runtime.js'
   import CommandPalette from './lib/CommandPalette.svelte'
+  import DropOverlay from './lib/DropOverlay.svelte'
   import { cliCommands } from './lib/cli'
   import { commands, isMac, provideCommands, type Command } from './lib/commands.svelte'
   import ErrorBanner from './lib/ErrorBanner.svelte'
@@ -167,6 +168,7 @@
 <InkFilters />
 <Toasts />
 <CommandPalette />
+<DropOverlay />
 <!-- Dialogs load when first opened, to keep the main chunk small: see scripts/bundle-budget.mjs. -->
 {#if commands.shortcutsOpen}
   <Lazy load={() => import('./lib/ShortcutsDialog.svelte')} onClose={() => (commands.shortcutsOpen = false)} />
