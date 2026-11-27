@@ -76,6 +76,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
   - **Apply to** the files, the files and staged (`--index`), or staged only, leaving the files as they are (`--cached`). **In reverse** takes a diff back out (`-R`).
   - **Only onto clean files:** a file with changes of yours says so, and Apply waits until it's committed, stashed or left out, so undoing the diff is exact.
   - **Afterwards:** "Applied the diff to 4 files", with **Undo**, which puts those files back as they were, as long as nothing has changed them since. If merging left a conflict, it shows in Changes with the usual conflict view, and Undo is **Put these files back**.
+- Patches and diffs can be dropped on the window, or come from the clipboard (#1025).
+  - **Dropping:** while files are dragged over the window, it says letting go previews them for the repository on screen and its branch. Dropped, they open the same preview as **Apply patches or a diff…**. Several files dropped together are one series in name order (0001-, 0002-…). A file that's neither patches nor a diff says so and opens nothing. With no repository on screen, the overlay says to open one or switch to its tab.
+  - **Apply the patch on the clipboard**, in the command palette, opens the clipboard's text in the same preview: the pair to **Copy as a patch**, or a patch copied from a mail or a web page.
 
 ### Changed
 

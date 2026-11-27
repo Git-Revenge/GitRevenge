@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+
 	"github.com/git-revenge/gitrevenge/internal/askpass"
 	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/session"
@@ -48,6 +50,8 @@ type App struct {
 	promptHook func(text string, kind askpass.Kind) (string, bool)
 	// emitHook receives events in tests, where there is no Wails runtime to send them to.
 	emitHook func(name string, data any)
+	// clipboardHook reads the clipboard in tests (#1025).
+	clipboardHook func() (string, error)
 	// updateURL overrides the GitHub releases endpoint; tests use it.
 	updateURL string
 	latest    latest
@@ -139,6 +143,8 @@ func New() *App {
 // Startup is called by Wails when the app starts. The context is kept for runtime calls.
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
+	// Files dropped on the window (#1025): main.go turns Wails' file drop on.
+	runtime.OnFileDrop(ctx, func(_, _ int, paths []string) { a.filesDropped(paths) })
 }
 
 // Shutdown is called by Wails when the app quits. It stops background git processes.

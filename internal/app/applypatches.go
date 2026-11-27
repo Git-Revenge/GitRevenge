@@ -12,6 +12,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
+	"github.com/git-revenge/gitrevenge/internal/session"
 )
 
 // Applying a series of patches with git am, previewed first (#1022).
@@ -139,7 +140,14 @@ func (a *App) ReadPatches(path, file string) (PatchFile, error) {
 	if err != nil {
 		return PatchFile{}, writeErr(err)
 	}
-	out := PatchFile{Name: filepath.Base(file), Kind: git.PatchFileKind(data), Messages: []git.MailMessage{}}
+	return a.readPatchData(r, filepath.Base(file), data)
+}
+
+// readPatchData reads patches or a diff for the preview, from a file, files dropped together
+// or the clipboard: what it holds and, for mail, each message. A copy is kept for the try and
+// the apply, so the source changing afterwards changes nothing.
+func (a *App) readPatchData(r *session.Repo, name string, data []byte) (PatchFile, error) {
+	out := PatchFile{Name: name, Kind: git.PatchFileKind(data), Messages: []git.MailMessage{}}
 	if out.Kind == git.PatchDiff {
 		return a.readDiff(r, out, data)
 	}
@@ -151,7 +159,12 @@ func (a *App) ReadPatches(path, file string) (PatchFile, error) {
 	if err != nil {
 		return PatchFile{}, writeErr(err)
 	}
-	msgs, err := r.Git.ReadMailbox(ctx, file, dir)
+	source := filepath.Join(dir, "source.mbox")
+	if err := os.WriteFile(source, data, 0o644); err != nil {
+		_ = os.RemoveAll(dir)
+		return PatchFile{}, writeErr(err)
+	}
+	msgs, err := r.Git.ReadMailbox(ctx, source, dir)
 	if err != nil {
 		_ = os.RemoveAll(dir)
 		return PatchFile{}, patchError(err)

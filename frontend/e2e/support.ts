@@ -20,6 +20,8 @@ export interface Scenario {
   patchStart?: unknown
   /** The file of patches the apply preview opens on (#1022). */
   patchFile?: unknown
+  /** For patchSources (#1025): no repository open, or one that isn't on screen. */
+  tabs?: 'none' | 'other'
   /** The refs on each commit in the graph, by commit id. */
   graphRefs?: Record<string, unknown[]>
   selectedCommit?: string

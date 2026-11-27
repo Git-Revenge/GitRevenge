@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { untrack } from 'svelte'
-  import { CarryOnHistorySearch, ChoosePatchFile, CloneShape, CommitRow, ReadPatches, SetHistorySearch, SquashOffer, SetTrailerFilter, SetTrailerPin, StopHistorySearch, TrailerFilter, TrailerFilterRows, TrailerFilterStep, TrailerPins } from '../../wailsjs/go/app/App.js'
+  import { onDestroy, untrack } from 'svelte'
+  import { CarryOnHistorySearch, ChoosePatchFile, CloneShape, CommitRow, ReadClipboardPatches, ReadPatches, ReadPatchFiles, SetHistorySearch, SquashOffer, SetTrailerFilter, SetTrailerPin, StopHistorySearch, TrailerFilter, TrailerFilterRows, TrailerFilterStep, TrailerPins } from '../../wailsjs/go/app/App.js'
   import ShallowBand from './ShallowBand.svelte'
   import type { app } from '../../wailsjs/go/models'
   import { onBackend } from './events'
@@ -319,17 +319,32 @@
   let patchFile = $state<app.PatchFile | null>(null)
   let diffFile = $state<app.PatchFile | null>(null)
 
-  /** Apply patches or a diff…: a file picked, read, and shown for what it is. Mail opens the
-   * series preview, a plain diff the diff's; anything else says what it is. */
+  /** Apply patches or a diff…: a file picked, read, and shown for what it is. */
   async function applyPatches() {
     const file = await session.run(() => ChoosePatchFile())
     if (!file) return
-    const read = await session.run(() => ReadPatches(path, file))
+    openPatches(await session.run(() => ReadPatches(path, file)))
+  }
+  /** Opens what was read in its preview: mail in the series', a plain diff in the diff's.
+   * Anything else says what it is (#1025). */
+  function openPatches(read: app.PatchFile | undefined) {
     if (!read) return
     if (read.kind === 'mail') patchFile = read
     else if (read.kind === 'diff' && read.diff) diffFile = read
-    else toasts.show(`${read.name} isn’t a patch or a diff.`)
+    else if (read.name === 'the clipboard') toasts.show('The clipboard doesn’t hold a patch or a diff.')
+    else toasts.show(`Not a patch or a diff: ${read.name}. Nothing was opened.`)
   }
+  /** Apply the patch on the clipboard (#1025): the pair to Copy as a patch. */
+  async function applyClipboard() {
+    openPatches(await session.run(() => ReadClipboardPatches(path)))
+  }
+  // Files dropped on the window, when this repository is the one on screen (#1025).
+  onDestroy(
+    onBackend('patches:dropped', (d) => {
+      if (session.active !== path || !d.paths.length) return
+      void session.run(() => ReadPatchFiles(path, d.paths)).then(openPatches)
+    }),
+  )
   const ctx: MenuContext = {
     get path() {
       return path
@@ -366,6 +381,7 @@
     { id: 'repo.remotes', group: 'Repository', title: 'Manage remotes…', keywords: 'origin url', run: () => (remotesOpen = true) },
     { id: 'repo.reflog', group: 'Repository', title: 'Show the reflog…', keywords: 'history head moves recover lost commit', run: () => (reflogRef = 'HEAD') },
     { id: 'repo.applyPatches', group: 'Repository', title: 'Apply patches or a diff…', keywords: 'am mbox mailbox format-patch import mail', run: () => void applyPatches() },
+    { id: 'repo.applyClipboard', group: 'Repository', title: 'Apply the patch on the clipboard', keywords: 'paste am diff git apply clipboard', run: () => void applyClipboard() },
     { id: 'repo.worktrees', group: 'Repository', title: 'Manage worktrees…', keywords: 'worktree checkout folder parallel', run: () => (worktreesOpen = true) },
     {
       id: 'view.rightPanel',

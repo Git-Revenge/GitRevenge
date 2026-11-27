@@ -333,9 +333,13 @@ export function PushToURLs(arg1:string,arg2:string,arg3:string,arg4:Array<string
 
 export function PushedUndo(arg1:string,arg2:boolean):Promise<app.SharedCommits>;
 
+export function ReadClipboardPatches(arg1:string):Promise<app.PatchFile>;
+
 export function ReadIgnoreFile(arg1:string,arg2:string):Promise<string>;
 
 export function ReadMailmapFile(arg1:string,arg2:string):Promise<string>;
+
+export function ReadPatchFiles(arg1:string,arg2:Array<string>):Promise<app.PatchFile>;
 
 export function ReadPatches(arg1:string,arg2:string):Promise<app.PatchFile>;
 
