@@ -25,6 +25,8 @@ export function ApplyDiff(arg1:string,arg2:string,arg3:Array<string>,arg4:string
 
 export function ApplyPatches(arg1:string,arg2:string,arg3:Array<number>,arg4:string,arg5:boolean):Promise<void>;
 
+export function ArchivePlan(arg1:string,arg2:string,arg3:string):Promise<git.ArchivePlan>;
+
 export function ArrivedCommits(arg1:string,arg2:string,arg3:string):Promise<app.Arrived>;
 
 export function AuthorCard(arg1:string,arg2:string):Promise<app.AuthorCard>;
@@ -423,6 +425,8 @@ export function RulerMarks(arg1:string):Promise<app.RulerMarks>;
 
 export function RunOperationAction(arg1:string,arg2:string):Promise<void>;
 
+export function SaveArchive(arg1:string,arg2:string,arg3:git.ArchiveOptions,arg4:string,arg5:string,arg6:boolean):Promise<app.SavedArchive>;
+
 export function SaveFile(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function SaveForgeRule(arg1:string,arg2:links.ForgeRule,arg3:string):Promise<void>;
@@ -534,6 +538,10 @@ export function StartBisect(arg1:string,arg2:string,arg3:string):Promise<void>;
 export function StashAction(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function StashSave(arg1:string,arg2:string,arg3:boolean):Promise<void>;
+
+export function StopArchive(arg1:string):Promise<void>;
+
+export function StopArchivePlan(arg1:string):Promise<void>;
 
 export function StopBackfillCost(arg1:string):Promise<void>;
 

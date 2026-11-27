@@ -34,6 +34,10 @@ export function ApplyPatches(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['app']['App']['ApplyPatches'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function ArchivePlan(arg1, arg2, arg3) {
+  return window['go']['app']['App']['ArchivePlan'](arg1, arg2, arg3);
+}
+
 export function ArrivedCommits(arg1, arg2, arg3) {
   return window['go']['app']['App']['ArrivedCommits'](arg1, arg2, arg3);
 }
@@ -830,6 +834,10 @@ export function RunOperationAction(arg1, arg2) {
   return window['go']['app']['App']['RunOperationAction'](arg1, arg2);
 }
 
+export function SaveArchive(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['app']['App']['SaveArchive'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
 export function SaveFile(arg1, arg2, arg3) {
   return window['go']['app']['App']['SaveFile'](arg1, arg2, arg3);
 }
@@ -1052,6 +1060,14 @@ export function StashAction(arg1, arg2, arg3) {
 
 export function StashSave(arg1, arg2, arg3) {
   return window['go']['app']['App']['StashSave'](arg1, arg2, arg3);
+}
+
+export function StopArchive(arg1) {
+  return window['go']['app']['App']['StopArchive'](arg1);
+}
+
+export function StopArchivePlan(arg1) {
+  return window['go']['app']['App']['StopArchivePlan'](arg1);
 }
 
 export function StopBackfillCost(arg1) {
