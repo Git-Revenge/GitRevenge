@@ -73,3 +73,24 @@ export function sparseLines(s: { cone: boolean; folders: string[]; files: number
   const what = s.cone ? `${n === 1 ? '1 folder' : `${count(n)} folders`} checked out` : `${n === 1 ? '1 pattern' : `${count(n)} patterns`} checked out`
   return { what, tag: `${count(s.files)} of ${count(s.total)} files · sparse` }
 }
+
+type StorageFigures = { bytes: number; loose: number; packs: number; garbage: number; gcAuto: number; autoPackLimit: number; due: boolean }
+
+/** The Storage row's lines (#937): what the objects take on disk, and how they're kept. */
+export function storageLines(s: StorageFigures): { what: string; tag: string } {
+  const loose = `${count(s.loose)} loose ${s.loose === 1 ? 'object' : 'objects'}`
+  const packs = `${count(s.packs)} ${s.packs === 1 ? 'pack' : 'packs'}`
+  return { what: `${s.bytes ? sizeWords(s.bytes) : 'Nothing'} on disk`, tag: `${loose} · ${packs}` }
+}
+
+/** Why maintenance is suggested, in git's own terms; "" when git wouldn't tidy up yet. */
+export function dueSaid(s: StorageFigures): string {
+  if (!s.due) return ''
+  if (s.gcAuto > 0 && s.loose > s.gcAuto) return `More than ${count(s.gcAuto)} objects are loose (gc.auto), so git would pack them.`
+  return `More than ${count(s.autoPackLimit)} packs (gc.autoPackLimit), so git would join them.`
+}
+
+/** Files in the object folder that are neither objects nor packs, said when there are any. */
+export function garbageSaid(s: Pick<StorageFigures, 'garbage'>): string {
+  return s.garbage ? `${count(s.garbage)} stray ${s.garbage === 1 ? 'file' : 'files'} in the object folder, such as a pack left half written.` : ''
+}

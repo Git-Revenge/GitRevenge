@@ -4,6 +4,7 @@
   // while other panels show, so the rail's badge and filter counts are always right.
   import { CloneShape, LFS, RemoveWorktree, Submodules, UpdateSubmodules, Worktrees } from '../../wailsjs/go/app/App.js'
   import CloneSection from './CloneSection.svelte'
+  import StorageSection from './StorageSection.svelte'
   import { isWhole, type Shape } from './thisClone'
   import type { app, git } from '../../wailsjs/go/models'
   import type { MenuItem } from './ContextMenu.svelte'
@@ -89,8 +90,10 @@
   let showIgnore = $derived(matchesFilter(filter, 'Ignore rules', '.gitignore', 'exclude'))
   let showPeople = $derived(matchesFilter(filter, 'People', '.mailmap', 'mailmap', 'authors'))
   let showClone = $derived(!isWhole(shape) && matchesFilter(filter, 'This clone', 'shallow', 'partial', 'sparse', 'one branch', 'history', 'folders'))
+  // Storage concerns every repository, whole or not (#937).
+  let showStorage = $derived(matchesFilter(filter, 'Storage', 'maintenance', 'gc', 'size', 'disk', 'loose', 'packs', 'schedule'))
   let filtering = $derived(filter.trim().length > 0)
-  let matches = $derived(shownTrees.length + shownSubs.length + (showLfs ? 1 : 0) + (showIgnore ? 1 : 0) + (showPeople ? 1 : 0) + (showClone ? 1 : 0))
+  let matches = $derived(shownTrees.length + shownSubs.length + (showLfs ? 1 : 0) + (showIgnore ? 1 : 0) + (showPeople ? 1 : 0) + (showClone ? 1 : 0) + (showStorage ? 1 : 0))
 
   $effect(() => {
     onStatus?.({ attention: subs.filter((s) => s.state !== 'ok').length, matches })
@@ -137,6 +140,10 @@
 
 {#if showClone && shape}
   <CloneSection {path} {shape} {openDialog} {onMenu} />
+{/if}
+
+{#if showStorage}
+  <StorageSection {path} {openDialog} />
 {/if}
 
 {#if shownTrees.length || !filtering}
