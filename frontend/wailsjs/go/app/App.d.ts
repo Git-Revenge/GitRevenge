@@ -137,6 +137,8 @@ export function DeleteMergedBranches(arg1:string,arg2:Array<string>):Promise<Arr
 
 export function DeleteStack(arg1:string,arg2:string,arg3:Array<string>,arg4:boolean):Promise<Array<string>>;
 
+export function DescribeCommit(arg1:string,arg2:string):Promise<git.Described>;
+
 export function DiscardFiles(arg1:string,arg2:Array<string>):Promise<void>;
 
 export function DownloadFiles(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;

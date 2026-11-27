@@ -4195,6 +4195,26 @@ export namespace git {
 		    return a;
 		}
 	}
+	export class Described {
+	    name: string;
+	    after: string;
+	    since: number;
+	    firstIn: string;
+	    contains: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Described(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.after = source["after"];
+	        this.since = source["since"];
+	        this.firstIn = source["firstIn"];
+	        this.contains = source["contains"];
+	    }
+	}
 	export class DiffFile {
 	    path: string;
 	    oldPath?: string;

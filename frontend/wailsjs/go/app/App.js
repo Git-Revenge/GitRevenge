@@ -258,6 +258,10 @@ export function DeleteStack(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['DeleteStack'](arg1, arg2, arg3, arg4);
 }
 
+export function DescribeCommit(arg1, arg2) {
+  return window['go']['app']['App']['DescribeCommit'](arg1, arg2);
+}
+
 export function DiscardFiles(arg1, arg2) {
   return window['go']['app']['App']['DiscardFiles'](arg1, arg2);
 }
