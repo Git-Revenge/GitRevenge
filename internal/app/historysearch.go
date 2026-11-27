@@ -174,6 +174,11 @@ func (a *App) startHistory(r *session.Repo, h *historyRun) {
 		switch {
 		case err == nil:
 			h.stopped = false
+			// It went through every commit. On a small history it can end before the count
+			// beside it, which ending stops: the total is then what it searched (#1052).
+			if h.total == 0 {
+				h.total = h.searched
+			}
 		case errors.Is(err, context.Canceled):
 			// Stopped, replaced or closed: the state says which.
 		default:
@@ -210,6 +215,13 @@ func (a *App) searchHistory(ctx context.Context, r *session.Repo, h *historyRun,
 	since := h.opts.Since
 
 	go func() {
+		if hold := a.historyCountHold; hold != nil {
+			select {
+			case <-hold:
+			case <-ctx.Done():
+				return
+			}
+		}
 		n, err := r.Git.HistoryCount(ctx, opts, since)
 		if err != nil {
 			return
