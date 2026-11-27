@@ -111,6 +111,8 @@ export function CommitSignatures(arg1:string,arg2:Array<string>):Promise<Array<g
 
 export function CompareCommits(arg1:string,arg2:string,arg3:string):Promise<app.Comparison>;
 
+export function CompareVersions(arg1:string,arg2:git.RangeSide,arg3:git.RangeSide,arg4:boolean):Promise<app.VersionsCompared>;
+
 export function ConflictContext(arg1:string):Promise<app.ConflictContext>;
 
 export function ConflictFile(arg1:string,arg2:string):Promise<git.ConflictFile>;
@@ -122,6 +124,8 @@ export function ConflictStop(arg1:string):Promise<app.ConflictStop>;
 export function ConflictSuggestions(arg1:string,arg2:string,arg3:Array<app.ConflictPlace>):Promise<app.ConflictReading>;
 
 export function CopyPatches(arg1:string,arg2:git.PatchRevs,arg3:git.PatchOptions):Promise<string>;
+
+export function CountVersion(arg1:string,arg2:string,arg3:string):Promise<app.VersionCount>;
 
 export function CurrentPatch(arg1:string):Promise<string>;
 
@@ -612,6 +616,8 @@ export function UpdateStack(arg1:string,arg2:Array<string>):Promise<Array<string
 export function UpdateSubmodules(arg1:string):Promise<void>;
 
 export function Version():Promise<string>;
+
+export function VersionBase(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
 
 export function WhoIs(arg1:string,arg2:app.MailmapText,arg3:string):Promise<Array<app.WhoAnswer>>;
 
