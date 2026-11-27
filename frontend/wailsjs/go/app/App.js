@@ -26,6 +26,10 @@ export function AnswerTrailerSlips(arg1, arg2, arg3) {
   return window['go']['app']['App']['AnswerTrailerSlips'](arg1, arg2, arg3);
 }
 
+export function ApplyDiff(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['app']['App']['ApplyDiff'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function ApplyPatches(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['app']['App']['ApplyPatches'](arg1, arg2, arg3, arg4, arg5);
 }
@@ -1130,6 +1134,10 @@ export function TrustRepo(arg1) {
   return window['go']['app']['App']['TrustRepo'](arg1);
 }
 
+export function TryDiff(arg1, arg2, arg3) {
+  return window['go']['app']['App']['TryDiff'](arg1, arg2, arg3);
+}
+
 export function TryLinkRule(arg1, arg2) {
   return window['go']['app']['App']['TryLinkRule'](arg1, arg2);
 }
@@ -1144,6 +1152,10 @@ export function Undo(arg1) {
 
 export function UndoBisect(arg1) {
   return window['go']['app']['App']['UndoBisect'](arg1);
+}
+
+export function UndoDiff(arg1, arg2) {
+  return window['go']['app']['App']['UndoDiff'](arg1, arg2);
 }
 
 export function UndoIgnore(arg1, arg2) {

@@ -331,6 +331,12 @@ const mounts = {
     const { default: Toasts } = await import('../src/lib/ui/Toasts.svelte')
     mount(Toasts, { target: document.body })
   },
+  async applyDiff() {
+    const { default: ApplyDiffDialog } = await import('../src/lib/ApplyDiffDialog.svelte')
+    mount(ApplyDiffDialog, { target: host, props: { path: '/r', file: scenario.patchFile as never, onClose: record('close') } })
+    const { default: Toasts } = await import('../src/lib/ui/Toasts.svelte')
+    mount(Toasts, { target: document.body })
+  },
   async savePatches() {
     const { default: SavePatchesDialog } = await import('../src/lib/SavePatchesDialog.svelte')
     mount(SavePatchesDialog, { target: host, props: { path: '/r', start: scenario.patchStart as never, onClose: record('close') } })
@@ -657,6 +663,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'applyPatches':
     await mounts.applyPatches()
+    break
+  case 'applyDiff':
+    await mounts.applyDiff()
     break
   case 'savePatches':
     await mounts.savePatches()

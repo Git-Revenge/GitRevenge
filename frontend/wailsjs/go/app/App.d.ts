@@ -21,6 +21,8 @@ export function AnswerTrailerQuestion(arg1:string,arg2:string,arg3:string,arg4:b
 
 export function AnswerTrailerSlips(arg1:string,arg2:string,arg3:Array<string>):Promise<app.TrailerCare>;
 
+export function ApplyDiff(arg1:string,arg2:string,arg3:Array<string>,arg4:string,arg5:boolean):Promise<app.AppliedDiff>;
+
 export function ApplyPatches(arg1:string,arg2:string,arg3:Array<number>,arg4:string,arg5:boolean):Promise<void>;
 
 export function ArrivedCommits(arg1:string,arg2:string,arg3:string):Promise<app.Arrived>;
@@ -573,6 +575,8 @@ export function TrailerValues(arg1:string,arg2:string,arg3:string,arg4:number,ar
 
 export function TrustRepo(arg1:string):Promise<void>;
 
+export function TryDiff(arg1:string,arg2:string,arg3:boolean):Promise<Array<app.DiffTry>>;
+
 export function TryLinkRule(arg1:string,arg2:links.Rule):Promise<app.LinkTry>;
 
 export function TryPatches(arg1:string,arg2:string,arg3:Array<number>,arg4:number):Promise<Array<app.PatchTry>>;
@@ -580,6 +584,8 @@ export function TryPatches(arg1:string,arg2:string,arg3:Array<number>,arg4:numbe
 export function Undo(arg1:string):Promise<void>;
 
 export function UndoBisect(arg1:string):Promise<void>;
+
+export function UndoDiff(arg1:string,arg2:string):Promise<void>;
 
 export function UndoIgnore(arg1:string,arg2:app.IgnoreAdded):Promise<void>;
 
