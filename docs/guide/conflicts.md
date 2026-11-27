@@ -49,6 +49,19 @@ A string or a comment is one token, so two edits inside the same string are neve
 
 The chip beside the file name says how it was read: **Read as Go**, say, or **Read by lines** when it couldn't be, with the reason in its tooltip. A file that doesn't parse, or isn't in a language the app reads as code, keeps the tool as described above.
 
+## Conflicts you've resolved before
+
+Git can remember how you resolved a conflict and resolve it the same way when it comes back, as it does when you rebase a long branch again and again. Git calls this rerere ("reuse recorded resolution"), and `rerere.enabled` in your git config turns it on.
+
+**When rerere is on**, a file it resolved says **resolved as before** in the list of files, and git reuses the resolution in one of two ways:
+
+- **Still to mark resolved:** git leaves the file conflicted, with your old resolution in it. Opening it shows the resolution, to check and then mark resolved.
+- **Staged straight away:** with `rerere.autoUpdate`, git stages the file as well. It's listed with the files to settle as resolved as before, never among the files that merged cleanly, so you can tell it apart.
+
+Opening a file rerere resolved says so. **Forget that resolution**, or **Forget** beside a staged one, throws the recorded resolution away (`git rerere forget`) and puts the conflict back in the file, to resolve again. The new resolution is what git reuses next time.
+
+**When rerere is off**, the app remembers the conflicts you resolve in the conflict tool: the conflicting text, as rerere matches it, never the file. When one comes back, the panel says **Seen before** and offers **Turn on rerere**, which sets `rerere.enabled` in the repository's own config. The conflicts still open are recorded then too, so resolving them now is what git reuses. **No thanks** puts the offer away, and it isn't made again in that repository.
+
 ## Merge drivers
 
 git can hand a file to a merge driver of your own instead of its line merge, set in `.gitattributes` with `merge=<name>`. [mergiraf](https://mergiraf.org/), for instance, merges by syntax in the terminal too. The app never installs or bundles one; it works with whatever git runs.

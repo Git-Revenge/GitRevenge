@@ -920,9 +920,26 @@ export namespace app {
 	        this.local = source["local"];
 	    }
 	}
+	export class ConflictRerere {
+	    on: boolean;
+	    resolved: string[];
+	    recurring: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ConflictRerere(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.on = source["on"];
+	        this.resolved = source["resolved"];
+	        this.recurring = source["recurring"];
+	    }
+	}
 	export class ConflictContext {
 	    mergeTool: string;
 	    clean: string[];
+	    rerere: ConflictRerere;
 	
 	    static createFrom(source: any = {}) {
 	        return new ConflictContext(source);
@@ -932,7 +949,26 @@ export namespace app {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.mergeTool = source["mergeTool"];
 	        this.clean = source["clean"];
+	        this.rerere = this.convertValues(source["rerere"], ConflictRerere);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class ConflictPlace {
 	    ours: string;
@@ -990,6 +1026,7 @@ export namespace app {
 		    return a;
 		}
 	}
+	
 	export class MergeDriver {
 	    name: string;
 	    command: string;
