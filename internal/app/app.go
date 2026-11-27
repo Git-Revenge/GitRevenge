@@ -46,8 +46,6 @@ type App struct {
 	patches patchSets
 	// applied holds each repository's last diff applied, for its Undo (#1024).
 	applied appliedDiffs
-	// describing holds each repository's describe in flight, so a newer one stops it (#940).
-	describing describeCalls
 	// versionCap, when set, stands in for maxVersionCommits in tests (#1041).
 	versionCap int
 	// promptHook answers credential prompts in tests instead of the UI.
