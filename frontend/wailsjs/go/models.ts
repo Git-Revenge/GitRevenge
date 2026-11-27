@@ -2518,6 +2518,11 @@ export namespace app {
 	    subject: string;
 	    origHead: string;
 	    written: string[];
+	    author: string;
+	    applied: number;
+	    stuck: boolean;
+	    stuckReason: string;
+	    madeBranch: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new RepoState(source);
@@ -2536,6 +2541,11 @@ export namespace app {
 	        this.subject = source["subject"];
 	        this.origHead = source["origHead"];
 	        this.written = source["written"];
+	        this.author = source["author"];
+	        this.applied = source["applied"];
+	        this.stuck = source["stuck"];
+	        this.stuckReason = source["stuckReason"];
+	        this.madeBranch = source["madeBranch"];
 	    }
 	}
 	export class RepoTab {

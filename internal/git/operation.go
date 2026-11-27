@@ -41,6 +41,15 @@ type OperationState struct {
 	OrigHead string
 	// Written are the commits a rebase has written so far, newest first, up to a cap.
 	Written []string
+	// Author wrote the patch git am has in hand; Subject is its subject (#1023). Applied
+	// counts the patches before it that went in, so Step-1-Applied were skipped.
+	Author  string
+	Applied int
+	// Stuck says git am stopped on a patch it couldn't apply at all: nothing is in conflict
+	// and nothing is staged, so there's nothing to resolve and Continue has nothing to commit.
+	// StuckReason is git's word on why, such as "src/feed.js: patch does not apply".
+	Stuck       bool
+	StuckReason string
 }
 
 // DetectOperation reports which operation is in progress, by checking the state git leaves

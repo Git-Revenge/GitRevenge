@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { abortedMessage, abortEffect, beads, blockedBy, continueLabel, finishedMessage, opNote, opTitle, rebaseMarks, stopTally, type OpState } from './operation'
+import { abortedMessage, abortEffect, beads, blockedBy, continueLabel, finishedMessage, opNote, opTitle, rebaseMarks, skippedAtEnd, skipLabel, stopTally, stuckNote, type OpState } from './operation'
 
 const id = (c: string) => c.repeat(40)
 const state = (over: Partial<OpState> = {}): OpState => ({ operation: 'rebase', step: 3, total: 5, conflicts: ['src/feed.js'], ours: 'feature/offline-cache', theirs: 'main', commit: id('c'), subject: 'Fall back to the cached reading', origHead: id('d'), written: [id('b'), id('a')], ...over })
@@ -105,5 +105,61 @@ describe('stopTally', () => {
   it('counts the files each merge driver settled', () => {
     expect(stopTally(tally([[3, 0]], ['mergiraf', 'mergiraf']))).toBe('2 settled by mergiraf')
     expect(stopTally(tally([[1, 1]], ['mergiraf']))).toBe('1 suggestion · 1 settled by mergiraf')
+  })
+})
+
+describe('git am (#1023)', () => {
+  const am = (over: Partial<OpState> = {}) =>
+    state({ operation: 'am', step: 4, total: 5, ours: 'main', theirs: '', commit: '', written: [], subject: 'Set the alert limit in knots too', author: 'Tyler Brooks', applied: 3, ...over })
+
+  it('names the branch, the patch in hand and who wrote it', () => {
+    expect(opTitle(am())).toEqual({ verb: 'Applying patches', a: '', join: 'onto', b: 'main' })
+    expect(opTitle(am({ ours: '' })).b).toBe('a detached HEAD')
+    expect(opNote(am(), 1)).toBe('Stopped at patch 4 of 5: Set the alert limit in knots too · Tyler Brooks')
+    expect(opNote(am({ conflicts: [] }), 1)).toBe('Patch 4 of 5 is resolved and staged.')
+    expect(opNote(am({ subject: '', author: '' }), 1)).toBe('Stopped at patch 4 of 5.')
+  })
+
+  it('counts what Continue has left, and draws a bead a patch', () => {
+    expect(continueLabel(am({ conflicts: [] }))).toBe('Continue with 1 more')
+    expect(continueLabel(am({ conflicts: [], step: 5 }))).toBe('Finish applying')
+    expect(beads(am())).toEqual(['done', 'done', 'done', 'bad', ''])
+    expect(beads(am({ conflicts: [], stuck: true }))).toEqual(['done', 'done', 'done', 'bad', ''])
+    expect(skipLabel(am())).toBe('Skip this patch')
+    expect(skipLabel(state())).toBe('Skip this commit')
+  })
+
+  it("says a patch didn't apply, why, and what's left to do", () => {
+    const stuck = am({ step: 2, conflicts: [], stuck: true, stuckReason: 'src/feed.js: patch does not apply', subject: 'Read the depth in metres', applied: 1 })
+    expect(opNote(stuck, 0)).toBe('Patch 2 of 5 didn’t apply: Read the depth in metres · Tyler Brooks')
+    expect(stuckNote(stuck, 0)).toBe('Git says “src/feed.js: patch does not apply”, and there’s nothing in conflict to resolve. Skip it, abort, or make the change by hand and stage it to bring Continue back.')
+    expect(stuckNote({ ...stuck, stuckReason: '' }, 0)).toBe('There’s nothing in conflict to resolve. Skip it, abort, or make the change by hand and stage it to bring Continue back.')
+    expect(stuckNote(am(), 1)).toBe('')
+  })
+
+  it('says when resolving a patch left nothing of it to commit', () => {
+    const empty = am({ conflicts: [], stuck: true, stuckReason: 'patch failed: src/feed.js:4' })
+    expect(opNote(empty, 1)).toBe('Nothing of patch 4 of 5 is left to commit: Set the alert limit in knots too · Tyler Brooks')
+    expect(stuckNote(empty, 1)).toBe('Resolved, it changes nothing, so there’s nothing to commit. It may be in already: skip it, or abort.')
+  })
+
+  it('says what aborting undoes, and the branch made for the patches', () => {
+    expect(abortEffect(am(), 1)).toBe('main goes back to ddddddd, where it was before the first patch. The 3 patches already applied and your work on the conflicts are thrown away.')
+    expect(abortEffect(am({ step: 2, conflicts: [] }), 0)).toBe('main goes back to ddddddd, where it was before the first patch. The 1 patch already applied is thrown away.')
+    expect(abortEffect(am({ step: 1, madeBranch: 'wind/knots', ours: 'wind/knots' }), 0)).toBe('wind/knots goes, as it was made for them, and you’re back where you were.')
+    expect(abortedMessage(am())).toBe('Applying the patches stopped. main is back at ddddddd.')
+    expect(abortedMessage(am({ madeBranch: 'wind/knots' }))).toBe('Applying the patches stopped, and wind/knots, made for them, is gone.')
+  })
+
+  it('counts the patches applied and skipped at the end', () => {
+    // Patch 4 of 5 with 3 in: none skipped yet. Continuing finishes with all 5.
+    expect(finishedMessage(am(), skippedAtEnd(am(), 'continue'))).toBe('Applied 5 patches onto main.')
+    // Patch 5 of 5 with 3 in: one was skipped before, and this one too.
+    const last = am({ step: 5, applied: 3 })
+    expect(skippedAtEnd(last, 'skip')).toBe(2)
+    expect(finishedMessage(last, 2)).toBe('Applied 3 patches onto main; skipped 2.')
+    expect(finishedMessage(am({ total: 1, step: 1, applied: 0 }), 1)).toBe('No patches were applied; the one was skipped.')
+    expect(finishedMessage(am({ total: 2, step: 2, applied: 0 }), 2)).toBe('No patches were applied; all 2 were skipped.')
+    expect(skippedAtEnd(state(), 'skip')).toBe(0)
   })
 })

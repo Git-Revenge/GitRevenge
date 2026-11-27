@@ -165,3 +165,105 @@ func TestApplyPatchesOntoANewBranch(t *testing.T) {
 		t.Fatal("a closed file of patches should say so")
 	}
 }
+
+func TestAbortingPatchesTakesTheBranchMadeForThem(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx, mbox := seriesRepo(t)
+	path := openForMap(t, a, fx)
+	a.chosen.add(mbox)
+	file, err := a.ReadPatches(path, mbox)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.ClosePatches(file.Token)
+
+	// The third conflicts: git am stops on the branch made for it.
+	if err := a.ApplyPatches(path, file.Token, []int{2}, "wind/knots", false); err == nil {
+		t.Fatal("the third patch should stop on its conflict")
+	}
+	st, err := a.RepoState(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Operation != "am" || st.Ours != "wind/knots" || st.MadeBranch != "wind/knots" || st.Subject != "Change line 6" || st.Stuck || !slices.Contains(st.Actions, "continue") {
+		t.Fatalf("state = %+v", st)
+	}
+	if err := a.RunOperationAction(path, "abort"); err != nil {
+		t.Fatal(err)
+	}
+	if branch := fx.Git("branch", "--show-current"); branch != "main" {
+		t.Fatalf("back on %q, want main", branch)
+	}
+	if out := fx.Git("branch", "--list", "wind/knots"); out != "" {
+		t.Fatalf("the branch made for the patches should be gone: %q", out)
+	}
+}
+
+func TestAStuckPatchOffersNoContinue(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx, _ := seriesRepo(t)
+	path := openForMap(t, a, fx)
+	bad := filepath.Join(t.TempDir(), "bad.mbox")
+	if err := os.WriteFile(bad, []byte("From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001\nFrom: A <a@example.com>\nSubject: [PATCH] Touch nowhere\nDate: Mon, 1 Jan 2026 00:00:00 +0000\n\n---\ndiff --git a/nowhere.txt b/nowhere.txt\nindex 1234567..89abcde 100644\n--- a/nowhere.txt\n+++ b/nowhere.txt\n@@ -1 +1 @@\n-x\n+y\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a.chosen.add(bad)
+	file, err := a.ReadPatches(path, bad)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.ClosePatches(file.Token)
+	if err := a.ApplyPatches(path, file.Token, []int{0}, "", false); err == nil {
+		t.Fatal("a patch for nothing should stop")
+	}
+	st, err := a.RepoState(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !st.Stuck || slices.Contains(st.Actions, "continue") || !slices.Contains(st.Actions, "skip") || st.MadeBranch != "" {
+		t.Fatalf("state = %+v, want stuck with Skip and Abort only", st)
+	}
+	if patch, err := a.CurrentPatch(path); err != nil || !strings.Contains(patch, "nowhere.txt") {
+		t.Fatalf("current patch = %q, %v", patch, err)
+	}
+	if err := a.RunOperationAction(path, "abort"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAmStateCountsThePatchesApplied(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx, mbox := seriesRepo(t)
+	path := openForMap(t, a, fx)
+	a.chosen.add(mbox)
+	file, err := a.ReadPatches(path, mbox)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.ClosePatches(file.Token)
+	start := fx.Head()
+
+	// The first applies and the third conflicts.
+	if err := a.ApplyPatches(path, file.Token, []int{0, 2}, "", false); err == nil {
+		t.Fatal("the third patch should stop on its conflict")
+	}
+	st, err := a.RepoState(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Operation != "am" || st.Step != 2 || st.Total != 2 || st.Applied != 1 || st.OrigHead != start || st.Ours != "main" {
+		t.Fatalf("state = %+v, want patch 2 of 2 with 1 applied", st)
+	}
+	if err := a.RunOperationAction(path, "skip"); err != nil {
+		t.Fatal(err)
+	}
+	if st, _ = a.RepoState(path); st.Operation != "" {
+		t.Fatalf("skipping the last should finish: %+v", st)
+	}
+	if got := fx.Git("log", "-1", "--format=%s"); got != "Change line 2" {
+		t.Fatalf("HEAD = %q, want the first patch", got)
+	}
+}

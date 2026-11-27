@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { ConflictStop, Refs, RepoState, RunOperationAction, Undo, UndoState } from '../../wailsjs/go/app/App.js'
+  import { ConflictStop, CurrentPatch, Refs, RepoState, RunOperationAction, Undo, UndoState } from '../../wailsjs/go/app/App.js'
   import type { app } from '../../wailsjs/go/models'
   import { ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
   import { bisect, expectedSteps } from './bisect.svelte'
   import { commands, formatShortcut, provideCommands } from './commands.svelte'
-  import { abortEffect, abortedMessage, beads as stepBeads, blockedBy, continueLabel, finishedMessage, OP_NOUN, opNote, opTitle, stopTally } from './operation'
+  import { abortEffect, abortedMessage, beads as stepBeads, blockedBy, continueLabel, finishedMessage, OP_NOUN, opNote, opTitle, skippedAtEnd, skipLabel, stopTally, stuckNote } from './operation'
   import { operations } from './operation.svelte'
+  import PatchView from './PatchView.svelte'
   import { toasts } from './toasts.svelte'
   import { session } from './session.svelte'
   import Icon from './ui/Icon.svelte'
@@ -71,7 +72,7 @@
     }
     const label = (await UndoState(repo).catch(() => null))?.undo ?? ''
     toasts.show(
-      finishedMessage(was),
+      finishedMessage(was, skippedAtEnd(was, action)),
       label
         ? {
             label: 'Undo',
@@ -102,6 +103,15 @@
   function goOn() {
     if (!busy && can.has('continue') && !conflicts.length) void act('continue')
   }
+
+  /** The patch git am couldn't apply, open to read (#1023). */
+  let shown = $state<{ title: string; text: string } | null>(null)
+  async function showPatch() {
+    const at = opState
+    const text = await session.run(() => CurrentPatch(path))
+    if (text !== undefined && opState === at) shown = { title: at?.subject ?? '', text }
+  }
+  let stuck = $derived(!!opState?.stuck)
 
   // Re-fetch when the tab changes or the backend reports a change on disk.
   $effect(() => {
@@ -137,7 +147,8 @@
       ? [
           ...(can.has('continue') && !conflicts.length ? [{ id: 'op.continue', group: 'Operation', title: continueLabel(opState), keywords: 'continue finish', shortcut: 'Mod+Enter', run: goOn }] : []),
           ...(conflicts.length ? [{ id: 'op.resolve', group: 'Operation', title: 'Resolve the next conflicted file', keywords: 'conflict', run: resolveNext }] : []),
-          ...(can.has('skip') ? [{ id: 'op.skip', group: 'Operation', title: 'Skip this commit', run: () => act('skip') }] : []),
+          ...(stuck ? [{ id: 'op.show-patch', group: 'Operation', title: "Show the patch that didn't apply", keywords: 'am diff', run: showPatch }] : []),
+          ...(can.has('skip') ? [{ id: 'op.skip', group: 'Operation', title: skipLabel(opState), run: () => act('skip') }] : []),
           { id: 'op.abort', group: 'Operation', title: `Abort the ${OP_NOUN[opState.operation] ?? opState.operation}…`, keywords: 'stop cancel', run: () => (aborting = true) },
         ]
       : run && !done
@@ -186,8 +197,8 @@
     </span>
   </div>
 {:else if opState?.operation && title}
-  <div class={['op', 'run', conflicts.length ? 'stopped' : 'ready']} role="status" in:reveal out:reveal={{ out: true }}>
-    <Icon name={conflicts.length ? 'warning' : opState.operation === 'merge' ? 'merge' : 'check'} />
+  <div class={['op', 'run', conflicts.length || stuck ? 'stopped' : 'ready']} role="status" in:reveal out:reveal={{ out: true }}>
+    <Icon name={conflicts.length || stuck ? 'warning' : opState.operation === 'merge' ? 'merge' : 'check'} />
     <div class="what">
       <strong>
         {title.verb}
@@ -196,6 +207,7 @@
         {#if title.b}<span class="mono">{title.b}</span>{/if}
       </strong>
       <span class="note">{opNote(opState, seen)}{#if stopTally(tally)}<span class="tally">{` · ${stopTally(tally)}`}</span>{/if}</span>
+      {#if stuck}<span class="note why">{stuckNote(opState, seen)}</span>{/if}
     </div>
     {#if stepBeads(opState).length}
       <span class="beads" role="img" aria-label="{opState.step - 1} of {opState.total} done, {conflicts.length ? 'stopped at' : 'now at'} {opState.step}">
@@ -211,17 +223,24 @@
         {#if conflicts.length}
           <button class="btn sm secondary" onclick={resolveNext}>Resolve {conflicts.length} {conflicts.length === 1 ? 'file' : 'files'}</button>
         {/if}
+        {#if stuck && seen === 0}
+          <button class="btn sm secondary" onclick={showPatch}>Show the patch</button>
+        {/if}
         {#if can.has('continue')}
           <button class={['btn primary', conflicts.length && 'off']} aria-disabled={conflicts.length > 0 || undefined} disabled={busy} title={blockedBy(opState) || undefined} onclick={goOn}>
             {conflicts.length ? 'Continue' : continueLabel(opState)}
             {#if !conflicts.length}<kbd>{formatShortcut('Mod+Enter')}</kbd>{/if}
           </button>
         {/if}
-        {#if can.has('skip')}<button class="btn sm quiet" disabled={busy} onclick={() => act('skip')}>Skip this commit</button>{/if}
+        {#if can.has('skip')}<button class="btn sm quiet" disabled={busy} onclick={() => act('skip')}>{skipLabel(opState)}</button>{/if}
         {#if can.has('abort')}<button class="btn sm text danger" disabled={busy} onclick={() => (aborting = true)}>Abort…</button>{/if}
       {/if}
     </span>
   </div>
+{/if}
+
+{#if shown}
+  <PatchView title={shown.title} text={shown.text} onClose={() => (shown = null)} />
 {/if}
 
 <style>
@@ -286,6 +305,12 @@
     font-size: 13px;
     color: var(--ink-mute);
     overflow-wrap: anywhere;
+  }
+
+  /* Why a patch that didn't apply stopped, and what's left to do about it. */
+  .note.why {
+    max-width: 640px;
+    color: var(--ink-soft);
   }
 
   .what .mono {

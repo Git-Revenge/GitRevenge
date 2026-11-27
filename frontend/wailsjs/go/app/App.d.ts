@@ -121,6 +121,8 @@ export function ConflictSuggestions(arg1:string,arg2:string,arg3:Array<app.Confl
 
 export function CopyPatches(arg1:string,arg2:git.PatchRevs,arg3:git.PatchOptions):Promise<string>;
 
+export function CurrentPatch(arg1:string):Promise<string>;
+
 export function DeletableBranches(arg1:string,arg2:Array<string>):Promise<Array<string>>;
 
 export function DeleteBranchAndWorktree(arg1:string,arg2:string,arg3:boolean,arg4:boolean):Promise<string>;

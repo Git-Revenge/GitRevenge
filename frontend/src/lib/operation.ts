@@ -4,7 +4,8 @@ import type { BisectMarks } from './bisect.svelte'
 // The words of the strip for a merge, rebase, cherry-pick or revert in progress (issue #593),
 // kept apart from the strip so they can be tested as plain functions.
 
-export type OpState = Pick<app.RepoState, 'operation' | 'step' | 'total' | 'conflicts' | 'ours' | 'theirs' | 'commit' | 'subject' | 'origHead' | 'written'>
+export type OpState = Pick<app.RepoState, 'operation' | 'step' | 'total' | 'conflicts' | 'ours' | 'theirs' | 'commit' | 'subject' | 'origHead' | 'written'> &
+  Partial<Pick<app.RepoState, 'author' | 'applied' | 'stuck' | 'stuckReason' | 'madeBranch'>>
 
 const short = (id: string) => id.slice(0, 7)
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
@@ -27,9 +28,26 @@ export function opTitle(s: OpState): { verb: string; a: string; join: string; b:
     case 'revert':
       return { verb: 'Reverting', a: short(s.commit), join: 'on', b: ours }
     case 'am':
-      return { verb: 'Applying patches', a: '', join: '', b: '' }
+      return { verb: 'Applying patches', a: '', join: 'onto', b: ours }
   }
   return { verb: s.operation, a: '', join: '', b: '' }
+}
+
+const capital = (s: string) => `${s[0].toUpperCase()}${s.slice(1)}`
+
+/** Which patch git am has in hand: "patch 4 of 5". */
+const patchAt = (s: OpState) => (s.total > 0 ? `patch ${s.step} of ${s.total}` : 'this patch')
+
+/** The patch in hand said: ": Set the alert limit · Tyler Brooks". */
+const patchSaid = (s: OpState) => `${s.subject ? `: ${s.subject}` : ''}${s.author ? ` · ${s.author}` : ''}`
+
+/** Why a patch git am stopped on has nothing to resolve, and what can be done (#1023). seen
+ * says the stop had conflicts, which were resolved to no change at all. "" for any other stop. */
+export function stuckNote(s: OpState, seen: number): string {
+  if (s.operation !== 'am' || !s.stuck) return ''
+  if (seen > 0) return 'Resolved, it changes nothing, so there’s nothing to commit. It may be in already: skip it, or abort.'
+  const why = s.stuckReason ? `Git says “${s.stuckReason.replace(/\.$/, '')}”, and there’s nothing in conflict to resolve.` : 'There’s nothing in conflict to resolve.'
+  return `${why} Skip it, abort, or make the change by hand and stage it to bring Continue back.`
 }
 
 /** The line under the heading: where it stopped, or that it's ready to go on. seen is the most
@@ -41,6 +59,12 @@ export function opNote(s: OpState, seen: number): string {
     if (n > 0) return seen > n ? `${seen - n} of ${count(seen, 'file', 'files')} resolved.` : `${count(n, 'file needs', 'files need')} resolving before the merge can be committed.`
     return seen > 0 ? `${seen === 1 ? 'The conflict is' : `All ${seen} conflicts are`} resolved. Commit the merge to finish.` : 'Nothing is in conflict. Commit the merge to finish.'
   }
+  if (s.operation === 'am') {
+    const which = patchAt(s)
+    if (s.stuck) return seen > 0 ? `Nothing of ${which} is left to commit${patchSaid(s) || '.'}` : `${capital(which)} didn’t apply${patchSaid(s) || '.'}`
+    if (n > 0 || seen === 0) return `Stopped at ${which}${patchSaid(s) || '.'}`
+    return `${capital(which)} is resolved and staged.`
+  }
   const where = steps ? `commit ${s.step} of ${s.total}` : s.commit ? short(s.commit) : 'this commit'
   if (n > 0 || seen === 0) return `Stopped at ${where}${s.subject ? `: ${s.subject}` : '.'}`
   return `${where[0].toUpperCase()}${where.slice(1)} is resolved and staged.`
@@ -49,9 +73,9 @@ export function opNote(s: OpState, seen: number): string {
 /** What Continue says: what pressing it will do. */
 export function continueLabel(s: OpState): string {
   if (s.operation === 'merge') return 'Commit the merge'
-  if (s.operation === 'rebase' && s.total > 0) {
+  if ((s.operation === 'rebase' || s.operation === 'am') && s.total > 0) {
     const left = s.total - s.step
-    return left > 0 ? `Continue with ${left} more` : 'Finish the rebase'
+    return left > 0 ? `Continue with ${left} more` : s.operation === 'am' ? 'Finish applying' : 'Finish the rebase'
   }
   if (s.operation === 'cherry-pick') return 'Finish the cherry-pick'
   if (s.operation === 'revert') return 'Finish the revert'
@@ -69,27 +93,55 @@ export function blockedBy(s: OpState): string {
 export function abortEffect(s: OpState, seen: number): string {
   const ours = s.ours || 'HEAD'
   const at = s.origHead ? short(s.origHead) : 'where it was'
-  const back = s.operation === 'rebase' ? `${ours} goes back to ${at}, where it was before.` : `${ours} stays at ${at}, as it was before the ${OP_NOUN[s.operation] ?? s.operation}.`
+  const back =
+    s.operation === 'am'
+      ? s.madeBranch
+        ? `${s.madeBranch} goes, as it was made for them, and you’re back where you were.`
+        : `${ours} goes back to ${at}, where it was before the first patch.`
+      : s.operation === 'rebase'
+        ? `${ours} goes back to ${at}, where it was before.`
+        : `${ours} stays at ${at}, as it was before the ${OP_NOUN[s.operation] ?? s.operation}.`
   const lost: string[] = []
   if (s.written.length) lost.push(`the ${count(s.written.length, 'commit', 'commits')} already written again`)
+  if (s.operation === 'am' && s.step > 1) lost.push(`the ${count(s.step - 1, 'patch', 'patches')} already applied`)
   if (seen > 0) lost.push('your work on the conflicts')
   if (!lost.length) return back
   const what = lost.join(' and ')
-  const one = lost.length === 1 && (seen > 0 || s.written.length === 1)
+  const one = lost.length === 1 && (seen > 0 || s.written.length === 1 || (s.operation === 'am' && s.step === 2))
   return `${back} ${what[0].toUpperCase()}${what.slice(1)} ${one ? 'is' : 'are'} thrown away.`
 }
 
 /** What to say after an abort. */
 export function abortedMessage(s: OpState): string {
+  if (s.operation === 'am') {
+    if (s.madeBranch) return `Applying the patches stopped, and ${s.madeBranch}, made for them, is gone.`
+    return `Applying the patches stopped.${s.origHead ? ` ${s.ours || 'HEAD'} is back at ${short(s.origHead)}.` : ''}`
+  }
   const noun = OP_NOUN[s.operation] ?? s.operation
   const at = s.origHead ? ` ${s.ours || 'HEAD'} is back at ${short(s.origHead)}.` : ''
   return `${noun[0].toUpperCase()}${noun.slice(1)} aborted.${at}`
 }
 
-/** What to say once it's over. */
-export function finishedMessage(s: OpState): string {
+/** How many patches a series skipped, once the action taken at s finished it: those skipped
+ * before the one in hand, and that one if it was skipped too. Those after it all went in, or
+ * git am would have stopped again. */
+export function skippedAtEnd(s: OpState, action: string): number {
+  if (s.operation !== 'am') return 0
+  return Math.max(0, s.step - 1 - (s.applied ?? 0)) + (action === 'skip' ? 1 : 0)
+}
+
+/** The Skip button's words. */
+export const skipLabel = (s: OpState) => (s.operation === 'am' ? 'Skip this patch' : 'Skip this commit')
+
+/** What to say once it's over. skipped is how many patches were skipped along the way. */
+export function finishedMessage(s: OpState, skipped = 0): string {
   const t = opTitle(s)
   switch (s.operation) {
+    case 'am': {
+      const applied = Math.max(0, s.total - skipped)
+      if (!applied) return `No patches were applied; ${skipped === 1 ? 'the one was' : `all ${skipped} were`} skipped.`
+      return `Applied ${count(applied, 'patch', 'patches')} onto ${t.b}${skipped ? `; skipped ${skipped}` : ''}.`
+    }
     case 'rebase':
       return `Rebased ${t.a}${t.b ? ` onto ${t.b}` : ''}.`
     case 'merge':
@@ -104,8 +156,8 @@ export function finishedMessage(s: OpState): string {
 
 /** A bead per step of a rebase, up to a dozen: done, the one in hand, and those to come. */
 export function beads(s: OpState): ('done' | 'bad' | 'now' | '')[] {
-  if (s.operation !== 'rebase' || s.total < 1 || s.total > 12) return []
-  return Array.from({ length: s.total }, (_, i) => (i + 1 < s.step ? 'done' : i + 1 === s.step ? (s.conflicts.length ? 'bad' : 'now') : ''))
+  if ((s.operation !== 'rebase' && s.operation !== 'am') || s.total < 1 || s.total > 12) return []
+  return Array.from({ length: s.total }, (_, i) => (i + 1 < s.step ? 'done' : i + 1 === s.step ? (s.conflicts.length || s.stuck ? 'bad' : 'now') : ''))
 }
 
 /** A rebase in progress as the graph marks it: the commits written so far, and the one in hand
