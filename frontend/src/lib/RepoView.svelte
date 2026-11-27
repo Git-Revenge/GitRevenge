@@ -315,18 +315,19 @@
   let reflogRef = $state('')
   /** Where Save as patches starts, while it's open (#1021). */
   let patchesStart = $state<PatchStart | null>(null)
-  /** A file of patches being previewed to apply (#1022). */
+  /** A file of patches being previewed to apply (#1022), or a plain diff (#1024). */
   let patchFile = $state<app.PatchFile | null>(null)
+  let diffFile = $state<app.PatchFile | null>(null)
 
   /** Apply patches or a diff…: a file picked, read, and shown for what it is. Mail opens the
-   * preview; a plain diff and anything else say what they are. */
+   * series preview, a plain diff the diff's; anything else says what it is. */
   async function applyPatches() {
     const file = await session.run(() => ChoosePatchFile())
     if (!file) return
     const read = await session.run(() => ReadPatches(path, file))
     if (!read) return
     if (read.kind === 'mail') patchFile = read
-    else if (read.kind === 'diff') toasts.show(`${read.name} is a plain diff. Applying one to your files isn’t in the app yet: git apply does it.`)
+    else if (read.kind === 'diff' && read.diff) diffFile = read
     else toasts.show(`${read.name} isn’t a patch or a diff.`)
   }
   const ctx: MenuContext = {
@@ -704,6 +705,9 @@
 {/if}
 {#if patchFile}
   <Lazy load={() => import('./ApplyPatchesDialog.svelte')} {path} file={patchFile} onClose={() => (patchFile = null)} />
+{/if}
+{#if diffFile}
+  <Lazy load={() => import('./ApplyDiffDialog.svelte')} {path} file={diffFile} onClose={() => (diffFile = null)} />
 {/if}
 {#if bisect.starting?.path === path}
   <Lazy load={() => import('./BisectDialog.svelte')} {path} bad={bisect.starting.bad} onClose={() => (bisect.starting = null)} />

@@ -73,9 +73,12 @@ func TestReadPatchesOnlyAChosenFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	a.chosen.add(diff)
-	if d, err := a.ReadPatches(path, diff); err != nil || d.Kind != git.PatchDiff || d.Token != "" {
+	// A plain diff opens the diff's preview (#1024).
+	d, err := a.ReadPatches(path, diff)
+	if err != nil || d.Kind != git.PatchDiff || d.Token == "" || d.Diff == nil || len(d.Diff.Files) != 1 || d.Diff.Files[0].Path != "a.txt" {
 		t.Fatalf("a plain diff = %+v, %v", d, err)
 	}
+	a.ClosePatches(d.Token)
 }
 
 func TestTryPatchesTellsEachRowAsItComes(t *testing.T) {

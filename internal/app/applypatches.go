@@ -29,6 +29,11 @@ type patchSet struct {
 	repo string
 	dir  string
 	msgs []git.MailMessage
+	// diff, for a plain diff (#1024), is a copy of it in dir; files are what it changes, and
+	// named says it names the versions it came from, so it can be merged.
+	diff  string
+	files []git.DiffFile
+	named bool
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -93,6 +98,8 @@ type PatchFile struct {
 	// Missing, in a partial clone, lists the versions of the files the patches change, as the
 	// checked-out commit has them, that were never downloaded: the preview needs them (#1003).
 	Missing []string `json:"missing,omitempty"`
+	// Diff is a plain diff's files, for git apply (#1024).
+	Diff *DiffInfo `json:"diff,omitempty"`
 }
 
 // ChoosePatchFile shows a file picker for patches or a diff, and returns the file chosen, or
@@ -133,6 +140,9 @@ func (a *App) ReadPatches(path, file string) (PatchFile, error) {
 		return PatchFile{}, writeErr(err)
 	}
 	out := PatchFile{Name: filepath.Base(file), Kind: git.PatchFileKind(data), Messages: []git.MailMessage{}}
+	if out.Kind == git.PatchDiff {
+		return a.readDiff(r, out, data)
+	}
 	if out.Kind != git.PatchMail {
 		return out, nil
 	}

@@ -1,5 +1,21 @@
 export namespace app {
 	
+	export class AppliedDiff {
+	    id: string;
+	    files: number;
+	    conflicts: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AppliedDiff(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.files = source["files"];
+	        this.conflicts = source["conflicts"];
+	    }
+	}
 	export class AreaCommit {
 	    sha: string;
 	    subject: string;
@@ -1057,6 +1073,58 @@ export namespace app {
 		}
 	}
 	
+	export class DiffInfo {
+	    files: git.DiffFile[];
+	    named: boolean;
+	    unclean: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DiffInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.files = this.convertValues(source["files"], git.DiffFile);
+	        this.named = source["named"];
+	        this.unclean = source["unclean"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class DiffTry {
+	    path: string;
+	    status: string;
+	    files?: string[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DiffTry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.status = source["status"];
+	        this.files = source["files"];
+	        this.error = source["error"];
+	    }
+	}
 	
 	export class DroppedCommit {
 	    commit: string;
@@ -1812,6 +1880,7 @@ export namespace app {
 	    staged: boolean;
 	    branch: string;
 	    missing?: string[];
+	    diff?: DiffInfo;
 	
 	    static createFrom(source: any = {}) {
 	        return new PatchFile(source);
@@ -1826,6 +1895,7 @@ export namespace app {
 	        this.staged = source["staged"];
 	        this.branch = source["branch"];
 	        this.missing = source["missing"];
+	        this.diff = this.convertValues(source["diff"], DiffInfo);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -4058,6 +4128,30 @@ export namespace git {
 		    }
 		    return a;
 		}
+	}
+	export class DiffFile {
+	    path: string;
+	    oldPath?: string;
+	    added: number;
+	    deleted: number;
+	    binary: boolean;
+	    created: boolean;
+	    removed: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new DiffFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.oldPath = source["oldPath"];
+	        this.added = source["added"];
+	        this.deleted = source["deleted"];
+	        this.binary = source["binary"];
+	        this.created = source["created"];
+	        this.removed = source["removed"];
+	    }
 	}
 	export class FetchRules {
 	    skipFetchAll: boolean;
