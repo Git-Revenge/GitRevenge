@@ -343,6 +343,13 @@ const mounts = {
     const { default: Toasts } = await import('../src/lib/ui/Toasts.svelte')
     mount(Toasts, { target: document.body })
   },
+  async archive() {
+    const { default: ArchiveDialog } = await import('../src/lib/ArchiveDialog.svelte')
+    const what = (scenario.archive ?? { rev: 'v1.1.0', label: 'v1.1.0' }) as { rev: string; label: string }
+    mount(ArchiveDialog, { target: host, props: { path: 'A:\\tidewater', rev: what.rev, label: what.label, onClose: record('close') } })
+    const { default: Toasts } = await import('../src/lib/ui/Toasts.svelte')
+    mount(Toasts, { target: document.body })
+  },
   async rebaseEditor() {
     host.style.cssText = 'display:block;height:100vh'
     const { default: RebaseEditor } = await import('../src/lib/RebaseEditor.svelte')
@@ -689,6 +696,9 @@ switch (new URLSearchParams(location.search).get('mount')) {
     break
   case 'savePatches':
     await mounts.savePatches()
+    break
+  case 'archive':
+    await mounts.archive()
     break
   case 'rebaseEditor':
     await mounts.rebaseEditor()

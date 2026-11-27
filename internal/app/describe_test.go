@@ -20,26 +20,30 @@ func TestDescribeCommit(t *testing.T) {
 	}
 }
 
-// Stepping down the graph asks again before the last answer comes: the newer ask stops it.
+// Stepping down the graph asks again before the last answer comes: the newer ask stops the
+// one before, for that repository only.
 func TestANewerDescribeStopsTheLast(t *testing.T) {
 	t.Parallel()
-	var calls describeCalls
-	first, cancelFirst := calls.start("/r")
-	defer cancelFirst()
-	other, cancelOther := calls.start("/other")
-	defer cancelOther()
-	second, cancelSecond := calls.start("/r")
-	if first.Err() == nil {
-		t.Fatal("the newer ask didn't stop the last")
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	ids := fx.Linear(1)
+	path := openForMap(t, a, fx)
+	r, err := a.openRepo(path)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if second.Err() != nil || other.Err() != nil {
-		t.Fatal("it stopped more than the last ask for that repository")
+	// Stand-ins for a describe still running here, and for another kind of read.
+	before, doneBefore := a.latest.start("describe", r.Path)
+	defer doneBefore()
+	other, doneOther := a.latest.start("blame", r.Path)
+	defer doneOther()
+	if _, err := a.DescribeCommit(path, ids[0]); err != nil {
+		t.Fatal(err)
 	}
-	cancelSecond()
-	// Cancelling one that's done does nothing to the next.
-	third, cancelThird := calls.start("/r")
-	defer cancelThird()
-	if third.Err() != nil {
-		t.Fatal("a finished ask stopped the next")
+	if before.Err() == nil {
+		t.Error("the newer describe didn't stop the one before")
+	}
+	if other.Err() != nil {
+		t.Error("it stopped a read of another kind")
 	}
 }

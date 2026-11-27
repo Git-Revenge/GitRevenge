@@ -18,6 +18,8 @@ export interface Scenario {
   graphData?: unknown[]
   /** Where Save as patches starts (#1021). */
   patchStart?: unknown
+  /** What Save as an archive saves (#936): { rev, label }. */
+  archive?: unknown
   /** The file of patches the apply preview opens on (#1022). */
   patchFile?: unknown
   /** For patchSources (#1025): no repository open, or one that isn't on screen. */

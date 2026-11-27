@@ -317,6 +317,8 @@
   let reflogRef = $state('')
   /** Where Save as patches starts, while it's open (#1021). */
   let patchesStart = $state<PatchStart | null>(null)
+  /** What Save as an archive is saving, while it's open (#936). */
+  let archiving = $state<{ rev: string; label: string } | null>(null)
   /** A file of patches being previewed to apply (#1022), or a plain diff (#1024). */
   let patchFile = $state<app.PatchFile | null>(null)
   /** Two versions of a branch compared (#1038), in the panel on the right; and the branch the
@@ -438,6 +440,7 @@
     openPreview: (kind, target, label) => (preview = { kind, target, label }),
     openReflog: (ref) => (reflogRef = ref),
     openPatches: (start) => (patchesStart = start),
+    openArchive: (rev, label) => (archiving = { rev, label }),
     compareVersions: (branch, oldTip, oldLabel) => versionsAsk.show({ path, branch, oldTip, oldLabel }),
     pickVersions: (branch) => (comparing = { branch, oldTip: '' }),
   }
@@ -807,6 +810,9 @@
 {/if}
 {#if patchesStart}
   <Lazy load={() => import('./SavePatchesDialog.svelte')} {path} start={patchesStart} onClose={() => (patchesStart = null)} />
+{/if}
+{#if archiving}
+  <Lazy load={() => import('./ArchiveDialog.svelte')} {path} rev={archiving.rev} label={archiving.label} onClose={() => (archiving = null)} />
 {/if}
 {#if patchFile}
   <Lazy load={() => import('./ApplyPatchesDialog.svelte')} {path} file={patchFile} onClose={() => (patchFile = null)} />
