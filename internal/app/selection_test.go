@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -275,5 +276,42 @@ func TestCompareInAPartialCloneSaysWhatsMissing(t *testing.T) {
 	fc, err := a.FileContents(path, DiffCompare, first+".."+head, "notes.txt", "", false)
 	if err != nil || fc.Kind != "missing" || len(fc.Missing) != 1 {
 		t.Fatalf("file = kind %q, missing %v, %v; want the first version missing", fc.Kind, fc.Missing, err)
+	}
+}
+
+func TestSquashOffer(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	local, _ := gittest.WithRemote(t, 2)
+	pushed := local.Head()
+	one := local.CommitFile("a.txt", "1\n", "one")
+	two := local.CommitFile("a.txt", "2\n", "two")
+	path := openForMap(t, a, local)
+	offer := func(oldest, newest string) SquashOffer {
+		t.Helper()
+		o, err := a.SquashOffer(path, oldest, newest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return o
+	}
+
+	if o := offer(one, two); !o.OK {
+		t.Fatalf("two new commits on main should squash: %+v", o)
+	}
+	if o := offer(pushed, one); o.OK || o.Reason != shortRef(pushed)+" is on origin/main too." {
+		t.Fatalf("a pushed commit = %+v", o)
+	}
+	local.Git("branch", "keep", one)
+	if o := offer(one, two); o.OK || o.Reason != shortRef(one)+" is on keep too." {
+		t.Fatalf("a commit another branch holds = %+v", o)
+	}
+	local.Git("checkout", "-q", "-b", "side", pushed)
+	if o := offer(one, two); o.OK || o.Reason != "Only for one line on side." {
+		t.Fatalf("commits that aren't on the checked-out branch = %+v", o)
+	}
+	local.Git("checkout", "-q", "--detach", two)
+	if o := offer(one, two); o.OK || !strings.Contains(o.Reason, "detached") {
+		t.Fatalf("a detached HEAD = %+v", o)
 	}
 }

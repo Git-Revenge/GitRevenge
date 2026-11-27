@@ -17,8 +17,9 @@ export interface MenuContext {
   /** The checked-out branch, or "" when HEAD is detached. */
   current: () => string
   openDialog: (spec: DialogSpec) => void
-  /** Opens the interactive rebase editor for the commits after base. */
-  openRebase: (base: string) => void
+  /** Opens the interactive rebase editor for the commits after base, with any commits named
+   * in squash starting squashed into the oldest of them (#1020). */
+  openRebase: (base: string, squash?: string[]) => void
   /** Opens the preview of merging target into the checked-out branch, or of rebasing that
    * branch onto it. label is how target is named to the user. */
   openPreview: (kind: 'merge' | 'rebase', target: string, label: string) => void

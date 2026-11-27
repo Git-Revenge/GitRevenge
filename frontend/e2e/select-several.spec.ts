@@ -93,9 +93,11 @@ test.describe('several commits selected', () => {
     await click(page, 1)
     await click(page, 3, ['Shift'])
     await expect(commitsIn(page)).toHaveCount(3)
+    // A line on main: Squash is on once the backend says so.
+    await expect(panel(page).getByRole('button', { name: 'Squash into one…' })).toBeEnabled()
     await click(page, 2, [], 'right')
     const menu = page.getByRole('menu')
-    await expect(menu.getByRole('menuitem')).toHaveText(['Cherry-pick 3 onto main', 'Revert 3…', 'Copy their ids'])
+    await expect(menu.getByRole('menuitem')).toHaveText(['Cherry-pick 3 onto main', 'Revert 3…', 'Squash into one…', 'Copy their ids'])
     await menu.getByRole('menuitem', { name: /^Cherry-pick 3 onto main/ }).click()
     await expect.poll(() => calls(page, 'Integrate')).toEqual([['/r', 'cherry-pick', [id(3), id(2), id(1)]]])
 
@@ -240,5 +242,60 @@ test.describe('two commits, and a line of them (#1019)', () => {
     await expect(note).toContainText('hasn’t got yet')
     await expect(note.getByRole('button', { name: 'Download' })).toBeVisible()
     expect(await calls(page, 'CancelDownload')).toHaveLength(1)
+  })
+})
+
+test.describe('a line squashed into one (#1020)', () => {
+  test.use({ timezoneId: 'UTC' })
+  const planOf = (...rows: number[]) => rows.map((i) => ({ commit: id(i), subject: `Commit ${i}`, message: `Commit ${i}` }))
+  const editor = { RebasePlan: planOf(3, 2, 1, 0), PreviewRebasePlan: { stopsAt: '', conflicts: [], incomplete: false, pushed: false, upstream: '', dropped: [] }, RepoState: { operation: '', conflicts: [] } }
+  const what = (page: Page, subject: string) => page.getByRole('button', { name: new RegExp(`^What to do with ${subject}:`) })
+
+  test('opens the rebase editor with the line marked to squash into its oldest', async ({ page }) => {
+    await open(page, 'repoView', { graphData: rows(8), responses: { ...base, ...editor }, current: 'main' })
+    await click(page, 1)
+    await click(page, 3, ['Shift'])
+    const squash = panel(page).getByRole('button', { name: 'Squash into one…' })
+    await expect(squash).toBeEnabled()
+    // Asked of the oldest and the newest.
+    expect((await calls(page, 'SquashOffer')).at(-1)).toEqual(['/r', id(3), id(1)])
+    await squash.click()
+    // From the oldest one's parent: the line and what's after it on main.
+    await expect.poll(async () => (await calls(page, 'RebasePlan')).at(-1)).toEqual(['/r', id(4)])
+    await expect(what(page, 'Commit 3')).toHaveAccessibleName(/: Keep$/)
+    await expect(what(page, 'Commit 2')).toHaveAccessibleName(/: Squash$/)
+    await expect(what(page, 'Commit 1')).toHaveAccessibleName(/: Squash$/)
+    await expect(what(page, 'Commit 0')).toHaveAccessibleName(/: Keep$/)
+    // Nothing runs until the plan is started.
+    expect(await calls(page, 'InteractiveRebase')).toEqual([])
+    await expect(page.getByRole('button', { name: 'Reset the plan' })).toBeEnabled()
+  })
+
+  test('says why not: commits on another branch, a gap, the first commit', async ({ page }) => {
+    await open(page, 'repoView', { graphData: rows(8), responses: { ...base, SquashOffer: { ok: false, reason: '0000003 is on origin/main too.' } }, current: 'main' })
+    const squash = panel(page).getByRole('button', { name: 'Squash into one…' })
+    await click(page, 1)
+    await click(page, 3, ['Shift'])
+    await expect(squash).toBeDisabled()
+    await expect(squash).toHaveAttribute('title', '0000003 is on origin/main too.')
+
+    await click(page, 1)
+    await click(page, 3, ['ControlOrMeta'])
+    await click(page, 5, ['ControlOrMeta'])
+    await expect(squash).toBeDisabled()
+    await expect(squash).toHaveAttribute('title', 'Only for one line on main.')
+
+    await click(page, 5)
+    await click(page, 7, ['Shift'])
+    await expect(squash).toHaveAttribute('title', 'It starts at the history’s first commit.')
+  })
+
+  test('isn’t offered with no branch checked out', async ({ page }) => {
+    await open(page, 'repoView', { graphData: rows(8), responses: base })
+    await click(page, 1)
+    await click(page, 3, ['Shift'])
+    await expect(panel(page).getByRole('button', { name: 'Revert 3…' })).toBeVisible()
+    await expect(panel(page).getByRole('button', { name: 'Squash into one…' })).toHaveCount(0)
+    expect(await calls(page, 'SquashOffer')).toEqual([])
   })
 })

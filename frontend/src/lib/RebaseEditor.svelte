@@ -4,14 +4,26 @@
   import type { app, git } from '../../wailsjs/go/models'
   import { errorText } from './errors'
   import { placesNote } from './preview'
-  import { ACTIONS, actionForKey, isCommitId, actionLabel, changed, foldable, foldIn, foldTarget, move, newPlan, outcome, problem as problemOf, setAction, toRun, type Action, type PlanItem } from './rebasePlan'
+  import { ACTIONS, actionForKey, isCommitId, actionLabel, changed, foldable, foldIn, foldTarget, move, newPlan, outcome, presetSquash, problem as problemOf, setAction, toRun, type Action, type PlanItem } from './rebasePlan'
   import { session } from './session.svelte'
   import Icon from './ui/Icon.svelte'
   import NotDownloaded from './diff/NotDownloaded.svelte'
 
   /** The interactive rebase editor (issue #596): what happens to each commit after base, oldest
    * first as git applies them, with the branch as it will be afterwards beside it. */
-  let { path, base, onClose }: { path: string; base: string; onClose: () => void } = $props()
+  let {
+    path,
+    base,
+    squash = [],
+    onClose,
+  }: {
+    path: string
+    base: string
+    /** Commits to start squashed into the oldest of them: a line selected in the graph and
+     * squashed into one (#1020). The plan shows it before anything runs. */
+    squash?: string[]
+    onClose: () => void
+  } = $props()
 
   let items = $state<PlanItem[]>([])
   /** The commits in the order they came, for Reset and to know whether anything changed. */
@@ -27,7 +39,7 @@
     error = ''
     try {
       fresh = newPlan((await RebasePlan(path, base)) ?? [])
-      items = fresh.map((it) => ({ ...it }))
+      items = squash.length ? presetSquash(fresh, squash) : fresh.map((it) => ({ ...it }))
     } catch (e) {
       error = errorText(e)
     } finally {

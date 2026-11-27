@@ -489,6 +489,8 @@ export function ShowRemoteFolder(arg1:string,arg2:string):Promise<void>;
 
 export function ShowingHidden(arg1:string):Promise<boolean>;
 
+export function SquashOffer(arg1:string,arg2:string,arg3:string):Promise<app.SquashOffer>;
+
 export function StackDeletePlan(arg1:string,arg2:Array<string>):Promise<app.StackPlan>;
 
 export function StackPushPlan(arg1:string,arg2:Array<string>):Promise<app.StackPush>;
