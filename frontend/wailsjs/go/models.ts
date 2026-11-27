@@ -2706,6 +2706,24 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class SavedArchive {
+	    file: string;
+	    folder: string;
+	    exists?: boolean;
+	    stopped?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SavedArchive(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.file = source["file"];
+	        this.folder = source["folder"];
+	        this.exists = source["exists"];
+	        this.stopped = source["stopped"];
+	    }
+	}
 	export class SavedPatches {
 	    files: string[];
 	    folder: string;
@@ -3828,6 +3846,44 @@ export namespace git {
 		    }
 		    return a;
 		}
+	}
+	export class ArchiveOptions {
+	    format: string;
+	    prefix: string;
+	    sub: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ArchiveOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.format = source["format"];
+	        this.prefix = source["prefix"];
+	        this.sub = source["sub"];
+	    }
+	}
+	export class ArchivePlan {
+	    commit: string;
+	    files: number;
+	    bytes: number;
+	    ignored: number;
+	    subst: number;
+	    missing: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ArchivePlan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.commit = source["commit"];
+	        this.files = source["files"];
+	        this.bytes = source["bytes"];
+	        this.ignored = source["ignored"];
+	        this.subst = source["subst"];
+	        this.missing = source["missing"];
+	    }
 	}
 	export class AuthorHistory {
 	    authored: number;

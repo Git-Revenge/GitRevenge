@@ -34,6 +34,9 @@ export interface MenuContext {
   openAuthor?: (row: Row) => void
   /** Opens Save as patches (#1021); absent where there's no dialog to open. */
   openPatches?: (start: PatchStart) => void
+  /** Opens Save as an archive (#936) for rev, named label; absent where there's no dialog to
+   * open. */
+  openArchive?: (rev: string, label: string) => void
   /** Compares two versions of branch (#1040): oldTip against its tip now; absent where
    * there's no panel to show it. */
   compareVersions?: (branch: string, oldTip: string, oldLabel: string) => void
@@ -66,6 +69,11 @@ function patchItems(row: Row, ctx: MenuContext): MenuItem[] {
     { label: 'Copy as a patch', icon: 'copy', separator: true, ...edge, run: () => copyAsPatches(ctx.path, { since: '', tip: row.id, last: 1, ids: [] } as git.PatchRevs, short, ctx.openDialog) },
     { label: 'Save as patches, up to here…', icon: 'file', ...edge, run: () => ctx.openPatches?.({ kind: 'commit', tip: row.id, subject: row.subject }) },
   ]
+}
+
+/** Save as an archive… (#936): a merge too, since an archive is a commit's files. */
+function archiveItems(rev: string, label: string, text: string, ctx: MenuContext): MenuItem[] {
+  return ctx.openArchive ? [{ label: text, icon: 'package', run: () => ctx.openArchive?.(rev, label) }] : []
 }
 
 /** Joins groups of items, drawing a rule between non-empty groups. */
@@ -415,7 +423,11 @@ export function refItems(ref: Ref, ctx: MenuContext, extras?: RefExtras): MenuIt
             },
           },
         ],
-        [...(ctx.openPatches ? [{ label: `Save ${ref.short} as patches…`, icon: 'file' as const, run: () => ctx.openPatches?.({ kind: 'branch', branch: ref.short, stackParent: ref.stackParent }) }] : []), ...compareItem(ref, ctx, extras)],
+        [
+          ...(ctx.openPatches ? [{ label: `Save ${ref.short} as patches…`, icon: 'file' as const, run: () => ctx.openPatches?.({ kind: 'branch', branch: ref.short, stackParent: ref.stackParent }) }] : []),
+          ...archiveItems(ref.short, ref.short, `Save ${ref.short} as an archive…`, ctx),
+          ...compareItem(ref, ctx, extras),
+        ],
         // Restacking is for work still to land: a branch already merged only needs deleting.
         ref.stackParentMerged && !session.merged[path]?.[ref.short]
           ? [
@@ -503,6 +515,7 @@ export function refItems(ref: Ref, ctx: MenuContext, extras?: RefExtras): MenuIt
     case 'tag':
       return groups(
         [...integrateItems(ctx, ref.name, ref.short), { label: `Push tag ${ref.short} to origin`, icon: 'push', run: push(path, 'origin', 'tag', ref.short) }],
+        archiveItems(ref.name, ref.short, `Save ${ref.short} as an archive…`, ctx),
         [
           { label: `Delete tag ${ref.short}`, icon: 'trash', danger: true, run: () => session.run(() => branch(path, 'untag', ref.short)) },
           { label: `Delete tag ${ref.short} from origin`, icon: 'trash', danger: true, run: push(path, 'origin', 'delete-tag', ref.short) },
@@ -560,6 +573,7 @@ export function commitItems(row: Row, refs: Ref[], ctx: MenuContext): MenuItem[]
       : []),
     ...(ctx.openBisect ? [{ label: 'Find what broke it, up to here…', icon: 'search' as const, run: () => ctx.openBisect?.(row.id) }] : []),
     ...patchItems(row, ctx),
+    ...archiveItems(row.id, short, 'Save as an archive…', ctx),
     {
       label: `Reset ${ctx.current() || 'HEAD'} to ${short}…`,
       icon: 'reset',

@@ -96,6 +96,19 @@ Drag patches or a diff from your file manager onto the window. While you hold th
 
 **Apply the patch on the clipboard**, in the command palette, opens the clipboard's text the same way. It's the pair to **Copy as a patch**, and takes a patch copied from a mail or a web page too.
 
+## Saving a commit's files as an archive
+
+When someone needs a project's files rather than its history, such as a release's source, **Save as an archive…** writes them as a zip or tar file with `git archive`. It's on a commit's menu, and as **Save** *name* **as an archive…** on a branch's and a tag's.
+
+The dialog says what goes in before anything is written: how many files, how big they are before compressing, and what the commit's own `.gitattributes` changes. Files and folders marked `export-ignore` are left out, and files marked `export-subst` have their `$Format:…$` placeholders filled in, as git does. Its choices are git archive's:
+
+- **Format:** zip, which every system opens, tar.gz or tar. The app remembers your choice for each repository.
+- **Everything in** (`--prefix`): the folder everything sits in inside the archive, named for the repository and what you're saving, such as `tidewater-v1.1.0/`. Clear it to have the files at the top.
+- **Only:** one folder of the commit, such as `src`, kept at its path inside. Left empty, it's the whole tree.
+- **Save to:** the folder, starting where you saved last, and the file's name, which follows the format until you type one. A file already there is replaced only when you say so.
+
+The git command those choices make shows below them. Saving a big repository takes a while (the Linux kernel's zip takes about 30 seconds), so the dialog says it's writing, with **Stop**. A stopped archive leaves nothing behind. In a [partial clone](big-repositories.md), the dialog says how many files it hasn't got, and **Download and save** fetches them in one download first.
+
 ## What stays on the command line
 
 Git Revenge doesn't send mail. Saving patches makes the files a mailing list wants, and from there the tools built for it take over:
