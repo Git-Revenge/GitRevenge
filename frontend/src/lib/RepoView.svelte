@@ -324,7 +324,14 @@
   function showVersions(compared: app.VersionsCompared, branch: string, oldLabel: string) {
     comparing = null
     versions = { compared, branch, oldLabel }
+    pairAt = -1
     view = 'commit'
+  }
+  /** The pair of the comparison open in the diff area (#1039), or -1. */
+  let pairAt = $state(-1)
+  function closeVersions() {
+    versions = null
+    pairAt = -1
   }
   let diffFile = $state<app.PatchFile | null>(null)
 
@@ -629,6 +636,10 @@
       <div class="graph">
         <Lazy load={() => import('./RebaseEditor.svelte')} {path} base={rebaseBase} squash={rebaseSquash} onClose={() => (rebaseBase = '')} />
       </div>
+    {:else if versions && pairAt >= 0}
+      <div class="graph">
+        <Lazy load={() => import('./VersionPairView.svelte')} compared={versions.compared} index={pairAt} onClose={() => (pairAt = -1)} onStep={(i: number) => (pairAt = i)} />
+      </div>
     {:else if diff}
       <div class="graph">
         {#if diff.mode === 'conflict'}
@@ -696,7 +707,19 @@
       onRevert={revertFound}
     />
   {:else if versions}
-    <Lazy load={() => import('./VersionsPanel.svelte')} compared={versions.compared} branch={versions.branch} oldLabel={versions.oldLabel} onClose={() => (versions = null)} onShow={(id: string) => void revealCommit(id)} />
+    <Lazy
+      load={() => import('./VersionsPanel.svelte')}
+      compared={versions.compared}
+      branch={versions.branch}
+      oldLabel={versions.oldLabel}
+      current={pairAt}
+      onClose={closeVersions}
+      onOpen={(i: number) => (pairAt = i)}
+      onShow={(id: string) => {
+        pairAt = -1
+        void revealCommit(id)
+      }}
+    />
   {:else if several}
     <SelectionPanel {path} selected={several} {ctx} squash={squashState} onUnpick={(row) => graph.unpick(row)} onShow={(row) => graph.reveal(row)} openFile={(t) => (diff = t)} />
   {:else if selected}
