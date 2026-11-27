@@ -9,6 +9,7 @@ import { session } from './session.svelte'
 import { toasts } from './toasts.svelte'
 import { BrowserOpenURL, ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
 import { remoteBranchHint, type RefExtras } from './branchWeb'
+import { ago, earlierTips } from './versions'
 import { linkStore } from './links/links.svelte'
 import { copyAsPatches, EDGE_REASON, type PatchStart } from './patches'
 
@@ -33,6 +34,26 @@ export interface MenuContext {
   openAuthor?: (row: Row) => void
   /** Opens Save as patches (#1021); absent where there's no dialog to open. */
   openPatches?: (start: PatchStart) => void
+  /** Compares two versions of branch (#1040): oldTip against its tip now; absent where
+   * there's no panel to show it. */
+  compareVersions?: (branch: string, oldTip: string, oldLabel: string) => void
+  /** Opens Compare two versions, starting on branch. */
+  pickVersions?: (branch: string) => void
+}
+
+/** Compare with an earlier version ▸, for a local branch (#1040): its tips from before a
+ * rebase, an amend or a reset, its upstream when it's moved apart, and Pick two versions…. */
+export function compareItem(ref: Ref, ctx: MenuContext, extras?: RefExtras): MenuItem[] {
+  // Without the extras the reflog isn't known: say nothing rather than "nothing to compare".
+  if (ref.kind !== 'local' || !ctx.compareVersions || !extras) return []
+  const tips = earlierTips(extras?.reflog ?? [])
+  const items: MenuItem[] = tips.map((t) => ({ label: `${t.said} · ${ago(t.time)}`, hint: t.commit.slice(0, 7), run: () => ctx.compareVersions?.(ref.short, t.commit, t.said) }))
+  if (ref.upstream && ref.ahead + ref.behind > 0) items.push({ label: ref.upstream, icon: 'remote', run: () => ctx.compareVersions?.(ref.short, ref.upstream, ref.upstream) })
+  if (!items.length) {
+    return [{ label: 'Compare with an earlier version', icon: 'rebase', disabled: true, hint: 'It hasn’t been rebased, amended or reset, and its upstream has the same commits.' }]
+  }
+  items.push({ label: 'Pick two versions…', separator: true, run: () => ctx.pickVersions?.(ref.short) })
+  return [{ label: 'Compare with an earlier version', icon: 'rebase', items }]
 }
 
 /** Copy as a patch and Save as patches, up to here, for one commit (#1021). A merge offers
@@ -394,10 +415,21 @@ export function refItems(ref: Ref, ctx: MenuContext, extras?: RefExtras): MenuIt
             },
           },
         ],
-        ctx.openPatches ? [{ label: `Save ${ref.short} as patches…`, icon: 'file', run: () => ctx.openPatches?.({ kind: 'branch', branch: ref.short, stackParent: ref.stackParent }) }] : [],
+        [...(ctx.openPatches ? [{ label: `Save ${ref.short} as patches…`, icon: 'file' as const, run: () => ctx.openPatches?.({ kind: 'branch', branch: ref.short, stackParent: ref.stackParent }) }] : []), ...compareItem(ref, ctx, extras)],
         // Restacking is for work still to land: a branch already merged only needs deleting.
         ref.stackParentMerged && !session.merged[path]?.[ref.short]
-          ? [{ label: `Restack ${ref.short} (${ref.stackParent} was merged)`, icon: 'rebase', run: () => session.run(() => Restack(ctx.path, ref.short)) }]
+          ? [
+              {
+                label: `Restack ${ref.short} (${ref.stackParent} was merged)`,
+                icon: 'rebase',
+                run: async () => {
+                  const before = ref.commit
+                  const done = await session.run(() => Restack(ctx.path, ref.short).then(() => true))
+                  // What became of its commits (#1040).
+                  if (done && ctx.compareVersions) toasts.show(`Restacked ${ref.short}.`, { label: 'What changed?', run: () => ctx.compareVersions?.(ref.short, before, 'Before the restack') })
+                },
+              },
+            ]
           : [],
         [...focusItems(ctx, ref, ref.short), hideItem(ctx, ref, ref.short)],
         [markItem(ctx, ref, ref.short), stackItem(ctx, ref)],

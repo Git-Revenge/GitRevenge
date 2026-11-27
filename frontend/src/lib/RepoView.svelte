@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte'
-  import { CarryOnHistorySearch, ChoosePatchFile, CloneShape, CommitRow, ReadClipboardPatches, ReadPatches, ReadPatchFiles, SetHistorySearch, SquashOffer, SetTrailerFilter, SetTrailerPin, StopHistorySearch, TrailerFilter, TrailerFilterRows, TrailerFilterStep, TrailerPins } from '../../wailsjs/go/app/App.js'
+  import { CarryOnHistorySearch, ChoosePatchFile, CloneShape, CommitRow, CompareVersions, Reflog, Refs, VersionBase, ReadClipboardPatches, ReadPatches, ReadPatchFiles, SetHistorySearch, SquashOffer, SetTrailerFilter, SetTrailerPin, StopHistorySearch, TrailerFilter, TrailerFilterRows, TrailerFilterStep, TrailerPins } from '../../wailsjs/go/app/App.js'
   import ShallowBand from './ShallowBand.svelte'
   import type { app } from '../../wailsjs/go/models'
   import { onBackend } from './events'
@@ -24,6 +24,8 @@
   import type { Selected } from './graph/selection'
   import type { PatchStart } from './patches'
   import { toasts } from './toasts.svelte'
+  import { earlierTips } from './versions'
+  import { versionsAsk, type VersionsAskFor } from './versionsAsk.svelte'
   import type { DiffTarget } from './diff/DiffView.svelte'
   import { ofCommits } from './diff/target'
   import Lazy from './ui/Lazy.svelte'
@@ -320,7 +322,45 @@
   /** Two versions of a branch compared (#1038), in the panel on the right; and the branch the
    * Compare two versions dialog starts on, while it's open. */
   let versions = $state<{ compared: app.VersionsCompared; branch: string; oldLabel: string } | null>(null)
-  let comparing = $state<{ branch: string } | null>(null)
+  let comparing = $state<{ branch: string; oldTip: string } | null>(null)
+
+  // A comparison asked for from a toast, the reflog or a menu (#1040): each version's start
+  // is worked out here, and when it can't be, Compare two versions opens to ask.
+  let askedSeq = 0
+  $effect(() => {
+    const a = versionsAsk.ask
+    if (!a || a.path !== path || a.seq === askedSeq) return
+    askedSeq = a.seq
+    void untrack(() => compareAsked(a))
+  })
+  async function compareAsked(a: VersionsAskFor) {
+    let oldTip = a.oldTip
+    let oldLabel = a.oldLabel
+    if (!oldTip) {
+      const tip = earlierTips((await Reflog(path, a.branch).catch(() => null)) ?? [])[0]
+      if (!tip) {
+        comparing = { branch: a.branch, oldTip: '' }
+        return
+      }
+      oldTip = tip.commit
+      oldLabel = tip.said
+    }
+    const refs = ((await Refs(path).catch(() => null)) ?? []) as Ref[]
+    const stack = refs.find((r) => r.kind === 'local' && r.short === a.branch)?.stackParent ?? ''
+    const [oldBase, newBase] = await Promise.all([VersionBase(path, a.branch, stack, oldTip).catch(() => ''), VersionBase(path, a.branch, stack, a.branch).catch(() => '')])
+    if (!oldBase || !newBase) {
+      comparing = { branch: a.branch, oldTip }
+      return
+    }
+    const got = await session.run(() => CompareVersions(path, { base: oldBase, tip: oldTip }, { base: newBase, tip: a.branch }, false))
+    if (got) showVersions(got, a.branch, oldLabel)
+  }
+
+  /** The interactive rebase editor ran to the end: what became of the branch's commits. */
+  function rebased() {
+    const branch = ctx.current()
+    if (branch) toasts.show(`Rebased ${branch}.`, { label: 'What changed?', run: () => versionsAsk.show({ path, branch, oldTip: '', oldLabel: '' }) })
+  }
   function showVersions(compared: app.VersionsCompared, branch: string, oldLabel: string) {
     comparing = null
     versions = { compared, branch, oldLabel }
@@ -388,6 +428,8 @@
     openPreview: (kind, target, label) => (preview = { kind, target, label }),
     openReflog: (ref) => (reflogRef = ref),
     openPatches: (start) => (patchesStart = start),
+    compareVersions: (branch, oldTip, oldLabel) => versionsAsk.show({ path, branch, oldTip, oldLabel }),
+    pickVersions: (branch) => (comparing = { branch, oldTip: '' }),
   }
 
   provideCommands(() => [
@@ -397,7 +439,7 @@
     { id: 'repo.remotes', group: 'Repository', title: 'Manage remotes…', keywords: 'origin url', run: () => (remotesOpen = true) },
     { id: 'repo.reflog', group: 'Repository', title: 'Show the reflog…', keywords: 'history head moves recover lost commit', run: () => (reflogRef = 'HEAD') },
     { id: 'repo.applyPatches', group: 'Repository', title: 'Apply patches or a diff…', keywords: 'am mbox mailbox format-patch import mail', run: () => void applyPatches() },
-    { id: 'repo.compareVersions', group: 'Repository', title: 'Compare two versions of a branch…', keywords: 'range-diff rebase before after versions what changed', run: () => (comparing = { branch: ctx.current() }) },
+    { id: 'repo.compareVersions', group: 'Repository', title: 'Compare two versions of a branch…', keywords: 'range-diff rebase before after versions what changed', run: () => (comparing = { branch: ctx.current(), oldTip: '' }) },
     { id: 'repo.applyClipboard', group: 'Repository', title: 'Apply the patch on the clipboard', keywords: 'paste am diff git apply clipboard', run: () => void applyClipboard() },
     { id: 'repo.worktrees', group: 'Repository', title: 'Manage worktrees…', keywords: 'worktree checkout folder parallel', run: () => (worktreesOpen = true) },
     {
@@ -634,7 +676,7 @@
     </div>
     {#if rebaseBase}
       <div class="graph">
-        <Lazy load={() => import('./RebaseEditor.svelte')} {path} base={rebaseBase} squash={rebaseSquash} onClose={() => (rebaseBase = '')} />
+        <Lazy load={() => import('./RebaseEditor.svelte')} {path} base={rebaseBase} squash={rebaseSquash} onClose={() => (rebaseBase = '')} onDone={rebased} />
       </div>
     {:else if versions && pairAt >= 0}
       <div class="graph">
@@ -765,6 +807,7 @@
     load={() => import('./CompareVersionsDialog.svelte')}
     {path}
     branch={comparing.branch}
+    oldTip={comparing.oldTip}
     onClose={() => (comparing = null)}
     onCompared={(compared: app.VersionsCompared, oldLabel: string) => showVersions(compared, comparing?.branch ?? '', oldLabel)}
   />
@@ -784,6 +827,10 @@
     onCreateBranch={(commit: string) => {
       reflogRef = ''
       dialog = branchAtDialog(path, commit)
+    }}
+    onCompare={(branch: string, commit: string, label: string) => {
+      reflogRef = ''
+      versionsAsk.show({ path, branch: branch || ctx.current(), oldTip: commit, oldLabel: label })
     }}
     onClose={() => (reflogRef = '')}
   />

@@ -3,11 +3,13 @@ import { PushToURLs, Undo, UndoState } from '../../wailsjs/go/app/App.js'
 import { pushSummary } from './pushResult'
 import { session } from './session.svelte'
 
-/** A short message in the corner, with at most one action, such as Undo. */
+/** A short message in the corner, with an action such as Undo, and at most one more, such as
+ * What changed? (#1040). */
 export interface Toast {
   id: number
   message: string
   action?: { label: string; run: () => void | Promise<void> }
+  also?: { label: string; run: () => void | Promise<void> }
 }
 
 /** How long a toast stays, in milliseconds. Hovering or focusing it holds it. */
@@ -17,9 +19,9 @@ class Toasts {
   list = $state<Toast[]>([])
   #next = 1
 
-  show(message: string, action?: Toast['action']): number {
+  show(message: string, action?: Toast['action'], also?: Toast['also']): number {
     const id = this.#next++
-    this.list = [...this.list.slice(-2), { id, message, action }]
+    this.list = [...this.list.slice(-2), { id, message, action, also }]
     return id
   }
 

@@ -152,3 +152,15 @@ test('a stop read as code counts its suggestions and what a merge driver settled
   await open(page, 'operation', scenario(rebase({ conflicts: ['src/feed.js', 'src/units.js'] }), { ConflictStop: stop }))
   await expect(strip(page)).toContainText('Stopped at commit 3 of 5: Fall back to the cached reading · 2 suggestions · 1 undecided · 1 settled by mergiraf')
 })
+
+test('a finished rebase offers What changed?, and a pushed one Compare first (#1040)', async ({ page }) => {
+  const pushed = branch('feature/offline-cache', { head: true, upstream: 'origin/feature/offline-cache', ahead: 5, behind: 5 })
+  await open(page, 'operation', scenario(rebase({ conflicts: [], step: 5 }), { Refs: [pushed] }))
+  await respond(page, { RepoState: idle, UndoState: { undo: 'Rebase onto main', redo: '' } })
+  await strip(page).getByRole('button', { name: /Finish the rebase/ }).click()
+  const ask = () => page.evaluate(() => (window as unknown as { __versionsAsk: () => object | null }).__versionsAsk())
+  await page.getByRole('button', { name: 'What changed?' }).click()
+  await expect.poll(ask).toMatchObject({ path: '/r', branch: 'feature/offline-cache', oldTip: 'd'.repeat(40), oldLabel: 'Before the rebase' })
+  await page.getByRole('button', { name: 'Compare first' }).click()
+  await expect.poll(ask).toMatchObject({ branch: 'feature/offline-cache', oldTip: 'origin/feature/offline-cache', oldLabel: 'origin/feature/offline-cache' })
+})

@@ -205,3 +205,15 @@ test('keeps its buttons on one line in a narrow column, with the outcome underne
   expect(after.y).toBeGreaterThanOrEqual(list.y + list.height - 1)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })
+
+// #1040: a rebase that runs to the end says so, so the repository view can offer What changed?.
+test('says when the rebase ran to the end, and not when it stopped', async ({ page }) => {
+  await open(page, 'rebaseEditor', scenario(clean, two))
+  await page.getByRole('button', { name: /Rewrite as 2 commits/ }).click()
+  await expect.poll(() => events(page, 'done')).toHaveLength(1)
+
+  await open(page, 'rebaseEditor', { ...scenario(clean, two, { RepoState: { operation: 'rebase', conflicts: ['a.txt'] } }), failures: { InteractiveRebase: 'The rebase stopped on a conflict.' } })
+  await page.getByRole('button', { name: /Rewrite as 2 commits/ }).click()
+  await expect.poll(() => events(page, 'close')).toHaveLength(1)
+  expect(await events(page, 'done')).toHaveLength(0)
+})

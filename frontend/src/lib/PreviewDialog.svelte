@@ -6,6 +6,8 @@
   import { errorText } from './errors'
   import { mergeChoices, mergeSummary, mergeVerb, placesNote, plural, rebaseVerb, type MergeHow } from './preview'
   import { session } from './session.svelte'
+  import { toasts } from './toasts.svelte'
+  import { versionsAsk } from './versionsAsk.svelte'
   import Icon from './ui/Icon.svelte'
   import Modal from './ui/Modal.svelte'
 
@@ -95,8 +97,14 @@
     }
     const args = action === 'merge' ? [onto, chosen] : fold && fixups > 0 ? [onto, 'autosquash'] : [onto]
     const expected = showConflicts
+    const [branch, name] = [current, label]
     onClose()
-    void Integrate(repo, action, args).catch(async (e: unknown) => {
+    void Integrate(repo, action, args)
+      .then(() => {
+        // A rebase that ran to the end: what became of the branch's commits (#1040).
+        if (action === 'rebase' && branch) toasts.show(`Rebased ${branch} onto ${name}.`, { label: 'What changed?', run: () => versionsAsk.show({ path: repo, branch, oldTip: '', oldLabel: '' }) })
+      })
+      .catch(async (e: unknown) => {
       // Stopping on the conflicts the preview named is what was asked for, not an error: the
       // operation strip takes over from here.
       const state = expected ? await RepoState(repo).catch(() => null) : null

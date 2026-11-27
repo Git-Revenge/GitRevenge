@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import { CompareVersions, CountVersion, Reflog, Refs, VersionBase } from '../../wailsjs/go/app/App.js'
   import type { app } from '../../wailsjs/go/models'
   import { errorText } from './errors'
@@ -13,12 +13,15 @@
   let {
     path,
     branch,
+    oldTip: startTip = '',
     onClose,
     onCompared,
   }: {
     path: string
     /** The branch to start from: its earlier tips are offered as the old version. */
     branch: string
+    /** The old version's tip to start on, when it's known (#1040): its base couldn't be. */
+    oldTip?: string
     onClose: () => void
     onCompared: (compared: app.VersionsCompared, oldLabel: string) => void
   } = $props()
@@ -61,7 +64,11 @@
     }
     if (ref?.upstream && ref.behind + ref.ahead > 0) out.push({ value: ref.upstream, said: ref.upstream, label: ref.upstream })
     choices = out
-    if (out.length) {
+    const start = untrack(() => startTip)
+    if (start) {
+      oldPick = out.some((c) => c.value === start) ? start : OTHER
+      oldTip = start
+    } else if (out.length) {
       oldPick = out[0].value
       oldTip = out[0].value
     }
