@@ -132,6 +132,36 @@ const behaviours: Record<string, (...args: never[]) => unknown> = {
     const total = scenario.graphData?.length ?? scenario.graphRows ?? 0
     return /^\d{40}$/.test(id) && Number(id) < total ? Number(id) : -1
   },
+  // A selection's commits are its rows' (#1018), oldest first: the highest rows first.
+  SelectedCommits: (_path: string, picks: { lo: number; hi: number }[]) => {
+    if ('SelectedCommits' in responses) return responses.SelectedCommits
+    type Stub = { index: number; id: string; parents: number; author: string; authorTime: number; subject: string }
+    const rows = [...new Set(picks.flatMap((p) => Array.from({ length: p.hi - p.lo + 1 }, (_, k) => p.lo + k)))].sort((a, b) => b - a)
+    const commits = rows.map((i) => {
+      const r = (scenario.graphData?.[i] ?? graphRow(i)) as Stub
+      return { index: i, id: r.id, parents: r.parents, author: r.author, authorTime: r.authorTime, subject: r.subject }
+    })
+    const authors = new Set(commits.map((c) => c.author))
+    const times = commits.map((c) => c.authorTime)
+    return {
+      ids: commits.map((c) => c.id),
+      commits: commits.slice(0, 100),
+      authors: authors.size,
+      author: authors.size === 1 ? commits[0].author : '',
+      first: Math.min(...times),
+      last: Math.max(...times),
+      merges: commits.filter((c) => c.parents > 1).length,
+      head: false,
+      stale: false,
+    }
+  },
+  SelectionFiles: (_path: string, ids: string[]) => ('SelectionFiles' in responses ? responses.SelectionFiles : { files: [], total: 0, read: ids.length }),
+  // The stub's commits are numbered, so a commit's row is its number.
+  CommitRows: (_path: string, ids: string[]) => {
+    if ('CommitRows' in responses) return responses.CommitRows
+    const total = scenario.graphData?.length ?? scenario.graphRows ?? 0
+    return ids.map((id) => (/^\d{40}$/.test(id) && Number(id) < total ? Number(id) : -1))
+  },
   // An author's folders are asked for one folder at a time: a test answers by the folder
   // asked about, '' for the top, and a folder it doesn't name has nothing under it.
   MapAuthorAreas: (_path: string, _identities: unknown, _days: number, under: string) => {
@@ -276,7 +306,7 @@ const mounts = {
     // A test about the saved view has the app read it first, as the app does when it starts.
     if (scenario.responses?.GraphViews) await (await import('../src/lib/theme.svelte')).theme.load()
     const wip = scenario.wip ? { changes: scenario.wip.changes, active: false, open: record('wip') } : undefined
-    mount(GraphView, { target: host, props: { path: '/repo', wip, onSelect: record('select'), onNote: (row: { index: number }) => win.__events.push(['note', row.index]), onContext: (row: { index: number }) => win.__events.push(['context-row', row.index]), onDrop: record('drop'), ...(scenario.suggests ? { onFilterAdd: record('filter-add'), onFilterDrop: record('filter-drop') } : {}), ...(scenario.finds ? { onFindInFiles: record('find-in-files') } : {}), ...(scenario.histories ? { onHistorySearch: record('history-search') } : {}), history: (scenario.graphHistory ?? null) as never, sparse: scenario.sparse ?? false, highlight: scenario.highlight ?? null, filterPicks: scenario.filterPicks ?? [], pins: scenario.pins ?? [], ...(scenario.graphChips ? { onFilterPick: record('filter-pick') } : {}), trailersUnread: scenario.trailersUnread ?? 0 } })
+    mount(GraphView, { target: host, props: { path: '/repo', wip, onSelect: record('select'), onSelection: (s: { count: number } | null) => win.__events.push(['selection', s?.count ?? 0]), onNote: (row: { index: number }) => win.__events.push(['note', row.index]), onContext: (row: { index: number }) => win.__events.push(['context-row', row.index]), onDrop: record('drop'), ...(scenario.suggests ? { onFilterAdd: record('filter-add'), onFilterDrop: record('filter-drop') } : {}), ...(scenario.finds ? { onFindInFiles: record('find-in-files') } : {}), ...(scenario.histories ? { onHistorySearch: record('history-search') } : {}), history: (scenario.graphHistory ?? null) as never, sparse: scenario.sparse ?? false, highlight: scenario.highlight ?? null, filterPicks: scenario.filterPicks ?? [], pins: scenario.pins ?? [], ...(scenario.graphChips ? { onFilterPick: record('filter-pick') } : {}), trailersUnread: scenario.trailersUnread ?? 0 } })
   },
   async commitMenu() {
     const { default: ContextMenu } = await import('../src/lib/ContextMenu.svelte')
@@ -332,7 +362,9 @@ const mounts = {
     mount(RepoView, { target: host, props: { path: '/r' } })
     // What an author's card asks the People tab for, which the app shell would then show.
     const { session } = await import('../src/lib/session.svelte')
-    session.tabs = [{ path: '/r', name: 'tidewater', head: 'main' } as never]
+    session.tabs = [{ path: '/r', name: 'tidewater', head: scenario.current ?? 'main' } as never]
+    // A scenario that names the checked-out branch has the tab open, so the menus name it.
+    if (scenario.current) session.active = '/r'
     const { peopleTab } = await import('../src/lib/people/tab.svelte')
     Object.assign(win, { __peopleTab: () => ({ open: peopleTab.open, repo: peopleTab.repo, ask: peopleTab.ask && JSON.parse(JSON.stringify(peopleTab.ask)) }) })
   },

@@ -4,7 +4,7 @@
   import { errorText } from '../errors'
   import { onMount, tick, untrack, type Snippet } from 'svelte'
   import { ALONE_STEPS, searchPlaceholder, SQUEEZE, squeezeFor } from '../barSqueeze'
-  import { ArrivedCommits, CommitNotes, CommitRow, CommitSignatures, FindCount, GraphFocus, HeadCommit, HistoryChanges, OwnMoveAge, GraphRows, NotedCommits, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView, TrailerFilterDays, TrailerSuggest } from '../../../wailsjs/go/app/App.js'
+  import { ArrivedCommits, CommitNotes, CommitRow, CommitRows, SelectedCommits, CommitSignatures, FindCount, GraphFocus, HeadCommit, HistoryChanges, OwnMoveAge, GraphRows, NotedCommits, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView, TrailerFilterDays, TrailerSuggest } from '../../../wailsjs/go/app/App.js'
   import { findSummary } from '../find/find'
   import { changeMark, type ChangeMark, type HistoryChange, type HistoryOptions } from '../filters/history'
   import { session } from '../session.svelte'
@@ -32,6 +32,7 @@
   import { boxFor, monthAt, monthLabel, percentThrough, placeTicks, positionFor, RULER_W, tickAt, tickSummary, unreadFrom, type MonthMark, type Tick } from './ruler'
   import { scrollMap } from './scrollMap'
   import { Washes, landWash } from './tween'
+  import { add, between, fromRows, has, nearest, size, toggle, type Run, type Selected } from './selection'
   import type { BisectMarks } from '../bisect.svelte'
 
   let {
@@ -40,6 +41,8 @@
     onContext,
     onDrop,
     onSelectedRefs,
+    onSelection,
+    onSelectionMenu,
     onNote,
     onAuthor,
     sparse = false,
@@ -128,6 +131,11 @@
     onSelect?: (row: Row | undefined, auto: boolean) => void
     /** Labels for the selected commit's refs, whenever they change. They can load after the selection. */
     onSelectedRefs?: (labels: RefLabel[]) => void
+    /** Several commits selected (#1018), or null when it's back to one. The count comes at once;
+     * the commits follow once read. */
+    onSelection?: (selection: Selected | null) => void
+    /** Right-click on a row of a selection of several: the menu for all of them. */
+    onSelectionMenu?: (x: number, y: number) => void
   } = $props()
 
   /** The repository's main remote, whose prefix labels leave off. */
@@ -364,7 +372,7 @@
     // that moves a branch. One made by another tool leaves the view alone.
     const age = await OwnMoveAge(path).catch(() => -1)
     const move = isOwnMove(age) ? branchMove(before, now) : null
-    const gone = await followSelection(!!move)
+    const [gone] = await Promise.all([followSelection(!!move), followPicks()])
     if (query) void runSearch()
     if (!move) return
     const got = move.from ? await ArrivedCommits(path, move.from, move.to).catch(() => null) : null
@@ -1018,6 +1026,117 @@
   /** Fetching rows failed, separately from reading the history; clears when a fetch works. */
   let rowError = $state('')
   let selected = $state(-1)
+  /** Several commits selected (#1018), as runs of rows; none while one is, the one in
+   * `selected`. When there are several, `selected` is the one last clicked or stepped to. */
+  let picks = $state.raw<Run[]>([])
+  /** Where Shift+click and Shift+arrows select from: the last row clicked without Shift. */
+  let pivot = -1
+  /** The selection's commits, oldest first, once read: a reload finds them again by these. */
+  let pickedIds: string[] = []
+  let pickSeq = 0
+  /** How strongly a selected row is washed when it isn't the one last clicked. */
+  const PICKED = 0.55
+  /** Over this many rows, Shift+click takes every row between, folded or not: telling which
+   * are folded away means reading each. */
+  const FOLD_CHECK_ROWS = 20_000
+
+  /** One commit, alone: the selection as it always was. */
+  function single(i: number, auto = false) {
+    if (picks.length) setPicks([])
+    pivot = i
+    select(i, auto)
+  }
+
+  /** Selects these rows. One row is no selection of several: picks hold none. */
+  function setPicks(runs: Run[], ids: string[] = []) {
+    picks = size(runs) > 1 ? runs : []
+    pickedIds = picks.length ? ids : []
+    schedule()
+    void reportPicks()
+  }
+
+  /** The rows from a to b that show: rows a fold hides are left out, as they can't be seen. */
+  function shownBetween(a: number, b: number): Run[] {
+    const [lo, hi] = [Math.min(a, b), Math.max(a, b)]
+    if (!foldKinds.size || hi - lo > FOLD_CHECK_ROWS) return between(lo, hi)
+    const rows: number[] = []
+    for (let i = lo; i <= hi; i++) if (i === a || i === b || !isHidden(i)) rows.push(i)
+    return fromRows(rows)
+  }
+
+  /** A click with Ctrl (⌘ on a Mac) or Shift: Ctrl adds or takes out one, Shift takes every
+   * row shown between the last one clicked and this one, and both together add those. */
+  function pickWith(i: number, ctrl: boolean, shift: boolean) {
+    const now = picks.length ? picks : selected >= 0 ? between(selected, selected) : []
+    if (shift) {
+      const from = pivot >= 0 ? pivot : selected >= 0 ? selected : i
+      const run = shownBetween(from, i)
+      setPicks(ctrl ? add(now, run) : run)
+      pivot = from
+      select(i)
+      return
+    }
+    const next = toggle(now, i)
+    // The last one stays: there's always a selection.
+    if (!next.length) return
+    pivot = i
+    setPicks(next)
+    select(has(next, i) ? i : nearest(next, i))
+  }
+
+  /** Tells the panel beside the graph: the count at once, the commits once read, after the
+   * clicking pauses. */
+  async function reportPicks() {
+    const seq = ++pickSeq
+    if (!picks.length) {
+      onSelection?.(null)
+      return
+    }
+    const count = size(picks)
+    announce = `${count.toLocaleString()} commits selected`
+    onSelection?.({ count, info: null })
+    await new Promise((r) => setTimeout(r, 120))
+    if (seq !== pickSeq) return
+    const sent = picks.map((r) => ({ lo: r.lo, hi: r.hi, loId: cache.get(r.lo)?.id ?? '', hiId: cache.get(r.hi)?.id ?? '' }))
+    const info = await SelectedCommits(path, sent).catch(() => null)
+    // A stale answer means a reload is on its way, and it follows the selection.
+    if (seq !== pickSeq || !info || info.stale) return
+    pickedIds = info.ids
+    onSelection?.({ count: info.ids.length, info })
+  }
+
+  /** After a reload, finds the selection's commits again. Those that are gone (rebased away,
+   * reset past) or that a filter hides drop out of it. */
+  async function followPicks() {
+    if (!picks.length) return
+    const ids = pickedIds
+    const seq = ++pickSeq
+    const rows = ids.length ? await CommitRows(path, ids).catch(() => null) : null
+    if (seq !== pickSeq) return
+    if (!rows) {
+      setPicks([])
+      return
+    }
+    setPicks(
+      fromRows(rows),
+      ids.filter((_, k) => rows[k] >= 0),
+    )
+    if (picks.length && !has(picks, selected)) select(nearest(picks, selected), true)
+  }
+
+  /** Back to one commit: the one last clicked. */
+  export function clearSelection() {
+    if (picks.length) single(selected)
+  }
+
+  /** Takes a commit out of the selection, by its row. */
+  export function unpick(i: number) {
+    if (!has(picks, i)) return
+    const next = toggle(picks, i)
+    setPicks(next)
+    if (!has(next, selected)) select(nearest(next, selected))
+  }
+
   /** The column positions as last drawn, for the header above the canvas. */
   let columns = $state<Layout>()
   /** The most lanes any row in view has used. The graph's width follows it, and only grows, so
@@ -1069,7 +1188,7 @@
       return
     }
     // The list belongs to the selected row, so it stays while the pointer or the focus is in it.
-    select(index)
+    single(index)
     const labels = refLabels(cache.refsFor(row.id), remote)
     const height = Math.min(labels.length, EXPANDED_REFS + 1) * CHIP_STEP + EXPAND_PAD * 2
     const place = Math.round(relY(index) + (heightOf(index) - CHIP_STEP) / 2 - EXPAND_PAD)
@@ -1198,8 +1317,9 @@
   function more(index: number, button: HTMLElement) {
     const row = cache.get(index)
     if (!row || !onContext) return
-    select(index)
     const r = button.getBoundingClientRect()
+    if (picks.length && has(picks, index) && onSelectionMenu) return onSelectionMenu(r.left, r.bottom + 2)
+    single(index)
     onContext(row, cache.refsFor(row.id), r.left, r.bottom + 2)
   }
   /** Each row's selection, hover and search-dimming strength, eased between frames. */
@@ -1686,7 +1806,7 @@
       }
       // The drop target is highlighted like a selection while dragging. Each strength eases
       // toward where it should be, so a selection arrives rather than appears.
-      const sel = washes.value(`s${i}`, i === selected || i === dropTarget ? 1 : 0, frameAt)
+      const sel = washes.value(`s${i}`, i === selected || i === dropTarget ? 1 : picks.length && has(picks, i) ? PICKED : 0, frameAt)
       const hov = washes.value(`h${i}`, i === hovered ? 1 : 0, frameAt)
       // During a bisect a commit wears its answer, and fades once it's out of the running.
       const place = bisectView ? bisectRow(row.id, bisectView, { bad: th.bad }) : null
@@ -1828,7 +1948,7 @@
     // fades.
     glideTo(i, 0.5)
     landing = reducedMotion() ? null : { index: i, start: performance.now() }
-    select(i)
+    single(i)
     scroller.focus()
   }
 
@@ -2110,7 +2230,20 @@
       e.preventDefault()
       const d = moves[e.key]
       // Rows that aren't commits, or that are folded away, are stepped over.
-      select(d === -Infinity ? 0 : d === Infinity ? span - 1 : selected < 0 ? 0 : stepCommits(selected, d))
+      const to = d === -Infinity ? 0 : d === Infinity ? span - 1 : selected < 0 ? 0 : stepCommits(selected, d)
+      // Shift with an arrow or a page grows or shrinks a selection from the last row clicked.
+      // Not with Home and End: the far end of a long history isn't read yet.
+      if (e.shiftKey && Number.isFinite(d) && selected >= 0) {
+        const from = pivot >= 0 ? pivot : selected
+        setPicks(shownBetween(from, to))
+        pivot = from
+        select(to)
+      } else single(to)
+    } else if (e.key === 'Escape' && picks.length) {
+      // Back to one commit: the one last clicked.
+      e.preventDefault()
+      e.stopPropagation()
+      single(selected)
     } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
       // On a commit in a fold: Right opens the fold, Left closes it.
       const fold = selected >= 0 ? foldOf(selected) : null
@@ -2168,6 +2301,7 @@
         cache.invalidate()
         if (query) void runSearch()
         void followSelection()
+        void followPicks()
       }
       if (p.done) {
         // A reload swaps in a new graph; anything cached may be stale.
@@ -2345,6 +2479,7 @@
       id={gridId}
       tabindex="0"
       role="grid"
+      aria-multiselectable="true"
       aria-label="Commit history"
       aria-rowcount={span}
       onscroll={onScroll}
@@ -2373,7 +2508,9 @@
         const rect = scroller.getBoundingClientRect()
         const chip = chipAt(i, e.clientX - rect.left, e.clientY - rect.top)
         if (chip) return onFilterPick?.(chip.key, chip.value)
-        select(i)
+        // Ctrl (⌘ on a Mac) and Shift select several (#1018).
+        if (e.ctrlKey || e.metaKey || e.shiftKey) return pickWith(i, e.ctrlKey || e.metaKey, e.shiftKey)
+        single(i)
         // A click on the note mark also asks for the note itself.
         const row = cache.get(i)
         if (row && onNoteMark(i, e.clientX - rect.left)) onNote?.(row)
@@ -2436,7 +2573,10 @@
         const row = i >= 0 ? cache.get(i) : undefined
         if (!row || !onContext) return
         e.preventDefault()
-        select(i)
+        // On a row of a selection of several, the menu is for all of them; on any other row,
+        // that row is selected alone first.
+        if (picks.length && has(picks, i) && onSelectionMenu) return onSelectionMenu(e.clientX, e.clientY)
+        single(i)
         onContext(row, cache.refsFor(row.id), e.clientX, e.clientY)
       }}
       onmouseleave={(e) => {
@@ -2654,13 +2794,25 @@
       tick={rowsTick}
       count={span}
       {selected}
+      {picks}
       headRow={() => headRow}
       remote={() => remote}
       dimmed={(i: number) => (!!matchSet && !matchSet.has(i)) || (!!highlight && !cache.get(i)?.match)}
       ruler={() => ({ ...marks, matches: rulerMatches })}
       {wip}
       folds={horizontalFolds}
-      onSelect={(i: number) => select(i)}
+      onSelect={(i: number, how?: { ctrl: boolean; shift: boolean; extend?: boolean }) => {
+        if (how?.extend && selected >= 0) {
+          // Shift with an arrow: grow or shrink from the last one clicked.
+          const from = pivot >= 0 ? pivot : selected
+          setPicks(shownBetween(from, i))
+          pivot = from
+          select(i)
+        } else if (how && (how.ctrl || how.shift)) pickWith(i, how.ctrl, how.shift)
+        else single(i)
+      }}
+      onEscape={() => clearSelection()}
+      onSelectionMenu={onSelectionMenu}
       onContext={onContext}
       onDrop={onDrop}
     />

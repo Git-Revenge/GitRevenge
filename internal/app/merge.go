@@ -37,7 +37,7 @@ func (a *App) Integrate(path, action string, args []string) error {
 		if len(args) == 0 {
 			return userError("Choose at least one commit to cherry-pick.")
 		}
-		err = a.record(r, "Cherry-pick "+shortRef(args[0]), kindMove, "", func() error { return r.Git.CherryPick(ctx, args...) })
+		err = a.record(r, "Cherry-pick "+commitsLabel(args), kindMove, "", func() error { return r.Git.CherryPick(ctx, args...) })
 	case "rebase":
 		err = a.record(r, "Rebase onto "+shortRef(arg(0)), kindMove, "", func() error {
 			if arg(1) == "autosquash" {
@@ -52,6 +52,12 @@ func (a *App) Integrate(path, action string, args []string) error {
 	case "revert":
 		mainline, _ := strconv.Atoi(arg(1))
 		err = a.record(r, "Revert "+shortRef(arg(0)), kindMove, "", func() error { return r.Git.Revert(ctx, arg(0), mainline) })
+	case "revert-all":
+		// Several commits, newest first, each with its own revert commit (#1018).
+		if len(args) == 0 {
+			return userError("Choose at least one commit to revert.")
+		}
+		err = a.record(r, "Revert "+commitsLabel(args), kindMove, "", func() error { return r.Git.RevertAll(ctx, args...) })
 	default:
 		return userError("Unknown action " + action + ".")
 	}

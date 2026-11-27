@@ -95,6 +95,8 @@ export function CommitNotes(arg1:string,arg2:string):Promise<Array<git.Note>>;
 
 export function CommitRow(arg1:string,arg2:string):Promise<number>;
 
+export function CommitRows(arg1:string,arg2:Array<string>):Promise<Array<number>>;
+
 export function CommitSignatures(arg1:string,arg2:Array<string>):Promise<Array<git.SignatureCheck>>;
 
 export function ConflictContext(arg1:string):Promise<app.ConflictContext>;
@@ -404,6 +406,10 @@ export function SaveLinkRule(arg1:string,arg2:links.Rule,arg3:string):Promise<vo
 export function SaveMailmap(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<void>;
 
 export function SearchGraph(arg1:string,arg2:string):Promise<graph.SearchResult>;
+
+export function SelectedCommits(arg1:string,arg2:Array<app.SelectionPick>):Promise<app.Selection>;
+
+export function SelectionFiles(arg1:string,arg2:Array<string>):Promise<app.SelectionFiles>;
 
 export function SetActiveRepo(arg1:string):Promise<void>;
 

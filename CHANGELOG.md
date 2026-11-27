@@ -50,6 +50,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
   - **A file's history:** it ends with the same band.
   - **The commit panel:** an edge commit opens with its files as its own and says its parent wasn't fetched, where it failed before.
   - **Merges and rebases:** a merge or rebase whose branches part before the edge waits for more history, instead of git's "refusing to merge unrelated histories". (#1006)
+- The graph selects several commits at once (#1018).
+  - **Selecting:** Ctrl+click (⌘+click on a Mac) adds or takes out one, Shift+click takes every row shown between the last one clicked and this one, and Shift with an arrow grows or shrinks it. Escape goes back to the one last clicked. The horizontal view takes the same clicks and keys.
+  - **The panel:** beside the graph, it says who wrote them and when, lists the files they change with how many of them change each, and lists the commits oldest first, each with × to take it out. A file opens to the commits that changed it, each with its own diff. It lists the first 100 commits and reads files from the first 500.
+  - **The menu:** right-click a selected row to cherry-pick them all onto your branch, oldest first, revert them, newest first, or copy their ids. Actions on more than 100 commits ask first.
+  - **Through a reload:** a selection follows its commits to their new rows. Commits that are gone, after a rebase or a reset, or that a filter hides, drop out of it.
 
 ### Changed
 

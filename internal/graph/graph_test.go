@@ -262,6 +262,26 @@ func TestWideGraphSpacesCheckpoints(t *testing.T) {
 	}
 }
 
+func TestCommits(t *testing.T) {
+	// A merge (row 0) of two lines that meet at a root.
+	g := build(t, [][]int{{1, 2}, {3}, {3}, {}})
+	got := g.Commits(-1, 3)
+	want := []Commit{
+		{Index: 0, ID: fakeID(0), Parents: 2, Author: "a", Subject: "0"},
+		{Index: 1, ID: fakeID(1), Parents: 1, Author: "a", Subject: "1"},
+		{Index: 2, ID: fakeID(2), Parents: 1, Author: "a", Subject: "2"},
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("Commits(-1, 3) = %+v, want %+v", got, want)
+	}
+	if last := g.Commits(3, 10); len(last) != 1 || last[0].Parents != 0 {
+		t.Fatalf("Commits(3, 10) = %+v, want the root alone", last)
+	}
+	if past := g.Commits(9, 2); past == nil || len(past) != 0 {
+		t.Fatalf("Commits past the end = %#v, want an empty list", past)
+	}
+}
+
 func TestRowOf(t *testing.T) {
 	g := build(t, [][]int{{1}, {}})
 	if r, ok := g.RowOf(fakeID(1)); !ok || r != 1 {
