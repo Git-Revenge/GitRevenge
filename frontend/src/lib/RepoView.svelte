@@ -317,6 +317,15 @@
   let patchesStart = $state<PatchStart | null>(null)
   /** A file of patches being previewed to apply (#1022), or a plain diff (#1024). */
   let patchFile = $state<app.PatchFile | null>(null)
+  /** Two versions of a branch compared (#1038), in the panel on the right; and the branch the
+   * Compare two versions dialog starts on, while it's open. */
+  let versions = $state<{ compared: app.VersionsCompared; branch: string; oldLabel: string } | null>(null)
+  let comparing = $state<{ branch: string } | null>(null)
+  function showVersions(compared: app.VersionsCompared, branch: string, oldLabel: string) {
+    comparing = null
+    versions = { compared, branch, oldLabel }
+    view = 'commit'
+  }
   let diffFile = $state<app.PatchFile | null>(null)
 
   /** Apply patches or a diff…: a file picked, read, and shown for what it is. */
@@ -381,6 +390,7 @@
     { id: 'repo.remotes', group: 'Repository', title: 'Manage remotes…', keywords: 'origin url', run: () => (remotesOpen = true) },
     { id: 'repo.reflog', group: 'Repository', title: 'Show the reflog…', keywords: 'history head moves recover lost commit', run: () => (reflogRef = 'HEAD') },
     { id: 'repo.applyPatches', group: 'Repository', title: 'Apply patches or a diff…', keywords: 'am mbox mailbox format-patch import mail', run: () => void applyPatches() },
+    { id: 'repo.compareVersions', group: 'Repository', title: 'Compare two versions of a branch…', keywords: 'range-diff rebase before after versions what changed', run: () => (comparing = { branch: ctx.current() }) },
     { id: 'repo.applyClipboard', group: 'Repository', title: 'Apply the patch on the clipboard', keywords: 'paste am diff git apply clipboard', run: () => void applyClipboard() },
     { id: 'repo.worktrees', group: 'Repository', title: 'Manage worktrees…', keywords: 'worktree checkout folder parallel', run: () => (worktreesOpen = true) },
     {
@@ -685,6 +695,8 @@
       onFixBranch={fixBranch}
       onRevert={revertFound}
     />
+  {:else if versions}
+    <Lazy load={() => import('./VersionsPanel.svelte')} compared={versions.compared} branch={versions.branch} oldLabel={versions.oldLabel} onClose={() => (versions = null)} onShow={(id: string) => void revealCommit(id)} />
   {:else if several}
     <SelectionPanel {path} selected={several} {ctx} squash={squashState} onUnpick={(row) => graph.unpick(row)} onShow={(row) => graph.reveal(row)} openFile={(t) => (diff = t)} />
   {:else if selected}
@@ -724,6 +736,15 @@
 {/if}
 {#if diffFile}
   <Lazy load={() => import('./ApplyDiffDialog.svelte')} {path} file={diffFile} onClose={() => (diffFile = null)} />
+{/if}
+{#if comparing}
+  <Lazy
+    load={() => import('./CompareVersionsDialog.svelte')}
+    {path}
+    branch={comparing.branch}
+    onClose={() => (comparing = null)}
+    onCompared={(compared: app.VersionsCompared, oldLabel: string) => showVersions(compared, comparing?.branch ?? '', oldLabel)}
+  />
 {/if}
 {#if bisect.starting?.path === path}
   <Lazy load={() => import('./BisectDialog.svelte')} {path} bad={bisect.starting.bad} onClose={() => (bisect.starting = null)} />

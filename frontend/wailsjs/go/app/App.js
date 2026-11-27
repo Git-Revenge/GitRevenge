@@ -206,6 +206,10 @@ export function CompareCommits(arg1, arg2, arg3) {
   return window['go']['app']['App']['CompareCommits'](arg1, arg2, arg3);
 }
 
+export function CompareVersions(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['CompareVersions'](arg1, arg2, arg3, arg4);
+}
+
 export function ConflictContext(arg1) {
   return window['go']['app']['App']['ConflictContext'](arg1);
 }
@@ -228,6 +232,10 @@ export function ConflictSuggestions(arg1, arg2, arg3) {
 
 export function CopyPatches(arg1, arg2, arg3) {
   return window['go']['app']['App']['CopyPatches'](arg1, arg2, arg3);
+}
+
+export function CountVersion(arg1, arg2, arg3) {
+  return window['go']['app']['App']['CountVersion'](arg1, arg2, arg3);
 }
 
 export function CurrentPatch(arg1) {
@@ -1208,6 +1216,10 @@ export function UpdateSubmodules(arg1) {
 
 export function Version() {
   return window['go']['app']['App']['Version']();
+}
+
+export function VersionBase(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['VersionBase'](arg1, arg2, arg3, arg4);
 }
 
 export function WhoIs(arg1, arg2, arg3) {

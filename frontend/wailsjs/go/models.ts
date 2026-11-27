@@ -3631,6 +3631,64 @@ export namespace app {
 	        this.available = source["available"];
 	    }
 	}
+	export class VersionCount {
+	    commits: number;
+	    merges: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new VersionCount(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.commits = source["commits"];
+	        this.merges = source["merges"];
+	    }
+	}
+	export class VersionsCompared {
+	    old: git.RangeSide;
+	    new: git.RangeSide;
+	    oldCount: VersionCount;
+	    newCount: VersionCount;
+	    pairs: git.RangePair[];
+	    text: string;
+	    command: string;
+	    loose: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new VersionsCompared(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.old = this.convertValues(source["old"], git.RangeSide);
+	        this.new = this.convertValues(source["new"], git.RangeSide);
+	        this.oldCount = this.convertValues(source["oldCount"], VersionCount);
+	        this.newCount = this.convertValues(source["newCount"], VersionCount);
+	        this.pairs = this.convertValues(source["pairs"], git.RangePair);
+	        this.text = source["text"];
+	        this.command = source["command"];
+	        this.loose = source["loose"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	export class WhoAnswer {
 	    written: git.Identity;
@@ -5012,6 +5070,50 @@ export namespace git {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.url = source["url"];
 	        this.remote = source["remote"];
+	    }
+	}
+	export class RangePair {
+	    old: number;
+	    new: number;
+	    oldId: string;
+	    newId: string;
+	    subject: string;
+	    oldSubject?: string;
+	    kind: string;
+	    into?: number;
+	    moved?: boolean;
+	    text: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RangePair(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.old = source["old"];
+	        this.new = source["new"];
+	        this.oldId = source["oldId"];
+	        this.newId = source["newId"];
+	        this.subject = source["subject"];
+	        this.oldSubject = source["oldSubject"];
+	        this.kind = source["kind"];
+	        this.into = source["into"];
+	        this.moved = source["moved"];
+	        this.text = source["text"];
+	    }
+	}
+	export class RangeSide {
+	    base: string;
+	    tip: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RangeSide(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.base = source["base"];
+	        this.tip = source["tip"];
 	    }
 	}
 	export class RebaseItem {
