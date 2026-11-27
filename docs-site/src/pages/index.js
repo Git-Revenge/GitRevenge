@@ -119,6 +119,11 @@ const features = [
     to: '/docs/guide/patches',
   },
   {
+    title: 'What a rebase did',
+    body: 'After a rebase, see what became of each commit: changed, the same, folded in, dropped or new. Read a changed commit’s two versions marked in one view, before you force-push it.',
+    to: '/docs/guide/two-versions',
+  },
+  {
     title: 'Diffs that read the code',
     body: 'In 47 languages, a diff tells changes from formatting, renames and moved code, so a tidy-up doesn’t bury the line that matters. A ribbon joins each change across the split view.',
     to: '/docs/guide/diffs',

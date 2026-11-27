@@ -82,6 +82,8 @@ A panel beside the plan shows the branch as it will be afterwards: the commits t
 
 The button says the outcome, such as **Rewrite as 3 commits**. **Reset the plan** puts every row back, and **Cancel** goes back to the graph with nothing changed. One Undo brings the whole branch back as it was.
 
+Once a rebase has run, **What changed?** on its message pairs each commit from before with the one it became: see [Two versions of a branch](two-versions.md).
+
 ![The interactive rebase editor](../img/rebase-editor-light.webp#gh-light-mode-only)
 ![The interactive rebase editor](../img/rebase-editor-dark.webp#gh-dark-mode-only)
 

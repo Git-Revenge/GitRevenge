@@ -84,7 +84,7 @@ async function demoScript() {
 
 /** Closes every tab, rebuilds the demo repositories, and opens the ones named. With clean,
  * tidewater's uncommitted changes are dropped first; with branch, that branch is checked out. */
-async function reset(page, open = ['tidewater'], { clean = false, branch, remotes = false } = {}) {
+async function reset(page, open = ['tidewater'], { clean = false, branch, remotes = false, then } = {}) {
   await page.evaluate(async () => {
     // Tabs that aren't repositories stay open across a reload.
     const pause = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -119,6 +119,8 @@ async function reset(page, open = ['tidewater'], { clean = false, branch, remote
   if (clean) run('git', ['-C', REPO, 'reset', '-q', '--hard'])
   if (branch) run('git', ['-C', REPO, 'checkout', '-q', branch])
   if (remotes) addRemotes()
+  // Anything else done to the demo from the command line, before the app opens it.
+  if (then) then()
   // Only the demo repositories belong on the start page, and it should look lived in: all
   // three recent, and a group in a known order. tidewater is opened last, to lead the list.
   await page.evaluate(async (demo) => {
@@ -2215,6 +2217,77 @@ scenes.applyDiff = (page) =>
     await p.waitForFunction(() => !document.body.innerText.includes('Trying each file'), { timeout: 30000 })
     await p.evaluate(() => document.activeElement?.blur())
     await sleep(600)
+    await park(p)
+  })
+
+// ── Two versions of a branch (#1038-#1041) ────────────────────────────────────────────
+
+/** Rebases feature/offline-cache onto main with its fixup folded in, from the command line,
+ * as someone would before force-pushing it, then opens the demo. Its reflog then has the tip
+ * from before the rebase, which the branch's menu offers. The rebase runs before the app opens
+ * the demo: run after, the app redraws as it notices, and closes a menu opened meanwhile. */
+async function autosquashed(p) {
+  const rebase = () =>
+    execFileSync('git', ['-C', REPO, 'rebase', '-q', '-i', '--autosquash', 'main', 'feature/offline-cache'], {
+      stdio: 'pipe',
+      env: { ...process.env, GIT_CONFIG_GLOBAL: path.win32.join(DEMO, 'gitconfig'), GIT_SEQUENCE_EDITOR: 'true' },
+    })
+  await reset(p, ['tidewater'], { clean: true, then: rebase })
+  await sleep(600)
+}
+
+/** The branch's menu, at Compare with an earlier version's submenu. */
+async function compareMenu(p) {
+  await click(p, sidebarRef('offline-cache'), { button: 'right', pause: 600 })
+  await click(p, byText('Compare with an earlier version'), { pause: 700 })
+  await p.waitForSelector(byText('Before the rebase'), { visible: true })
+}
+
+/** The comparison of feature/offline-cache with itself before the rebase, in the panel. */
+async function compared(p) {
+  await autosquashed(p)
+  await compareMenu(p)
+  await click(p, byText('Before the rebase'), { pause: 800 })
+  await p.waitForFunction(() => document.querySelector('aside.versions ol.rows li'), { timeout: 30000 })
+  await sleep(600)
+}
+
+const versionRow = (subject) => `::-p-xpath(//aside[contains(@class,'versions')]//button[contains(normalize-space(.), ${JSON.stringify(subject)})])`
+
+/** The changed pair open in the diff area, with the sidebar out of its way. */
+async function changedPair(p) {
+  await compared(p)
+  await click(p, '[aria-label="Hide the sidebar panel"]', { pause: 500 })
+  await click(p, versionRow('Cache the last reading from each station'), { pause: 800 })
+  await p.waitForSelector('section.pair [role=table]')
+  await sleep(500)
+}
+
+scenes.versionsMenu = (page) =>
+  stills(page, 'versions-menu', async (p) => {
+    await autosquashed(p)
+    await compareMenu(p)
+    await park(p)
+  })
+
+scenes.versions = (page) =>
+  stills(page, 'versions', async (p) => {
+    await compared(p)
+    await park(p)
+  })
+
+scenes.versionPair = (page) =>
+  stills(page, 'version-pair', async (p) => {
+    await changedPair(p)
+    await park(p)
+  })
+
+scenes.versionPairSide = (page) =>
+  stills(page, 'version-pair-side', async (p) => {
+    await changedPair(p)
+    await click(p, `::-p-xpath(//div[@aria-label='How to read it']/button[normalize-space(.)='Side by side'])`, { pause: 600 })
+    await p.evaluate(() => document.activeElement?.blur())
+    await p.waitForSelector('section.pair .side')
     await park(p)
   })
 

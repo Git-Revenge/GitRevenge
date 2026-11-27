@@ -35,6 +35,7 @@ After that, the guide covers each part of the app in turn:
 | [Resolving conflicts](conflicts.md) | The conflict tool, suggestions where code can be combined, and merge drivers. |
 | [Branch care](branch-care.md) | Branch kinds, hiding, cleaning up merged branches, and stacks. |
 | [Patches](patches.md) | Saving commits as patches, applying a series with `git am` or a plain diff with `git apply`, previewed first, from a file, a drop or the clipboard. |
+| [Two versions of a branch](two-versions.md) | What became of each commit after a rebase, an amend or a reset, with `git range-diff`: changed, the same, folded in, dropped or new, and each changed pair read Marked or Side by side. |
 | [Reading a diff](diffs.md) | Layouts and the ribbon, code read token by token, formatting, renames and moved code. |
 | [Previews and history](history.md) | Rendered previews, file history and blame, the reflog, bisect, notes and signatures. |
 | [Remotes, LFS and submodules](remotes.md) | Fetch, pull and push, where pushes go, the Remotes panel, tidying, pushing to several places, and forges. |
