@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { calls, open } from './support'
+import { branch, calls, open } from './support'
 
 // Two versions of a branch compared with git range-diff (#1038): Compare two versions of a
 // branch…, its dialog, and the panel that lists what became of each commit. The backend is
@@ -173,5 +173,66 @@ test.describe('a changed pair, read', () => {
     await expect(view(page)).toContainText('pair 1 of 5')
     await view(page).getByRole('button', { name: 'Copy as text' }).click()
     await expect(view(page).getByRole('button', { name: 'Copied' })).toBeVisible()
+  })
+})
+
+test.describe('where it starts', () => {
+  const ref = branch('feature/offline-cache', { head: true, commit: id('e'), upstream: 'origin/feature/offline-cache', ahead: 4, behind: 5 })
+  const amended = [{ selector: 'feature/offline-cache@{2}', commit: id('1'), action: 'commit: wip', time: now - 7200 }]
+  const withTips = (more: object = {}) => scenario({ Refs: [ref], Reflog: [...reflog, ...amended], ...more })
+  const branchMenu = async (page: Page) => {
+    await page.locator('.row.ref', { hasText: 'offline-cache' }).first().click({ button: 'right' })
+    const item = page.getByRole('menuitem', { name: /Compare with an earlier version/ })
+    await expect(item).toBeVisible()
+    return item
+  }
+
+  test("a branch's menu offers its tips from before a rewrite, and its upstream", async ({ page }) => {
+    await open(page, 'patchSources', withTips())
+    await (await branchMenu(page)).hover()
+    const sub = page.getByRole('menu').last()
+    await expect(sub.getByRole('menuitem')).toHaveText([/^\s*Before the rebase · 4 min ago/, /^\s*origin\/feature\/offline-cache/, /^\s*Pick two versions…/])
+    await sub.getByRole('menuitem', { name: /Before the rebase/ }).click()
+    await expect.poll(async () => (await calls(page, 'CompareVersions'))[0]).toEqual(['/r', { base: id('c'), tip: id('2') }, { base: id('c'), tip: 'feature/offline-cache' }, false])
+    await expect(panel(page)).toContainText('Before the rebase 2222222 → now eeeeeee')
+  })
+
+  test('the upstream, and Pick two versions, from the same menu', async ({ page }) => {
+    await open(page, 'patchSources', withTips())
+    await (await branchMenu(page)).hover()
+    await page.getByRole('menu').last().getByRole('menuitem', { name: /^origin\/feature\/offline-cache/ }).click()
+    await expect.poll(async () => (await calls(page, 'CompareVersions'))[0]?.[1]).toEqual({ base: id('c'), tip: 'origin/feature/offline-cache' })
+    await expect(panel(page)).toContainText('origin/feature/offline-cache')
+
+    await (await branchMenu(page)).hover()
+    await page.getByRole('menu').last().getByRole('menuitem', { name: 'Pick two versions…' }).click()
+    await expect(page.getByRole('dialog', { name: 'Compare two versions' })).toBeVisible()
+  })
+
+  test('says why when there is nothing to compare', async ({ page }) => {
+    await open(page, 'patchSources', scenario({ Refs: [branch('feature/offline-cache', { head: true, commit: id('e') })], Reflog: [reflog[1]] }))
+    const item = await branchMenu(page)
+    await expect(item).toBeDisabled()
+    await expect(item).toContainText('It hasn’t been rebased, amended or reset, and its upstream has the same commits.')
+  })
+
+  test('the reflog compares an entry with now', async ({ page }) => {
+    await open(page, 'patchSources', withTips())
+    await page.locator('.row.ref', { hasText: 'offline-cache' }).first().click({ button: 'right' })
+    await page.getByRole('menuitem', { name: /Reflog of feature\/offline-cache/ }).click()
+    const d = page.getByRole('dialog', { name: 'Reflog' })
+    await d.getByRole('button', { name: 'Compare with now' }).first().click()
+    await expect(d).toHaveCount(0)
+    await expect.poll(async () => (await calls(page, 'CompareVersions'))[0]?.[1]).toEqual({ base: id('c'), tip: id('2') })
+    await expect(panel(page)).toContainText('Before the rebase 2222222')
+  })
+
+  test('without a base to go by, Compare two versions opens on the tip to ask where it starts', async ({ page }) => {
+    await open(page, 'patchSources', withTips({ VersionBase: '' }))
+    await (await branchMenu(page)).hover()
+    await page.getByRole('menu').last().getByRole('menuitem', { name: /Before the rebase/ }).click()
+    const d = page.getByRole('dialog', { name: 'Compare two versions' })
+    await expect(d.locator('select')).toHaveValue(id('2'))
+    expect(await calls(page, 'CompareVersions')).toEqual([])
   })
 })

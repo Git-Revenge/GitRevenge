@@ -2,7 +2,7 @@
  * remote branch is from its remote's default branch, and which local branches track it. It's
  * read from the backend as the menu opens, so the menus themselves stay plain functions. */
 
-import { BranchWebLinks, PushPlan, RemoteBranchStatus, Remotes } from '../../wailsjs/go/app/App.js'
+import { BranchWebLinks, PushPlan, Reflog, RemoteBranchStatus, Remotes } from '../../wailsjs/go/app/App.js'
 import type { app, git } from '../../wailsjs/go/models'
 import type { Ref } from './graph/rowCache'
 import { repoReads } from './repoReads'
@@ -25,6 +25,8 @@ export interface RefExtras {
   remotes: string[]
   /** Where Push sends a local branch, by git's rules and the Pushing settings. */
   plan?: git.PushPlan
+  /** A local branch's reflog, newest first, for Compare with an earlier version ▸ (#1040). */
+  reflog?: git.ReflogEntry[]
 }
 
 /** Splits a remote branch's short name at its remote, the longest remote name first. */
@@ -65,12 +67,14 @@ export async function loadRefExtras(path: string, refs: Ref[]): Promise<Map<stri
   for (const ref of refs) {
     if (ref.kind === 'local' && !remoteBranchOf(ref)) out.set(ref.short, { remote: '', branch: ref.short, host: '', trackedBy: [], localExists: true, remotes })
   }
-  // And every local branch, where Push sends it.
+  // And every local branch, where Push sends it, and its reflog.
+  const logs = new Map<string, git.ReflogEntry[]>()
   await Promise.all(
     refs
       .filter((r) => r.kind === 'local')
       .map(async (r) => {
-        const plan = await PushPlan(path, r.short).catch(() => null)
+        const [plan, log] = await Promise.all([PushPlan(path, r.short).catch(() => null), Reflog(path, r.short).catch(() => null)])
+        if (log) logs.set(r.short, log)
         if (!plan) return
         const e = out.get(r.short)
         if (e) e.plan = plan
@@ -100,6 +104,10 @@ export async function loadRefExtras(path: string, refs: Ref[]): Promise<Map<stri
   for (const [short, plan] of pending) {
     const e = out.get(short)
     if (e) e.plan = plan
+  }
+  for (const [short, log] of logs) {
+    const e = out.get(short)
+    if (e) e.reflog = log
   }
   return out
 }

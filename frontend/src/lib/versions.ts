@@ -83,6 +83,32 @@ export function ago(seconds: number, now = Date.now() / 1000): string {
   return days === 1 ? 'yesterday' : `${days} days ago`
 }
 
+/** A branch's earlier tip that a rewrite moved it away from (#1040). */
+export interface EarlierTip {
+  commit: string
+  /** What moved it away, capitalized: "Before the rebase". */
+  said: string
+  /** When that happened, in seconds. */
+  time: number
+}
+
+const REWRITES = new Set(['before the rebase', 'before the amend', 'before the reset'])
+
+/** The branch's last few tips that a rebase, an amend or a reset moved it away from, newest
+ * first, from its reflog (newest first too). Each is named and dated by the entry that moved
+ * the branch away from it; the tip it's at now, and repeats, are left out. */
+export function earlierTips(entries: { commit: string; action: string; time: number }[], most = 3): EarlierTip[] {
+  const out: EarlierTip[] = []
+  const now = entries[0]?.commit
+  for (let i = 1; i < entries.length && out.length < most; i++) {
+    const said = tipLabel(entries[i - 1].action)
+    const commit = entries[i].commit
+    if (!REWRITES.has(said) || commit === now || out.some((t) => t.commit === commit)) continue
+    out.push({ commit, said: `${said[0].toUpperCase()}${said.slice(1)}`, time: entries[i - 1].time })
+  }
+  return out
+}
+
 /** A reflog entry's tip as a choice for the old version: what moved the branch from it. */
 export function tipLabel(action: string): string {
   const a = action.toLowerCase()

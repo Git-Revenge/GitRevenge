@@ -27,9 +27,9 @@
     }
   })
 
-  async function act(t: Toast) {
+  async function act(t: Toast, which: 'action' | 'also' = 'action') {
     toasts.dismiss(t.id)
-    await t.action?.run()
+    await t[which]?.run()
   }
 </script>
 
@@ -48,6 +48,9 @@
       role="group"
     >
       <span class="message">{t.message}</span>
+      {#if t.also}
+        <button class="btn sm text" onclick={() => act(t, 'also')}>{t.also.label}</button>
+      {/if}
       {#if t.action}
         <button class="btn sm text" onclick={() => act(t)}>{t.action.label}</button>
       {/if}

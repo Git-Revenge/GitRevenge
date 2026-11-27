@@ -16,6 +16,7 @@
     base,
     squash = [],
     onClose,
+    onDone,
   }: {
     path: string
     base: string
@@ -23,6 +24,8 @@
      * squashed into one (#1020). The plan shows it before anything runs. */
     squash?: string[]
     onClose: () => void
+    /** The rebase ran to the end without stopping (#1040). */
+    onDone?: () => void
   } = $props()
 
   let items = $state<PlanItem[]>([])
@@ -228,6 +231,7 @@
     try {
       await InteractiveRebase(path, base, toRun($state.snapshot(items)) as git.RebaseItem[])
       onClose()
+      onDone?.()
     } catch (e) {
       // Stopped on a conflict: the rebase is under way, and the strip above takes it from here.
       const state = await RepoState(path).catch(() => null)

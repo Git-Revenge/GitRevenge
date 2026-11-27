@@ -346,7 +346,7 @@ const mounts = {
   async rebaseEditor() {
     host.style.cssText = 'display:block;height:100vh'
     const { default: RebaseEditor } = await import('../src/lib/RebaseEditor.svelte')
-    mount(RebaseEditor, { target: host, props: { path: '/r', base: 'b'.repeat(40), onClose: record('close') } })
+    mount(RebaseEditor, { target: host, props: { path: '/r', base: 'b'.repeat(40), onClose: record('close'), onDone: record('done') } })
   },
   async markdownPreview() {
     const { previewerFor } = await import('../src/lib/diff/previews/registry')
@@ -498,6 +498,9 @@ const mounts = {
     mount(Toasts, { target: document.body })
     const { session } = await import('../src/lib/session.svelte')
     win.__changed = (path) => (session.revision[path] = (session.revision[path] ?? 0) + 1)
+    // What the strip's toasts asked to compare (#1040): the repository view takes it in the app.
+    const { versionsAsk } = await import('../src/lib/versionsAsk.svelte')
+    Object.assign(win, { __versionsAsk: () => (versionsAsk.ask ? { ...versionsAsk.ask } : null) })
   },
   async conflictView() {
     host.style.cssText = 'display:block;height:100vh'

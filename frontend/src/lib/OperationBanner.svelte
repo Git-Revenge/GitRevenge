@@ -8,6 +8,7 @@
   import { operations } from './operation.svelte'
   import PatchView from './PatchView.svelte'
   import { toasts } from './toasts.svelte'
+  import { versionsAsk } from './versionsAsk.svelte'
   import { session } from './session.svelte'
   import Icon from './ui/Icon.svelte'
   import { reveal } from './ui/motion'
@@ -86,13 +87,23 @@
             },
           }
         : undefined,
+      // A rebase of a branch: what became of each of its commits (#1040).
+      was.operation === 'rebase' && was.ours && was.origHead
+        ? { label: 'What changed?', run: () => versionsAsk.show({ path: repo, branch: was.ours, oldTip: was.origHead, oldLabel: 'Before the rebase' }) }
+        : undefined,
     )
     if (was.operation !== 'rebase') return
     // A rebased branch that was already pushed has left its old commits on the remote.
     const refs = (await Refs(repo).catch(() => null)) ?? []
     const head = refs.find((r) => r.kind === 'local' && r.head)
     if (head?.upstream && head.behind > 0) {
-      toasts.show(`${head.upstream} still has the commits from before the rebase.`, { label: 'Force push…', run: () => void commands.all().find((c) => c.id === 'repo.force-push')?.run() })
+      const upstream = head.upstream
+      toasts.show(
+        `${upstream} still has the commits from before the rebase.`,
+        { label: 'Force push…', run: () => void commands.all().find((c) => c.id === 'repo.force-push')?.run() },
+        // What the remote has against what you'd push (#1040).
+        { label: 'Compare first', run: () => versionsAsk.show({ path: repo, branch: head.short, oldTip: upstream, oldLabel: upstream }) },
+      )
     }
   }
 

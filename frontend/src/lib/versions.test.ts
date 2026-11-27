@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ago, isSame, kindOf, mergesNote, noteOf, placesOf, summaryOf, tipLabel } from './versions'
+import { ago, earlierTips, isSame, kindOf, mergesNote, noteOf, placesOf, summaryOf, tipLabel } from './versions'
 
 const pair = (over: object = {}) => ({ old: 1, new: 1, kind: 'same', subject: 'Cache the last reading', oldSubject: '', into: 0, moved: false, newId: 'b'.repeat(40), ...over })
 
@@ -67,5 +67,31 @@ describe('earlier tips', () => {
     expect(ago(now - 7200, now)).toBe('2 h ago')
     expect(ago(now - 90000, now)).toBe('yesterday')
     expect(ago(now - 3 * 86400, now)).toBe('3 days ago')
+  })
+})
+
+describe('earlierTips', () => {
+  const at = (commit: string, action: string, time: number) => ({ commit, action, time })
+  it('names the tips a rebase, an amend or a reset moved the branch away from', () => {
+    const log = [
+      at('e', 'rebase (finish): refs/heads/topic onto c', 500),
+      at('d', 'commit (amend): Fall back', 400),
+      at('c', 'commit: Fall back', 300),
+      at('b', 'reset: moving to HEAD~1', 200),
+      at('a', 'commit: wip', 100),
+      at('0', 'branch: Created from main', 50),
+    ]
+    expect(earlierTips(log)).toEqual([
+      { commit: 'd', said: 'Before the rebase', time: 500 },
+      { commit: 'c', said: 'Before the amend', time: 400 },
+      { commit: 'a', said: 'Before the reset', time: 200 },
+    ])
+    expect(earlierTips(log, 1)).toHaveLength(1)
+  })
+
+  it('leaves out plain commits, the tip it is at, and repeats', () => {
+    expect(earlierTips([at('b', 'commit: two', 2), at('a', 'commit: one', 1)])).toEqual([])
+    expect(earlierTips([at('a', 'reset: moving to a', 3), at('a', 'commit: one', 2)])).toEqual([])
+    expect(earlierTips([])).toEqual([])
   })
 })

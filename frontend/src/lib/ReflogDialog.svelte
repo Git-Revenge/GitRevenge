@@ -10,18 +10,25 @@
   import Modal from './ui/Modal.svelte'
   import Icon from './ui/Icon.svelte'
   import Loading from './ui/Loading.svelte'
+  import { tipLabel } from './versions'
+
+  const capitalize = (s: string) => `${s[0].toUpperCase()}${s.slice(1)}`
 
   let {
     path,
     initialRef = 'HEAD',
     onReveal,
     onCreateBranch,
+    onCompare,
     onClose,
   }: {
     path: string
     initialRef?: string
     onReveal: (commit: string) => void
     onCreateBranch: (commit: string) => void
+    /** Compares the branch at this entry with now (#1040): branch is the reflog's branch, or ""
+     * for HEAD's; label says what moved it away, "Before the rebase". */
+    onCompare?: (branch: string, commit: string, label: string) => void
     onClose: () => void
   } = $props()
 
@@ -77,7 +84,7 @@
           <tr><th scope="col">Entry</th><th scope="col">What happened</th><th scope="col">When</th><th scope="col">Commit</th><th><span class="visually-hidden">Actions</span></th></tr>
         </thead>
         <tbody>
-          {#each entries as e (e.selector)}
+          {#each entries as e, i (e.selector)}
             <tr>
               <td class="mono">{e.selector}</td>
               <td class="action" title={e.action}>{e.action}</td>
@@ -86,6 +93,13 @@
               <td class="row-actions">
                 <button class="btn sm quiet" onclick={() => onReveal(e.commit)} title="Show this commit in the graph"><Icon name="search" size={14} />Show</button>
                 <button class="btn sm quiet" onclick={() => onCreateBranch(e.commit)} title="Start a branch at this commit"><Icon name="branch" size={14} />New branch…</button>
+                {#if onCompare && i > 0 && e.commit !== entries?.[0]?.commit}
+                  <button
+                    class="btn sm quiet"
+                    onclick={() => onCompare(ref.startsWith('refs/heads/') ? ref.slice(11) : '', e.commit, capitalize(tipLabel(entries?.[i - 1]?.action ?? '')))}
+                    title="What became of its commits since"><Icon name="rebase" size={14} />Compare with now</button
+                  >
+                {/if}
               </td>
             </tr>
           {/each}
