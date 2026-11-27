@@ -96,7 +96,8 @@ test.describe('read as code', () => {
     await openDiff(page, 'unified', { code, lines })
     const summary = page.getByRole('group', { name: 'What changed' })
     await expect(summary.locator('.where')).toHaveText('3 places')
-    await page.getByRole('switch', { name: 'Hide formatting' }).click()
+    // The checkbox sits under its track: a click lands on the switch's label, as a person's does.
+    await page.locator('label.switch', { hasText: 'Hide formatting' }).click()
     await expect(page.locator('tr.format')).toHaveCount(0)
     // The line reads as unchanged, in its new form.
     await expect(page.locator('tr.eq', { hasText: 'const maxHours = 48' })).toHaveCount(1)
@@ -106,9 +107,21 @@ test.describe('read as code', () => {
     await expect(page.locator('tr.format')).toHaveCount(2)
   })
 
+  test('the switch is the app’s own: one knob, and it moves (#1032)', async ({ page }) => {
+    await openDiff(page, 'unified', { code, lines })
+    const label = page.locator('label.switch', { hasText: 'Hide formatting' })
+    const knob = () => label.locator('.track').evaluate((t) => getComputedStyle(t, '::after').transform)
+    // A second knob drawn beside the app's would sit still at the left.
+    await expect(label.locator('.knob')).toHaveCount(0)
+    expect(await knob()).toBe('none')
+    await label.click()
+    await expect(page.getByRole('switch', { name: 'Hide formatting' })).toBeChecked()
+    await expect.poll(knob).toBe('matrix(1, 0, 0, 1, 18, 0)')
+  })
+
   test('starts hidden when Settings says so', async ({ page }) => {
     await openDiff(page, 'unified', { code, lines }, {}, { diffHideFormatting: true })
-    await expect(page.getByRole('switch', { name: 'Hide formatting' })).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByRole('switch', { name: 'Hide formatting' })).toBeChecked()
     await expect(page.locator('tr.format')).toHaveCount(0)
   })
 
@@ -130,7 +143,8 @@ test.describe('read as code', () => {
     await expect(ribbon.locator('g.band.change')).toHaveCount(1)
     await expect(page.locator('[data-side="new"] .cm-word-rename').first()).toHaveText('readings')
     await expect(page.locator('[data-side="new"] .cm-block-note').first()).toHaveText('same value')
-    await page.getByRole('switch', { name: 'Hide formatting' }).click()
+    // The checkbox sits under its track: a click lands on the switch's label, as a person's does.
+    await page.locator('label.switch', { hasText: 'Hide formatting' }).click()
     await expect(ribbon.locator('g.band.format')).toHaveCount(0)
     await expect(page.locator('[data-side="new"] .cm-format')).toHaveCount(0)
   })
@@ -169,7 +183,7 @@ test.describe('staging', () => {
     await openDiff(page, 'unified', { code, lines }, { diffTarget: { mode: 'unstaged', file: 'internal/tides/forecast.go' } }, { diffHideFormatting: true })
     const hide = page.getByRole('switch', { name: 'Hide formatting' })
     await expect(hide).toBeDisabled()
-    await expect(hide).toHaveAttribute('aria-checked', 'false')
+    await expect(hide).not.toBeChecked()
     await expect(page.locator('tr.format')).toHaveCount(2)
     const formatting = page.locator('section.hunk', { has: page.locator('.tag', { hasText: 'formatting only' }) })
     await expect(formatting).toHaveCount(1)

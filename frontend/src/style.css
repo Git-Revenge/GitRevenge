@@ -728,7 +728,9 @@ html.busy * {
   }
 }
 
-/* An on/off switch: a real checkbox inside, the track drawn after it. */
+/* An on/off switch: a real checkbox inside, the track drawn after it. It is the app's only switch:
+   its rules reach any .track inside a .switch, so a switch of other markup gets a second knob
+   (#1032). Use this one. */
 .switch {
   position: relative;
   display: inline-flex;
