@@ -1,19 +1,26 @@
 <script lang="ts">
+  import { CancelDownload, DownloadFiles, FetchMoreHistory } from '../../wailsjs/go/app/App.js'
   import type { app, git } from '../../wailsjs/go/models'
   import { ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
+  import { errorText } from './errors'
+  import { network } from './network.svelte'
+  import Busy from './ui/Busy.svelte'
   import Icon from './ui/Icon.svelte'
-  import { isSame, kindOf, mergesNote, noteOf, placesOf, summaryOf } from './versions'
+  import { isSame, kindOf, looseOffer, mergesNote, nothingChanged, noteOf, placesOf, summaryOf, tooBigSaid } from './versions'
 
   /** Two versions of a branch, compared (#1038): what became of each old commit. */
   let {
+    path,
     compared,
     branch,
     oldLabel,
     onClose,
     onShow,
     onOpen,
+    onRecompare,
     current = -1,
   }: {
+    path: string
     compared: app.VersionsCompared
     /** The branch, or "" when the versions aren't one branch's. */
     branch: string
@@ -24,9 +31,36 @@
     onShow: (id: string) => void
     /** Opens a pair that changed, by its place, in the diff area (#1039). */
     onOpen?: (index: number) => void
+    /** Compares the same two versions again (#1041): matched loosely or as git does, or a big
+     * one anyway, or once what was missing is here. */
+    onRecompare?: (o: { loose?: boolean; anyway?: boolean }) => void
     /** The pair open in the diff area, or -1. */
     current?: number
   } = $props()
+
+  // What a partial clone needs first (#1041): one download, with Stop.
+  let downloading = $state(false)
+  let token = ''
+  let error = $state('')
+  async function download() {
+    downloading = true
+    error = ''
+    token = `versions-${Date.now()}`
+    try {
+      await DownloadFiles(path, token, compared.missing ?? [])
+      onRecompare?.({})
+    } catch (e) {
+      error = /cancel|stopp?ed|killed|interrupt/i.test(errorText(e)) ? '' : errorText(e)
+    } finally {
+      downloading = false
+    }
+  }
+  // A version that reaches a shallow clone's edge: more history, then again.
+  async function fetchMore() {
+    await network.run(path, 'history', () => FetchMoreHistory(path, { commits: 1000, since: 0, all: false }))
+    onRecompare?.({})
+  }
+  let held = $derived(!!compared.tooBig || (compared.missing?.length ?? 0) > 0)
 
   let hideSame = $state(false)
   let clicked = $state(-1)
@@ -64,19 +98,57 @@
     <p class="sides">
       {oldLabel} <span class="mono id">{short(compared.old.tip)}</span> → now <span class="mono id">{short(compared.new.tip)}</span>
     </p>
-    <p class="summary">{summaryOf(compared.pairs, compared.oldCount.commits, compared.newCount.commits)}</p>
+    {#if !held}
+      <p class="summary">{nothingChanged(compared) || summaryOf(compared.pairs, compared.oldCount.commits, compared.newCount.commits)}</p>
+    {/if}
     {#if mergesNote(compared.oldCount.merges, compared.newCount.merges)}
       <p class="summary">{mergesNote(compared.oldCount.merges, compared.newCount.merges)}</p>
     {/if}
   </header>
 
-  <div class="tools">
-    <label><input type="checkbox" bind:checked={hideSame} /> Hide the same</label>
-    <span class="grow"></span>
-    <button class="btn sm text" onclick={copy}>{copied ? 'Copied' : 'Copy as text'}</button>
-  </div>
+  {#if compared.tooBig}
+    <div class="ask" role="status">
+      <p>{tooBigSaid(compared.oldCount.commits, compared.newCount.commits)}</p>
+      <button class="btn sm secondary" onclick={() => onRecompare?.({ anyway: true })}>Compare them</button>
+    </div>
+  {:else if compared.missing?.length}
+    <div class="ask" role="status">
+      <p>Comparing them needs {compared.missing.length.toLocaleString()} file {compared.missing.length === 1 ? 'version' : 'versions'} this partial clone hasn’t got.</p>
+      {#if downloading}
+        <span class="busy"><Busy /> Downloading… <button class="btn sm text" onclick={() => void CancelDownload(token)}>Stop</button></span>
+      {:else}
+        <button class="btn sm secondary" onclick={download}>Download them</button>
+      {/if}
+      {#if error}<p class="form-error" role="alert">{error}</p>{/if}
+    </div>
+  {:else}
+    {#if compared.oldEdge || compared.newEdge}
+      <div class="ask" role="status">
+        <p>{compared.oldEdge && compared.newEdge ? 'Both versions start' : compared.oldEdge ? 'The old version starts' : 'The new version starts'} where this shallow clone’s history stops, so its oldest commit shows every file as added.</p>
+        <button class="btn sm secondary" onclick={fetchMore}>Fetch 1,000 commits more</button>
+      </div>
+    {/if}
+    {#if looseOffer(compared)}
+      <div class="ask" role="status">
+        <p>{looseOffer(compared)}</p>
+        <button class="btn sm secondary" onclick={() => onRecompare?.({ loose: true })}>Match more loosely</button>
+      </div>
+    {:else if compared.loose}
+      <div class="ask" role="status">
+        <p>Matched loosely, so a commit reworked a lot still pairs with its old self.</p>
+        <button class="btn sm text" onclick={() => onRecompare?.({ loose: false })}>Match as git does</button>
+      </div>
+    {/if}
+    <div class="tools">
+      <label><input type="checkbox" bind:checked={hideSame} /> Hide the same</label>
+      <span class="grow"></span>
+      <button class="btn sm text" onclick={copy}>{copied ? 'Copied' : 'Copy as text'}</button>
+    </div>
+  {/if}
 
-  {#if compared.pairs.length}
+  {#if held}
+    <!-- Nothing compared yet: the list comes once it is. -->
+  {:else if compared.pairs.length}
     <ol class="rows" aria-label="What became of each commit">
       {#each shown as { p, i } (i)}
         {@const k = kindOf(p)}
@@ -275,6 +347,30 @@
   .pill.new {
     background: color-mix(in srgb, var(--accent-a) 14%, transparent);
     color: var(--accent-a);
+  }
+
+  .ask {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 10px 12px;
+    border-radius: var(--r-md);
+    background: var(--paper-warm);
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+  }
+
+  .ask p {
+    margin: 0;
+  }
+
+  .busy {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
   }
 
   .foot,

@@ -3654,6 +3654,10 @@ export namespace app {
 	    text: string;
 	    command: string;
 	    loose: boolean;
+	    tooBig: boolean;
+	    missing: string[];
+	    oldEdge: boolean;
+	    newEdge: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new VersionsCompared(source);
@@ -3669,6 +3673,10 @@ export namespace app {
 	        this.text = source["text"];
 	        this.command = source["command"];
 	        this.loose = source["loose"];
+	        this.tooBig = source["tooBig"];
+	        this.missing = source["missing"];
+	        this.oldEdge = source["oldEdge"];
+	        this.newEdge = source["newEdge"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
