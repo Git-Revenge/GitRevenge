@@ -46,6 +46,7 @@ const sidebars = {
         { type: 'doc', id: 'guide/branches', label: 'Branches, merges and rebases' },
         { type: 'doc', id: 'guide/conflicts', label: 'Resolving conflicts' },
         { type: 'doc', id: 'guide/branch-care', label: 'Branch care' },
+        { type: 'doc', id: 'guide/patches', label: 'Patches' },
         { type: 'doc', id: 'guide/history', label: 'Previews and history' },
         { type: 'doc', id: 'guide/remotes', label: 'Remotes, LFS and submodules' },
         { type: 'doc', id: 'guide/git-config', label: 'Git config' },

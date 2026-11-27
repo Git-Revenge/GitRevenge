@@ -78,6 +78,44 @@ Ticket keys and web addresses in a message or trailer are links when a [smart li
 ![A selected commit, with its message, trailers, author, a git note and the files it changed](../img/commit-details-light.webp#gh-light-mode-only)
 ![A selected commit, with its message, trailers, author, a git note and the files it changed](../img/commit-details-dark.webp#gh-dark-mode-only)
 
+## Selecting several commits
+
+The graph can select several commits at once, to compare them, see them as one change, or act on them together.
+
+- <kbd>Ctrl</kbd>+click (<kbd>⌘</kbd>+click on macOS) adds a commit to the selection, or takes it out.
+- <kbd>Shift</kbd>+click takes every row shown between the last one clicked and this one.
+- <kbd>Shift</kbd> with an arrow key, or with <kbd>Page Up</kbd> and <kbd>Page Down</kbd>, grows or shrinks the selection from the last row clicked.
+- <kbd>Esc</kbd> goes back to the one last clicked.
+
+The [horizontal view](experimental-views.md) takes the same clicks and keys.
+
+### The panel for several
+
+The panel on the right shows them together, in one of three ways:
+
+- **Two, side by side:** their difference, from the older one's files to the newer one's, as `git diff A B` shows it. A line says how they stand to each other, such as "c0e582a is 3 commits after df840f3", and **Swap sides** turns it round.
+- **One line of history:** three or more, each the parent of the next, show **all together**, as one diff from before the oldest to the newest. That's what squashing them would make. A line that starts at the history's first commit, or where a [shallow clone](big-repositories.md#where-a-shallow-history-stops) stops, shows its files as added.
+- **Picked here and there:** any others. The panel lists the files they change, with how many of them change each. A file opens to the commits that changed it, each with its own diff.
+
+![Three commits of one line selected: the panel shows them all together, as one diff](../img/selection-light.webp#gh-light-mode-only)
+![Three commits of one line selected: the panel shows them all together, as one diff](../img/selection-dark.webp#gh-dark-mode-only)
+
+Every way says who wrote them and when, and lists the commits, oldest first, each with **×** to take it out of the selection. A file opens in the [diff view](diffs.md), with the code read and moves found as in any diff, and the commits named beside it. The panel lists the first 100 commits, and reads the files from the first 500.
+
+### What you can do with them
+
+Right-click a selected row, or use the buttons on the panel:
+
+- **Cherry-pick** them onto your branch, oldest first, whatever order you clicked them in.
+- **Revert** them, newest first, so each undoes cleanly. A merge among them is reverted on its own, from its own menu.
+- **Squash into one…**, for one line on the branch you're on, opens the [interactive rebase editor](branches.md#interactive-rebase) with the line marked to squash, so you see the plan and the combined message before anything runs. For anything else it says why not, such as "c0e582a is on origin/main too."
+- [Save as patches…](patches.md#saving-commits-as-patches), or **Copy as patches**.
+- **Copy their ids**, oldest first.
+
+Anything that would act on more than 100 commits asks first.
+
+When the graph reloads, after a fetch, a commit or a change made in a terminal, the selection follows its commits to their new rows. Commits that are gone, after a rebase or a reset, or that a filter hides, drop out of it.
+
 ## Authors
 
 The name on a commit is the one `git log` shows: if the repository has a [mailmap](people.md), someone who has committed under several names or addresses appears under one. A repository with no mailmap shows each commit's author as written.

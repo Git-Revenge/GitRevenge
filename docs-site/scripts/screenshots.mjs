@@ -2097,6 +2097,127 @@ scenes.about = (page) =>
     await park(p)
   })
 
+// ── Selecting several commits, and patches (#1018-#1025) ──────────────────────────────
+
+const READING_TIMES = ['Keep the time each reading was taken', 'Mark a reading stale after half an hour', 'Lower the wind alert to 55 km/h, as the harbour master asked']
+
+/** Selects feature/reading-times' three commits, one line. The rows are drawn on a canvas, so
+ * they're clicked where they are. The newest is found by searching, which brings the other two
+ * on screen below it. Clicking a row on screen doesn't scroll the graph, so clicks step down
+ * from it, each saying through the panel which commit is there, until all three are found. */
+async function selectReadingTimes(p) {
+  const s = await (await p.$('.scroller')).boundingBox()
+  const x = s.x + Math.min(s.width / 2, 360)
+  const subject = () => p.evaluate(() => document.querySelector('[aria-label="Commit details"] h2')?.textContent?.trim() ?? '')
+  await selectCommit(p, READING_TIMES[2])
+  const card = await (await p.waitForSelector('.row-actions', { visible: true })).boundingBox()
+  const found = {}
+  for (let y = card.y + card.height / 2; y < s.y + s.height - 10 && Object.keys(found).length < 3; y += 14) {
+    await p.mouse.click(x, y)
+    await sleep(250)
+    const at = await subject()
+    if (READING_TIMES.includes(at) && !(at in found)) found[at] = y
+  }
+  const at = READING_TIMES.map((name) => found[name])
+  if (at.some((y) => y === undefined)) throw new Error(`found: ${Object.keys(found).join(' | ')}`)
+  await clickAt(p, x, at[0], { pause: 300 })
+  await p.keyboard.down('Control')
+  for (const y of at.slice(1)) await clickAt(p, x, y, { pause: 300 })
+  await p.keyboard.up('Control')
+  await p.waitForFunction(() => document.body.innerText.includes('one line of history'), { timeout: 15000 })
+  await sleep(1500)
+}
+
+scenes.selection = (page) =>
+  stills(page, 'selection', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await selectReadingTimes(p)
+    await park(p)
+  })
+
+scenes.savePatches = (page) =>
+  stills(page, 'save-patches', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await click(p, sidebarRef('reading-times'), { button: 'right', pause: 400 })
+    await click(p, byText('Save feature/reading-times as patches…'), { pause: 600 })
+    await p.waitForFunction(() => document.querySelector('[role=dialog] ol.commits li'), { timeout: 15000 })
+    await replaceIn(p, '[role=dialog] input[aria-label="Into folder"]', path.win32.join(DEMO, 'patches'))
+    await p.evaluate(() => document.activeElement?.blur())
+    await sleep(400)
+    await park(p)
+  })
+
+/** Git with the demo's global config, as the app runs it. */
+function demoGit(args) {
+  return execFileSync('git', ['-C', REPO, ...args], { encoding: 'utf8', env: { ...process.env, GIT_CONFIG_GLOBAL: path.win32.join(DEMO, 'gitconfig') } })
+}
+
+/**
+ * Opens text in the patches preview through Apply the patch on the clipboard, the one way in
+ * that needs no file dialog. The clipboard is the system's: its text is kept first, and put
+ * back after only if it still holds this text, so anything copied meanwhile stays. Anything
+ * on it that isn't text is lost.
+ */
+async function fromClipboard(p, text) {
+  const dir = path.join(work, 'clipboard')
+  mkdirSync(dir, { recursive: true })
+  const kept = path.join(dir, 'kept.txt')
+  const mine = path.join(dir, 'patch.txt')
+  writeFileSync(mine, text)
+  const ps = (script) => execFileSync('powershell.exe', ['-NoProfile', '-Command', script], { encoding: 'utf8' })
+  ps(`$t = Get-Clipboard -Raw; [IO.File]::WriteAllText('${kept}', [string]$t)`)
+  try {
+    ps(`Set-Clipboard -Value ([IO.File]::ReadAllText('${mine}'))`)
+    await palette(p, 'Apply the patch on the clipboard')
+    await p.waitForSelector('[role=dialog]', { timeout: 20000 })
+  } finally {
+    const now = ps('Get-Clipboard -Raw') ?? ''
+    if (now.replace(/\r\n/g, '\n').trim() === text.replace(/\r\n/g, '\n').trim()) {
+      // An empty clipboard goes back to empty: Set-Clipboard won't take an empty string.
+      ps(`$t = [IO.File]::ReadAllText('${kept}'); if ($t) { Set-Clipboard -Value $t } else { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::Clear() }`)
+    }
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+scenes.applySeries = (page) =>
+  stills(page, 'apply-series', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await fromClipboard(p, demoGit(['format-patch', '--stdout', 'main..feature/reading-times']))
+    // Each row fills in as its try finishes.
+    await p.waitForFunction(() => !document.body.innerText.includes('Trying them'), { timeout: 30000 })
+    // The dialog focuses its first box as it opens: no focus ring in the picture.
+    await p.evaluate(() => document.activeElement?.blur())
+    await sleep(600)
+    await park(p)
+  })
+
+scenes.applyStrip = (page) =>
+  stills(page, 'apply-strip', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    const mbox = path.join(work, 'reading-times.mbox')
+    writeFileSync(mbox, demoGit(['format-patch', '--stdout', 'main..feature/reading-times']))
+    // Started in a terminal, as the strip says it can be: it stops at patch 1's conflict.
+    try {
+      demoGit(['am', '--3way', mbox])
+    } catch {
+      // git am stops with a conflict, which is the point.
+    }
+    await p.waitForFunction(() => document.body.innerText.includes('Stopped at patch 1 of 3'), { timeout: 20000 })
+    await sleep(1200)
+    await park(p)
+  })
+
+scenes.applyDiff = (page) =>
+  stills(page, 'apply-diff', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await fromClipboard(p, demoGit(['diff', 'main...feature/offline-cache']))
+    await p.waitForFunction(() => !document.body.innerText.includes('Trying each file'), { timeout: 30000 })
+    await p.evaluate(() => document.activeElement?.blur())
+    await sleep(600)
+    await park(p)
+  })
+
 // ── Main ──────────────────────────────────────────────────────────────────────────────
 
 mkdirSync(out, { recursive: true })
