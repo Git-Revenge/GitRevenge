@@ -105,7 +105,7 @@ const features = [
   },
   {
     title: 'The hard parts',
-    body: 'An interactive rebase editor that shows the branch as it will be. A conflict tool built around the result, which suggests where both sides’ edits combine. Bisect, blame, file history, the reflog and git notes.',
+    body: 'An interactive rebase editor that shows the branch as it will be. A conflict tool built around the result, which suggests where both sides’ edits combine. Bisect, blame you can drag back through every version of a file, file history, the reflog and git notes.',
     to: '/docs/guide/branches',
   },
   {
