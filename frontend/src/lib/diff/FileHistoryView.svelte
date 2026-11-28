@@ -58,6 +58,11 @@
     {#if commits}<span class="meta">{commits.length} {commits.length === 1 ? 'commit' : 'commits'}</span>{/if}
     <span class="spacer"></span>
     <button class="btn quiet" onclick={() => onOpen({ mode: 'blame', file })}>Blame</button>
+    <!-- The selected commit's blame, with the track's handle there (#1083). Under the name it
+         had then, which File history follows past renames; a version restored keeps today's. -->
+    {#if selected && selected.status !== 'D'}
+      <button class="btn quiet" onclick={() => selected && onOpen({ mode: 'blame', file: selected.path, commit: selected.id, ...(selected.path !== file ? { writeAs: file } : {}) })}>Blame at {selected.id.slice(0, 7)}</button>
+    {/if}
   </header>
   <ul class="list">
     {#if !commits}

@@ -49,9 +49,24 @@ func TestBlameTrackAndItsSteps(t *testing.T) {
 	if track, _ = a.BlameTrack(tab.Path, "a.txt", ""); !track.WorkTree {
 		t.Error("the work tree's change made no last step")
 	}
-	// Blamed at a commit, there's no work tree on the track.
-	if track, _ = a.BlameTrack(tab.Path, "a.txt", second); track.WorkTree || len(track.Versions) != 2 {
-		t.Errorf("at a commit: %+v", track)
+	// Blamed at a commit in HEAD's history, the track still runs to the newest version and the
+	// work tree, with home on the commit's version (#1083).
+	if track, _ = a.BlameTrack(tab.Path, "a.txt", first); !track.WorkTree || len(track.Versions) != 2 || track.Home != 0 {
+		t.Errorf("at the first commit: %+v", track)
+	}
+	// A commit that didn't change the file is at the version before it.
+	fx.Git("stash")
+	other := fx.CommitFile("b.txt", "b\n", "elsewhere")
+	if track, _ = a.BlameTrack(tab.Path, "a.txt", other); len(track.Versions) != 2 || track.Home != 1 {
+		t.Errorf("at a commit that left a.txt alone: %+v", track)
+	}
+	// One HEAD hasn't got has a track of its own history, with no work tree.
+	fx.Git("checkout", "-q", "-b", "side", first)
+	side := fx.CommitFile("a.txt", "one\nside\n", "on the side")
+	fx.Git("checkout", "-q", "main")
+	fx.Git("stash", "pop")
+	if track, _ = a.BlameTrack(tab.Path, "a.txt", side); track.WorkTree || len(track.Versions) != 2 || track.Home != 1 || track.Versions[1].ID != side {
+		t.Errorf("at a commit HEAD hasn't got: %+v", track)
 	}
 	last, err := a.FileDiff(tab.Path, DiffWorkTree, "", "a.txt", "", false, ReadLines)
 	if err != nil || last.Contents.Old.Text != "one\ntwo\n" || last.Contents.New.Text != "one\ntwo, changed\n" || last.Diff == nil || last.Diff.Added != 1 || last.Diff.Removed != 1 {

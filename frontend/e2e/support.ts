@@ -32,6 +32,8 @@ export interface Scenario {
   commandKeys?: boolean
   /** For the blame mount: the file's name today, when the blame is of an older name (#1082). */
   blameWriteAs?: string
+  /** For the blame mount: the commit it's blamed at, "" for the work tree (#1083). */
+  blameRev?: string
   /** The file whose diff is open in the working tree panel. */
   diffFile?: string
   /** What the diff view compares; a commit's file unless said. */

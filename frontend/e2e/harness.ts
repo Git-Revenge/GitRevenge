@@ -255,7 +255,7 @@ const mounts = {
     // [ and ] step along the track (#1078), as the app's own key handler runs them.
     const { commands } = await import('../src/lib/commands.svelte')
     window.addEventListener('keydown', (e) => commands.dispatch(e))
-    mount(BlameView, { target: host, props: { path: '/r', file: 'a.txt', writeAs: scenario.blameWriteAs ?? '', onClose: record('close'), onOpen: record('open'), onReveal: record('reveal') } })
+    mount(BlameView, { target: host, props: { path: '/r', file: 'a.txt', rev: scenario.blameRev ?? '', writeAs: scenario.blameWriteAs ?? '', onClose: record('close'), onOpen: record('open'), onReveal: record('reveal') } })
   },
   async math() {
     const { default: MathView } = await import('../src/lib/markdown/MathView.svelte')
