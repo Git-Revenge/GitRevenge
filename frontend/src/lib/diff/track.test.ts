@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { along, authorInks, blameBackward, blameForward, changedLines, churnText, fillBlame, markHeight, stepLabel, textLines, trackSteps, yearMarks, type Blamed } from './track'
+import { ageBucket, along, authorInks, blameBackward, blameForward, changedLines, changeRows, churnText, fillBlame, loadWay, markHeight, saveWay, stepIndex, stepLabel, textLines, trackSteps, yearMarks, type Blamed } from './track'
 
 const v = (id: string, author: string, time: number, added = 1, removed = 0, binary = false) => ({ id, author, time, subject: id, added, removed, binary, merge: false })
 const at = (y: number, m: number) => Math.floor(new Date(y, m - 1, 15).getTime() / 1000)
@@ -93,5 +93,33 @@ describe('blame worked out from a neighbour', () => {
   it('gives up when the blame and the change don’t line up', () => {
     expect(blameForward(blameA.slice(0, 2), blocksB, ['one', 'TWO', 'three', 'four'], { id: 'b', author: 'B', time: 2, subject: 'b' })).toBeNull()
     expect(blameBackward([bl('a', 'one')], blocksB, 3)).toBeNull()
+  })
+})
+
+describe('three ways to read a version', () => {
+  it('puts the lines a version took out back where they were, between what it kept and added', () => {
+    const rows = changeRows(['one', 'two', 'three'], ['one', 'TWO', 'three', 'four'], [
+      { oldStart: 1, oldEnd: 2, newStart: 1, newEnd: 2 },
+      { oldStart: 3, oldEnd: 3, newStart: 3, newEnd: 4 },
+    ])
+    expect(rows.map((r) => `${r.kind} ${r.num} ${r.text}`)).toEqual(['same 1 one', 'del 0 two', 'add 2 TWO', 'same 3 three', 'add 4 four'])
+    expect(rows.map((r) => r.at)).toEqual([0, -1, 1, 2, 3])
+  })
+
+  it('washes a line by how many versions back it last changed', () => {
+    expect([0, 1, 3, 4, 10, 11, -1, undefined].map(ageBucket)).toEqual(['now', 'recent', 'recent', 'while', 'while', 'old', 'old', 'old'])
+    expect(stepIndex([{ id: 'a' }, { id: 'b' }, { id: '' }]).get('b')).toBe(1)
+  })
+
+  it('remembers the way for each repository, Who wrote it at first', () => {
+    const kept = new Map<string, string>()
+    const store = { getItem: (k: string) => kept.get(k) ?? null, setItem: (k: string, v: string) => void kept.set(k, v) }
+    expect(loadWay('/r', store)).toBe('who')
+    saveWay('/r', 'age', store)
+    expect(loadWay('/r', store)).toBe('age')
+    expect(loadWay('/other', store)).toBe('who')
+    const broken = { getItem: () => { throw new Error('no storage') }, setItem: () => { throw new Error('no storage') } }
+    expect(loadWay('/r', broken)).toBe('who')
+    expect(() => saveWay('/r', 'age', broken)).not.toThrow()
   })
 })

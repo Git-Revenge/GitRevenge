@@ -5,7 +5,7 @@
   // versions; [ and ] do it from anywhere in the view.
   import Icon from '../ui/Icon.svelte'
   import { formatTime, laneVar } from '../graph/draw'
-  import { along, authorInks, churnText, markHeight, stepLabel, yearMarks, type Step } from './track'
+  import { along, authorInks, churnText, markHeight, READ_WAYS, stepLabel, yearMarks, type ReadWay, type Step } from './track'
 
   let {
     steps,
@@ -14,6 +14,8 @@
     renamedFrom = '',
     onCarryOn,
     onReveal,
+    way = 'who',
+    onWay,
   }: {
     steps: Step[]
     /** The step shown. */
@@ -25,6 +27,9 @@
     onCarryOn?: () => void
     /** Shows a commit in the graph. */
     onReveal?: (commit: string) => void
+    /** How the version is read (#1080), and how to read it another way. */
+    way?: ReadWay
+    onWay?: (way: ReadWay) => void
   } = $props()
 
   let inks = $derived(authorInks(steps))
@@ -54,6 +59,11 @@
           <button class="sha" onclick={() => onReveal?.(step.id)} title="Show in graph">{step.id.slice(0, 7)}</button>
           · {step.author} · {formatTime(step.time)} · <span class="mono">{churnText(step, at === 0)}</span>
         </span>
+      {/if}
+      {#if onWay}
+        <div class="ways" role="group" aria-label="How to read this version">
+          {#each READ_WAYS as w (w.id)}<button aria-pressed={way === w.id} onclick={() => onWay(w.id)}>{w.label}</button>{/each}
+        </div>
       {/if}
     </div>
   {/if}
@@ -98,6 +108,33 @@
     align-items: baseline;
     gap: 2px 10px;
     min-width: 0;
+  }
+
+  .ways {
+    display: inline-flex;
+    flex: none;
+    margin-left: auto;
+    border: 1px solid var(--paper-edge);
+    border-radius: var(--r-md);
+    overflow: hidden;
+  }
+
+  .ways button {
+    padding: 3px 10px;
+    border: 0;
+    background: none;
+    color: var(--ink-mute);
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .ways button + button {
+    border-left: 1px solid var(--paper-edge);
+  }
+
+  .ways button[aria-pressed='true'] {
+    background: var(--selected);
+    color: var(--ink);
   }
 
   .subject {

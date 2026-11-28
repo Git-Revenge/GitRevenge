@@ -137,6 +137,75 @@ export function fillBlame(known: (Blamed | null)[], blamed: Blamed[]): Blamed[] 
   return k === blamed.length && out.every((l) => l !== null) ? (out as Blamed[]) : null
 }
 
+// Three ways to read a version (#1080): who wrote each line, what the version changed, and
+// how long ago each line last changed.
+
+export type ReadWay = 'who' | 'changes' | 'age'
+export const READ_WAYS: { id: ReadWay; label: string }[] = [
+  { id: 'who', label: 'Who wrote it' },
+  { id: 'changes', label: 'What changed' },
+  { id: 'age', label: 'How old' },
+]
+
+type WayStore = Pick<Storage, 'getItem' | 'setItem'>
+const wayKey = (path: string) => `gitrevenge.blameWay:${path}`
+
+/** The way a repository's versions were last read on this computer: Who wrote it at first. */
+export function loadWay(path: string, store: WayStore): ReadWay {
+  try {
+    const v = store.getItem(wayKey(path))
+    return v === 'changes' || v === 'age' ? v : 'who'
+  } catch {
+    return 'who'
+  }
+}
+
+export function saveWay(path: string, way: ReadWay, store: WayStore) {
+  try {
+    store.setItem(wayKey(path), way)
+  } catch {
+    // Storage unavailable: the choice lasts for this view only.
+  }
+}
+
+/** A row of What changed: a line as it is (num counts from 1), one the version added, or one
+ * it took out, shown where it was. */
+export type ChangeRow = { kind: 'same' | 'add' | 'del'; text: string; num: number; at: number }
+
+/** The version's lines with the ones it took out put back where they were: before is the
+ * version before's text, after this one's, and blocks the change between them. at is the
+ * line's place in after (for its highlighting), or -1 for one taken out. */
+export function changeRows(before: string[], after: string[], blocks: Block[]): ChangeRow[] {
+  const rows: ChangeRow[] = []
+  let n = 0
+  const same = (until: number) => {
+    for (; n < until && n < after.length; n++) rows.push({ kind: 'same', text: after[n], num: n + 1, at: n })
+  }
+  for (const b of blocks) {
+    same(b.newStart)
+    for (let o = b.oldStart; o < b.oldEnd; o++) rows.push({ kind: 'del', text: before[o] ?? '', num: 0, at: -1 })
+    for (; n < b.newEnd && n < after.length; n++) rows.push({ kind: 'add', text: after[n], num: n + 1, at: n })
+  }
+  same(after.length)
+  return rows
+}
+
+/** How long ago a line last changed, in versions back from the one shown, as How old washes
+ * it: in this version, 1 to 3 back, 4 to 10 back, or older (also a line from before the
+ * track starts). */
+export function ageBucket(back: number | undefined): 'now' | 'recent' | 'while' | 'old' {
+  if (back === undefined || back < 0) return 'old'
+  if (back === 0) return 'now'
+  if (back <= 3) return 'recent'
+  if (back <= 10) return 'while'
+  return 'old'
+}
+
+/** Each step's place on the track, by commit ("" for the work tree). */
+export function stepIndex(steps: Pick<Step, 'id'>[]): Map<string, number> {
+  return new Map(steps.map((s, i) => [s.id, i]))
+}
+
 /** A text's lines, without the empty one after its last newline. */
 export function textLines(text: string): string[] {
   const lines = text.split('\n')
