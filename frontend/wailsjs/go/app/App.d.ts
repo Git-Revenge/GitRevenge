@@ -39,6 +39,8 @@ export function Bisect(arg1:string):Promise<app.BisectInfo>;
 
 export function Blame(arg1:string,arg2:string,arg3:string):Promise<Array<git.BlameLine>>;
 
+export function BlameBlock(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number):Promise<Array<git.BlockVersion>>;
+
 export function BlameDownloading(arg1:string,arg2:string,arg3:string):Promise<Array<git.BlameLine>>;
 
 export function BlameNeeds(arg1:string,arg2:string,arg3:string):Promise<app.BlameNeeds>;

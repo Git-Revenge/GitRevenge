@@ -1,7 +1,8 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import Icon from '../ui/Icon.svelte'
-  import { Blame, BlameDownloading, BlameNeeds, BlameStep, BlameTrack, CancelDownload, DownloadFiles, FileDiff } from '../../../wailsjs/go/app/App.js'
+  import { Blame, BlameBlock, BlameDownloading, BlameNeeds, BlameStep, BlameTrack, CancelDownload, DownloadFiles, FileDiff } from '../../../wailsjs/go/app/App.js'
+  import BlockPanel from './BlockPanel.svelte'
   import VersionTrack from './VersionTrack.svelte'
   import { ageBucket, blameBackward, blameForward, changedLines, changeRows, fillBlame, loadWay, saveWay, stepIndex, textLines, trackSteps, type Blamed, type ReadWay, type Step } from './track'
   import type { git } from '../../../wailsjs/go/models'
@@ -118,6 +119,63 @@
     way = w
     saveWay(path, w, localStorage)
   }
+
+  // Rewind these lines (#1081): a block's own history, beside the code. Select lines, or use
+  // a blame block's button, at any version that's a commit.
+  /** The commit the version shown is, or "" for the work tree, which has no history yet. */
+  let shownCommit = $derived(steps.length ? (steps[at]?.id ?? '') : rev || 'HEAD')
+  let canRewind = $derived(!!shownCommit && way !== 'changes')
+  let block = $state<{ from: number; to: number; commit: string; versions: git.BlockVersion[] | null; problem: string } | null>(null)
+  /** Lines selected in the code, as the bar under it names them. */
+  let picked = $state<{ from: number; to: number } | null>(null)
+  let body = $state<HTMLElement>()
+
+  async function rewind(from: number, to: number) {
+    const commit = shownCommit
+    if (!commit) return
+    const asked = { from, to, commit, versions: null, problem: '' }
+    block = asked
+    picked = null
+    try {
+      const versions = await BlameBlock(path, file, commit, from, to)
+      if (block?.commit === commit && block.from === from && block.to === to) block = { ...asked, versions }
+    } catch (err) {
+      if (block?.commit === commit && block.from === from) block = { ...asked, problem: errorText(err) }
+    }
+  }
+
+  /** The block of lines a blame block's first line starts: as far as the same commit runs. */
+  function blockAt(blamed: Blamed[], i: number): { from: number; to: number } | null {
+    const c = blamed[i]?.commit
+    if (!c || (i > 0 && blamed[i - 1]?.commit === c)) return null
+    let end = i
+    while (end + 1 < blamed.length && blamed[end + 1].commit === c) end++
+    return { from: i + 1, to: end + 1 }
+  }
+
+  /** Shows the whole file at one of the block's versions, when the track has it. */
+  function showAt(commit: string) {
+    const i = steps.findIndex((s) => s.id === commit)
+    if (i >= 0) goTo(i)
+  }
+
+  // A selection in the code names its lines, for the bar under it.
+  $effect(() => {
+    const el = body
+    if (!el) return
+    const onSelect = () => {
+      const sel = document.getSelection()
+      if (!sel || sel.isCollapsed || !sel.anchorNode || !sel.focusNode || !el.contains(sel.anchorNode) || !el.contains(sel.focusNode)) {
+        picked = null
+        return
+      }
+      const lineOf = (n: Node) => Number((n instanceof Element ? n : n.parentElement)?.closest('tr[data-line]')?.getAttribute('data-line') ?? 0)
+      const [a, b] = [lineOf(sel.anchorNode), lineOf(sel.focusNode)]
+      picked = a && b ? { from: Math.min(a, b), to: Math.max(a, b) } : null
+    }
+    document.addEventListener('selectionchange', onSelect)
+    return () => document.removeEventListener('selectionchange', onSelect)
+  })
 
   /** The newest version against the one before, for What changed there. Older versions
    * carry theirs. */
@@ -349,7 +407,7 @@
   </p>
 {/snippet}
 
-{#snippet gutter(l: Blamed, start: boolean)}
+{#snippet gutter(l: Blamed, start: boolean, block: { from: number; to: number } | null)}
   <td class="gutter" style:border-left-color={uncommitted(l.commit) ? 'transparent' : laneVar(colorOf[l.commit] ?? 0)}>
     {#if start}
       {#if uncommitted(l.commit)}
@@ -364,6 +422,7 @@
             <span class="who" title={l.author}>{l.author}</span>
             <span class="muted when">{formatTime(l.time)}</span>
           {/if}
+          {#if block && canRewind}<button class="rewind" onclick={() => rewind(block.from, block.to)} aria-label={block.from === block.to ? 'Rewind line ' + block.from : 'Rewind lines ' + block.from + ' to ' + block.to} title="Rewind these lines"><Icon name="history" size={12} /></button>{/if}
         </span>
       {/if}
     {/if}
@@ -385,7 +444,8 @@
   {#if steps.length > 1 && !ask}
     <VersionTrack {steps} {at} onAt={goTo} {renamedFrom} onCarryOn={carryOn} {onReveal} {way} onWay={setWay} />
   {/if}
-  <div class="body code-ground">
+  <div class="split">
+  <div class="body code-ground" bind:this={body}>
     {#if ask}
       <div class="ask" role="group" aria-label="Blame {file}?">
         <h2>Blame <span class="mono">{file}</span>?</h2>
@@ -440,8 +500,8 @@
             {#each older.lines as text, i (i)}
               {@const changed = older.changed.has(i)}
               {@const b = olderBlame?.[i]}
-              <tr class={way === 'age' ? 'age-' + ageOf(b) : ''} class:changed={changed && way !== 'age'} class:start={!!b && (i === 0 || olderBlame?.[i - 1]?.commit !== b.commit)} {@attach stepped && i === older.first ? toChange(older.at) : undefined}>
-                {#if b}{@render gutter(b, i === 0 || olderBlame?.[i - 1]?.commit !== b.commit)}{:else}<td class="gutter"></td>{/if}
+              <tr data-line={i + 1} class={way === 'age' ? 'age-' + ageOf(b) : ''} class:changed={changed && way !== 'age'} class:start={!!b && (i === 0 || olderBlame?.[i - 1]?.commit !== b.commit)} {@attach stepped && i === older.first ? toChange(older.at) : undefined}>
+                {#if b}{@render gutter(b, i === 0 || olderBlame?.[i - 1]?.commit !== b.commit, blockAt(olderBlame ?? [], i))}{:else}<td class="gutter"></td>{/if}
                 <td class="num">{i + 1}</td>
                 <td class="code"
                   >{#if older.tokens[i]}{#each older.tokens[i] as t, k (k)}<span class={t.cls}>{t.text}</span>{/each}{:else}{text}{/if}</td
@@ -460,13 +520,14 @@
           {#each lines as l, i (i)}
             {@const start = i === 0 || lines[i - 1].commit !== l.commit}
             <tr
+              data-line={i + 1}
               class:start
               class:at={i + 1 === line}
               class={way === 'age' ? 'age-' + ageOf(l) : ''}
               class:changed={stepped && way !== 'age' && newestChanged.has(i)}
               {@attach i + 1 === line ? scrollHere : stepped && i === newestFirst ? toChange(at) : undefined}
             >
-              {@render gutter(l, start)}
+              {@render gutter(l, start, start ? blockAt(lines, i) : null)}
               <td class="num">{i + 1}</td>
               <td class="code"
                 >{#if tokens[i]}{#each tokens[i] as t, k (k)}<span class={t.cls}>{t.text}</span>{/each}{:else}{l.line}{/if}</td
@@ -476,6 +537,16 @@
         </tbody>
       </table>
     {/if}
+    {#if picked && canRewind && !block}
+      <div class="picked" role="group" aria-label="Lines selected">
+        <span>{picked.from === picked.to ? 'Line ' + picked.from : 'Lines ' + picked.from + ' to ' + picked.to}</span>
+        <button class="btn sm" onclick={() => picked && rewind(picked.from, picked.to)}><Icon name="history" size={13} />Rewind these lines</button>
+      </div>
+    {/if}
+  </div>
+  {#if block}
+    <BlockPanel from={block.from} to={block.to} versions={block.versions} problem={block.problem} fileVersions={steps.filter((s) => s.id).length} onShow={showAt} onClose={() => (block = null)} {onReveal} />
+  {/if}
   </div>
 </div>
 
@@ -491,10 +562,60 @@
     flex: 1;
   }
 
-  .body {
+  /* The code, and beside it a block's history when one is rewound (#1081). */
+  .split {
+    display: flex;
     flex: 1;
     min-height: 0;
+  }
+
+  .body {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
     overflow: auto;
+  }
+
+  /* Lines selected: the way to rewind them, at the foot of what shows. */
+  .picked {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--paper-warm);
+    border-top: 1px solid var(--paper-edge);
+  }
+
+  /* A blame block's own way to rewind it, quiet until its row is pointed at or tabbed to. */
+  .rewind {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    margin-left: 4px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    color: var(--ink-mute);
+    cursor: pointer;
+    opacity: 0;
+  }
+
+  tr:hover .rewind,
+  .rewind:focus-visible {
+    opacity: 1;
+  }
+
+  .rewind:hover {
+    color: var(--link);
   }
 
   .ask {
