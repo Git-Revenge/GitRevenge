@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/git-revenge/gitrevenge/internal/gittest"
 	"github.com/git-revenge/gitrevenge/internal/semdiff"
@@ -276,6 +277,25 @@ func TestFormattingOnlyMarksFilesWithNothingElse(t *testing.T) {
 	head := strings.TrimSpace(fx.Git("rev-parse", "HEAD"))
 	if got, _ = a.FormattingOnly(tab.Path, DiffCommit, head, []string{"fmt.go", "real.go"}); strings.Join(got, ",") != "fmt.go" {
 		t.Errorf("in the commit: %q, want fmt.go", got)
+	}
+}
+
+// #1070: a file whose quick read runs out of time, as a small one can on a busy machine, is
+// read again with longer, and keeps its mark. It used to lose it, and macOS CI failed.
+func TestFormattingOnlyReadsAgainWhenTheQuickReadRunsOut(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	a.formattingRead = time.Nanosecond
+	fx := gittest.New(t)
+	fx.CommitFile("fmt.go", "package p\n\nconst a = 0x30\n", "first")
+	tab, err := a.OpenRepo(fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fx.WriteFile("fmt.go", "package p\n\nconst a = 48\n")
+	got, err := a.FormattingOnly(tab.Path, DiffUnstaged, "", []string{"fmt.go"})
+	if err != nil || strings.Join(got, ",") != "fmt.go" {
+		t.Errorf("formatting only: %q, %v; want fmt.go", got, err)
 	}
 }
 

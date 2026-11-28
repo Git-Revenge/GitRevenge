@@ -236,7 +236,14 @@ func (a *App) FormattingOnly(path, mode, commit string, files []string) ([]strin
 			}
 			o := opts
 			o.Language = langs[f]
+			o.ReadTime = a.formattingRead
 			res, err := a.diffs.get().Diff(r.Git.Context(), c.Old.Text, c.New.Text, o)
+			if err == nil && res.Fallback == semdiff.FallbackTime {
+				// Too slow to read in the quick budget, which a busy machine can miss even for a
+				// small file: read again with longer, as the diff view's second read does (#1070).
+				o.ReadTime = semdiff.PatientRead
+				res, err = a.diffs.get().Diff(r.Git.Context(), c.Old.Text, c.New.Text, o)
+			}
 			if err != nil || res.Engine != semdiff.EngineCode || len(res.Blocks) == 0 {
 				return
 			}

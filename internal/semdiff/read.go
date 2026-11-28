@@ -103,6 +103,10 @@ func readCode(ctx context.Context, id string, before, after string, timeout time
 
 // readVersion parses src and reads its tokens, and with tree set its named nodes.
 func readVersion(ctx context.Context, l *language, src string, timeout time.Duration, tree bool) reading {
+	// The grammar is built on its first use in the process, and that isn't parsing: the budget
+	// starts once it's ready (#1070). Go's takes 11 ms on a fast machine, far longer under the
+	// race detector on a busy one, and both versions wait for it.
+	l.load()
 	var deadline time.Time
 	if timeout > 0 {
 		deadline = time.Now().Add(timeout)
