@@ -90,7 +90,7 @@ Click the chip for its options.
 | **Match case** | `km/h` but not `KM/H`. |
 | **Regular expression** | Read the text as a regular expression, as git reads one. |
 | **A commit counts when** | **It appears or goes away** (`git log -S`), the default: the commit changed how many times the text is in a file. **A line with it changes** (`git log -G`): the commit added or removed a line with the text, even if the text stayed. In Tidewater that adds an eighth commit, *Rewrite the check guide*, which realigned a table row with `km/h` in it. Once a way has run, it shows how many commits it found. |
-| **Only in** | Patterns between commas, as in Find's **Files**: `src/`, `*.js`, `!*.min.js`. |
+| **Only in** | Patterns between commas, as in Find's **Files**: `src/`, `*.js`, `!*.min.js`. While the timeline is [focused on a folder or file](graph.md#focusing-on-a-folder-or-file), a new search starts with it here. |
 | **As far back as** | The whole history, the last year, or a date. |
 
 **Search again** runs it with what you've changed, and **Remove** takes the chip off. <kbd>Esc</kbd> closes the options.

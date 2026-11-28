@@ -1884,6 +1884,27 @@ scenes.historySearchHighlight = (page) =>
     await park(p)
   })
 
+/** The timeline focused on src/alerts/ from the palette (#1063): the chip and the count in the
+ * bar, the folder's commits on their lanes, and branches whose tips changed nothing there
+ * labelled, faded, where they last did. The panels step aside so the bar has room for the chip. */
+scenes.pathFocus = (page) =>
+  stills(page, 'path-focus', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await hidePanel(p)
+    await palette(p, 'Hide the sidebar panel')
+    await palette(p, 'Focus the timeline on a folder or file')
+    const box = await p.waitForSelector('::-p-aria(Folder or file)')
+    await box.type('src/alerts/')
+    await sleep(600)
+    await p.keyboard.press('Enter')
+    await p.waitForSelector('.focus-name')
+    // The labels and the whole history's count arrive beside the load.
+    await untilSettled(p, () => !document.body.innerText.includes('Loading history') && /\d of [\d,]+ commits/.test(document.querySelector('.graph-tools')?.innerText ?? document.body.innerText))
+    await sleep(1500)
+    await p.evaluate(() => document.activeElement?.blur())
+    await park(p)
+  })
+
 /** The chip's options, with a count beside each way a commit can count: each shows once a
  * search that way has finished, so it's searched with -G, then with -S again. */
 scenes.historySearchOptions = (page) =>

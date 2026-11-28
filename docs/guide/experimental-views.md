@@ -60,7 +60,7 @@ The first switch in the top left, **Branches / Authors**, turns the map from bra
 Double-click a person, or use their card, to open them. What they worked on stands round them, in their colour. **By branch / By area**, beside the second switch, chooses what that is, for everyone who's open:
 
 - **By branch.** A ring for what of theirs has landed in the trunk, and a node for each unmerged branch that holds commits of theirs, sized by those commits. A branch node has the card and the right-click menu it has among the branches.
-- **By area.** The folders their commits touched, each sized by how many of their commits touched it. Double-click a folder to open it into its own folders, as far down as you like. A folder's card lists their latest commits there, and each goes to that commit in the timeline. A commit counts once for every folder it touches. In a repository that squash-merges, where everyone's branch is the trunk, this is the way to see who works where.
+- **By area.** The folders their commits touched, each sized by how many of their commits touched it. Double-click a folder to open it into its own folders, as far down as you like. A folder's card lists their latest commits there, and each goes to that commit in the timeline. **Focus the timeline on it**, on the card, shows [the folder's whole history](graph.md#focusing-on-a-folder-or-file), everyone's. A commit counts once for every folder it touches. In a repository that squash-merges, where everyone's branch is the trunk, this is the way to see who works where.
 
 Pins work here as they do among the branches: drag a person, a branch or a folder to keep it somewhere. A double-click on something pinned lets it go, as it does there, so open a pinned person or folder from its card.
 
