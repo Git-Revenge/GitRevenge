@@ -96,6 +96,26 @@ func (a *App) BlameStep(path, file, commit string, ranges []git.BlameRange) ([]g
 	return lines, err
 }
 
+// BlameBlock lists the versions of lines from to to of file at commit (#1081): Rewind these
+// lines, in the blame view. Newest first, following the lines as they move. Asking for
+// another block stops this one, which then answers with nothing.
+func (a *App) BlameBlock(path, file, commit string, from, to int) ([]git.BlockVersion, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return nil, err
+	}
+	if commit == "" {
+		return nil, userError("Lines not committed yet have no history to rewind.")
+	}
+	ctx, done := a.latest.start("blame-block", r.Path)
+	defer done()
+	versions, err := r.Git.BlockHistory(ctx, file, commit, from, to)
+	if errors.Is(err, context.Canceled) {
+		return []git.BlockVersion{}, nil
+	}
+	return versions, err
+}
+
 // Blame attributes each line of file at rev ("" for the work tree) to a commit. Asking for
 // another blame stops this one, which then answers with nothing. In a partial clone it
 // downloads nothing: BlameNeeds says what it would need, and the view asks before

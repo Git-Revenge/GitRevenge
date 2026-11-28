@@ -58,3 +58,20 @@ func TestBlameTrackAndItsSteps(t *testing.T) {
 		t.Fatalf("the work tree's step = %+v, %v", last, err)
 	}
 }
+
+// #1081: Rewind these lines, through the app.
+func TestBlameBlock(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.CommitFile("a.txt", "one\ntwo\nthree\n", "first")
+	second := fx.CommitFile("a.txt", "one\nTWO\nthree\n", "second")
+	tab, _ := a.OpenRepo(fx.Dir)
+	got, err := a.BlameBlock(tab.Path, "a.txt", second, 2, 2)
+	if err != nil || len(got) != 2 || got[0].Subject != "second" || got[1].Subject != "first" {
+		t.Fatalf("block = %+v, %v", got, err)
+	}
+	if _, err := a.BlameBlock(tab.Path, "a.txt", "", 1, 1); err == nil {
+		t.Error("rewound lines not committed yet")
+	}
+}

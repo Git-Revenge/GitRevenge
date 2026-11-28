@@ -184,3 +184,52 @@ test.describe('three ways to read a version', () => {
     await expect(ways(page).getByRole('button', { name: 'Who wrote it' })).toHaveAttribute('aria-pressed', 'false')
   })
 })
+
+// #1081: Rewind these lines: a block's own history beside the code.
+test.describe('rewind a block of lines', () => {
+  const bv = (id: string, subject: string, from: number, to: number, lines: [string, string][]) => ({ id, author: 'Ana Cruz', time: T, subject, from, to, lines: lines.map(([kind, text]) => ({ kind, text })) })
+  const history = [bv(B, 'Say two', 2, 2, [['+', 'two']])]
+  const panel = (page: Page) => page.getByRole('complementary', { name: /through time/ })
+
+  test('a blame block’s own button rewinds it, and a version shows the whole file there', async ({ page }) => {
+    const s = scenario({})
+    await open(page, 'blame', { ...s, responses: { ...s.responses, BlameBlock: history } })
+    await expect(code(page)).toHaveCount(3)
+    await page.getByRole('button', { name: 'Rewind line 2' }).click()
+    expect(await calls(page, 'BlameBlock')).toEqual([['/r', 'a.txt', C, 2, 2]])
+    await expect(panel(page)).toHaveAccessibleName('Line 2, through time')
+    await expect(panel(page)).toContainText('1 of the file’s 3 versions changed it.')
+    await expect(panel(page)).toContainText('Say two · Ana Cruz')
+    await expect(panel(page).locator('.l.add')).toHaveText('+Added: two')
+    await panel(page).getByRole('button', { name: `Show the whole file at ${B.slice(0, 7)}` }).click()
+    await expect(track(page)).toContainText('Version 2 of 3')
+    await panel(page).getByRole('button', { name: 'Close' }).click()
+    await expect(panel(page)).toHaveCount(0)
+  })
+
+  test('selected lines can be rewound', async ({ page }) => {
+    const s = scenario({})
+    await open(page, 'blame', { ...s, responses: { ...s.responses, BlameBlock: history } })
+    await expect(code(page)).toHaveCount(3)
+    await page.evaluate(() => {
+      const cells = document.querySelectorAll('.body td.code')
+      const range = document.createRange()
+      range.setStart(cells[0], 0)
+      range.setEnd(cells[1], cells[1].childNodes.length)
+      document.getSelection()?.removeAllRanges()
+      document.getSelection()?.addRange(range)
+    })
+    const bar = page.getByRole('group', { name: 'Lines selected' })
+    await expect(bar).toContainText('Lines 1 to 2')
+    await bar.getByRole('button', { name: 'Rewind these lines' }).click()
+    expect(await calls(page, 'BlameBlock')).toEqual([['/r', 'a.txt', C, 1, 2]])
+    await expect(panel(page)).toHaveAccessibleName('Lines 1 to 2, through time')
+  })
+
+  test('lines not committed yet have nothing to rewind', async ({ page }) => {
+    const s = scenario({ workTree: true })
+    await open(page, 'blame', { ...s, responses: { ...s.responses, BlameTrack: { versions, renamedFrom: '', workTree: true } } })
+    await expect(code(page)).toHaveCount(3)
+    await expect(page.getByRole('button', { name: /^Rewind line/ })).toHaveCount(0)
+  })
+})

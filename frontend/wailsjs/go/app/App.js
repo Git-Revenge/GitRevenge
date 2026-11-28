@@ -62,6 +62,10 @@ export function Blame(arg1, arg2, arg3) {
   return window['go']['app']['App']['Blame'](arg1, arg2, arg3);
 }
 
+export function BlameBlock(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['app']['App']['BlameBlock'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function BlameDownloading(arg1, arg2, arg3) {
   return window['go']['app']['App']['BlameDownloading'](arg1, arg2, arg3);
 }
