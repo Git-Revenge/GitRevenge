@@ -338,6 +338,10 @@ export function FindInFiles(arg1, arg2, arg3) {
   return window['go']['app']['App']['FindInFiles'](arg1, arg2, arg3);
 }
 
+export function FocusSuggestions(arg1, arg2) {
+  return window['go']['app']['App']['FocusSuggestions'](arg1, arg2);
+}
+
 export function ForcePushLoss(arg1) {
   return window['go']['app']['App']['ForcePushLoss'](arg1);
 }
@@ -384,6 +388,10 @@ export function GraphDensity() {
 
 export function GraphFocus(arg1) {
   return window['go']['app']['App']['GraphFocus'](arg1);
+}
+
+export function GraphOutOf(arg1) {
+  return window['go']['app']['App']['GraphOutOf'](arg1);
 }
 
 export function GraphRows(arg1, arg2, arg3) {

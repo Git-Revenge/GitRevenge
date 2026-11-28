@@ -3,6 +3,7 @@ package app
 import (
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/git-revenge/gitrevenge/internal/branchkind"
 	"github.com/git-revenge/gitrevenge/internal/gittest"
@@ -194,4 +195,39 @@ func TestGraphPathFocus(t *testing.T) {
 			t.Errorf("%q was taken", bad)
 		}
 	}
+}
+
+// #1060: the palette's box offers the folders and files at HEAD, and the count of the whole
+// history arrives under a path focus.
+func TestFocusSuggestionsAndTheWholeCount(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.CommitFile("src/alerts/sms.js", "x\n", "sms")
+	fx.CommitFile("README.md", "r\n", "readme")
+	path := openForMap(t, a, fx)
+
+	got, err := a.FocusSuggestions(path, "src/al")
+	if err != nil || !slices.Equal(got, []string{"src/alerts/", "src/alerts/sms.js"}) {
+		t.Fatalf("suggestions = %v, %v", got, err)
+	}
+	// A new commit is listed: the paths are kept for one commit only.
+	fx.CommitFile("src/alerts/gusts.js", "g\n", "gusts")
+	if got, _ := a.FocusSuggestions(path, "gusts"); !slices.Equal(got, []string{"src/alerts/gusts.js"}) {
+		t.Errorf("after a commit: %v", got)
+	}
+
+	if n, _ := a.GraphOutOf(path); n != 0 {
+		t.Errorf("out of %d with no path focus", n)
+	}
+	if err := a.SetGraphPath(path, "src/alerts/"); err != nil {
+		t.Fatal(err)
+	}
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		if n, _ := a.GraphOutOf(path); n == 3 {
+			return
+		}
+	}
+	n, _ := a.GraphOutOf(path)
+	t.Errorf("out of %d, want 3", n)
 }

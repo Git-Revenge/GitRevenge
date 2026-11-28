@@ -4,7 +4,7 @@
   import { errorText } from '../errors'
   import { onMount, tick, untrack, type Snippet } from 'svelte'
   import { ALONE_STEPS, searchPlaceholder, SQUEEZE, squeezeFor } from '../barSqueeze'
-  import { ArrivedCommits, CommitNotes, CommitRow, CommitRows, SelectedCommits, CommitSignatures, FindCount, GraphFocus, HeadCommit, HistoryChanges, OwnMoveAge, GraphRows, NotedCommits, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView, TrailerFilterDays, TrailerSuggest } from '../../../wailsjs/go/app/App.js'
+  import { ArrivedCommits, CommitNotes, CommitRow, CommitRows, SelectedCommits, CommitSignatures, FindCount, ClearGraphFocus, GraphFocus, GraphOutOf, HeadCommit, HistoryChanges, OwnMoveAge, GraphRows, NotedCommits, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView, TrailerFilterDays, TrailerSuggest } from '../../../wailsjs/go/app/App.js'
   import { findSummary } from '../find/find'
   import { changeMark, type ChangeMark, type HistoryChange, type HistoryOptions } from '../filters/history'
   import { session } from '../session.svelte'
@@ -409,6 +409,23 @@
 
   /** The folder or file the graph is focused on (#1059), "" for none. */
   let focusPath = $state('')
+  /** How many commits the history has without the path focus, for "265 of 1,410" (#1060); 0
+   * until counted. */
+  let outOf = $state(0)
+  /** What the chip names: the branch, the path, or both. */
+  let chipShown = $derived(!!focus || !!focusPath)
+  let chipTitle = $derived(
+    focusPath
+      ? `Only the commits that changed something in ${focusPath}${focus ? ` on ${focusLabel}` : ''} are showing`
+      : `Only ${focusLabel} and what it's built on are showing`,
+  )
+
+  /** Asks for the whole history's count under a path focus, until it has arrived. */
+  async function loadOutOf() {
+    if (!focusPath) return
+    const n = await GraphOutOf(path).catch(() => 0)
+    if (focusPath) outOf = n
+  }
 
   /** Whether the graph is focused, so a branch outside it can be explained. */
   export function focused(): boolean {
@@ -423,13 +440,16 @@
     focus = next?.branch ? next : null
     if ((next?.path ?? '') !== focusPath) {
       focusPath = next?.path ?? ''
+      outOf = 0
+      void loadOutOf()
       onFocusPath?.(focusPath)
     }
     return (!!focus && focusLabel !== was) || (!!focusPath && focusPath !== wasPath)
   }
 
+  /** The chip's close button: ends a branch focus and a path focus both. */
   function stopFocusing() {
-    void session.run(() => SetGraphFocus(path, '', false))
+    void session.run(() => ClearGraphFocus(path))
   }
 
   /** Rows fetched beyond the viewport, so short scrolls never show blanks. */
@@ -2206,7 +2226,7 @@
   }
 
   provideCommands(() => [
-    ...(focus ? [{ id: 'graph.stopFocus', group: 'View', title: `Stop focusing on ${focusLabel}`, run: stopFocusing }] : []),
+    ...(chipShown ? [{ id: 'graph.stopFocus', group: 'View', title: `Stop focusing on ${focusPath && focus ? `${focusLabel}, in ${focusPath}` : focusPath || focusLabel}`, run: stopFocusing }] : []),
     {
       id: 'graph.search',
       group: 'View',
@@ -2306,6 +2326,9 @@
       // The ruler's marks follow the history as it's read, a couple of seconds apart at most.
       if (p.done || performance.now() - marksAt > 2000) void loadMarks()
       cache.setTotal(p.rows, !p.done, p.paused, p.estimate)
+      if (focusPath && !outOf) void loadOutOf()
+      // The count runs beside the load, and can land after it: asked once more a moment on.
+      if (p.done && focusPath) setTimeout(() => void (outOf || loadOutOf()), 800)
       if (p.refsReady) cache.invalidate() // labels arrived after the first rows
       if (p.reset || p.done) widest = 1
       if (p.reset && !p.done) {
@@ -2362,17 +2385,19 @@
     {:else}
       <!-- A shallow clone's count is of what it has: since its edge, not since the start (#1006). -->
       <span class="meta" title={historySince ? 'A shallow clone: its older history is on the server only' : undefined}
-        >{total.toLocaleString()} commits{historySince ? ` since ${day(historySince)}` : ''}</span
+        >{total.toLocaleString()}{focusPath && outOf ? ` of ${outOf.toLocaleString()}` : ''} commits{historySince ? ` since ${day(historySince)}` : ''}</span
       >
     {/if}
     {#if kindRows.length}<KindFilter rows={kindRows} onToggle={setKindView} iconOnly={level >= SQUEEZE.network} />{/if}
     {#if level < SQUEEZE.density}
     <ViewMenu views={menuViews(colorTheme.experimental)} current={colorTheme.view} iconOnly={level >= SQUEEZE.count} onPick={(v) => session.run(() => colorTheme.setView(v))} />
     {/if}
-    {#if focus}
-      <span class="focus" title="Only {focusLabel} and what it's built on are showing">
-        <Icon name="focus" size={13} />{#if !searchIconOnly}<span class="focus-name">Focused on {focusLabel}</span>{/if}
-        <button class="btn sm quiet icon" onclick={stopFocusing} aria-label="Stop focusing" title="Stop focusing, and show every branch again"><Icon name="close" size={13} /></button>
+    {#if chipShown}
+      <span class="focus" title={chipTitle}>
+        <Icon name="focus" size={13} />{#if !searchIconOnly}<span class="focus-name"
+            >Focused on {focus ? focusLabel : ''}{focus && focusPath ? ', in ' : ''}{#if focusPath}<code>{focusPath}</code>{/if}</span
+          >{/if}
+        <button class="btn sm quiet icon" onclick={stopFocusing} aria-label="Stop focusing" title={focusPath ? 'Stop focusing, and show the whole history again' : 'Stop focusing, and show every branch again'}><Icon name="close" size={13} /></button>
       </span>
     {/if}
     {#if searchIconOnly && !searchOpen && !query.trim() && !mapView}
@@ -2959,6 +2984,11 @@
     font-size: 13px;
     color: var(--ink-soft);
     background: color-mix(in srgb, var(--accent-a) 14%, transparent);
+  }
+
+  .focus-name code {
+    font-family: var(--font-mono);
+    font-size: 12px;
   }
 
   .focus-name {
