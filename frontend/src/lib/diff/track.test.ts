@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { along, authorInks, changedLines, churnText, markHeight, stepLabel, textLines, trackSteps, yearMarks } from './track'
+import { along, authorInks, blameBackward, blameForward, changedLines, churnText, fillBlame, markHeight, stepLabel, textLines, trackSteps, yearMarks, type Blamed } from './track'
 
-const v = (id: string, author: string, time: number, added = 1, removed = 0, binary = false) => ({ id, author, time, subject: id, added, removed, binary })
+const v = (id: string, author: string, time: number, added = 1, removed = 0, binary = false) => ({ id, author, time, subject: id, added, removed, binary, merge: false })
 const at = (y: number, m: number) => Math.floor(new Date(y, m - 1, 15).getTime() / 1000)
 
 describe('trackSteps', () => {
@@ -62,5 +62,36 @@ describe('a step’s text', () => {
   it('splits a text into lines, without the empty one at the end', () => {
     expect(textLines('a\r\nb\n')).toEqual(['a', 'b'])
     expect(textLines('')).toEqual([])
+  })
+})
+
+describe('blame worked out from a neighbour', () => {
+  const bl = (commit: string, line: string): Blamed => ({ commit, author: commit.toUpperCase(), time: 1, summary: commit, line, origLine: 1 })
+  // Version a: one two three. Version b changes two to TWO and adds four.
+  const blameA = [bl('a', 'one'), bl('a', 'two'), bl('a', 'three')]
+  const blocksB = [
+    { oldStart: 1, oldEnd: 2, newStart: 1, newEnd: 2 },
+    { oldStart: 3, oldEnd: 3, newStart: 3, newEnd: 4 },
+  ]
+
+  it('steps forward with no blame at all: the lines a version changed are its own', () => {
+    const got = blameForward(blameA, blocksB, ['one', 'TWO', 'three', 'four'], { id: 'b', author: 'B', time: 2, subject: 'b' })
+    expect(got?.map((l) => `${l.commit} ${l.line}`)).toEqual(['a one', 'b TWO', 'a three', 'b four'])
+  })
+
+  it('steps back, leaving only the lines the next version changed to blame', () => {
+    const blameB = [bl('a', 'one'), bl('b', 'TWO'), bl('a', 'three'), bl('b', 'four')]
+    const back = blameBackward(blameB, blocksB, 3)
+    expect(back?.ranges).toEqual([{ from: 2, to: 2 }])
+    expect(back?.known.map((l) => l?.line ?? null)).toEqual(['one', null, 'three'])
+    expect(fillBlame(back!.known, [bl('z', 'two')])?.map((l) => `${l.commit} ${l.line}`)).toEqual(['a one', 'z two', 'a three'])
+    // Too few or too many lines blamed: not to be trusted.
+    expect(fillBlame(back!.known, [])).toBeNull()
+    expect(fillBlame(back!.known, [bl('z', 'two'), bl('z', 'extra')])).toBeNull()
+  })
+
+  it('gives up when the blame and the change don’t line up', () => {
+    expect(blameForward(blameA.slice(0, 2), blocksB, ['one', 'TWO', 'three', 'four'], { id: 'b', author: 'B', time: 2, subject: 'b' })).toBeNull()
+    expect(blameBackward([bl('a', 'one')], blocksB, 3)).toBeNull()
   })
 })

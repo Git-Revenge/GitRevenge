@@ -80,3 +80,51 @@ func TestUncommitted(t *testing.T) {
 		t.Error("a staged change wasn't seen")
 	}
 }
+
+// #1079: blaming only some lines of a version, for the track to work out the rest from a
+// neighbour; and a merge marked, whose new lines may come from its other parent.
+func TestBlameRangesAndMerges(t *testing.T) {
+	t.Parallel()
+	fx := gittest.New(t)
+	first := fx.CommitFile("a.txt", "one\ntwo\nthree\nfour\n", "first")
+	second := fx.CommitFile("a.txt", "one\nTWO\nthree\nFOUR\n", "second")
+	repo := OpenRepo(newTestRunner(t), fx.Dir)
+	ctx := context.Background()
+
+	got, err := repo.BlameRanges(ctx, "a.txt", second, []BlameRange{{From: 1, To: 2}, {From: 4, To: 4}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var says []string
+	for _, l := range got {
+		says = append(says, l.Commit[:7]+" "+l.Line)
+	}
+	want := []string{first[:7] + " one", second[:7] + " TWO", second[:7] + " FOUR"}
+	if strings.Join(says, ", ") != strings.Join(want, ", ") {
+		t.Errorf("ranges = %v, want %v", says, want)
+	}
+	if all, _ := repo.BlameRanges(ctx, "a.txt", second, nil); len(all) != 4 {
+		t.Errorf("no ranges: %d lines, want every one", len(all))
+	}
+	if _, err := repo.BlameRanges(ctx, "a.txt", second, []BlameRange{{From: 3, To: 2}}); err == nil {
+		t.Error("took a range that ends before it starts")
+	}
+
+	// Both sides change the file, so the merge is a version of its own.
+	fx.Git("checkout", "-q", "-b", "side")
+	fx.CommitFile("a.txt", "one\nTWO\nthree\nFOUR\nfrom the side\n", "side")
+	fx.Git("checkout", "-q", "main")
+	fx.CommitFile("a.txt", "from main\none\nTWO\nthree\nFOUR\n", "main")
+	fx.Git("merge", "-q", "--no-ff", "-m", "merge side", "side")
+	versions, err := repo.Versions(ctx, "a.txt", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	merges := map[string]bool{}
+	for _, v := range versions {
+		merges[v.Subject] = v.Merge
+	}
+	if !merges["merge side"] || merges["side"] || merges["main"] || merges["second"] {
+		t.Errorf("merges = %v, want only merge side", merges)
+	}
+}

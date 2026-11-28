@@ -21,6 +21,8 @@ type FileVersion struct {
 	Added   int  `json:"added"`
 	Removed int  `json:"removed"`
 	Binary  bool `json:"binary,omitempty"`
+	// Merge marks a merge commit: its new lines may come from another parent, not from it.
+	Merge bool `json:"merge,omitempty"`
 }
 
 // MaxFileVersions caps how many versions Versions returns: the newest ones.
@@ -41,7 +43,7 @@ func (r *Repo) Versions(ctx context.Context, path, rev string) ([]FileVersion, e
 		Args: []string{
 			"--literal-pathspecs", "log", "--numstat", "--no-renames",
 			"--max-count=" + strconv.Itoa(MaxFileVersions),
-			"--format=%x1e%H%x1f%aN%x1f%at%x1f%s",
+			"--format=%x1e%H%x1f%P%x1f%aN%x1f%at%x1f%s",
 			rev, "--", path,
 		},
 		Env: noLazyFetch,
@@ -57,18 +59,18 @@ func (r *Repo) Versions(ctx context.Context, path, rev string) ([]FileVersion, e
 	return versions, nil
 }
 
-// parseVersions reads records of: RS sha US author US time US subject, then numstat lines
+// parseVersions reads records of: RS sha US parents US author US time US subject, then numstat lines
 // (added TAB removed TAB path, or - TAB - TAB path for a binary file).
 func parseVersions(out []byte) []FileVersion {
 	versions := []FileVersion{}
 	for rec := range bytes.SplitSeq(out, []byte{0x1e}) {
 		lines := strings.Split(strings.TrimSpace(string(rec)), "\n")
-		h := strings.SplitN(lines[0], "\x1f", 4)
-		if len(h) != 4 {
+		h := strings.SplitN(lines[0], "\x1f", 5)
+		if len(h) != 5 {
 			continue
 		}
-		t, _ := strconv.ParseInt(h[2], 10, 64)
-		v := FileVersion{ID: h[0], Author: h[1], Time: t, Subject: h[3]}
+		t, _ := strconv.ParseInt(h[3], 10, 64)
+		v := FileVersion{ID: h[0], Author: h[2], Time: t, Subject: h[4], Merge: len(strings.Fields(h[1])) > 1}
 		for _, l := range lines[1:] {
 			f := strings.SplitN(l, "\t", 3)
 			if len(f) != 3 {

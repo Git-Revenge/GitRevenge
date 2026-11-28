@@ -1,8 +1,8 @@
 <script lang="ts">
   import Icon from '../ui/Icon.svelte'
-  import { Blame, BlameDownloading, BlameNeeds, BlameTrack, CancelDownload, DownloadFiles, FileDiff } from '../../../wailsjs/go/app/App.js'
+  import { Blame, BlameDownloading, BlameNeeds, BlameStep, BlameTrack, CancelDownload, DownloadFiles, FileDiff } from '../../../wailsjs/go/app/App.js'
   import VersionTrack from './VersionTrack.svelte'
-  import { changedLines, textLines, trackSteps, type Step } from './track'
+  import { blameBackward, blameForward, changedLines, fillBlame, textLines, trackSteps, type Blamed, type Step } from './track'
   import type { git } from '../../../wailsjs/go/models'
   import { errorText } from '../errors'
   import Busy from '../ui/Busy.svelte'
@@ -38,11 +38,12 @@
   let lines = $state<git.BlameLine[] | null>(null)
   let tokens = $state<Token[][]>([])
 
-  /** A stable color per commit, so a commit's blocks read as one. */
+  /** A stable color per commit, so a commit's blocks read as one: the newest version's
+   * commits first, so they keep their colours at an older one. */
   let colorOf = $derived.by(() => {
     const m: Record<string, number> = {}
     let n = 0
-    for (const l of lines ?? []) if (!(l.commit in m)) m[l.commit] = n++
+    for (const l of [...(lines ?? []), ...(olderBlame ?? [])]) if (!(l.commit in m)) m[l.commit] = n++
     return m
   })
 
@@ -96,7 +97,10 @@
         const text = kind === 'text' ? res.contents.new.text : ''
         const changed = changedLines(res.diff?.blocks ?? [])
         const view: Older = { at: i, kind, lines: textLines(text), tokens: highlightLines(text, null), changed, first: changed.size ? Math.min(...changed) : -1 }
+        blocksOf.set(s.id, res.diff?.blocks ?? [])
         older = view
+        olderBlame = kind === 'text' ? (blameOf.get(s.id) ?? null) : null
+        if (kind === 'text' && !olderBlame) settle(i)
         const lang = await languageFor(file)
         // older is a proxy of view now, never the same object: the step says it's still this one.
         if (lang && older?.at === i && f === file && r === rev) older = { ...view, tokens: highlightLines(text, lang) }
@@ -105,6 +109,77 @@
       reading = false
     }
   }
+
+  // Who wrote each line at an older version (#1079): read once the handle has settled, never
+  // on each step of a drag, and kept, so going back to one is instant. A version next to one
+  // already read is worked out from it: forward with no git at all, back with git blame of
+  // only the lines the step changed.
+  /** Each version's blame, by commit ("" for the work tree), and its change against the one
+   * before, from FileDiff. Plain maps: what shows is olderBlame. */
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const blameOf = new Map<string, Blamed[]>()
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const blocksOf = new Map<string, { oldStart: number; oldEnd: number; newStart: number; newEnd: number }[]>()
+  let olderBlame = $state<Blamed[] | null>(null)
+  let settleTimer: ReturnType<typeof setTimeout> | undefined
+  /** How long the handle has to rest on a version before its blame is read. */
+  const SETTLE_MS = 250
+
+  /** Keeps a version's blame, letting the longest-kept go past a few dozen: on a big file
+   * each is thousands of lines. */
+  function keep(id: string, blamed: Blamed[]) {
+    blameOf.delete(id)
+    blameOf.set(id, blamed)
+    while (blameOf.size > 40) blameOf.delete(blameOf.keys().next().value!)
+  }
+
+  function settle(i: number) {
+    clearTimeout(settleTimer)
+    settleTimer = setTimeout(() => void blameAt(i), SETTLE_MS)
+  }
+
+  /** The blame of step i, and the change of the step after it, read if need be. */
+  async function blocksAt(i: number) {
+    const s = steps[i]
+    const known = blocksOf.get(s.id)
+    if (known) return known
+    const res = await FileDiff(path, s.id ? 'commit' : 'worktree', s.id, file, '', false, 'lines').catch(() => null)
+    if (!res?.diff) return null
+    blocksOf.set(s.id, res.diff.blocks)
+    return res.diff.blocks
+  }
+
+  async function blameAt(i: number) {
+    const [f, r] = [file, rev]
+    const s = steps[i]
+    const view = older
+    if (!s?.id || !view || view.at !== i || view.kind !== 'text') return
+    const still = () => f === file && r === rev && at === i && older?.at === i
+    let got: Blamed[] | null = blameOf.get(s.id) ?? null
+    try {
+      const before = i > 0 ? blameOf.get(steps[i - 1].id) : undefined
+      const after = i < steps.length - 1 ? blameOf.get(steps[i + 1].id) : undefined
+      if (!got && before && !s.merge) got = blameForward(before, blocksOf.get(s.id) ?? [], view.lines, s)
+      if (!got && after) {
+        const blocks = await blocksAt(i + 1)
+        const back = blocks && blameBackward(after, blocks, view.lines.length)
+        if (back && still()) got = back.ranges.length ? fillBlame(back.known, await BlameStep(path, file, s.id, back.ranges)) : fillBlame(back.known, [])
+      }
+      if (!got && still()) got = await BlameStep(path, file, s.id, [])
+    } catch {
+      // Not downloaded, or git failed: the text stands without who wrote it.
+      got = null
+    }
+    if (!got || got.length !== view.lines.length) return
+    keep(s.id, got)
+    if (still()) olderBlame = got
+  }
+
+  // The newest version's blame is the view's own: the track starts from it.
+  $effect(() => {
+    const newestStep = steps.at(-1)
+    if (lines && newestStep && lines.length) keep(newestStep.id, lines)
+  })
 
   function goTo(i: number) {
     if (!steps.length) return
@@ -142,6 +217,10 @@
   $effect(() => {
     const [f, r] = [file, rev]
     steps = []
+    blameOf.clear()
+    blocksOf.clear()
+    olderBlame = null
+    clearTimeout(settleTimer)
     renamedFrom = ''
     older = null
     stepped = false
@@ -220,6 +299,27 @@
   const scrollHere = (row: HTMLElement) => row.scrollIntoView({ block: 'center' })
 </script>
 
+{#snippet gutter(l: Blamed, start: boolean)}
+  <td class="gutter" style:border-left-color={uncommitted(l.commit) ? 'transparent' : laneVar(colorOf[l.commit] ?? 0)}>
+    {#if start}
+      {#if uncommitted(l.commit)}
+        <span class="muted">Not committed yet</span>
+      {:else}
+        <span class="who-when">
+          <button class="sha" onclick={() => onReveal(l.commit)} title="{l.summary}&#10;Show in graph">{l.commit.slice(0, 7)}</button>
+          {#if l.edge}
+            <!-- A shallow clone's edge (#1006): written there or earlier, in history it hasn't got. -->
+            <span class="who before" title="This clone's history stops at {l.commit.slice(0, 7)}: these lines are as old as it, or older">before {day(l.time)}</span>
+          {:else}
+            <span class="who" title={l.author}>{l.author}</span>
+            <span class="muted when">{formatTime(l.time)}</span>
+          {/if}
+        </span>
+      {/if}
+    {/if}
+  </td>
+{/snippet}
+
 <div class="blame">
   <header class="view-head">
     <button class="btn quiet" onclick={onClose} title="Back"><Icon name="back" />Back</button>
@@ -265,14 +365,16 @@
                 : 'The file isn’t at this version.'}
         </p>
       {:else}
-        <!-- An older version: its text, and the lines it changed. Who wrote each line shows at
-             the newest version. -->
+        <!-- An older version: its text, the lines it changed, and once the handle has settled,
+             who wrote each line (#1079). -->
+        {#if !olderBlame && older.at === at}<p class="reading" role="status">Reading who wrote each line…</p>{/if}
         <table class:wrap={wrap.on} class:dim={older.at !== at}>
           <tbody>
             {#each older.lines as text, i (i)}
               {@const changed = older.changed.has(i)}
-              <tr class:changed {@attach stepped && i === older.first ? toChange(older.at) : undefined}>
-                <td class="gutter"></td>
+              {@const b = olderBlame?.[i]}
+              <tr class:changed class:start={!!b && (i === 0 || olderBlame?.[i - 1]?.commit !== b.commit)} {@attach stepped && i === older.first ? toChange(older.at) : undefined}>
+                {#if b}{@render gutter(b, i === 0 || olderBlame?.[i - 1]?.commit !== b.commit)}{:else}<td class="gutter"></td>{/if}
                 <td class="num">{i + 1}</td>
                 <td class="code"
                   >{#if older.tokens[i]}{#each older.tokens[i] as t, k (k)}<span class={t.cls}>{t.text}</span>{/each}{:else}{text}{/if}</td
@@ -295,24 +397,7 @@
               class:changed={stepped && newestChanged.has(i)}
               {@attach i + 1 === line ? scrollHere : stepped && i === newestFirst ? toChange(at) : undefined}
             >
-              <td class="gutter" style:border-left-color={uncommitted(l.commit) ? 'transparent' : laneVar(colorOf[l.commit] ?? 0)}>
-                {#if start}
-                  {#if uncommitted(l.commit)}
-                    <span class="muted">Not committed yet</span>
-                  {:else}
-                    <span class="who-when">
-                      <button class="sha" onclick={() => onReveal(l.commit)} title="{l.summary}&#10;Show in graph">{l.commit.slice(0, 7)}</button>
-                      {#if l.edge}
-                        <!-- A shallow clone's edge (#1006): written there or earlier, in history it hasn't got. -->
-                        <span class="who before" title="This clone's history stops at {l.commit.slice(0, 7)}: these lines are as old as it, or older">before {day(l.time)}</span>
-                      {:else}
-                        <span class="who" title={l.author}>{l.author}</span>
-                        <span class="muted when">{formatTime(l.time)}</span>
-                      {/if}
-                    </span>
-                  {/if}
-                {/if}
-              </td>
+              {@render gutter(l, start)}
               <td class="num">{i + 1}</td>
               <td class="code"
                 >{#if tokens[i]}{#each tokens[i] as t, k (k)}<span class={t.cls}>{t.text}</span>{/each}{:else}{l.line}{/if}</td
@@ -412,6 +497,17 @@
   /* While the next step is read, the last one stays, faded, rather than blanking. */
   table.dim {
     opacity: 0.55;
+  }
+
+  .reading {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: 0;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--ink-mute);
+    background: var(--paper-warm);
   }
 
   .no-text {

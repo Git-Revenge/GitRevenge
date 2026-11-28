@@ -4046,6 +4046,20 @@ export namespace git {
 	        this.edge = source["edge"];
 	    }
 	}
+	export class BlameRange {
+	    from: number;
+	    to: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new BlameRange(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.from = source["from"];
+	        this.to = source["to"];
+	    }
+	}
 	export class BranchMerge {
 	    target: string;
 	    how: string;
@@ -4582,6 +4596,7 @@ export namespace git {
 	    added: number;
 	    removed: number;
 	    binary?: boolean;
+	    merge?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new FileVersion(source);
@@ -4596,6 +4611,7 @@ export namespace git {
 	        this.added = source["added"];
 	        this.removed = source["removed"];
 	        this.binary = source["binary"];
+	        this.merge = source["merge"];
 	    }
 	}
 	export class FolderCount {
