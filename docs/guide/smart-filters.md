@@ -75,7 +75,7 @@ A filter has two modes, switched in the strip and remembered for each repository
 
 The **Horizontal** view always highlights, since taking commits out would break its lanes.
 
-A filter stacks with [focus](graph.md#focusing-on-a-branch) and with [hidden branches](branch-care.md#hiding-branches): the graph shows what passes all of them. It lasts until you clear it or close the tab.
+A filter stacks with a focus on a [branch](graph.md#focusing-on-a-branch) or a [folder or file](graph.md#focusing-on-a-folder-or-file), and with [hidden branches](branch-care.md#hiding-branches): the graph shows what passes all of them. It lasts until you clear it or close the tab.
 
 A few things follow from a filter:
 

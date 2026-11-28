@@ -185,7 +185,7 @@ A strip above the graph says how many commits the filter keeps, with a chip for 
 ![A filter on as Only these: the strip above the graph, and only the commits it keeps](../img/smart-filter-only-light.webp#gh-light-mode-only)
 ![A filter on as Only these: the strip above the graph, and only the commits it keeps](../img/smart-filter-only-dark.webp#gh-dark-mode-only)
 
-A filter stacks with a [focus](#focusing-on-a-branch) and with hidden branches. [Smart filters](smart-filters.md) covers the panel, combining values, pinning a key so its values show on every row, and Trailer care.
+A filter stacks with a focus on a [branch](#focusing-on-a-branch) or a [folder or file](#focusing-on-a-folder-or-file), and with hidden branches. [Smart filters](smart-filters.md) covers the panel, combining values, pinning a key so its values show on every row, and Trailer care.
 
 ## Branches and tags
 
@@ -226,7 +226,30 @@ Focus is the opposite of [hiding a branch](branch-care.md#hiding-branches): it s
 
 The graph then shows the branch, its remote-tracking copies, and the history they're built on. Other branches' labels stay on commits that are still showing, so you can see where the branch left them. Stashes and the checked-out branch's other commits leave the view, and the commit panel and working tree still work as usual.
 
-Only one focus exists at a time, and choosing another replaces it. The bar above the graph says what's focused. To go back to everything, click the **×** there, or right-click the branch and choose **Stop focusing**. A focus lasts until you close the tab, or until its branch is deleted.
+One branch is focused at a time, and choosing another replaces it. It can stack with a [folder or file](#focusing-on-a-folder-or-file). The bar above the graph says what's focused. To go back to everything, click the **×** there, or right-click the branch and choose **Stop focusing**. A focus lasts until you close the tab, or until its branch is deleted.
+
+## Focusing on a folder or file
+
+The timeline can show only the commits that changed something under a folder, or in one file, as `git log -- src/alerts/` does. Each of those commits joins its nearest ancestor that also touched the path, so the lanes still show where work branched off and came back through a merge.
+
+Ways in:
+
+- Right-click a folder or file in the working tree's changes, or in a commit's files, and choose **Focus the timeline on …**.
+- On a folder's card in the [Map's Authors mode](experimental-views.md#authors), choose **Focus the timeline on it**.
+- In the command palette, choose **Focus the timeline on a folder or file…** and type. It suggests the folders and files at the checked-out commit as you go. A name without a slash that's a folder is taken as the folder.
+
+![The timeline focused on src/alerts/: the chip in the bar, the commits that changed the folder, and main labelled, faded, where it last touched it](../img/path-focus-light.webp#gh-light-mode-only)
+![The timeline focused on src/alerts/: the chip in the bar, the commits that changed the folder, and main labelled, faded, where it last touched it](../img/path-focus-dark.webp#gh-dark-mode-only)
+
+The bar above the graph says "Focused on `src/alerts/`", and the count says how many of the history's commits touched it: "290 of 1,512 commits". In a narrower window the count moves into the search field, as it always does ("Search 290 commits"). The working tree's row counts only what's changed under the path. With a branch focus as well, the chip says "Focused on feature/offline-cache, in `src/alerts/`", and the graph shows that branch's commits that touched the path. The chip's **×** ends both, and **Stop focusing** in the command palette does the same.
+
+A branch whose tip changed nothing under the path would have no row of its own. Its label sits, faded, on the newest commit in its history that did, and says how far back that is: **main · 26 later**. Hover over it for "main's tip is 26 commits later; none of them touched src/alerts/". Its menu acts on the branch itself.
+
+[Smart filters](#filtering-by-a-trailer) and the [history search](searching-code.md) narrow the focused history further, and the filter's count is of the commits it keeps under the path. A history search started while the timeline is focused starts with **Only in** set to the folder; clear it there to search every file.
+
+The timeline doesn't follow renames, as `git log -- <path>` doesn't: git can follow a rename for one file's own history, never across a graph. When the file you're focused on was renamed in the oldest commit that shows, a note under the bar says what it was called before, and that its history from then isn't here. **File history**, in the note, follows renames.
+
+A path no commit in the history touched says so, rather than leaving the timeline blank: it may be spelled differently, or be on a branch that's hidden. **Stop focusing** is beside it. Like a branch focus, a folder or file focus lasts until you close the tab.
 
 ## Views
 

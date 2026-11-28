@@ -95,7 +95,7 @@ const trades = [
 const features = [
   {
     title: 'A graph you can read',
-    body: 'Commits in date order with your main branch as a spine, a line for each day, bot and docs commits folded away, and a ruler at the edge that shows where the branches, tags and search matches are.',
+    body: 'Commits in date order with your main branch as a spine, a line for each day, bot and docs commits folded away, and a ruler at the edge that shows where the branches, tags and search matches are. Narrow it to one folder or file.',
     to: '/docs/guide/graph',
   },
   {
