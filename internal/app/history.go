@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/git-revenge/gitrevenge/internal/git"
 )
@@ -42,8 +43,11 @@ type BlameTrack struct {
 	// there, and the view offers to carry on under the old name.
 	RenamedFrom string `json:"renamedFrom"`
 	// WorkTree says the file has changes not committed yet, a last step after the versions.
-	// It's only ever set for the work tree's blame (rev "").
 	WorkTree bool `json:"workTree"`
+	// Home is the version the view's own blame is of, as an index into Versions (#1083): the
+	// newest version in rev's history. Blamed at a commit, the track still runs to the
+	// newest version, with the handle on that commit's.
+	Home int `json:"home"`
 }
 
 // BlameTrack lists the versions of file in rev's history ("" for HEAD, and then the work
@@ -58,18 +62,36 @@ func (a *App) BlameTrack(path, file, rev string) (BlameTrack, error) {
 	}
 	ctx, done := a.latest.start("blame-track", r.Path)
 	defer done()
-	versions, err := r.Git.Versions(ctx, file, rev)
+	// Blamed at a commit in HEAD's history, the track runs from the first version to the
+	// newest, with home on the commit's. One HEAD hasn't got (another branch's) has a track
+	// of its own history only.
+	versions, err := r.Git.Versions(ctx, file, "")
 	if errors.Is(err, context.Canceled) {
 		return empty, nil
 	}
 	if err != nil {
 		return empty, err
 	}
-	track := BlameTrack{Versions: versions}
-	if len(versions) > 0 {
-		track.RenamedFrom, _ = r.Git.RenamedAt(ctx, versions[0].ID, file)
+	track := BlameTrack{Versions: versions, Home: len(versions) - 1}
+	fromHead := true
+	if rev != "" {
+		home, _, err := r.Git.LastTouched(ctx, rev, file)
+		at := slices.IndexFunc(versions, func(v git.FileVersion) bool { return v.ID == home })
+		if err == nil && at >= 0 {
+			track.Home = at
+		} else {
+			fromHead = false
+			if versions, err = r.Git.Versions(ctx, file, rev); err != nil {
+				return empty, err
+			}
+			track = BlameTrack{Versions: versions, Home: len(versions) - 1}
+		}
 	}
-	if rev == "" {
+	if len(track.Versions) > 0 {
+		track.RenamedFrom, _ = r.Git.RenamedAt(ctx, track.Versions[0].ID, file)
+	}
+	// The work tree is the step after HEAD's newest version, so only a track from HEAD has it.
+	if fromHead {
 		track.WorkTree, _ = r.Git.Uncommitted(ctx, file)
 	}
 	return track, nil

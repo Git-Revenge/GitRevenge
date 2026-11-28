@@ -439,6 +439,8 @@
     onMenu(
       [
         ...diffToolItems(path, { mode: 'commit', commit: commitId, file: f.path, oldPath: f.oldPath }),
+        // Its blame with the track's handle on this commit (#1083); a deleted file has none.
+        ...(f.status === 'D' ? [] : [{ label: 'Blame at this commit', icon: 'blame' as const, run: () => openFile({ mode: 'blame', file: f.path, commit: commitId }) }]),
         focusPathItem(path, f.path),
         { label: 'Copy path', icon: 'copy', run: () => void ClipboardSetText(f.path).catch(() => false) },
       ],

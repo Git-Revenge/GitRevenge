@@ -563,6 +563,7 @@ export namespace app {
 	    versions: git.FileVersion[];
 	    renamedFrom: string;
 	    workTree: boolean;
+	    home: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new BlameTrack(source);
@@ -573,6 +574,7 @@ export namespace app {
 	        this.versions = this.convertValues(source["versions"], git.FileVersion);
 	        this.renamedFrom = source["renamedFrom"];
 	        this.workTree = source["workTree"];
+	        this.home = source["home"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

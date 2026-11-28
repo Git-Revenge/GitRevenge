@@ -286,3 +286,68 @@ test.describe('restore', () => {
     expect(await calls(page, 'RestoreVersion')).toEqual([['/r', 'lib/texts.txt', C, 'a.txt']])
   })
 })
+
+// #1083: the ways in, and a partial clone's versions.
+test.describe('the ways in', () => {
+  test('blamed at a commit, the handle is on its version, with newer ones after it', async ({ page }) => {
+    const s = scenario({ home: 1 }, { [C]: step('one\ntwo\nthree\n', [{ oldStart: 2, oldEnd: 2, newStart: 2, newEnd: 3 }]) })
+    await open(page, 'blame', { ...s, blameRev: B, responses: { ...s.responses, Blame: [blame(A, 'one'), blame(B, 'two')] } })
+    await expect(track(page)).toContainText('Version 2 of 3')
+    await expect(code(page)).toHaveText(['one', 'two'])
+    expect((await calls(page, 'BlameTrack'))[0]).toEqual(['/r', 'a.txt', B])
+    await track(page).getByRole('button', { name: 'The version after' }).click()
+    await expect(track(page)).toContainText('Version 3 of 3, the newest')
+    await expect(code(page)).toHaveText(['one', 'two', 'three'])
+    // And back home: the view's own blame again.
+    await track(page).getByRole('button', { name: 'The version before' }).click()
+    await expect(track(page)).toContainText('Version 2 of 3')
+    await expect(page.locator('.body td.gutter .sha')).toHaveText(['aaaaaaa', 'bbbbbbb'])
+  })
+
+  test('File history’s Blame at opens the selected commit’s, under the name it had then', async ({ page }) => {
+    const renamed = { id: 'e3'.repeat(20), author: 'Ana Cruz', time: 1792000000, subject: 'rename', path: 'old.txt', status: 'M' }
+    await open(page, 'fileHistory', { responses: { FileHistory: { commits: [renamed] } } })
+    await page.getByRole('button', { name: `Blame at ${renamed.id.slice(0, 7)}` }).click()
+    expect(await events(page, 'open')).toEqual([[{ mode: 'blame', file: 'old.txt', commit: renamed.id, writeAs: 'new.txt' }]])
+  })
+
+  test('a partial clone without a version asks once, and downloads what the track needs', async ({ page }) => {
+    const s = scenario({}, { [B]: { ...step('', [], 'missing'), contents: { ...step('', []).contents, kind: 'missing', missing: ['x'.repeat(40)] } } })
+    await open(page, 'blame', { ...s, responses: { ...s.responses, BlameNeeds: { partial: true, versions: 3, missing: [] } } })
+    await expect(code(page)).toHaveCount(3)
+    await page.evaluate(() => (window as unknown as { __respond: (r: object) => void }).__respond({ BlameNeeds: { partial: true, versions: 3, missing: ['b'.repeat(40)] } }))
+    await track(page).getByRole('button', { name: 'The version before' }).click()
+    const ask = page.getByRole('group', { name: 'Download the file’s versions?' })
+    await expect(ask).toContainText('hasn’t been downloaded to this partial clone')
+    await ask.getByRole('button', { name: 'Download the versions' }).click()
+    await expect.poll(() => calls(page, 'DownloadFiles')).toHaveLength(1)
+    expect((await calls(page, 'DownloadFiles'))[0][2]).toEqual(['b'.repeat(40)])
+    expect((await calls(page, 'BlameNeeds')).at(-1)).toEqual(['/r', 'a.txt', ''])
+  })
+})
+
+test('a commit’s file menu blames it at that commit', async ({ page }) => {
+  const person = { name: 'Ana Cruz', email: 'ana@example.com', time: 1793500000 }
+  const row0 = '0'.repeat(40)
+  const c = { id: row0, subject: 'Commit 0', body: '', trailers: [], parents: ['a'.repeat(40)], author: person, committer: person }
+  const files = [
+    { status: 'M', path: 'src/alerts/sms.js', oldPath: '', added: 1, deleted: 1 },
+    { status: 'D', path: 'gone.js', oldPath: '', added: 0, deleted: 3 },
+  ]
+  const identity = { name: 'A', email: 'a@example.com' }
+  await open(page, 'repoView', {
+    graphRows: 3,
+    responses: { Refs: [], CommitSignatures: [], CommitNotes: [], WorkingTree: { status: { files: [] }, identity, signing: { enabled: false } }, CommitDetail: { commit: c, files }, CommitRow: 1, Blame: [], BlameTrack: { versions: [], renamedFrom: '', workTree: false, home: 0 }, BlameNeeds: { partial: false, versions: 0, missing: [] } },
+  })
+  const box = (await page.locator('.scroller').boundingBox())!
+  await page.mouse.click(box.x + 500, box.y + 52 + 26)
+  await expect(page.getByRole('heading', { name: 'Commit 0' })).toBeVisible()
+  const tab = page.getByRole('tab', { name: 'Files', exact: true })
+  if (await tab.count()) await tab.click()
+  await page.locator('.files .file-row', { hasText: 'gone.js' }).click({ button: 'right' })
+  await expect(page.getByRole('menu').getByRole('menuitem', { name: 'Blame at this commit' })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await page.locator('.files .file-row', { hasText: 'sms.js' }).click({ button: 'right' })
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Blame at this commit' }).click()
+  await expect.poll(() => calls(page, 'Blame')).toEqual([['/r', 'src/alerts/sms.js', row0]])
+})

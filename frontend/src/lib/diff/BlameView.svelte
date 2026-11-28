@@ -74,7 +74,10 @@
   let steps = $state<Step[]>([])
   let renamedFrom = $state('')
   let at = $state(0)
-  let newest = $derived(steps.length === 0 || at === steps.length - 1)
+  /** The step whose blame is the view's own: the newest, or blamed at a commit, that
+   * commit's version, with newer ones after it on the track (#1083). */
+  let home = $state(0)
+  let newest = $derived(steps.length === 0 || at === home)
   /** An older version, as read: its lines and the ones it changed, or why there's no text. */
   type Older = { at: number; kind: string; lines: string[]; tokens: Token[][]; changed: Set<number>; first: number; oldLines: string[]; blocks: Block[] }
   type Block = { oldStart: number; oldEnd: number; newStart: number; newEnd: number }
@@ -91,11 +94,11 @@
     if (reading) return
     reading = true
     try {
-      while (want >= 0 && want < steps.length - 1 && older?.at !== want) {
+      while (want >= 0 && want < steps.length && want !== home && older?.at !== want) {
         const i = want
         const s = steps[i]
         const [f, r] = [file, rev]
-        const res = await FileDiff(path, 'commit', s.id, file, '', false, 'lines').catch((err) => {
+        const res = await FileDiff(path, s.id ? 'commit' : 'worktree', s.id, file, '', false, 'lines').catch((err) => {
           session.error = errorText(err)
           return null
         })
@@ -251,7 +254,7 @@
    * carry theirs. */
   let newestDiff = $state<{ id: string; before: string[]; after: string[]; blocks: Block[] } | null>(null)
   $effect(() => {
-    const s = steps.at(-1)
+    const s = steps[home]
     if (way !== 'changes' || !newest || !s || newestDiff?.id === s.id) return
     const [f, r] = [file, rev]
     void FileDiff(path, s.id ? 'commit' : 'worktree', s.id, file, '', false, 'lines')
@@ -320,19 +323,21 @@
     const [f, r] = [file, rev]
     const s = steps[i]
     const view = older
-    if (!s?.id || !view || view.at !== i || view.kind !== 'text') return
+    if (!s || !view || view.at !== i || view.kind !== 'text') return
     const still = () => f === file && r === rev && at === i && older?.at === i
     let got: Blamed[] | null = blameOf.get(s.id) ?? null
     try {
       const before = i > 0 ? blameOf.get(steps[i - 1].id) : undefined
       const after = i < steps.length - 1 ? blameOf.get(steps[i + 1].id) : undefined
-      if (!got && before && !s.merge) got = blameForward(before, blocksOf.get(s.id) ?? [], view.lines, s)
-      if (!got && after) {
+      // The work tree, after a home at a commit, is blamed as it is: its own lines have no commit.
+      if (!got && !s.id && still()) got = await Blame(path, file, '')
+      if (!got && s.id && before && !s.merge) got = blameForward(before, blocksOf.get(s.id) ?? [], view.lines, s)
+      if (!got && s.id && after) {
         const blocks = await blocksAt(i + 1)
         const back = blocks && blameBackward(after, blocks, view.lines.length)
         if (back && still()) got = back.ranges.length ? fillBlame(back.known, await BlameStep(path, file, s.id, back.ranges)) : fillBlame(back.known, [])
       }
-      if (!got && still()) got = await BlameStep(path, file, s.id, [])
+      if (!got && s.id && still()) got = await BlameStep(path, file, s.id, [])
     } catch {
       // Not downloaded, or git failed: the text stands without who wrote it.
       got = null
@@ -344,9 +349,31 @@
 
   // The newest version's blame is the view's own: the track starts from it.
   $effect(() => {
-    const newestStep = steps.at(-1)
+    const newestStep = steps[home]
     if (lines && newestStep && lines.length) keep(newestStep.id, lines)
   })
+
+  // A partial clone: the versions the track needs, in one download (#1083).
+  let trackDownloading = $state(false)
+  let trackFailed = $state('')
+  async function downloadTrack() {
+    const [f, i] = [file, at]
+    trackDownloading = true
+    trackFailed = ''
+    try {
+      const needs = await BlameNeeds(path, file, '')
+      if (needs.missing.length) await DownloadFiles(path, `track-${Date.now()}`, needs.missing)
+      if (f !== file) return
+      blocksOf.clear()
+      older = null
+      want = i
+      void readSteps()
+    } catch (err) {
+      trackFailed = errorText(err)
+    } finally {
+      trackDownloading = false
+    }
+  }
 
   function goTo(i: number) {
     if (!steps.length) return
@@ -358,7 +385,7 @@
 
   /** The lines the newest step changed: the newest commit's, or those not committed yet. */
   let newestChanged = $derived.by(() => {
-    const s = steps.at(-1)
+    const s = steps[home]
     // Made afresh each time and never changed after: nothing watches it change.
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const out = new Set<number>()
@@ -399,7 +426,8 @@
         if (f !== file || r !== rev) return
         steps = trackSteps(t)
         renamedFrom = t.renamedFrom
-        at = steps.length - 1
+        home = r && t.home >= 0 ? t.home : steps.length - 1
+        at = home
       })
       .catch(() => {
         // The track is extra: blame shows without it.
@@ -560,6 +588,20 @@
     {:else if !newest}
       {#if !older}
         <Loading />
+      {:else if older.kind === 'missing'}
+        <!-- A partial clone without this version (#1083): the versions the track needs come in
+             one download, as blame asks for its own. -->
+        <div class="ask" role="group" aria-label="Download the file’s versions?">
+          <p>This version of <span class="mono">{file}</span> hasn’t been downloaded to this partial clone. The versions the track needs come from the remote in one download.</p>
+          {#if trackFailed}<p class="failed" role="alert">The download failed: {trackFailed}</p>{/if}
+          <div class="actions">
+            {#if trackDownloading}
+              <span class="busy" role="status"><Busy /> Downloading…</span>
+            {:else}
+              <button class="btn primary" onclick={downloadTrack}>Download the versions</button>
+            {/if}
+          </div>
+        </div>
       {:else if older.kind !== 'text'}
         <p class="no-text" role="status">
           {older.kind === 'binary' || older.kind === 'image'
