@@ -147,7 +147,8 @@ test.describe('commit graph', () => {
       await open(page, 'graph', scenario({ branch: 'topic', stack: false }))
       await expect(page.getByText('Focused on topic')).toBeVisible()
       await page.getByRole('button', { name: 'Stop focusing' }).click()
-      await expect.poll(() => calls(page, 'SetGraphFocus')).toEqual([['/repo', '', false]])
+      // The chip ends every focus, a folder's too (#1060).
+      await expect.poll(() => calls(page, 'ClearGraphFocus')).toEqual([['/repo']])
     })
 
     test('names a stack', async ({ page }) => {

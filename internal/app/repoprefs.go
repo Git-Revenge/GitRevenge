@@ -511,3 +511,14 @@ func nonNil(s []string) []string {
 	}
 	return slices.Clone(s)
 }
+
+// GraphOutOf is how many commits the history of the repository at path has without its path
+// focus, while one narrows the graph (#1060), so the toolbar can say 265 of 1,410. It is 0
+// until counted, and with no path focus.
+func (a *App) GraphOutOf(path string) (int, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return 0, err
+	}
+	return r.GraphOutOf(), nil
+}

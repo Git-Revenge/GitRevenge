@@ -407,6 +407,20 @@ test.describe("the Map's Authors mode", () => {
       await expect.poll(async () => (await calls(page, 'CommitRow')).at(-1)).toEqual(['/repo', id(4)])
     })
 
+    // #1060: the folder's whole history, everyone's, in the timeline.
+    test('a folder’s card focuses the timeline on it; the files at the top have nothing to focus on', async ({ page }) => {
+      await toAreas(page)
+      await authorOf(page, 'Maya Okafor').dblclick()
+      await areaOf(page, maya.key, '', true).click()
+      const topCard = page.locator('.map .card')
+      await expect(topCard).toContainText('the files at the top')
+      await expect(topCard.getByRole('button', { name: 'Focus the timeline on it' })).toHaveCount(0)
+      await areaOf(page, maya.key, 'frontend').click()
+      await page.getByRole('group', { name: "About frontend/, of Maya Okafor's" }).getByRole('button', { name: 'Focus the timeline on it' }).click()
+      await expect.poll(() => calls(page, 'SetGraphPath')).toEqual([['/repo', 'frontend/']])
+      await expect(page.locator('.map')).toHaveCount(0)
+    })
+
     test('the author’s card opens them, and says when folders were left out', async ({ page }) => {
       await toAreas(page)
       await authorOf(page, 'Maya Okafor').click()

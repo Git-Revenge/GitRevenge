@@ -43,6 +43,7 @@
     type Showing,
     type Who,
   } from './mapLayout'
+  import { focusTimelineOn } from '../focusPathItem'
 
   let {
     path,
@@ -764,6 +765,9 @@
             {!folderOpen(n) ? 'Show its folders' : under === 'reading' ? 'Reading its folders…' : 'Fold its folders away'}
           </button>
         {/if}
+        <!-- The whole history of the folder, everyone's, not only theirs (#1060). The files at
+             the top aren't a folder, so there's nothing to focus on. -->
+        {#if !n.files && n.path}<button class="btn sm text" onclick={() => void focusTimelineOn(path, `${n.path}/`)}>Focus the timeline on it</button>{/if}
         {#if n.pinned}<button class="btn sm text" onclick={() => unpin(key)}>Let it go back to its place</button>{/if}
       </span>
     </div>

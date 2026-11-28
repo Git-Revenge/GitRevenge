@@ -314,6 +314,8 @@
 
   let dialog = $state<DialogSpec | null>(null)
   let remotesOpen = $state(false)
+  /** The palette's box for focusing the timeline on a folder or file (#1060). */
+  let focusPathOpen = $state(false)
   let worktreesOpen = $state(false)
   /** Commit after which the interactive rebase editor rewrites history, or "" when closed. */
   let rebaseBase = $state('')
@@ -458,6 +460,7 @@
     { id: 'branch.new', group: 'Branch', title: 'New branch…', keywords: 'create', shortcut: 'Mod+B', run: () => (dialog = newBranchDialog(ctx)) },
     // The rebase editor is left out: Escape shouldn't throw away a plan being edited.
     ...(diff ? [{ id: 'view.close', group: 'View', title: 'Back to the graph', keywords: 'close diff', shortcut: 'Escape', run: () => (diff = null) }] : []),
+    { id: 'graph.focusPath', group: 'View', title: 'Focus the timeline on a folder or file…', keywords: 'path folder file directory history log narrow timeline', run: () => (focusPathOpen = true) },
     { id: 'repo.remotes', group: 'Repository', title: 'Manage remotes…', keywords: 'origin url', run: () => (remotesOpen = true) },
     { id: 'repo.reflog', group: 'Repository', title: 'Show the reflog…', keywords: 'history head moves recover lost commit', run: () => (reflogRef = 'HEAD') },
     { id: 'repo.applyPatches', group: 'Repository', title: 'Apply patches or a diff…', keywords: 'am mbox mailbox format-patch import mail', run: () => void applyPatches() },
@@ -868,6 +871,9 @@
   <Lazy load={() => import('./WorktreesDialog.svelte')} {path} onClose={() => (worktreesOpen = false)} />
 {/if}
 
+{#if focusPathOpen}
+  <Lazy load={() => import('./FocusPathDialog.svelte')} {path} onClose={() => (focusPathOpen = false)} />
+{/if}
 {#if remotesOpen}
   <Lazy load={() => import('./RemotesDialog.svelte')} {path} onClose={() => (remotesOpen = false)} />
 {/if}

@@ -50,6 +50,7 @@
   import { anchored, escapeName, extension, plural as count, sourceName, type IgnoreScope, type IgnoreTarget } from './ignore'
   import PushedUndoDialog from './PushedUndoDialog.svelte'
   import type { MenuItem } from './ContextMenu.svelte'
+  import { focusPathItem } from './focusPathItem'
   import { gitConfig } from './gitconfig/config.svelte'
   import { tick } from 'svelte'
   import { appendTrailer, asPerson, trailerKeyChoices } from './trailers'
@@ -393,6 +394,7 @@
       ...(isStaged(f) ? [{ label: `Unstage ${name}`, icon: 'minus' as const, run: () => unstage([f.path]) }] : []),
       ...(unstaged ? diffToolItems(path, { mode: 'unstaged', file: f.path }, both ? `Open the unstaged changes in ${tool}` : undefined) : []),
       ...(staged ? diffToolItems(path, { mode: 'staged', file: f.path, oldPath: f.origPath }, both ? `Open the staged changes in ${tool}` : undefined) : []),
+      focusPathItem(path, f.path),
       { label: 'Copy path', icon: 'copy', run: () => copyPath(f.path) },
       { label: 'Ignore', icon: 'eye', separator: true, items: ignoreItems(f) },
       ...(isUnstaged(f) ? [{ label: f.untracked ? `Delete ${name}…` : `Discard changes to ${name}…`, icon: 'undo' as const, separator: true, run: () => void (confirmDiscard = [f.path]) }] : []),
@@ -412,7 +414,8 @@
         { label: `Ignore ${name} only on this machine`, run: () => quickIgnore(subject, 'exclude', pattern, []) },
         { label: 'Ignore…', separator: true, run: () => void (ignoring = { subject }) },
         { label: 'Edit ignore rules…', run: () => ignoreRules.show(path) },
-        { label: 'Copy path', icon: 'copy', separator: true, run: () => copyPath(dir) },
+        { ...focusPathItem(path, `${dir}/`), separator: true },
+        { label: 'Copy path', icon: 'copy', run: () => copyPath(dir) },
       ],
       e.clientX,
       e.clientY,

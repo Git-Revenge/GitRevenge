@@ -170,6 +170,10 @@ func (r *Repo) Authored(spans [][2]int64) ([]int, bool) { return r.graph.Authore
 // it has looked through so far, and how many the history has in all (0 until counted).
 func (r *Repo) Filtered() (on bool, looked, total int) { return r.graph.Filtered() }
 
+// GraphOutOf is how many commits the history has without the path focus, while one narrows
+// the graph: see graphLoader.OutOf.
+func (r *Repo) GraphOutOf() int { return r.graph.OutOf() }
+
 // Rules returns the branch rules (kinds and hide patterns) in a repository's settings.
 func Rules(rs settings.RepoSettings) branchkind.Rules {
 	overrides := map[branchkind.Kind][]string{}

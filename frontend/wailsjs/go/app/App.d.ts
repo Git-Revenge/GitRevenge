@@ -177,6 +177,8 @@ export function FindCount(arg1:string,arg2:git.GrepOptions):Promise<app.FindCoun
 
 export function FindInFiles(arg1:string,arg2:string,arg3:git.GrepOptions):Promise<app.FindResult>;
 
+export function FocusSuggestions(arg1:string,arg2:string):Promise<Array<string>>;
+
 export function ForcePushLoss(arg1:string):Promise<app.SharedCommits>;
 
 export function ForgetResolution(arg1:string,arg2:string):Promise<void>;
@@ -200,6 +202,8 @@ export function GitDiffAlgorithm(arg1:string):Promise<string>;
 export function GraphDensity():Promise<string>;
 
 export function GraphFocus(arg1:string):Promise<session.Focus>;
+
+export function GraphOutOf(arg1:string):Promise<number>;
 
 export function GraphRows(arg1:string,arg2:number,arg3:number):Promise<app.GraphPage>;
 

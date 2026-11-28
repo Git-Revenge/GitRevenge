@@ -398,6 +398,9 @@ const mounts = {
     if (scenario.current) session.active = '/r'
     const { peopleTab } = await import('../src/lib/people/tab.svelte')
     Object.assign(win, { __peopleTab: () => ({ open: peopleTab.open, repo: peopleTab.repo, ask: peopleTab.ask && JSON.parse(JSON.stringify(peopleTab.ask)) }) })
+    // Runs a command by its id, as picking it in the palette does.
+    const { commands } = await import('../src/lib/commands.svelte')
+    Object.assign(win, { __runCommand: (id: string) => commands.all().find((c) => c.id === id)?.run() })
   },
   // Patches from a dropped file or the clipboard (#1025): the repository view on screen, with
   // the drop overlay and toasts. scenario.tabs 'none' has no repository open, 'other' has one
@@ -412,9 +415,6 @@ const mounts = {
     mount(Toasts, { target: document.body })
     const { default: DropOverlay } = await import('../src/lib/DropOverlay.svelte')
     mount(DropOverlay, { target: document.body })
-    // Runs a command by its id, as picking it in the palette does.
-    const { commands } = await import('../src/lib/commands.svelte')
-    Object.assign(win, { __runCommand: (id: string) => commands.all().find((c) => c.id === id)?.run() })
   },
   // Trailer care, the dialog where a repository says how its trailers are read.
   async trailerCare() {

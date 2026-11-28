@@ -6,6 +6,7 @@
   import type { FindOptions } from './find/find'
   import { prefs } from './prefs.svelte'
   import type { MenuItem } from './ContextMenu.svelte'
+  import { focusPathItem } from './focusPathItem'
   import { commands } from './commands.svelte'
   import { linkTitle, type LinkPart } from './links/links'
   import { linkStore } from './links/links.svelte'
@@ -438,11 +439,19 @@
     onMenu(
       [
         ...diffToolItems(path, { mode: 'commit', commit: commitId, file: f.path, oldPath: f.oldPath }),
+        focusPathItem(path, f.path),
         { label: 'Copy path', icon: 'copy', run: () => void ClipboardSetText(f.path).catch(() => false) },
       ],
       e.clientX,
       e.clientY,
     )
+  }
+
+  /** A folder heading's menu (#1060): the timeline focused on it, and its path. */
+  function folderMenu(e: MouseEvent, dir: string) {
+    if (!onMenu || !dir) return
+    e.preventDefault()
+    onMenu([focusPathItem(path, `${dir}/`), { label: 'Copy path', icon: 'copy', run: () => void ClipboardSetText(dir).catch(() => false) }], e.clientX, e.clientY)
   }
 
   // The files where the history search's text changed in this commit, and by how much.
@@ -571,9 +580,10 @@
         {#if r.type === 'folder'}
           <li class="folder-row" data-row={index} aria-posinset={index + 1} aria-setsize={rows.length} style:--depth={r.depth} style:top="{fileWindow.tops[index]}px" style:height="{rowHeight(r)}px">
             {#if r.collapsible}
-              <button class="folder" aria-expanded={r.open} title={r.path} onclick={() => toggleFolder(r.path)}><Icon name="chevron" size={12} />{r.name}/</button>
+              <button class="folder" aria-expanded={r.open} title={r.path} onclick={() => toggleFolder(r.path)} oncontextmenu={(e) => folderMenu(e, r.path)}><Icon name="chevron" size={12} />{r.name}/</button>
             {:else}
-              <div class="folder" title={r.path}>{r.name}</div>
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div class="folder" title={r.path} oncontextmenu={(e) => folderMenu(e, r.path)}>{r.name}</div>
             {/if}
           </li>
         {:else}

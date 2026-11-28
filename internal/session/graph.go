@@ -78,7 +78,10 @@ type graphLoader struct {
 	// looked through, sorted: what a day held before the filter took commits out of it.
 	times []int64
 	// total is how many commits the history being loaded has, filter aside; 0 until counted.
-	total   int
+	total int
+	// outOf is how many commits the history has without a path focus, counted only under one
+	// (#1060): the chip says 265 of 1,410. 0 until counted, or with no path focus.
+	outOf   int
 	current *graph.Graph
 	// narrowed says current was loaded under a filter: it holds only what the filter keeps.
 	// filter is what the next load will be under, which isn't always what's shown.
@@ -266,6 +269,14 @@ func (l *graphLoader) Authored(spans [][2]int64) (counts []int, ok bool) {
 // Filtered reports whether a filter is narrowing the graph, how many commits the load
 // under it has looked through so far, kept or passed over, and how many the history has
 // in all (0 until that's counted).
+// OutOf is how many commits the history has without the path focus, while one narrows it;
+// 0 until counted, or with no path focus.
+func (l *graphLoader) OutOf() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.outOf
+}
+
 func (l *graphLoader) Filtered() (on bool, looked, total int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -550,6 +561,7 @@ func (l *graphLoader) reload() {
 	filter := l.filter
 	l.looked = 0
 	l.times = nil
+	l.outOf = 0
 	// Counted before the lock is let go, so that stop, which takes it to say nothing more
 	// loads, never starts waiting with a load about to be added.
 	l.wg.Add(1)
@@ -670,6 +682,21 @@ func (l *graphLoader) reload() {
 			opts.Exclude, opts.Remotes = rules.Hide(), remotes
 		}
 		if focus.Path != "" {
+			// What the path leaves out of: the same history without it.
+			whole := opts
+			l.wg.Add(1)
+			go func() {
+				defer l.wg.Done()
+				n, err := l.repo.CountCommits(ctx, whole)
+				if err != nil {
+					return
+				}
+				l.mu.Lock()
+				if ctx.Err() == nil {
+					l.outOf = n
+				}
+				l.mu.Unlock()
+			}()
 			opts.Paths = []string{focus.Path}
 		}
 
