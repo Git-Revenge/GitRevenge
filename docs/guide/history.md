@@ -42,8 +42,31 @@ Nothing a preview shows reaches the network. Audio and video of up to 32 MB open
 
 From a file's diff, **History** lists every commit that changed it, and **Blame** shows who last changed each line and in which commit.
 
-![Blame: each line with the commit and author that last changed it](../img/blame-light.webp#gh-light-mode-only)
-![Blame: each line with the commit and author that last changed it](../img/blame-dark.webp#gh-dark-mode-only)
+![Blame: each line with the commit and author that last changed it, under the track through the file's versions](../img/blame-light.webp#gh-light-mode-only)
+![Blame: each line with the commit and author that last changed it, under the track through the file's versions](../img/blame-dark.webp#gh-dark-mode-only)
+
+### Blame through time
+
+Above the code, a track runs through the file's versions: one mark for each commit that changed it, coloured by its author and taller the more lines it changed, with the years under it. Drag the handle, use the buttons either side or the arrow keys on it, Home and End, or **[** and **]** from anywhere in the view, to read the file as it was at each version. Each step washes what that version changed and brings it into view, and says which version it is ("Version 9 of 24"), with the commit, its author and date, and how many lines it added and took out. Changes not committed yet are the last step.
+
+![The demo's src/alerts/sms.js at version 9 of 24: the line that version changed washed, and the track with the handle partway along](../img/blame-track-light.webp#gh-light-mode-only)
+![The demo's src/alerts/sms.js at version 9 of 24: the line that version changed washed, and the track with the handle partway along](../img/blame-track-dark.webp#gh-dark-mode-only)
+
+The text of a version shows as soon as you reach it. Who wrote each line fills in once the handle rests, and a version next to one already read is worked out from it, so stepping through a long history stays quick.
+
+A version reads three ways, from the switch on the track, and the choice is kept for each repository:
+
+- **Who wrote it**: the blame at that version.
+- **What changed**: that version against the one before, with what it took out struck through where it was, marked − and +.
+- **How old**: each line washed by how many versions back it last changed, from this one to more than ten back, with a key.
+
+**Rewind these lines** gives a block of lines its own history. Select the lines, or use the button that shows at the start of a blame block, and a panel beside the code lists only the versions that changed them, newest first, each with what it did to them. It follows them as they move down the file, as `git log -L` does. **Show the whole file at …** moves the file's track to that version.
+
+**Restore this version**, on the track, writes the file as it was into the working tree, and **Restore these lines**, in a block's history, puts just those lines back where they are now. Either becomes a change to commit or throw away: no commit changes, and the index is left alone. It asks first, saying how many lines it adds and takes out, and if the file has changes you haven't committed, it says so: **Undo**, in the note afterwards, brings back what was there.
+
+The track follows no renames: it stops at the version where the file got its name, which says what it was called before, with **Carry on under the old name**. A version restored from there is written under the file's name today. Blame, like the track, is for text: a version where the file was binary says so.
+
+Besides the blame view, **Blame at this commit** in a commit's files, and **Blame at …** in a file's history, open it at that commit: the track still runs to the newest version, with the handle on that commit's. In a [partial clone](big-repositories.md#when-a-file-isnt-here-yet), the versions the track needs that were never downloaded come in one download, after asking.
 
 
 ## The reflog

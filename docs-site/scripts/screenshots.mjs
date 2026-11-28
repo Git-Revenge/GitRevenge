@@ -678,6 +678,28 @@ scenes.blame = (page) =>
     await sleep(1200)
   })
 
+/** Blame through time (#1084): src/alerts/sms.js at version 9 of 24, which changed one line,
+ * with who wrote each line filled in. The panels step aside for the code. */
+scenes.blameTrack = (page) =>
+  stills(page, 'blame-track', async (p) => {
+    await reset(p, ['tidewater'], { clean: true })
+    await selectCommit(p, 'd83efed')
+    await showFiles(p)
+    await click(p, file('src/alerts/sms.js'))
+    await sleep(600)
+    await click(p, byText('Blame', 'button'))
+    await p.waitForSelector('::-p-aria(Version of the file)')
+    await hidePanel(p)
+    await palette(p, 'Hide the sidebar panel')
+    const slider = await p.waitForSelector('::-p-aria(Version of the file)')
+    await slider.focus()
+    await p.keyboard.press('Home')
+    for (let i = 1; i < 9; i++) await p.keyboard.press('ArrowRight')
+    await untilSettled(p, () => !document.querySelector('.reading') && !!document.querySelector('.body tr.changed') && !!document.querySelector('.body td.gutter .sha'))
+    await p.evaluate(() => document.activeElement?.blur())
+    await park(p)
+  })
+
 scenes.dashboard = (page) =>
   stills(page, 'group-dashboard', async (p) => {
     await reset(p, [])
