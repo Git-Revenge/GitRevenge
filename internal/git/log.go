@@ -285,18 +285,26 @@ func (r *Repo) RenamedFrom(ctx context.Context, opts LogOptions) (old string, er
 	if oldest == "" {
 		return "", nil
 	}
-	// A first commit, or a shallow clone's edge, has no parent here to have been renamed from.
-	parent, err := r.ReadString(ctx, "rev-parse", "--verify", "-q", oldest+"^")
+	return r.RenamedAt(ctx, oldest, opts.Paths[0])
+}
+
+// RenamedAt says what commit renamed path from, against its first parent: "" when it didn't
+// rename anything to path, or has no parent here (a first commit, or a shallow clone's edge).
+func (r *Repo) RenamedAt(ctx context.Context, commit, path string) (old string, err error) {
+	if err := CheckRevs(commit); err != nil {
+		return "", err
+	}
+	parent, err := r.ReadString(ctx, "rev-parse", "--verify", "-q", commit+"^")
 	if err != nil {
 		return "", nil
 	}
 	// Every file, not only this one: a rename is found from the file that went away.
-	raw, err := r.readCmd(ctx, Cmd{Args: []string{"diff-tree", "-r", "-z", "--name-status", "-M", "--no-commit-id", strings.TrimSpace(parent), oldest}, Env: noLazyFetch})
+	raw, err := r.readCmd(ctx, Cmd{Args: []string{"diff-tree", "-r", "-z", "--name-status", "-M", "--no-commit-id", strings.TrimSpace(parent), commit}, Env: noLazyFetch})
 	if err != nil {
 		return "", err
 	}
 	for _, c := range parseNameStatus(raw) {
-		if c.Status == "R" && c.Path == opts.Paths[0] {
+		if c.Status == "R" && c.Path == path {
 			return c.OldPath, nil
 		}
 	}

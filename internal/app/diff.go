@@ -25,6 +25,9 @@ const (
 	// "FROM..TO"; FROM "" is nothing, for a line of commits that starts at a first commit or
 	// a shallow clone's edge.
 	DiffCompare = "compare"
+	// DiffWorkTree compares HEAD's file with the work tree's: the blame view's last step,
+	// when the file has changes not committed yet (#1078).
+	DiffWorkTree = "worktree"
 )
 
 // compareRevs splits a DiffCompare commit, "FROM..TO", into its two commits.
@@ -75,6 +78,8 @@ func (a *App) FileContents(path, mode, commit, file, oldPath string, force bool)
 		from, to = git.FileRef{Rev: "HEAD", Path: oldPath}, git.IndexVersion(file)
 	case DiffUnstaged:
 		from, to = git.IndexVersion(file), git.WorkTreeVersion(file)
+	case DiffWorkTree:
+		from, to = git.FileRef{Rev: "HEAD", Path: file}, git.WorkTreeVersion(file)
 	default:
 		return git.FileContents{}, userError("Unknown diff mode " + mode + ".")
 	}
