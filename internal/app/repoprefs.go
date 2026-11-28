@@ -349,15 +349,17 @@ func (a *App) ShowingHidden(path string) (bool, error) {
 }
 
 // SetGraphFocus narrows the graph of the repository at path to one branch, or with stack to the
-// stack it's in, replacing any focus it had. An empty branch ends the focus. It lasts for this
-// session, or until the branch goes.
+// stack it's in, replacing any branch focus it had. An empty branch ends the branch focus. A
+// path focus stays either way (#1059): ClearGraphFocus ends both. It lasts for this session,
+// or until the branch goes.
 func (a *App) SetGraphFocus(path, branch string, stack bool) error {
 	r, err := a.openRepo(path)
 	if err != nil {
 		return err
 	}
+	kept := r.Focus().Path
 	if branch == "" {
-		r.SetFocus(session.Focus{})
+		r.SetFocus(session.Focus{Path: kept})
 		return nil
 	}
 	refs := r.Refs().All
@@ -370,8 +372,58 @@ func (a *App) SetGraphFocus(path, branch string, stack bool) error {
 	if !known {
 		return userError("There's no branch named " + branch + " to focus on.")
 	}
-	r.SetFocus(session.Focus{Branch: branch, Stack: stack})
+	r.SetFocus(session.Focus{Branch: branch, Stack: stack, Path: kept})
 	return nil
+}
+
+// SetGraphPath narrows the graph of the repository at path to the commits that changed
+// something under a folder or file of it (#1059), as git log -- <target> does, keeping any
+// branch focus. A folder ends in a slash. An empty target ends the path focus. It lasts for
+// this session.
+func (a *App) SetGraphPath(path, target string) error {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return err
+	}
+	clean, err := focusPath(target)
+	if err != nil {
+		return err
+	}
+	f := r.Focus()
+	f.Path = clean
+	r.SetFocus(f)
+	return nil
+}
+
+// ClearGraphFocus ends every focus the graph of the repository at path has: a branch and a
+// path both.
+func (a *App) ClearGraphFocus(path string) error {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return err
+	}
+	r.SetFocus(session.Focus{})
+	return nil
+}
+
+// focusPath tidies a folder or file inside the repository for a path focus: forward slashes,
+// none at the start, a folder's kept at the end. A path out of the repository is refused.
+func focusPath(target string) (string, error) {
+	p := strings.ReplaceAll(strings.TrimSpace(target), `\`, "/")
+	folder := strings.HasSuffix(p, "/")
+	p = strings.Trim(p, "/")
+	if p == "" || p == "." {
+		return "", nil
+	}
+	for _, part := range strings.Split(p, "/") {
+		if part == "" || part == "." || part == ".." {
+			return "", userError("“" + strings.TrimSpace(target) + "” isn't a folder or file inside the repository.")
+		}
+	}
+	if folder {
+		p += "/"
+	}
+	return p, nil
 }
 
 // GraphFocus returns what the graph of the repository at path is focused on.

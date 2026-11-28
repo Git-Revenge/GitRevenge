@@ -6203,6 +6203,7 @@ export namespace session {
 	export class Focus {
 	    branch: string;
 	    stack: boolean;
+	    path: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Focus(source);
@@ -6212,6 +6213,7 @@ export namespace session {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.branch = source["branch"];
 	        this.stack = source["stack"];
+	        this.path = source["path"];
 	    }
 	}
 

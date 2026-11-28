@@ -131,9 +131,15 @@ func newRefIndex(refs []git.Ref) *RefIndex {
 // Focus narrows the graph to one branch, or to the whole stack it's in: the opposite of hiding
 // a branch. As with hiding, the name has no remote, so its remote-tracking copies come too. The
 // zero Focus is no focus.
+//
+// Path narrows it to the commits that changed something under a folder or file (#1059), as
+// git log -- <path> does: each joined to its nearest such ancestor, so the lanes still show
+// where work branched off and came back. It stacks with a branch: that branch's history,
+// under the path.
 type Focus struct {
 	Branch string `json:"branch"`
 	Stack  bool   `json:"stack"`
+	Path   string `json:"path"`
 }
 
 // annotate sets each branch's kind and whether the rules hide it. Unless they're being
@@ -581,17 +587,17 @@ func (l *graphLoader) reload() {
 		close(sigReady)
 
 		var focused map[string]bool
-		if focus != (Focus{}) {
+		if focus.Branch != "" {
 			var err error
 			focused, err = l.focusedRefs(ctx, focus, rules, remotes)
 			if ctx.Err() != nil {
 				return // superseded or closed; the newer load reports
 			}
 			if err == nil && len(focused) == 0 {
-				// Its branch has gone, so there's nothing left to focus on.
+				// Its branch has gone, so there's no branch left to focus on; a path stays.
 				l.mu.Lock()
 				if l.focus == focus {
-					l.focus = Focus{}
+					l.focus = Focus{Path: focus.Path}
 				}
 				l.mu.Unlock()
 			}
@@ -637,11 +643,15 @@ func (l *graphLoader) reload() {
 			stashes[id] = true
 		}
 		hidden := map[string]bool{}
-		// Under a filter there's one lane and nothing to pin to it.
-		if filter == nil {
+		// Under a filter there's one lane and nothing to pin to it. Under a path the Trunk tips
+		// mostly aren't in the history at all (their last commits changed nothing there), so
+		// nothing is pinned either.
+		if filter == nil && focus.Path == "" {
 			pins, kinds := KindTips(ctx, l.repo, rules, remotes, show)
 			g.Pin(pins)
 			g.SetTipKinds(kinds)
+		}
+		if filter == nil {
 			// A shallow clone's edge commits keep their lanes running on (#1006): its history
 			// doesn't begin there. Without the edge they read as first commits, as before.
 			if edge, err := l.repo.ShallowEdge(ctx); err == nil {
@@ -658,6 +668,9 @@ func (l *graphLoader) reload() {
 			slices.Sort(opts.Revs)
 		} else if !show {
 			opts.Exclude, opts.Remotes = rules.Hide(), remotes
+		}
+		if focus.Path != "" {
+			opts.Paths = []string{focus.Path}
 		}
 
 		// The size of the whole history, for the scrollbar while the reader is paused. It

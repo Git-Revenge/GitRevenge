@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -265,5 +266,51 @@ func TestLogExcludesHiddenBranches(t *testing.T) {
 	fx.Checkout("wip/local")
 	if got := subjects(LogOptions{Exclude: []string{"wip/*"}, Remotes: []string{"origin"}}); len(got) != 2 {
 		t.Fatalf("HEAD on a hidden branch should keep it: %v", got)
+	}
+}
+
+// #1059: a path-limited log keeps only the commits that changed something under the path,
+// each joined to its nearest such ancestor, and a merge that brought nothing new there is left
+// out, as git log -- <path> leaves it out.
+func TestLogUnderAPath(t *testing.T) {
+	t.Parallel()
+	fx := gittest.New(t)
+	c1 := fx.CommitFile("a/x.txt", "x\n", "c1: a")
+	fx.CommitFile("b/y.txt", "y\n", "c2: b")
+	fx.Branch("side")
+	s1 := fx.CommitFile("a/x2.txt", "x2\n", "s1: a, on side")
+	fx.CommitFile("b/z.txt", "z\n", "s2: b, on side")
+	fx.Checkout("main")
+	fx.CommitFile("b/w.txt", "w\n", "c3: b")
+	if err := fx.Merge("side"); err != nil {
+		t.Fatal(err)
+	}
+	repo := OpenRepo(newTestRunner(t), fx.Dir)
+	ctx := context.Background()
+
+	var got []LogCommit
+	if err := repo.Log(ctx, LogOptions{Paths: []string{"a/"}}, func(c LogCommit) error {
+		got = append(got, c)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].ID != s1 || got[1].ID != c1 {
+		t.Fatalf("commits = %v", got)
+	}
+	// s1's real parent is s2's base, c2, which changed nothing in a/: git rewrites it to c1.
+	if !slices.Equal(got[0].Parents, []string{c1}) || len(got[1].Parents) != 0 {
+		t.Errorf("parents = %v, %v", got[0].Parents, got[1].Parents)
+	}
+	if n, err := repo.CountCommits(ctx, LogOptions{Paths: []string{"a/"}}); err != nil || n != 2 {
+		t.Errorf("count = %d, %v", n, err)
+	}
+	// A file, too.
+	if n, _ := repo.CountCommits(ctx, LogOptions{Paths: []string{"b/w.txt"}}); n != 1 {
+		t.Errorf("count of one file = %d", n)
+	}
+	// Read literally: a glob character is just a character.
+	if n, _ := repo.CountCommits(ctx, LogOptions{Paths: []string{"a/*"}}); n != 0 {
+		t.Errorf("a glob was expanded: %d", n)
 	}
 }

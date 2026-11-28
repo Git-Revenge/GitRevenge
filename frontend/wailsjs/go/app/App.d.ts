@@ -79,6 +79,8 @@ export function ChooseFolder(arg1:string):Promise<string>;
 
 export function ChoosePatchFile():Promise<string>;
 
+export function ClearGraphFocus(arg1:string):Promise<void>;
+
 export function Clone(arg1:string,arg2:string,arg3:string,arg4:git.CloneOptions):Promise<string>;
 
 export function CloneAbandon(arg1:string):Promise<void>;
@@ -478,6 +480,8 @@ export function SetGitConfigText(arg1:string,arg2:string):Promise<app.ConfigDoc>
 export function SetGraphDensity(arg1:string):Promise<void>;
 
 export function SetGraphFocus(arg1:string,arg2:string,arg3:boolean):Promise<void>;
+
+export function SetGraphPath(arg1:string,arg2:string):Promise<void>;
 
 export function SetGraphView(arg1:string):Promise<void>;
 

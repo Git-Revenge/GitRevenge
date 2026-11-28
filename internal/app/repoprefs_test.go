@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/git-revenge/gitrevenge/internal/branchkind"
+	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
 func kindOf(p RepoPreferences, k branchkind.Kind) KindPatterns {
@@ -143,5 +144,54 @@ func TestMarkBranchKind(t *testing.T) {
 	}
 	if err := a.MarkBranchKind(repo, "x", "nightly"); err == nil {
 		t.Fatal("accepted an unknown kind")
+	}
+}
+
+// #1059: a path focus keeps any branch focus, a branch focus keeps any path, and clearing
+// ends both.
+func TestGraphPathFocus(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	fx.CommitFile("src/alerts/sms.js", "x\n", "sms")
+	fx.Branch("topic")
+	fx.Checkout("main")
+	path := openForMap(t, a, fx)
+
+	if err := a.SetGraphPath(path, `src\alerts\`); err != nil {
+		t.Fatal(err)
+	}
+	if f, _ := a.GraphFocus(path); f.Path != "src/alerts/" || f.Branch != "" {
+		t.Fatalf("focus = %+v", f)
+	}
+	if err := a.SetGraphFocus(path, "topic", false); err != nil {
+		t.Fatal(err)
+	}
+	if f, _ := a.GraphFocus(path); f.Path != "src/alerts/" || f.Branch != "topic" {
+		t.Fatalf("with a branch: %+v", f)
+	}
+	// Stopping the branch focus keeps the path.
+	if err := a.SetGraphFocus(path, "", false); err != nil {
+		t.Fatal(err)
+	}
+	if f, _ := a.GraphFocus(path); f.Path != "src/alerts/" || f.Branch != "" {
+		t.Fatalf("branch stopped: %+v", f)
+	}
+	if err := a.SetGraphPath(path, "src/alerts/sms.js"); err != nil {
+		t.Fatal(err)
+	}
+	if f, _ := a.GraphFocus(path); f.Path != "src/alerts/sms.js" {
+		t.Fatalf("a file: %+v", f)
+	}
+	if err := a.ClearGraphFocus(path); err != nil {
+		t.Fatal(err)
+	}
+	if f, _ := a.GraphFocus(path); f.Path != "" || f.Branch != "" {
+		t.Fatalf("cleared: %+v", f)
+	}
+	for _, bad := range []string{"../elsewhere", "src/../../x", "a//b"} {
+		if err := a.SetGraphPath(path, bad); err == nil {
+			t.Errorf("%q was taken", bad)
+		}
 	}
 }

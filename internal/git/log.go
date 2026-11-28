@@ -44,6 +44,10 @@ type LogOptions struct {
 	Remotes []string
 	// MaxCount limits the number of commits; 0 means no limit.
 	MaxCount int
+	// Paths, when set, keeps only the commits that changed something under them, as git log
+	// -- <path> does, each with its parents rewritten to its nearest such ancestors so the
+	// lanes still hold together (#1059). They're read literally: no glob is expanded.
+	Paths []string
 }
 
 // logFormat separates fields with US (0x1f). Records are NUL-terminated via -z, and none of
@@ -68,6 +72,10 @@ func (r *Repo) Log(ctx context.Context, opts LogOptions, fn func(LogCommit) erro
 	args := []string{"log", "--date-order", "-z", "--format=" + logFormat, "--no-show-signature"}
 	if opts.MaxCount > 0 {
 		args = append(args, "--max-count="+strconv.Itoa(opts.MaxCount))
+	}
+	if len(opts.Paths) > 0 {
+		// Without it, %P names a commit's real parents, which a path-limited history leaves out.
+		args = append(args, "--parents")
 	}
 	args = append(args, r.logRevs(ctx, opts)...)
 
@@ -149,7 +157,11 @@ func (r *Repo) logRevs(ctx context.Context, opts LogOptions) []string {
 	}
 	args = append(args, opts.Extra...)
 	// "--" stops revs from being read as paths.
-	return append(args, "--")
+	args = append(args, "--")
+	for _, p := range opts.Paths {
+		args = append(args, ":(literal)"+p)
+	}
+	return args
 }
 
 // tagTips returns the tags to start a log from besides branches and HEAD: only those HEAD
