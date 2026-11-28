@@ -241,7 +241,7 @@ Ways in:
 ![The timeline focused on src/alerts/: the chip in the bar, the commits that changed the folder, and main labelled, faded, where it last touched it](../img/path-focus-light.webp#gh-light-mode-only)
 ![The timeline focused on src/alerts/: the chip in the bar, the commits that changed the folder, and main labelled, faded, where it last touched it](../img/path-focus-dark.webp#gh-dark-mode-only)
 
-The bar above the graph says "Focused on `src/alerts/`", and the count says how many of the history's commits touched it: "290 of 1,481 commits". The working tree's row counts only what's changed under the path. With a branch focus as well, the chip says "Focused on feature/offline-cache, in `src/alerts/`", and the graph shows that branch's commits that touched the path. The chip's **×** ends both, and **Stop focusing** in the command palette does the same.
+The bar above the graph says "Focused on `src/alerts/`", and the count says how many of the history's commits touched it: "290 of 1,512 commits". In a narrower window the count moves into the search field, as it always does ("Search 290 commits"). The working tree's row counts only what's changed under the path. With a branch focus as well, the chip says "Focused on feature/offline-cache, in `src/alerts/`", and the graph shows that branch's commits that touched the path. The chip's **×** ends both, and **Stop focusing** in the command palette does the same.
 
 A branch whose tip changed nothing under the path would have no row of its own. Its label sits, faded, on the newest commit in its history that did, and says how far back that is: **main · 26 later**. Hover over it for "main's tip is 26 commits later; none of them touched src/alerts/". Its menu acts on the branch itself.
 

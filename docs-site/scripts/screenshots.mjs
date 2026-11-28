@@ -1898,8 +1898,12 @@ scenes.pathFocus = (page) =>
     await sleep(600)
     await p.keyboard.press('Enter')
     await p.waitForSelector('.focus-name')
-    // The labels and the whole history's count arrive beside the load.
-    await untilSettled(p, () => !document.body.innerText.includes('Loading history') && /\d of [\d,]+ commits/.test(document.querySelector('.graph-tools')?.innerText ?? document.body.innerText))
+    // The labels and the whole history's count arrive beside the load. At this width the count
+    // is in the search field (#1072).
+    await untilSettled(
+      p,
+      () => !document.body.innerText.includes('Loading history') && /commits/i.test(document.querySelector('.graph-tools .meta')?.textContent || document.querySelector('.graph-tools input')?.placeholder || ''),
+    )
     await sleep(1500)
     await p.evaluate(() => document.activeElement?.blur())
     await park(p)
