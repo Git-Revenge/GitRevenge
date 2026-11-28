@@ -107,6 +107,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Fixed
 
+- With a focus on, the bar above the graph cut the focus chip's name and the commit count ("Focused on src/a…", "290 OF 1,512 CO…") where it had room for everything but the chip. The bar's steps count the chip now: the count moves into the search field first, and once the search is an icon, the chip keeps only its own (#1072).
 - The diff view's **Hide formatting** switch drew a second knob that didn't move, grey at the left of the track. It's the app's own switch now, the same as Git Config's, so it shows one knob, and the knob moves. (#1032)
 - In the interactive rebase editor, two or more commits squashed in a row into the same commit lost the messages between the first and the last: each squash started from the kept commit's message rather than the message so far. Now each starts from the message so far, so the commit keeps them all, as git's own does. (#1020)
 - The conflict tool lost every place's original in a file where git had joined two conflicts a line or two apart into one, as git's default conflict style does: **Three-way** was off, and the file had no suggestions while the operation strip counted some. The tool now works from git's merge with the originals kept whenever the file on disk is still the same merge, so the places come apart again, each with its original. (#974)
