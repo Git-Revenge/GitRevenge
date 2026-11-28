@@ -115,6 +115,22 @@ func (h *historyRun) keeps() map[string]struct{} {
 	return maps.Clone(h.found)
 }
 
+// edge is where a running search's finished stretch ends: the oldest commit it has looked at
+// with everything newer looked at too. A reload under it needn't walk further (#995). ""
+// once it has stopped or ended, when a reload walks everything again, or before it has
+// finished a stretch.
+func (h *historyRun) edge() string {
+	if h == nil {
+		return ""
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if !h.running {
+		return ""
+	}
+	return h.after
+}
+
 func (h *historyRun) state() *HistoryState {
 	if h == nil {
 		return nil

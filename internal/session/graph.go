@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"sync"
@@ -205,7 +206,15 @@ type Filter struct {
 	Keep map[string]struct{}
 	// Sig tells one filter from another, so setting the same one again reloads nothing.
 	Sig string
+	// Until, when set, is the commit the walk ends at: a history search running under the
+	// filter (#995) has looked at nothing older yet, so a reload needn't walk past it to find
+	// nothing more. A load that ends there doesn't count the history it didn't reach. One that
+	// never meets the commit walks to the end, as without it.
+	Until string
 }
+
+// errUntil ends a load's walk at its filter's Until commit.
+var errUntil = errors.New("reached the filter's end")
 
 // SetFilter narrows the graph to what filter keeps, or with nil shows everything again, and
 // reloads it if that's a change.
@@ -695,6 +704,8 @@ func (l *graphLoader) reload() {
 		// Under a filter a kept commit is added once the next one is known, as its child:
 		// held is the one waiting.
 		var held *git.LogCommit
+		// reachedUntil says the walk has met the filter's Until commit, kept: it ends there.
+		reachedUntil := false
 		looked := 0
 		var times []int64
 		err := l.repo.Log(ctx, opts, func(c git.LogCommit) error {
@@ -721,12 +732,22 @@ func (l *graphLoader) reload() {
 					if err := ctx.Err(); err != nil {
 						return err
 					}
+					if filter.Until != "" && c.ID == filter.Until {
+						return errUntil
+					}
 					return nil
+				}
+				if filter.Until != "" && c.ID == filter.Until {
+					// Kept and the last to look at: it's the oldest, with nothing after it.
+					reachedUntil = true
 				}
 				kept := c
 				before := held
 				held = &kept
 				if before == nil {
+					if reachedUntil {
+						return errUntil
+					}
 					return nil // the newest kept commit: it waits for the one after it
 				}
 				before.Parents = []string{kept.ID}
@@ -749,8 +770,16 @@ func (l *graphLoader) reload() {
 					l.report(GraphProgress{Rows: n, Estimate: est})
 				}
 			}
-			return l.pauseIfAhead(ctx, g, n, awaitRefs, swapLocked)
+			if err := l.pauseIfAhead(ctx, g, n, awaitRefs, swapLocked); err != nil || !reachedUntil {
+				return err
+			}
+			return errUntil
 		})
+		// Ended at the filter's Until: what's shown is whole for the history it reached.
+		partial := errors.Is(err, errUntil)
+		if partial {
+			err = nil
+		}
 		// The last commit kept has nothing after it.
 		if err == nil && held != nil {
 			held.Parents = nil
@@ -758,7 +787,12 @@ func (l *graphLoader) reload() {
 		}
 		if filter != nil {
 			l.mu.Lock()
-			if ctx.Err() == nil && err == nil {
+			switch {
+			case ctx.Err() != nil || err != nil:
+			case partial:
+				// Not the whole history: counts and day totals wait for a load that is.
+				l.looked, l.times = 0, nil
+			default:
 				l.looked = looked
 				slices.Sort(times)
 				l.times = times

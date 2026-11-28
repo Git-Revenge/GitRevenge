@@ -109,3 +109,64 @@ func TestFilterStacksWithFocus(t *testing.T) {
 		}
 	}
 }
+
+// #995: a filter's Until ends a load's walk there, for a history search that has looked at
+// nothing older: what it shows is whole for what it reached, and it doesn't count the rest.
+func TestFilterUntilEndsTheWalk(t *testing.T) {
+	m, _ := newManager(t)
+	fx := gittest.New(t)
+	ids := fx.Linear(8) // ids[7] is the newest
+	r, err := m.Open(context.Background(), fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitGraph(t, r, 8)
+	keep := map[string]struct{}{ids[6]: {}, ids[4]: {}, ids[1]: {}}
+	rowsOf := func() []string {
+		g, _ := r.Graph()
+		var out []string
+		for _, row := range g.Rows(0, g.Len()) {
+			out = append(out, row.ID)
+		}
+		return out
+	}
+
+	// Ending at a commit the filter passes over: the kept ones newer than it.
+	r.SetFilter(&Filter{Keep: keep, Sig: "to 3", Until: ids[3]})
+	waitGraph(t, r, 2)
+	if got := rowsOf(); got[0] != ids[6] || got[1] != ids[4] {
+		t.Fatalf("rows = %v", got)
+	}
+	g, _ := r.Graph()
+	if rows := g.Rows(0, 2); rows[1].Parents != 0 {
+		t.Errorf("the last row shown has %d parents, want none", rows[1].Parents)
+	}
+	// Not the whole history: it isn't counted as looked through, nor are its days.
+	if on, looked, _ := r.Filtered(); !on || looked != 0 {
+		t.Errorf("filtered = %v, looked %d, want nothing counted", on, looked)
+	}
+	if _, ok := r.Authored([][2]int64{{0, 1 << 62}}); ok {
+		t.Error("a walk that ended early counts its days")
+	}
+
+	// Ending at a kept commit: it's shown, the last.
+	r.SetFilter(&Filter{Keep: keep, Sig: "to 4", Until: ids[4]})
+	waitGraph(t, r, 2)
+	if got := rowsOf(); got[1] != ids[4] {
+		t.Fatalf("rows = %v", got)
+	}
+
+	// A commit the walk never meets: the whole history, as without it.
+	r.SetFilter(&Filter{Keep: keep, Sig: "nowhere", Until: "0000000000000000000000000000000000000000"})
+	waitGraph(t, r, 3)
+	if on, looked, total := r.Filtered(); !on || looked != 8 || total != 8 {
+		t.Errorf("filtered = %v, looked %d of %d, want all 8", on, looked, total)
+	}
+
+	// Without it, the whole history.
+	r.SetFilter(&Filter{Keep: keep, Sig: "all"})
+	waitGraph(t, r, 3)
+	if got := rowsOf(); got[2] != ids[1] {
+		t.Fatalf("rows = %v", got)
+	}
+}

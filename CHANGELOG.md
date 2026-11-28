@@ -94,6 +94,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Changed
 
+- **The history search on a big history:** under **Only these**, the graph now follows the search, a reload behind, instead of waiting for it to end. While the search runs, a reload stops where the search has got to, since nothing older has been searched. On the Linux kernel it showed 439 of 566 commits found at 70 seconds, where before it showed none at 90. The search itself goes about a quarter slower while it runs, for the reloads beside it. (#995)
 - In a partial clone, a version of a file that was never downloaded no longer shows as missing from its commit: the diff says it hasn't been downloaded, and downloads it. (#1003)
 - **Git Revenge now needs git 2.50 or newer** (it needed 2.40), for partial clones: 2.44 is the first git that can be told not to download, and 2.49 the first that can download what a partial clone is missing in batches. RHEL 9 and 10 already ship git 2.52. On Ubuntu 24.04, whose git is 2.43, add the Git maintainers' PPA (`sudo add-apt-repository ppa:git-core/ppa`) before upgrading. Debian 13's git is 2.47 and no newer one is packaged for it, so Debian is supported again from its next release. On Windows and macOS, install a newer git from git-scm.com, winget or Homebrew. The Linux packages and the winget package ask for git 2.50. (#1001)
 - Diffs are worked out by the app's Go side rather than in the window, and kept for the files you go back to, so a large file's diff no longer holds up the view while it's compared. (#944)

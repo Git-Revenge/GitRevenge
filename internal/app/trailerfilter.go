@@ -276,15 +276,20 @@ func (a *App) applyFilter(r *session.Repo, graph bool) TrailerFilterState {
 	a.trailerFilters.setHighlighted(f, nil)
 	// The same picks keep more once more of the history has been read, or a commit made,
 	// and a history search more as it goes.
+	// While a history search runs, a reload stops where the search has got to: nothing older
+	// has been searched, so the walk would find nothing more there (#995). Its end moves on as
+	// the search does, and once the search stops or ends a reload walks everything.
 	var searched any
+	until := ""
 	if f.history != nil {
-		searched = []any{f.history.opts, f.history.generation()}
+		until = f.history.edge()
+		searched = []any{f.history.opts, f.history.generation(), until}
 	}
 	if !graph {
 		return state
 	}
 	sig, _ := json.Marshal([]any{f.picks, reading.Gen(), len(keep), searched})
-	r.SetFilter(&session.Filter{Keep: keep, Sig: string(sig)})
+	r.SetFilter(&session.Filter{Keep: keep, Sig: string(sig), Until: until})
 	return state
 }
 
