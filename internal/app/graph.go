@@ -74,10 +74,16 @@ func (a *App) GraphRows(path string, start, count int) (GraphPage, error) {
 		}
 	}
 	idx := r.Refs()
+	// Under a path focus, a branch whose tip changed nothing there is labelled where its
+	// history last did, after the labels of the refs that are at that commit (#1061).
+	moved := r.PathLabels()
 	refs := map[string][]git.Ref{}
 	for _, row := range rows {
 		if rs := idx.ByCommit[row.ID]; len(rs) > 0 {
 			refs[row.ID] = rs
+		}
+		if ms := moved[row.ID]; len(ms) > 0 {
+			refs[row.ID] = append(slices.Clone(refs[row.ID]), ms...)
 		}
 	}
 	ids := make([]string, len(rows))

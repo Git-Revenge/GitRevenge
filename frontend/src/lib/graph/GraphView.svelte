@@ -2783,7 +2783,7 @@
         }}
       >
         {#each pinned.labels.slice(0, EXPANDED_REFS) as l (l.ref.name)}
-          <button class="label-button" aria-haspopup="menu" aria-label="Menu for {l.text}" onclick={(e) => labelMenu(at, l, e.currentTarget)}><RefChip label={l} lane={pinned.lane} /></button>
+          <button class="label-button" aria-haspopup="menu" aria-label="Menu for {l.text}" onclick={(e) => labelMenu(at, l, e.currentTarget)}><RefChip label={l} lane={pinned.lane} {focusPath} /></button>
         {/each}
         {#if pinned.labels.length > EXPANDED_REFS}
           <span class="more">and {pinned.labels.length - EXPANDED_REFS} more</span>
@@ -2814,7 +2814,7 @@
     {#each expanded && expanded.index !== pinned?.index ? [expanded] : [] as open (open.index)}
       <div class="ref-expand" aria-hidden="true" style:left="{open.left}px" style:top="{open.top}px" in:labelsUnfold out:labelsFold>
         {#each open.labels.slice(0, EXPANDED_REFS) as l (l.ref.name)}
-          <RefChip label={l} lane={open.lane} />
+          <RefChip label={l} lane={open.lane} {focusPath} />
         {/each}
         {#if open.labels.length > EXPANDED_REFS}
           <span class="more">and {open.labels.length - EXPANDED_REFS} more</span>

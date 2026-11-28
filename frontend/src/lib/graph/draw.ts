@@ -1511,6 +1511,24 @@ export function mainRemote(refs: Ref[]): string {
  * namesake on the main remote. The main remote's prefix gives way to the remote icon, and a
  * branch on just one other remote keeps its prefix, so `fork/x` stays apart from `x`. */
 export function refLabels(refs: Ref[], main = 'origin'): RefLabel[] {
+  // A branch labelled where its history last touched the focused path (#1061) comes after the
+  // refs that are really on the commit, and says how far back its tip is.
+  const moved = refs.filter((r) => r.later)
+  if (moved.length === 0) return labelsOf(refs, main)
+  return [...labelsOf(refs.filter((r) => !r.later), main), ...labelsOf(moved, main).map((l) => ({ ...l, text: `${l.text} · ${l.ref.later} later` }))]
+}
+
+/** A label's tooltip when its branch's tip is later than the commit it's on (#1061): "main's
+ * tip is 26 commits later; none of them touched src/alerts/". */
+export function laterSaid(label: RefLabel, path: string): string {
+  const n = label.ref.later ?? 0
+  if (!n) return ''
+  const name = label.text.slice(0, label.text.lastIndexOf(' · '))
+  const where = path || 'the focused folder or file'
+  return n === 1 ? `${name}'s tip is 1 commit later, which didn't touch ${where}` : `${name}'s tip is ${n.toLocaleString()} commits later; none of them touched ${where}`
+}
+
+function labelsOf(refs: Ref[], main: string): RefLabel[] {
   const sorted = sortRefs(refs)
   const branchOf = (r: Pick<Ref, 'short'>) => r.short.slice(remoteOf(r).length + 1)
   const isHeadRef = (r: Ref) => branchOf(r) === 'HEAD'
@@ -1550,6 +1568,9 @@ export function refLabels(refs: Ref[], main = 'origin'): RefLabel[] {
 function labelChrome(ctx: Pick<CanvasRenderingContext2D, 'measureText'>, r: Ref, remotes: number): number {
   return 14 + (labelKind(r) ? KIND_ICON_W : 0) + (r.stackDepth ? KIND_ICON_W : 0) + remoteMarkWidth(ctx, remotes)
 }
+
+/** How strongly a label is drawn whose branch's tip is later than its commit (#1061). */
+const LATER_ALPHA = 0.55
 
 /** The gap between a label and what follows it. */
 const LABEL_GAP = 5
@@ -1601,7 +1622,10 @@ function drawLabels(
     more = `+${labels.length}`
   } else {
     const w = ctx.measureText(name).width + chrome
+    // A branch whose tip is later than this commit is faded: it isn't really here (#1061).
+    if (r.later) ctx.globalAlpha = LATER_ALPHA
     drawLabel(ctx, name, x, mid, w, h, r, color, theme, remotes)
+    ctx.globalAlpha = 1
     x += w + LABEL_GAP
   }
   if (more) {

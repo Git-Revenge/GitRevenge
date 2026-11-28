@@ -109,6 +109,8 @@ export interface RefOptions {
   worktree?: string
   subject?: string
   commit?: string
+  /** Labelled where its history last touched the focused path, its tip this many commits on (#1061). */
+  later?: number
 }
 
 export function branch(short: string, options: RefOptions = {}) {

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { calls, open } from './support'
+import { branch, calls, open } from './support'
 
 // A timeline focused on a folder or file: the working tree row counts only what's changed
 // under it (#1059), and the chip and the ways in (#1060). The backend is stubbed.
@@ -139,5 +139,29 @@ test.describe('the ways in', () => {
     await expect(dialog).toContainText('No folder or file at the checked-out commit is called that.')
     await dialog.getByRole('button', { name: 'Focus', exact: true }).click()
     await expect(dialog.getByRole('alert')).toContainText('isn’t a folder or file inside the repository')
+  })
+})
+
+// #1061: a branch whose tip changed nothing under the path is labelled, faded, where its
+// history last did.
+test.describe('a branch labelled where it last touched the path', () => {
+  const id = '0'.repeat(40)
+  const graphRefs = { [id]: [branch('fix/gusts'), branch('main', { later: 26, branchKind: 'trunk' })] }
+  const focus = { branch: '', stack: false, path: 'src/alerts/' }
+
+  test('is faded, after the refs really there, and its tooltip says how far back its tip is', async ({ page }) => {
+    await open(page, 'graph', { graphRows: 5, graphRefs, responses: { Refs: graphRefs[id], CommitSignatures: [], GraphFocus: focus, GraphOutOf: 1410 } })
+    await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '5')
+    await page.waitForTimeout(150)
+    const box = (await page.locator('.scroller').boundingBox())!
+    await page.mouse.move(box.x + 30, box.y + 26 + 26)
+    const list = page.locator('.ref-expand')
+    await expect(list.locator('.chip')).toHaveCount(2)
+    const later = list.locator('.chip').nth(1)
+    await expect(later.locator('.name')).toHaveText('main · 26 later')
+    await expect(later).toHaveClass(/later/)
+    await expect(later).toHaveAttribute('title', "main's tip is 26 commits later; none of them touched src/alerts/")
+    await expect(list.locator('.chip').first()).not.toHaveClass(/later/)
+    await expect(list.locator('.chip').first()).not.toHaveAttribute('title', /.*/)
   })
 })

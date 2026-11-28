@@ -314,3 +314,26 @@ func TestLogUnderAPath(t *testing.T) {
 		t.Errorf("a glob was expanded: %d", n)
 	}
 }
+
+// #1061: where a branch's history last touched a path, and how far its tip is past it.
+func TestLastTouched(t *testing.T) {
+	t.Parallel()
+	fx := gittest.New(t)
+	a1 := fx.CommitFile("a/x.txt", "x\n", "a1")
+	fx.CommitFile("b/y.txt", "y\n", "b1")
+	tip := fx.CommitFile("b/z.txt", "z\n", "b2")
+	repo := OpenRepo(newTestRunner(t), fx.Dir)
+	ctx := context.Background()
+
+	if id, later, err := repo.LastTouched(ctx, tip, "a/"); err != nil || id != a1 || later != 2 {
+		t.Errorf("a/: %s, %d, %v", id, later, err)
+	}
+	// The tip touched it itself.
+	if id, later, _ := repo.LastTouched(ctx, tip, "b/"); id != tip || later != 0 {
+		t.Errorf("b/: %s, %d", id, later)
+	}
+	// Nothing in the history did.
+	if id, later, _ := repo.LastTouched(ctx, tip, "c/"); id != "" || later != 0 {
+		t.Errorf("c/: %s, %d", id, later)
+	}
+}
