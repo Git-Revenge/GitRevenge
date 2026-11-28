@@ -41,7 +41,7 @@
   import WorkingTreePanel from './WorkingTreePanel.svelte'
   import { bisect, marksOf } from './bisect.svelte'
   import { rebaseMarks } from './operation'
-  import { SHARED_STEPS, squeezeFor } from './barSqueeze'
+  import { SHARED_STEPS, squeezeWithChip } from './barSqueeze'
   import { operations } from './operation.svelte'
   import { Integrate } from '../../wailsjs/go/app/App.js'
 
@@ -82,7 +82,9 @@
   let noteAsk = $state(0)
   /** The bar stays on one line: as it narrows, its parts give way in steps. */
   let barWidth = $state(0)
-  let barSqueeze = $derived(squeezeFor(barWidth, SHARED_STEPS))
+  /** How wide the graph's focus chip is, 0 with no focus: the bar's steps leave it out (#1072). */
+  let chipWidth = $state(0)
+  let barSqueeze = $derived(squeezeWithChip(barWidth, SHARED_STEPS, chipWidth))
   /** Where the graph puts its header tools: in the bar, beside the repository's actions. */
   let toolsHost = $state<HTMLElement>()
   let selected = $state<Row | undefined>()
@@ -669,7 +671,7 @@
       <ShallowBand {path} since={shallowSince} />
     {/snippet}
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} onFocusPath={(p: string) => (focusPath = p)} tail={shallowSince ? shallowTail : undefined} historySince={shallowSince} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filterOn} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFindInFiles={(text) => findAsk.show(path, text)} onHistorySearch={(text) => setHistory(inFocus(historyOptions(text), focusPath))} onFileHistory={(file: string) => (diff = { mode: 'history', file })} history={historyOn} onFilterDrop={dropLastFilter} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onSelection={(s) => (several = s)} onSelectionMenu={(x, y) => openMenu(selectionMenu(several?.count ?? 0, several?.info ?? null, ctx, squashState), x, y)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} onFocusPath={(p: string) => (focusPath = p)} onChipWidth={(w: number) => (chipWidth = w)} tail={shallowSince ? shallowTail : undefined} historySince={shallowSince} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filterOn} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFindInFiles={(text) => findAsk.show(path, text)} onHistorySearch={(text) => setHistory(inFocus(historyOptions(text), focusPath))} onFileHistory={(file: string) => (diff = { mode: 'history', file })} history={historyOn} onFilterDrop={dropLastFilter} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onSelection={(s) => (several = s)} onSelectionMenu={(x, y) => openMenu(selectionMenu(several?.count ?? 0, several?.info ?? null, ctx, squashState), x, y)} onContext={(row, refs, x, y) =>
           void whileBusy(loadRefExtras(path, refs)).then((e) => openMenu(commitMenuItems(row, refs, ctx, e), x, y))}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)

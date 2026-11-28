@@ -25,6 +25,30 @@ export function squeezeFor(width: number, steps: number[]): number {
   return steps.filter((s) => width < s).length
 }
 
+/** The focus chip's width, in px, once the search is an icon and the chip's name has gone with
+ * it: the focus icon and ×. Measured with the app's fonts. */
+export const FOCUS_ICON_W = 56
+
+/** The most a focus chip's name takes before it's cut, as the chip's style has it. */
+export const FOCUS_NAME_MAX = 260
+
+/** The chip's whole width with a name that takes nameW px: the icon, the name and × (#1072). */
+export const focusChipWidth = (nameW: number) => FOCUS_ICON_W + 5 + Math.min(FOCUS_NAME_MAX, Math.ceil(nameW))
+
+/**
+ * How many steps a bar this wide has taken with the focus chip on it (#1072), which the steps'
+ * widths leave out. chip is the chip's whole width, 0 with no focus. The chip loses its name
+ * once the search is an icon, so from that step on it only takes FOCUS_ICON_W, and the steps
+ * are worked out again with that: never fewer than the search's step, so the chip's size never
+ * decides the step that decides its size.
+ */
+export function squeezeWithChip(width: number, steps: number[], chip: number): number {
+  if (width <= 0 || chip <= 0) return squeezeFor(width, steps)
+  const full = squeezeFor(Math.max(1, width - chip), steps)
+  if (full < SQUEEZE.search) return full
+  return Math.max(Math.min(SQUEEZE.search, steps.length), squeezeFor(Math.max(1, width - FOCUS_ICON_W), steps))
+}
+
 /** What the search field says when empty: what it searches, or, once the count has left the bar,
  * how many commits that is. */
 export function searchPlaceholder(level: number, commits: number, more: boolean, since = ''): string {

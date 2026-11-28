@@ -3,7 +3,7 @@
   import { foldDay, foldedAway, foldLabel, type Fold } from './folds'
   import { errorText } from '../errors'
   import { onMount, tick, untrack, type Snippet } from 'svelte'
-  import { ALONE_STEPS, searchPlaceholder, SQUEEZE, squeezeFor } from '../barSqueeze'
+  import { ALONE_STEPS, focusChipWidth, searchPlaceholder, SQUEEZE, squeezeWithChip } from '../barSqueeze'
   import { ArrivedCommits, CommitNotes, CommitRow, CommitRows, SelectedCommits, CommitSignatures, FindCount, ClearGraphFocus, GraphFocus, GraphOutOf, GraphRenamedFrom, HeadCommit, HistoryChanges, OwnMoveAge, GraphRows, NotedCommits, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView, TrailerFilterDays, TrailerSuggest } from '../../../wailsjs/go/app/App.js'
   import { findSummary } from '../find/find'
   import { changeMark, type ChangeMark, type HistoryChange, type HistoryOptions } from '../filters/history'
@@ -63,6 +63,7 @@
     wip,
     onFocusPath,
     onFileHistory,
+    onChipWidth,
     toolsHost,
     squeeze,
     bisect = null,
@@ -96,6 +97,9 @@
     /** Opens a file's own history, which follows renames: offered when the file the graph is
      * focused on was renamed at its oldest commit here (#1062). */
     onFileHistory?: (file: string) => void
+    /** Told how wide the focus chip is with its name, 0 with no focus, for a caller whose bar
+     * gives way in steps (#1072): the steps' widths leave the chip out. */
+    onChipWidth?: (px: number) => void
     /** Right-click on a row, with the refs pointing at it and the mouse position. */
     onContext?: (row: Row, refs: Ref[], x: number, y: number) => void
     /** A row dragged onto another row. */
@@ -545,7 +549,12 @@
   let viewH = $state(0)
   /** The graph's own width, for squeezing its own bar when no caller says how far. */
   let ownWidth = $state(0)
-  let level = $derived(squeeze ?? squeezeFor(ownWidth, ALONE_STEPS))
+  /** The focus chip's name as it would be with room, measured from a copy out of sight: the
+   * chip itself loses its name in a squeezed bar, which would change the measure (#1072). */
+  let chipNameW = $state(0)
+  let chipW = $derived(chipShown && chipNameW ? focusChipWidth(chipNameW) : 0)
+  $effect(() => onChipWidth?.(chipW))
+  let level = $derived(squeeze ?? squeezeWithChip(ownWidth, ALONE_STEPS, chipW))
   /** Whether the search field is showing while the bar only has room for its icon. */
   let searchOpen = $state(false)
   let searchIconOnly = $derived(level >= SQUEEZE.search)
@@ -2424,6 +2433,10 @@
           >{/if}
         <button class="btn sm quiet icon" onclick={stopFocusing} aria-label="Stop focusing" title={focusPath ? 'Stop focusing, and show the whole history again' : 'Stop focusing, and show every branch again'}><Icon name="close" size={13} /></button>
       </span>
+      <!-- The name again, out of sight and with room, so the bar knows what the chip needs. -->
+      <span class="focus-measure" aria-hidden="true" bind:clientWidth={chipNameW}
+        >Focused on {focus ? focusLabel : ''}{focus && focusPath ? ', in ' : ''}{#if focusPath}<code>{focusPath}</code>{/if}</span
+      >
     {/if}
     {#if searchIconOnly && !searchOpen && !query.trim() && !mapView}
       <button class="btn sm quiet icon search-open" aria-label="Search commits" title="Search commits" aria-expanded="false" onclick={focusSearch}><Icon name="search" size={14} /></button>
@@ -3040,6 +3053,23 @@
     max-width: 260px;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* The chip's name with room, measured and never seen: as the chip sets it, but uncut. */
+  .focus-measure {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: inline-block;
+    visibility: hidden;
+    pointer-events: none;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .focus-measure code {
+    font-family: var(--font-mono);
+    font-size: 12px;
   }
 
   /* Under the bar, as the smart filter's strip is: the whole width, wrapping on a narrow one. */
