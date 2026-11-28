@@ -75,6 +75,27 @@ func (a *App) BlameTrack(path, file, rev string) (BlameTrack, error) {
 	return track, nil
 }
 
+// BlameStep blames file at one of the track's versions (#1079): every line, or with ranges
+// only those, which the view asks for when it works out the rest from a version next to it.
+// Asking for another step stops this one, which then answers with nothing; the view's own
+// blame goes on. It downloads nothing: in a partial clone, a version it lacks is an error.
+func (a *App) BlameStep(path, file, commit string, ranges []git.BlameRange) ([]git.BlameLine, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return nil, err
+	}
+	if commit == "" {
+		return nil, userError("Which version to blame?")
+	}
+	ctx, done := a.latest.start("blame-step", r.Path)
+	defer done()
+	lines, err := r.Git.BlameRanges(ctx, file, commit, ranges)
+	if errors.Is(err, context.Canceled) {
+		return []git.BlameLine{}, nil
+	}
+	return lines, err
+}
+
 // Blame attributes each line of file at rev ("" for the work tree) to a commit. Asking for
 // another blame stops this one, which then answers with nothing. In a partial clone it
 // downloads nothing: BlameNeeds says what it would need, and the view asks before

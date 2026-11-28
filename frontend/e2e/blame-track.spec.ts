@@ -106,3 +106,42 @@ test('a file with one version has no track', async ({ page }) => {
   await expect(code(page)).toHaveText(['one', 'two', 'three'])
   await expect(track(page)).toHaveCount(0)
 })
+
+// #1079: who wrote each line at an older version, read once the handle settles, and worked
+// out from a version next to it when that one's blame is known.
+test.describe('who wrote each line, at any version', () => {
+  const who = (page: Page) => page.locator('.body td.gutter .sha')
+  const cStep = step('one\ntwo\nthree\n', [{ oldStart: 2, oldEnd: 2, newStart: 2, newEnd: 3 }])
+
+  test('a step back from the newest is worked out from it, with no blame at all', async ({ page }) => {
+    await open(page, 'blame', scenario({}, { [C]: cStep }))
+    await expect(code(page)).toHaveCount(3)
+    await track(page).getByRole('button', { name: 'The version before' }).click()
+    await expect(who(page)).toHaveText(['aaaaaaa', 'bbbbbbb'])
+    expect(await calls(page, 'BlameStep')).toEqual([])
+  })
+
+  test('a step back over a changed line blames only that line', async ({ page }) => {
+    // The newest version changed two to TWO, and added three.
+    const s = scenario({}, { [C]: step('one\nTWO\nthree\n', [{ oldStart: 1, oldEnd: 2, newStart: 1, newEnd: 3 }]) })
+    await open(page, 'blame', { ...s, responses: { ...s.responses, Blame: [blame(A, 'one'), blame(C, 'TWO'), blame(C, 'three')], BlameStep: [blame(B, 'two')] } })
+    await expect(code(page)).toHaveCount(3)
+    await track(page).getByRole('button', { name: 'The version before' }).click()
+    await expect(who(page)).toHaveText(['aaaaaaa', 'bbbbbbb'])
+    expect(await calls(page, 'BlameStep')).toEqual([['/r', 'a.txt', B, [{ from: 2, to: 2 }]]])
+  })
+
+  test('a version with no neighbour read is blamed whole once the handle rests, and the next step forward from it needs nothing', async ({ page }) => {
+    const s = scenario({}, { [C]: cStep })
+    await open(page, 'blame', { ...s, responses: { ...s.responses, BlameStep: [blame(A, 'one')] } })
+    await expect(code(page)).toHaveCount(3)
+    await slider(page).focus()
+    await page.keyboard.press('Home')
+    await expect(who(page)).toHaveText(['aaaaaaa'])
+    expect(await calls(page, 'BlameStep')).toEqual([['/r', 'a.txt', A, []]])
+    await page.keyboard.press('ArrowRight')
+    await expect(track(page)).toContainText('Version 2 of 3')
+    await expect(who(page)).toHaveText(['aaaaaaa', 'bbbbbbb'])
+    expect(await calls(page, 'BlameStep')).toHaveLength(1)
+  })
+})
