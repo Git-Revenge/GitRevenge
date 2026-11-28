@@ -1,5 +1,5 @@
 // Package branchkind classifies branches into the built-in kinds (Trunk, Release,
-// Environment, Docs, Bot, Feature) and decides which are hidden, by glob patterns kept per
+// Environment, Docs, Bot, Feature, Bug) and decides which are hidden, by glob patterns kept per
 // repository in local settings (ADR 0009).
 package branchkind
 
@@ -13,7 +13,8 @@ import (
 // Kind is a branch's kind. The zero value is an ordinary branch.
 type Kind string
 
-// The built-in kinds, in the order they are tried: the first whose patterns match wins.
+// The built-in kinds, in the order they are tried: the first whose patterns match wins. Bug
+// is a branch named for a fix (#975): a working branch, as Feature is.
 const (
 	None        Kind = ""
 	Trunk       Kind = "trunk"
@@ -22,13 +23,15 @@ const (
 	Docs        Kind = "docs"
 	Bot         Kind = "bot"
 	Feature     Kind = "feature"
+	Bug         Kind = "bug"
 )
 
 // Order lists the kinds in matching order.
-var Order = []Kind{Trunk, Release, Environment, Docs, Bot, Feature}
+var Order = []Kind{Trunk, Release, Environment, Docs, Bot, Feature, Bug}
 
 // Defaults are the patterns each kind uses until a repository overrides them. Environment
-// has none: staging and production are too often ordinary branches.
+// has none: staging and production are too often ordinary branches. hotfix/* is Release
+// rather than Bug: a hotfix branch is cut for a release.
 var Defaults = map[Kind][]string{
 	Trunk:       {"main", "master", "develop", "trunk"},
 	Release:     {"release/*", "releases/*", "hotfix/*"},
@@ -36,6 +39,7 @@ var Defaults = map[Kind][]string{
 	Docs:        {"gh-pages", "gh-docs", "docs-site"},
 	Bot:         {"dependabot/*", "renovate/*"},
 	Feature:     {"feature/*", "features/*", "feat/*"},
+	Bug:         {"bug/*", "bugs/*", "bugfix/*", "bugfixes/*", "fix/*", "fixes/*"},
 }
 
 // Valid reports whether k is one of the built-in kinds.

@@ -1275,13 +1275,13 @@ export function drawRow(
     disc(ctx, x, mid, r - 4, color)
   } else if (tall) {
     // A commit that starts a run: the author's initials in a lane-coloured ring; on a
-    // Release, Environment, Docs or Bot lane, the kind's icon instead. Trunk and Feature keep
-    // the initials, because who did the work matters on those lanes.
+    // Release, Environment, Docs or Bot lane, the kind's icon instead. Trunk, Feature and Bug
+    // keep the initials, because who did the work matters on those lanes.
     cut(13.5)
     disc(ctx, x, mid, 12, color)
     cut(10.25)
     disc(ctx, x, mid, 9.5, theme.deep)
-    const kind = row.kind && row.kind !== 'trunk' && row.kind !== 'feature' ? kindInfo(row.kind) : undefined
+    const kind = row.kind && row.kind !== 'trunk' && row.kind !== 'feature' && row.kind !== 'bug' ? kindInfo(row.kind) : undefined
     const icon = kind ? iconPath(kind.icon) : undefined
     if (icon) {
       ctx.save()

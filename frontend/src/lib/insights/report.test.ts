@@ -45,7 +45,7 @@ describe('inputs', () => {
       windows: [{ ...inputs.windows[0], kinds: { trunk: ['main'], bot: ['dependabot/*'] }, botAuthors: ['*[bot]', 'Release Bot', '*@bots.example.com'] }],
     }
     const lines = Object.fromEntries(inputLines(withBots))
-    expect(lines['Branch kinds']).toBe('trunk main; release (none); environment (none); docs (none); bot dependabot/*; feature (none)')
+    expect(lines['Branch kinds']).toBe('trunk main; release (none); environment (none); docs (none); bot dependabot/*; feature (none); bug (none)')
     expect(lines['Bot authors']).toBe('*[bot]; Release Bot; *@bots.example.com')
   })
 })

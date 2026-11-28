@@ -25,7 +25,7 @@ With a repository's tab active, a **This repository** section adds settings that
 
 | Setting | What it does |
 |---|---|
-| **Trunk, Release, Environment, Docs, Feature, Bot** | The patterns that decide each [branch kind](branch-care.md#branch-kinds). **Use defaults** puts one back. |
+| **Trunk, Release, Environment, Docs, Bot, Feature, Bug** | The patterns that decide each [branch kind](branch-care.md#branch-kinds). **Use defaults** puts one back. |
 | **Clean up merged branches after each pull** | Deletes local branches whose upstream was deleted and that have nothing unpushed. [More](branch-care.md#cleaning-up-merged-branches). |
 | **Sync notes on fetch, pull and push** | Shares git notes with the remote. [More](branch-care.md#syncing-notes). |
 | **Hidden branches** | Patterns of branches to leave out of the sidebar and graph. [More](branch-care.md#hiding-branches). |

@@ -1,7 +1,7 @@
 import type { IconName } from './ui/icons'
 
 /** A branch's kind (ADR 0009); '' is an ordinary branch. */
-export type BranchKind = '' | 'trunk' | 'release' | 'environment' | 'docs' | 'bot' | 'feature'
+export type BranchKind = '' | 'trunk' | 'release' | 'environment' | 'docs' | 'bot' | 'feature' | 'bug'
 
 export interface KindInfo {
   label: string
@@ -17,6 +17,9 @@ export const KINDS: Record<Exclude<BranchKind, ''>, KindInfo> = {
   docs: { label: 'Docs', icon: 'book', token: '--accent-a' },
   bot: { label: 'Bot', icon: 'bot', token: '--ink-faint' },
   feature: { label: 'Feature', icon: 'sprout', token: '--success' },
+  // #975: sepia, apart from Trunk's rose, Release's plum, Environment's ochre, Docs' teal and
+  // Feature's green.
+  bug: { label: 'Bug', icon: 'bug', token: '--accent-c' },
 }
 
 /** The kind's info, or undefined for an ordinary branch (or an unknown kind). */

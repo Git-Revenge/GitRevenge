@@ -6,7 +6,7 @@ Everything here is set per repository and kept in its git config (`.git/config`)
 
 ## Branch kinds
 
-Some branches aren't like the others. Git Revenge knows six **kinds**, and treats each one in its own way:
+Some branches aren't like the others. Git Revenge knows seven **kinds**, and treats each one in its own way:
 
 | Kind | Default patterns | What changes |
 |---|---|---|
@@ -14,8 +14,9 @@ Some branches aren't like the others. Git Revenge knows six **kinds**, and treat
 | **Release** | `release/*`, `releases/*`, `hotfix/*` | Marks its folder in the sidebar, newest version first. Can bound an Insights releases window. |
 | **Environment** | none | For deploy branches such as `staging` or `production`. Asks before a force push or delete. |
 | **Docs** | `gh-pages`, `gh-docs`, `docs-site` | Drawn muted in the graph. Left out of Insights. |
-| **Feature** | `feature/*`, `features/*`, `feat/*` | Marks its folder in the sidebar with a sprout. Otherwise it's an ordinary working branch: no extra confirmations, and it stays in Insights. |
 | **Bot** | `dependabot/*`, `renovate/*` | Marks its folder in the sidebar, which starts closed. Grouped as dependency updates in Insights. |
+| **Feature** | `feature/*`, `features/*`, `feat/*` | Marks its folder in the sidebar with a sprout. Otherwise it's an ordinary working branch: no extra confirmations, and it stays in Insights. |
+| **Bug** | `bug/*`, `bugs/*`, `bugfix/*`, `bugfixes/*`, `fix/*`, `fixes/*` | A branch named for a fix. Marks its folder in the sidebar with a bug, and otherwise works as Feature does. `hotfix/*` stays a Release pattern, since a hotfix is cut for a release; move it with the patterns if you think of it as a fix. |
 
 A pattern matches the branch name without its remote, so `release/*` covers `release/1.4` and `origin/release/1.4` alike. A `*` matches anything, slashes included, so `dependabot/*` catches `dependabot/npm_and_yarn/vite-7.1`. The first kind that matches wins, in the order of the table.
 
@@ -26,11 +27,11 @@ A pattern matches the branch name without its remote, so `release/*` covers `rel
 
 ### How kinds look
 
-- **Graph chips** take the kind's colour and icon: Trunk in rose and bold, Release in plum, Environment in ochre, Docs as a teal outline, Feature in green, Bot in faint text.
+- **Graph chips** take the kind's colour and icon: Trunk in rose and bold, Release in plum, Environment in ochre, Docs as a teal outline, Feature in green, Bug in sepia, Bot in faint text.
 - **The timeline** shows the kind's icon in a commit's circle, instead of the author's initials, for commits on Release, Environment, Docs and Bot lines.
-- **Docs lines** are drawn faded, with their commit messages muted, since a published site isn't code. A line that also has an ordinary or Feature branch at its tip isn't faded.
+- **Docs lines** are drawn faded, with their commit messages muted, since a published site isn't code. A line that also has an ordinary, Feature or Bug branch at its tip isn't faded.
 - **Bot and Docs lines** fold in the timeline: each line's commits of a day take [one line](graph.md#folded-lanes), such as "11 Docs commits".
-- **When branches of different kinds point at one commit**, each keeps its own label, and the commit's line takes the kind that comes first in the order Trunk, Release, Environment, Docs, Bot, Feature.
+- **When branches of different kinds point at one commit**, each keeps its own label, and the commit's line takes the kind that comes first in the order Trunk, Release, Environment, Docs, Bot, Feature, Bug.
 - **The sidebar** keeps your local branches in one tree in the **Branches** panel, with the checked-out branch first, or the folder holding it, and Trunk next. A kind's icon marks a folder when every branch in it shares that kind, and otherwise marks each branch. Remote branches do the same in the **Remotes** panel.
 
 The design behind kinds is [ADR 0009](../adr/0009-branch-kinds.md).

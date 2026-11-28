@@ -1,6 +1,6 @@
 # 0009 — Branch kinds are built in, matched by local patterns
 
-- Status: Accepted, amended 2026-11-01 (a sixth kind, Feature, and the sidebar's rail) and 2026-11-09 (patterns move to git config, ADR 0011)
+- Status: Accepted, amended 2026-11-01 (a sixth kind, Feature, and the sidebar's rail) 2026-11-09 (patterns move to git config, ADR 0011) and 2026-11-27 (a seventh kind, Bug)
 - Date: 2026-10-31
 
 ## Context
@@ -46,3 +46,7 @@ From #419, on commits that several branches point at:
 ## Amendment, 2026-11-04
 
 From #504: the graph's Docs and Bots toggles become one **Kinds** dropdown with a checkbox for every kind the repository has, or has hidden. Any kind can now be hidden, using the same per-repository setting. An ordinary branch has no kind, so it has no checkbox.
+
+## Amendment, 2026-11-27
+
+From #975: **Bug is a seventh kind,** for branches named for a fix: `bug/*`, `bugs/*`, `bugfix/*`, `bugfixes/*`, `fix/*` and `fixes/*` by default. It behaves as Feature does: no extra confirmations, cleanup on pull treats it as Feature, it stays in Insights, it keeps author initials in the timeline, and a Docs tip it shares takes its kind. It has a colour of its own, sepia (`--accent-c`), and a bug icon that marks its folder in the sidebar. It comes after Feature in matching order, and none of its patterns overlap another kind's. `hotfix/*` stays a Release pattern, since a hotfix branch is cut for a release; anyone who thinks of hotfixes as fixes can move the pattern.

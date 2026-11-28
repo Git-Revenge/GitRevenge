@@ -89,6 +89,15 @@ func TestDocsTipSharedWithFeatureBranchTakesFeature(t *testing.T) {
 	}
 }
 
+// #975: a Bug branch is real work too.
+func TestDocsTipSharedWithBugBranchTakesBug(t *testing.T) {
+	fx := gittest.New(t)
+	head := tipOffTrunk(fx, "gh-pages", "fix/crash")
+	if got := tipKindsOf(t, fx, branchkind.New(nil, nil))[head]; got != string(branchkind.Bug) {
+		t.Errorf("kind = %q, want bug", got)
+	}
+}
+
 func TestDocsTipIgnoresAHiddenBranch(t *testing.T) {
 	fx := gittest.New(t)
 	head := tipOffTrunk(fx, "gh-pages", "secret")

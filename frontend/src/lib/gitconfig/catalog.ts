@@ -73,7 +73,7 @@ export const CATALOG: KeyInfo[] = [
   k('gitrevenge.cleanupOnPull', 'bool', 'Git Revenge: after each pull, deletes local branches whose upstream is gone and that have nothing unpushed.'),
   k('gitrevenge.syncNotes', 'bool', 'Git Revenge: fetches git notes on fetch and pull, and pushes changed notes on push.'),
   k('gitrevenge.hide', 'string', 'Git Revenge: a pattern of branches to leave out of the sidebar and graph, such as wip/*. One empty value means none here.', { multi: true }),
-  k('gitrevenge.hideKind', 'enum', 'Git Revenge: a branch kind whose branches are hidden.', { multi: true, values: ['trunk', 'release', 'environment', 'docs', 'bot', 'feature'] }),
+  k('gitrevenge.hideKind', 'enum', 'Git Revenge: a branch kind whose branches are hidden.', { multi: true, values: ['trunk', 'release', 'environment', 'docs', 'bot', 'feature', 'bug'] }),
   k('gitrevenge.webLinks', 'bool', 'Git Revenge: turns web addresses written out in full into links. On unless set to false.'),
   k('gitrevenge-kind.<name>.pattern', 'string', 'Git Revenge: a pattern of branches of this kind, such as release/*. One empty value means the kind matches nothing.', { multi: true }),
   k('gitrevenge-insights.stale', 'int', 'Git Revenge: days without a commit before Insights calls a branch stale.'),
