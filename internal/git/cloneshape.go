@@ -356,14 +356,8 @@ func (r *Repo) BackfillCost(ctx context.Context) (BackfillCost, error) {
 	if s, err := r.sparseShape(ctx); err == nil && s != nil && s.Cone {
 		cone = s.Folders
 	}
-	if out, err := r.ReadString(ctx, "count-objects", "-v"); err == nil {
-		for line := range strings.SplitSeq(out, "\n") {
-			key, val, _ := strings.Cut(line, ": ")
-			if key == "size" || key == "size-pack" {
-				kb, _ := strconv.ParseInt(strings.TrimSpace(val), 10, 64)
-				cost.Size += kb * 1024
-			}
-		}
+	if st, err := r.Storage(ctx); err == nil {
+		cost.Size = st.LooseBytes + st.PackBytes
 	}
 	// Downloads off: a missing folder listing (a tree:0 clone) is counted, not fetched.
 	// print-info names each missing object's path: "?<id> path=<path> type=<type>".

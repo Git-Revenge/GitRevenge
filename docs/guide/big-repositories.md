@@ -55,6 +55,15 @@ A clone that holds less than the whole repository says so in the [sidebar](tour.
 
 Each runs as a fetch does: its progress in the toolbar, with **Cancel**, and the graph and lists catching up when it lands.
 
+## Storage
+
+Git keeps a new object as a file of its own, a loose object, and gathers them into packs now and then. A repository with tens of thousands of loose objects, or dozens of packs, makes every git command slower; on one the size of the Linux kernel, that's a delay you notice. The Repository panel's **Storage** section, there for every repository, says how it stands, from `git count-objects`:
+
+- **What the objects take on disk,** and how many are loose and how many packs hold the rest. Files in the object folder that are neither, such as a pack left half written, are named too.
+- **Run maintenance** runs `git maintenance run`: the tasks your git config enables, or `git gc` when it enables none. It runs as a fetch does, in the toolbar with **Cancel**. git prints nothing about its progress when it isn't writing to a terminal, so the toolbar says it's running maintenance rather than how far it has got.
+- **It's suggested only when git would act on its own:** more loose objects than `gc.auto` (6,700 unless you've set it), or more packs than `gc.autoPackLimit` (50). The panel then says which, and the button stands out. Otherwise it's there when you want it, and the panel doesn't ask.
+- **Git's maintenance schedule:** the panel says whether this repository is on it. **Put it on the schedule…** runs `git maintenance start`. That adds the repository to the list in your global git config, and has your system's scheduler (Task Scheduler, launchd, or cron or systemd) run maintenance on every repository in the list, hourly, daily and weekly. **Take it off the schedule** runs `git maintenance unregister`, which leaves the schedule in place for any other repository on it.
+
 ## Where a shallow history stops
 
 Git lists a shallow clone's oldest commits as if they had no parents, so a graph would draw them as where the project began. Git Revenge reads the commits they really have from `.git/shallow` and lets their lines run on, dashed, to the end of the graph, into a band that says where the history stops:

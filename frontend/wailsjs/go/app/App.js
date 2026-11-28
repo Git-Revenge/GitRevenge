@@ -818,6 +818,10 @@ export function RepoState(arg1) {
   return window['go']['app']['App']['RepoState'](arg1);
 }
 
+export function RepoStorage(arg1) {
+  return window['go']['app']['App']['RepoStorage'](arg1);
+}
+
 export function ResolveConflict(arg1, arg2, arg3) {
   return window['go']['app']['App']['ResolveConflict'](arg1, arg2, arg3);
 }
@@ -844,6 +848,10 @@ export function RestoreStack(arg1, arg2, arg3) {
 
 export function RulerMarks(arg1) {
   return window['go']['app']['App']['RulerMarks'](arg1);
+}
+
+export function RunMaintenance(arg1) {
+  return window['go']['app']['App']['RunMaintenance'](arg1);
 }
 
 export function RunOperationAction(arg1, arg2) {
@@ -880,6 +888,10 @@ export function SaveMailmap(arg1, arg2, arg3, arg4) {
 
 export function SavePatches(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['app']['App']['SavePatches'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
+export function ScheduleMaintenance(arg1, arg2) {
+  return window['go']['app']['App']['ScheduleMaintenance'](arg1, arg2);
 }
 
 export function SearchGraph(arg1, arg2) {

@@ -9,6 +9,7 @@ export const NETWORK_LABELS: Record<string, string> = {
   branches: 'Fetching every branch',
   backfill: 'Downloading every file',
   folders: 'Checking out folders',
+  maintenance: 'Running maintenance',
 }
 
 /**

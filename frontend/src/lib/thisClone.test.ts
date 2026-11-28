@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { day, folderNames, isWhole, moreHistory, partialWords, shallowLines, sizeWords, sparseLines } from './thisClone'
+import { day, dueSaid, folderNames, garbageSaid, isWhole, moreHistory, partialWords, shallowLines, sizeWords, sparseLines, storageLines } from './thisClone'
 
 const NOV_26_2025 = Date.UTC(2025, 10, 26, 12) / 1000
 
@@ -43,5 +43,25 @@ describe('this clone', () => {
     expect(sizeWords(310 * (1 << 20))).toBe('310 MB')
     expect(sizeWords(12_000)).toBe('12 KB')
     expect(sizeWords(10)).toBe('1 KB')
+  })
+})
+
+describe('storage', () => {
+  const s = (more: object = {}) => ({ bytes: 3 * 2 ** 30, loose: 120, packs: 2, garbage: 0, gcAuto: 6700, autoPackLimit: 50, due: false, ...more })
+
+  it('says what the objects take, and how they’re kept', () => {
+    expect(storageLines(s())).toEqual({ what: '3.0 GB on disk', tag: '120 loose objects · 2 packs' })
+    expect(storageLines(s({ bytes: 0, loose: 1, packs: 1 }))).toEqual({ what: 'Nothing on disk', tag: '1 loose object · 1 pack' })
+  })
+
+  it('says why maintenance is due, in git’s terms, and nothing otherwise', () => {
+    expect(dueSaid(s())).toBe('')
+    expect(dueSaid(s({ loose: 9000, due: true }))).toBe('More than 6,700 objects are loose (gc.auto), so git would pack them.')
+    expect(dueSaid(s({ packs: 60, due: true }))).toBe('More than 50 packs (gc.autoPackLimit), so git would join them.')
+  })
+
+  it('names stray files only when there are some', () => {
+    expect(garbageSaid({ garbage: 0 })).toBe('')
+    expect(garbageSaid({ garbage: 2 })).toBe('2 stray files in the object folder, such as a pack left half written.')
   })
 })

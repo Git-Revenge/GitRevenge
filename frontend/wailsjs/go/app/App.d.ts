@@ -417,6 +417,8 @@ export function RepoPreferences(arg1:string):Promise<app.RepoPreferences>;
 
 export function RepoState(arg1:string):Promise<app.RepoState>;
 
+export function RepoStorage(arg1:string):Promise<app.RepoStorage>;
+
 export function ResolveConflict(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function Restack(arg1:string,arg2:string):Promise<void>;
@@ -430,6 +432,8 @@ export function RestoreSession():Promise<app.SessionState>;
 export function RestoreStack(arg1:string,arg2:Array<string>,arg3:Record<string, string>):Promise<void>;
 
 export function RulerMarks(arg1:string):Promise<app.RulerMarks>;
+
+export function RunMaintenance(arg1:string):Promise<void>;
 
 export function RunOperationAction(arg1:string,arg2:string):Promise<void>;
 
@@ -448,6 +452,8 @@ export function SaveLinkRule(arg1:string,arg2:links.Rule,arg3:string):Promise<vo
 export function SaveMailmap(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<void>;
 
 export function SavePatches(arg1:string,arg2:git.PatchRevs,arg3:git.PatchOptions,arg4:string,arg5:string,arg6:boolean):Promise<app.SavedPatches>;
+
+export function ScheduleMaintenance(arg1:string,arg2:boolean):Promise<void>;
 
 export function SearchGraph(arg1:string,arg2:string):Promise<graph.SearchResult>;
 

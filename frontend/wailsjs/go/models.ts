@@ -2655,6 +2655,40 @@ export namespace app {
 	        this.madeBranch = source["madeBranch"];
 	    }
 	}
+	export class RepoStorage {
+	    loose: number;
+	    looseBytes: number;
+	    packs: number;
+	    packBytes: number;
+	    garbage: number;
+	    garbageBytes: number;
+	    prunePackable: number;
+	    gcAuto: number;
+	    autoPackLimit: number;
+	    registered: boolean;
+	    bytes: number;
+	    due: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new RepoStorage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loose = source["loose"];
+	        this.looseBytes = source["looseBytes"];
+	        this.packs = source["packs"];
+	        this.packBytes = source["packBytes"];
+	        this.garbage = source["garbage"];
+	        this.garbageBytes = source["garbageBytes"];
+	        this.prunePackable = source["prunePackable"];
+	        this.gcAuto = source["gcAuto"];
+	        this.autoPackLimit = source["autoPackLimit"];
+	        this.registered = source["registered"];
+	        this.bytes = source["bytes"];
+	        this.due = source["due"];
+	    }
+	}
 	export class RepoTab {
 	    path: string;
 	    name: string;
