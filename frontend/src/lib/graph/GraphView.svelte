@@ -2433,9 +2433,11 @@
           >{/if}
         <button class="btn sm quiet icon" onclick={stopFocusing} aria-label="Stop focusing" title={focusPath ? 'Stop focusing, and show the whole history again' : 'Stop focusing, and show every branch again'}><Icon name="close" size={13} /></button>
       </span>
-      <!-- The name again, out of sight and with room, so the bar knows what the chip needs. -->
+      <!-- The name again, out of sight and with room, so the bar knows what the chip needs. Its
+           words are drawn by CSS from data-t, so the page holds them once: a search of its text
+           finds the chip alone. -->
       <span class="focus-measure" aria-hidden="true" bind:clientWidth={chipNameW}
-        >Focused on {focus ? focusLabel : ''}{focus && focusPath ? ', in ' : ''}{#if focusPath}<code>{focusPath}</code>{/if}</span
+        ><span data-t="Focused on {focus ? focusLabel : ''}{focus && focusPath ? ', in ' : ''}"></span>{#if focusPath}<code data-t={focusPath}></code>{/if}</span
       >
     {/if}
     {#if searchIconOnly && !searchOpen && !query.trim() && !mapView}
@@ -3070,6 +3072,11 @@
   .focus-measure code {
     font-family: var(--font-mono);
     font-size: 12px;
+  }
+
+  .focus-measure [data-t]::before {
+    content: attr(data-t);
+    white-space: pre;
   }
 
   /* Under the bar, as the smart filter's strip is: the whole width, wrapping on a narrow one. */
