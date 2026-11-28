@@ -34,7 +34,11 @@ type GraphProgress struct {
 	// RefsReady is set on the update sent when refs finish loading during a first load,
 	// so the UI can re-fetch rows to pick up their labels.
 	RefsReady bool
-	Err       error
+	// Late is news that arrived beside a load under a path focus: the labels, the whole
+	// history's count, a rename. The rest of the update says nothing new; the UI reads
+	// those again and leaves the rows' state as it was.
+	Late bool
+	Err  error
 }
 
 // graphLoader owns a repository's commit graph and reloads it on demand. It streams
@@ -85,7 +89,10 @@ type graphLoader struct {
 	// pathLabels holds, under a path focus, the labels of branches whose tips changed nothing
 	// there, by the commit where their history last did (#1061); nil until found.
 	pathLabels map[string][]git.Ref
-	current    *graph.Graph
+	// renamedFrom is, under a focus on a file, what the file was called before the oldest
+	// commit here that touched it, when that commit renamed it (#1062); "" otherwise.
+	renamedFrom string
+	current     *graph.Graph
 	// narrowed says current was loaded under a filter: it holds only what the filter keeps.
 	// filter is what the next load will be under, which isn't always what's shown.
 	narrowed bool
@@ -348,7 +355,35 @@ func (l *graphLoader) labelPath(ctx context.Context, g *graph.Graph, idx *RefInd
 	}
 	l.pathLabels = labels
 	l.mu.Unlock()
-	l.report(GraphProgress{Rows: g.Len(), RefsReady: true})
+	l.report(GraphProgress{Late: true})
+}
+
+// findRename looks, under a focus on a file, for a rename at the oldest commit here that
+// touched it (#1062): the window says the history before it isn't in the timeline. It runs
+// beside the load, under opts with the path, and may outlast it: ctx is cancelled by the
+// next reload or stop.
+func (l *graphLoader) findRename(ctx context.Context, opts git.LogOptions) {
+	defer l.wg.Done()
+	old, err := l.repo.RenamedFrom(ctx, opts)
+	if err != nil || old == "" {
+		return
+	}
+	l.mu.Lock()
+	if ctx.Err() != nil {
+		l.mu.Unlock()
+		return
+	}
+	l.renamedFrom = old
+	l.mu.Unlock()
+	l.report(GraphProgress{Late: true})
+}
+
+// RenamedFrom is, under a focus on a file, what it was called before the oldest commit here
+// that touched it, when that commit renamed it; "" until found, or with none.
+func (l *graphLoader) RenamedFrom() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.renamedFrom
 }
 
 // PathLabels is, under a path focus, the labels of branches whose tips changed nothing under
@@ -659,6 +694,7 @@ func (l *graphLoader) reload() {
 	l.times = nil
 	l.outOf = 0
 	l.pathLabels = nil
+	l.renamedFrom = ""
 	// Counted before the lock is let go, so that stop, which takes it to say nothing more
 	// loads, never starts waiting with a load about to be added.
 	l.wg.Add(1)
@@ -793,12 +829,20 @@ func (l *graphLoader) reload() {
 					return
 				}
 				l.mu.Lock()
-				if after.Err() == nil {
+				counted := after.Err() == nil
+				if counted {
 					l.outOf = n
 				}
 				l.mu.Unlock()
+				if counted {
+					l.report(GraphProgress{Late: true})
+				}
 			}()
 			opts.Paths = []string{focus.Path}
+			if !strings.HasSuffix(focus.Path, "/") {
+				l.wg.Add(1)
+				go l.findRename(after, opts)
+			}
 		}
 
 		// The size of the whole history, for the scrollbar while the reader is paused. It

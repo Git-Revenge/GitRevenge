@@ -44,7 +44,10 @@ type GraphProgress struct {
 	// Estimate is about how many rows the whole history has, or 0 until known.
 	Estimate int `json:"estimate"`
 	// Reset means a reloaded graph replaced the displayed one; cached rows are stale.
-	Reset bool   `json:"reset"`
+	Reset bool `json:"reset"`
+	// Late is news beside a load under a path focus (labels, the whole history's count, a
+	// rename): read those again, and leave the rest as it was.
+	Late  bool   `json:"late"`
 	Error string `json:"error"`
 }
 
@@ -151,7 +154,7 @@ func (a *App) openRepo(path string) (*session.Repo, error) {
 }
 
 func (a *App) emitGraphProgress(path string, p session.GraphProgress) {
-	ev := GraphProgress{Path: path, Rows: p.Rows, Done: p.Done, RefsReady: p.RefsReady, Paused: p.Paused, Estimate: p.Estimate, Reset: p.Reset}
+	ev := GraphProgress{Path: path, Rows: p.Rows, Done: p.Done, RefsReady: p.RefsReady, Paused: p.Paused, Estimate: p.Estimate, Reset: p.Reset, Late: p.Late}
 	if p.Err != nil {
 		ev.Error = p.Err.Error()
 	}

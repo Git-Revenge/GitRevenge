@@ -4,7 +4,7 @@
   import { errorText } from '../errors'
   import { onMount, tick, untrack, type Snippet } from 'svelte'
   import { ALONE_STEPS, searchPlaceholder, SQUEEZE, squeezeFor } from '../barSqueeze'
-  import { ArrivedCommits, CommitNotes, CommitRow, CommitRows, SelectedCommits, CommitSignatures, FindCount, ClearGraphFocus, GraphFocus, GraphOutOf, HeadCommit, HistoryChanges, OwnMoveAge, GraphRows, NotedCommits, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView, TrailerFilterDays, TrailerSuggest } from '../../../wailsjs/go/app/App.js'
+  import { ArrivedCommits, CommitNotes, CommitRow, CommitRows, SelectedCommits, CommitSignatures, FindCount, ClearGraphFocus, GraphFocus, GraphOutOf, GraphRenamedFrom, HeadCommit, HistoryChanges, OwnMoveAge, GraphRows, NotedCommits, RepoPreferences, RulerMarks, SearchGraph, SetGraphFocus, SetKindView, TrailerFilterDays, TrailerSuggest } from '../../../wailsjs/go/app/App.js'
   import { findSummary } from '../find/find'
   import { changeMark, type ChangeMark, type HistoryChange, type HistoryOptions } from '../filters/history'
   import { session } from '../session.svelte'
@@ -14,6 +14,7 @@
   import { theme as colorTheme } from '../theme.svelte'
   import { formatShortcut, provideCommands } from '../commands.svelte'
   import Icon from '../ui/Icon.svelte'
+  import Empty from '../ui/Empty.svelte'
   import { DUR, easeInk, fadeUp, labelsFold, labelsUnfold, menuOut, reducedMotion, stagger } from '../ui/motion'
   import KindFilter from './KindFilter.svelte'
   import { day } from '../thisClone'
@@ -61,6 +62,7 @@
     historySince = 0,
     wip,
     onFocusPath,
+    onFileHistory,
     toolsHost,
     squeeze,
     bisect = null,
@@ -91,6 +93,9 @@
     /** Told the folder or file the graph is focused on (#1059), "" for none: the working tree
      * row counts only what's changed under it. */
     onFocusPath?: (path: string) => void
+    /** Opens a file's own history, which follows renames: offered when the file the graph is
+     * focused on was renamed at its oldest commit here (#1062). */
+    onFileHistory?: (file: string) => void
     /** Right-click on a row, with the refs pointing at it and the mouse position. */
     onContext?: (row: Row, refs: Ref[], x: number, y: number) => void
     /** A row dragged onto another row. */
@@ -420,11 +425,23 @@
       : `Only ${focusLabel} and what it's built on are showing`,
   )
 
+  /** What the focused file was called before its oldest commit here, when that commit renamed
+   * it (#1062): the timeline follows no renames, so its history from before isn't here. */
+  let renamedFrom = $state('')
+
   /** Asks for the whole history's count under a path focus, until it has arrived. */
   async function loadOutOf() {
     if (!focusPath) return
     const n = await GraphOutOf(path).catch(() => 0)
     if (focusPath) outOf = n
+  }
+
+  /** Asks whether the focused file was renamed where its history here begins. A folder never
+   * is: git follows a rename for one file only. */
+  async function loadRenamed() {
+    if (!focusPath || focusPath.endsWith('/')) return
+    const old = await GraphRenamedFrom(path).catch(() => '')
+    if (focusPath) renamedFrom = old || ''
   }
 
   /** Whether the graph is focused, so a branch outside it can be explained. */
@@ -441,7 +458,9 @@
     if ((next?.path ?? '') !== focusPath) {
       focusPath = next?.path ?? ''
       outOf = 0
+      renamedFrom = ''
       void loadOutOf()
+      void loadRenamed()
       onFocusPath?.(focusPath)
     }
     return (!!focus && focusLabel !== was) || (!!focusPath && focusPath !== wasPath)
@@ -2322,13 +2341,19 @@
     void loadNoted()
     const off = onBackend('graph:progress', (p) => {
       if (p.path !== path) return
+      if (p.late) {
+        // News beside a load under a path focus: labels for the rows, the whole history's
+        // count, a rename. Whether the load is going or done is as it was.
+        cache.invalidate()
+        void loadOutOf()
+        void loadRenamed()
+        schedule()
+        return
+      }
       if (p.done) void loadNoted()
       // The ruler's marks follow the history as it's read, a couple of seconds apart at most.
       if (p.done || performance.now() - marksAt > 2000) void loadMarks()
       cache.setTotal(p.rows, !p.done, p.paused, p.estimate)
-      if (focusPath && !outOf) void loadOutOf()
-      // The count runs beside the load, and can land after it: asked once more a moment on.
-      if (p.done && focusPath) setTimeout(() => void (outOf || loadOutOf()), 800)
       if (p.refsReady) cache.invalidate() // labels arrived after the first rows
       if (p.reset || p.done) widest = 1
       if (p.reset && !p.done) {
@@ -2459,6 +2484,15 @@
       {/if}
     </span>
   </div>
+  <!-- Focused on a file whose oldest commit here renamed it (#1062): the timeline follows no
+       renames, as git log -- <path> doesn't, so its history under the old name isn't here. -->
+  {#if focusPath && renamedFrom && rowsView}
+    <p class="path-note" role="note">
+      <Icon name="history" size={13} />
+      <span>Before a rename it was <code>{renamedFrom}</code>, and its history from then isn’t here.</span>
+      {#if onFileHistory}<button class="btn sm text" onclick={() => onFileHistory(focusPath)}>File history</button><span>follows renames.</span>{/if}
+    </p>
+  {/if}
   <!-- Compact is a table, so its columns are named. The timeline has one column of words. -->
   {#if columns?.refW && density === 'compact' && rowsView}
     <div class="columns">
@@ -2508,6 +2542,16 @@
     {#if tail && tailY !== null}
       <div class="tail" style:top="{tailY}px" style:height="{TAIL_H}px" style:width="{leadWidth}px" onwheel={(e) => scrollBy(e.deltaY)}>
         {@render tail()}
+      </div>
+    {/if}
+    <!-- A path no commit here touched (#1062): said, with why it might be, rather than a blank
+         timeline. Under Only these it's the filter that left nothing, which its strip says. -->
+    {#if focusPath && !loading && !error && !rowError && total === 0 && !sparse}
+      <div class="nothing" style:top="{(lead ? rowH : 0) + 8}px">
+        <Empty note="nothing here"
+          ><span>No commit {focus ? `on ${focusLabel}` : 'in this history'} touched <code>{focusPath}</code>. It may be spelled differently, or be on a branch {focus ? 'outside the focus' : 'that’s hidden'}.</span
+          ><button class="btn sm text" onclick={stopFocusing}>Stop focusing</button></Empty
+        >
       </div>
     {/if}
     <div
@@ -2996,6 +3040,42 @@
     max-width: 260px;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* Under the bar, as the smart filter's strip is: the whole width, wrapping on a narrow one. */
+  .path-note {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin: 0;
+    padding: 5px 12px;
+    border-bottom: 1px dashed var(--paper-edge);
+    background: var(--paper);
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--ink-soft);
+  }
+
+  .path-note :global(svg) {
+    flex: none;
+    color: var(--accent);
+  }
+
+  .path-note code,
+  .nothing code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  /* Where the first commit would be, under the working tree's row. */
+  .nothing {
+    position: absolute;
+    z-index: 1;
+    left: 0;
+    right: 0;
+    padding: 0 16px;
   }
 
   .step.up {

@@ -394,6 +394,10 @@ export function GraphOutOf(arg1) {
   return window['go']['app']['App']['GraphOutOf'](arg1);
 }
 
+export function GraphRenamedFrom(arg1) {
+  return window['go']['app']['App']['GraphRenamedFrom'](arg1);
+}
+
 export function GraphRows(arg1, arg2, arg3) {
   return window['go']['app']['App']['GraphRows'](arg1, arg2, arg3);
 }

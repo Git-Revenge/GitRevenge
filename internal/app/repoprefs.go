@@ -522,3 +522,15 @@ func (a *App) GraphOutOf(path string) (int, error) {
 	}
 	return r.GraphOutOf(), nil
 }
+
+// GraphRenamedFrom is, while the graph of the repository at path is focused on a file, what
+// the file was called before the oldest commit here that touched it, when that commit renamed
+// it (#1062): the timeline follows no renames, so the window says its history before that
+// isn't here, and offers File history, which follows them. It is "" until found, and with none.
+func (a *App) GraphRenamedFrom(path string) (string, error) {
+	r, err := a.openRepo(path)
+	if err != nil {
+		return "", err
+	}
+	return r.GraphRenamedFrom(), nil
+}

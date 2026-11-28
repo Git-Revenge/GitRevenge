@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -279,6 +280,54 @@ func TestPathFocusLabelsBranchesWhereTheyLastTouchedIt(t *testing.T) {
 	waitGraph(t, r, 5)
 	if got := r.PathLabels(); got != nil {
 		t.Errorf("labels without a path: %v", got)
+	}
+}
+
+// #1062: focused on a file whose oldest commit here renamed it, the loader says what it was
+// called; on a folder, or a file added under its own name, it says nothing.
+func TestPathFocusFindsARenameAtTheFilesOldestCommit(t *testing.T) {
+	m, _ := newManager(t)
+	fx := gittest.New(t)
+	body := strings.Repeat("send an alert when the gust is over the limit\n", 8)
+	fx.CommitFile("lib/sms.js", body, "add sms")
+	fx.Git("mv", "lib/sms.js", "lib/texts.js")
+	fx.Commit("call it texts")
+	fx.CommitFile("lib/texts.js", body+"and log it\n", "log it")
+	fx.CommitFile("lib/gusts.js", "gusts\n", "add gusts")
+	r, err := m.Open(context.Background(), fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitGraph(t, r, 4)
+	renamed := func() string {
+		t.Helper()
+		for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+			if old := r.GraphRenamedFrom(); old != "" {
+				return old
+			}
+		}
+		return ""
+	}
+
+	r.SetFocus(Focus{Path: "lib/texts.js"})
+	waitGraph(t, r, 2)
+	if got := renamed(); got != "lib/sms.js" {
+		t.Errorf("focused on the renamed file: %q, want lib/sms.js", got)
+	}
+	for path, rows := range map[string]int{"lib/gusts.js": 1, "lib/": 4} {
+		r.SetFocus(Focus{Path: path})
+		waitGraph(t, r, rows)
+		// The whole history's count arrives beside the load as the rename would: once it has,
+		// so would a rename.
+		for deadline := time.Now().Add(10 * time.Second); r.GraphOutOf() == 0; time.Sleep(20 * time.Millisecond) {
+			if time.Now().After(deadline) {
+				t.Fatalf("focused on %s, the whole history was never counted", path)
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
+		if got := r.GraphRenamedFrom(); got != "" {
+			t.Errorf("focused on %s: %q", path, got)
+		}
 	}
 }
 

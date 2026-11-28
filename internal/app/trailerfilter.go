@@ -231,6 +231,25 @@ func (a *App) TrailerFilter(path string) (TrailerFilterState, error) {
 // applyTrailerFilter works out what the repository's filter keeps, as the trailers are read
 // now, and has the graph show it: only those commits under Only these, everything under
 // Highlight or with no filter. Asking again with nothing changed reloads nothing.
+// keptIn counts the commits of keep that g has rows for, going through whichever is smaller.
+func keptIn(g *graph.Graph, keep map[string]struct{}) int {
+	n := 0
+	if rows := g.Len(); rows <= len(keep) {
+		for i := range rows {
+			if _, ok := keep[g.ID(i)]; ok {
+				n++
+			}
+		}
+		return n
+	}
+	for id := range keep {
+		if _, ok := g.RowOf(id); ok {
+			n++
+		}
+	}
+	return n
+}
+
 func (a *App) applyTrailerFilter(r *session.Repo) TrailerFilterState {
 	return a.applyFilter(r, true)
 }
@@ -268,6 +287,14 @@ func (a *App) applyFilter(r *session.Repo, graph bool) TrailerFilterState {
 	state.History = f.history.state()
 	keep := a.trailerFilters.keeps(f, reading)
 	state.Kept = len(keep)
+	if r.Focus().Path != "" {
+		// Under a path focus most of what the picks keep changed nothing there, and the total
+		// is of the path's commits alone (#1062): the count is of the kept commits the graph
+		// has read, so it never says more than the total.
+		if g, _ := r.Graph(); g != nil {
+			state.Kept = keptIn(g, keep)
+		}
+	}
 	if !f.only {
 		a.trailerFilters.setHighlighted(f, keep)
 		r.SetFilter(nil)

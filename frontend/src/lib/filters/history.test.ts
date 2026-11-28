@@ -12,6 +12,7 @@ import {
   historyKey,
   historyOptions,
   historyStatus,
+  inFocus,
   lastYear,
   narrowText,
   offersNarrowing,
@@ -184,5 +185,21 @@ describe('countText', () => {
     expect(countText(undefined)).toBe('')
     expect(countText(1)).toBe('1 commit')
     expect(countText(7)).toBe('7 commits')
+  })
+})
+
+describe('inFocus', () => {
+  it('starts Only in at the folder or file the timeline is focused on', () => {
+    expect(inFocus(historyOptions('gust'), 'src/alerts/').paths).toEqual(['src/alerts/'])
+    expect(inFocus(historyOptions('gust'), '').paths).toEqual([])
+  })
+
+  it('leaves a search that names its own files', () => {
+    expect(inFocus(historyOptions('gust', { paths: ['docs/'] }), 'src/alerts/').paths).toEqual(['docs/'])
+  })
+
+  it('gives a path with a pattern’s characters as it’s spelled', () => {
+    expect(inFocus(historyOptions('gust'), 'src/[id]/page.js').paths).toEqual([':(literal)src/[id]/page.js'])
+    expect(inFocus(historyOptions('gust'), '!notes.md').paths).toEqual([':(literal)!notes.md'])
   })
 })

@@ -205,6 +205,8 @@ export function GraphFocus(arg1:string):Promise<session.Focus>;
 
 export function GraphOutOf(arg1:string):Promise<number>;
 
+export function GraphRenamedFrom(arg1:string):Promise<string>;
+
 export function GraphRows(arg1:string,arg2:number,arg3:number):Promise<app.GraphPage>;
 
 export function GraphViews():Promise<app.GraphViews>;

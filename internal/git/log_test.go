@@ -337,3 +337,45 @@ func TestLastTouched(t *testing.T) {
 		t.Errorf("c/: %s, %d", id, later)
 	}
 }
+
+// #1062: a timeline focused on a file says when the oldest commit in it renamed the file.
+func TestRenamedFrom(t *testing.T) {
+	t.Parallel()
+	fx := gittest.New(t)
+	body := strings.Repeat("send an alert when the gust is over the limit\n", 8)
+	fx.CommitFile("first.txt", "first\n", "first")
+	fx.CommitFile("lib/sms.js", body, "add sms")
+	fx.Git("mv", "lib/sms.js", "lib/texts.js")
+	fx.Commit("call it texts")
+	fx.CommitFile("lib/texts.js", body+"and log it\n", "log it")
+	fx.CommitFile("src/alerts/gusts.js", "gusts\n", "add gusts")
+	repo := OpenRepo(newTestRunner(t), fx.Dir)
+	ctx := context.Background()
+	renamed := func(path string) string {
+		t.Helper()
+		old, err := repo.RenamedFrom(ctx, LogOptions{Paths: []string{path}})
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		return old
+	}
+
+	if got := renamed("lib/texts.js"); got != "lib/sms.js" {
+		t.Errorf("a renamed file: %q", got)
+	}
+	// Its history before the rename is its own, with no rename in it.
+	if got := renamed("lib/sms.js"); got != "" {
+		t.Errorf("the old name: %q", got)
+	}
+	// Added under its own name, and in the first commit.
+	if got := renamed("src/alerts/gusts.js"); got != "" {
+		t.Errorf("an added file: %q", got)
+	}
+	if got := renamed("first.txt"); got != "" {
+		t.Errorf("a file of the first commit: %q", got)
+	}
+	// Nothing touched it.
+	if got := renamed("nowhere.js"); got != "" {
+		t.Errorf("a file never there: %q", got)
+	}
+}

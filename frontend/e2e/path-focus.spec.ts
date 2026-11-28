@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { branch, calls, open } from './support'
+import { branch, calls, events, open } from './support'
 
 // A timeline focused on a folder or file: the working tree row counts only what's changed
 // under it (#1059), and the chip and the ways in (#1060). The backend is stubbed.
@@ -163,5 +163,100 @@ test.describe('a branch labelled where it last touched the path', () => {
     await expect(later).toHaveAttribute('title', "main's tip is 26 commits later; none of them touched src/alerts/")
     await expect(list.locator('.chip').first()).not.toHaveClass(/later/)
     await expect(list.locator('.chip').first()).not.toHaveAttribute('title', /.*/)
+  })
+})
+
+// #1062: the history search and smart filters under a path focus, a file renamed where its
+// history here begins, and a path no commit touched.
+test.describe('with the search and filters', () => {
+  const focus = { branch: '', stack: false, path: 'src/alerts/' }
+  const opts = (o: object = {}) => ({ text: 'gust', matchCase: false, regex: false, lines: false, paths: [] as string[], since: 0, ...o })
+  const searching = (o: object = {}) => ({ options: opts(o), found: 0, searched: 0, total: 265, backTo: 0, running: true, stopped: false, ms: 0, estimateMs: 0, problem: '' })
+  const responses = (filter: object) => ({
+    Refs: [branch('main', { head: true })],
+    ShowingHidden: false,
+    Worktrees: [],
+    CommitSignatures: [],
+    CommitNotes: [],
+    WorkingTree: { ...workingTree, status: { files: [] } },
+    GraphFocus: focus,
+    GraphOutOf: 1410,
+    TrailerFilter: filter,
+    SearchGraph: { rows: [], total: 0 },
+    FindCount: { lines: 0, files: 0, superseded: false },
+    SetHistorySearch: { picks: [], only: true, kept: 0, total: 265, history: searching({ paths: ['src/alerts/'] }) },
+  })
+  const none = { picks: [], only: true, kept: 0, total: 265 }
+
+  test('the history search’s Only in starts at the focused folder', async ({ page }) => {
+    await open(page, 'repoView', { graphRows: 3, responses: responses(none) })
+    await expect(page.locator('.focus')).toHaveAttribute('title', 'Only the commits that changed something in src/alerts/ are showing')
+    await page.getByRole('button', { name: 'Search commits' }).click()
+    await page.getByRole('combobox', { name: 'Search commits' }).fill('gust')
+    await page.getByRole('option', { name: /Commits\s*that add or remove “gust”/ }).click()
+    await expect.poll(() => calls(page, 'SetHistorySearch')).toEqual([['/r', opts({ paths: ['src/alerts/'] })]])
+    const strip = page.getByRole('group', { name: 'Smart filter' })
+    await strip.getByRole('button', { name: 'Commits that add or remove gust, options' }).click()
+    await expect(page.getByRole('dialog', { name: 'Change the history search' }).getByRole('textbox', { name: 'Only in' })).toHaveValue('src/alerts/')
+    // The focus stays, beside the filter.
+    await expect(page.locator('.focus')).toHaveAttribute('title', 'Only the commits that changed something in src/alerts/ are showing')
+  })
+
+  test('a smart filter narrows the focused history, and counts within it', async ({ page }) => {
+    const fixed = { key: 'changelog', value: 'text:fixed', keyLabel: 'Changelog', valueLabel: 'fixed', kind: 'text' }
+    await open(page, 'repoView', { graphRows: 3, responses: responses({ picks: [fixed], only: true, kept: 3, total: 265 }) })
+    const strip = page.getByRole('group', { name: 'Smart filter' })
+    await expect(strip.getByRole('status')).toHaveText('3 of 265 commits')
+    await expect(strip).toContainText('fixed')
+    await expect(page.locator('.focus')).toHaveAttribute('title', 'Only the commits that changed something in src/alerts/ are showing')
+  })
+})
+
+test.describe('a renamed file', () => {
+  const graph = (path: string, renamedFrom: string) => ({ graphRows: 3, responses: { CommitSignatures: [], Refs: [], GraphFocus: { branch: '', stack: false, path }, GraphOutOf: 1410, GraphRenamedFrom: renamedFrom } })
+
+  test('says its history before the rename isn’t here, and offers File history', async ({ page }) => {
+    await open(page, 'graph', graph('src/alerts/sms.js', 'lib/sms.js'))
+    const note = page.getByRole('note')
+    await expect(note).toContainText('Before a rename it was lib/sms.js, and its history from then isn’t here.')
+    await expect(note).toContainText('follows renames.')
+    await note.getByRole('button', { name: 'File history' }).click()
+    expect(await events(page, 'file-history')).toEqual([['src/alerts/sms.js']])
+  })
+
+  test('says nothing for a file added under its own name, or a folder', async ({ page }) => {
+    await open(page, 'graph', graph('src/alerts/sms.js', ''))
+    await expect(page.locator('.focus-name')).toHaveText('Focused on src/alerts/sms.js')
+    await expect(page.locator('.path-note')).toHaveCount(0)
+
+    await open(page, 'graph', graph('src/alerts/', 'never asked'))
+    await expect(page.locator('.focus-name')).toHaveText('Focused on src/alerts/')
+    await expect(page.locator('.path-note')).toHaveCount(0)
+    expect(await calls(page, 'GraphRenamedFrom')).toEqual([])
+  })
+})
+
+test.describe('nothing there', () => {
+  const graph = (focus: object, rows = 0) => ({ graphRows: rows, responses: { CommitSignatures: [], Refs: [], GraphFocus: focus, GraphOutOf: 1410, GraphRenamedFrom: '' } })
+
+  test('says no commit touched the path, why that might be, and stops focusing', async ({ page }) => {
+    await open(page, 'graph', graph({ branch: '', stack: false, path: 'src/alert/' }))
+    const said = page.locator('.nothing')
+    await expect(said).toContainText('No commit in this history touched src/alert/. It may be spelled differently, or be on a branch that’s hidden.')
+    await said.getByRole('button', { name: 'Stop focusing' }).click()
+    await expect.poll(() => calls(page, 'ClearGraphFocus')).toEqual([['/repo']])
+  })
+
+  test('under a branch focus, names the branch', async ({ page }) => {
+    await open(page, 'graph', graph({ branch: 'topic', stack: false, path: 'src/alert/' }))
+    await expect(page.locator('.nothing')).toContainText('No commit on topic touched src/alert/. It may be spelled differently, or be on a branch outside the focus.')
+  })
+
+  test('says nothing while there are commits, or with no path', async ({ page }) => {
+    await open(page, 'graph', graph({ branch: '', stack: false, path: 'src/alerts/' }, 3))
+    await expect(page.locator('.scroller')).toHaveAttribute('aria-rowcount', '3')
+    await expect(page.locator('.nothing')).toHaveCount(0)
+    await open(page, 'graph', graph({ branch: '', stack: false, path: '' }))
+    await expect(page.locator('.nothing')).toHaveCount(0)
   })
 })

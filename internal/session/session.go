@@ -178,6 +178,10 @@ func (r *Repo) GraphOutOf() int { return r.graph.OutOf() }
 // it, by the commit where their history last did: see graphLoader.PathLabels.
 func (r *Repo) PathLabels() map[string][]git.Ref { return r.graph.PathLabels() }
 
+// GraphRenamedFrom is, under a focus on a file, what it was called before the oldest commit
+// here that touched it, when that commit renamed it: see graphLoader.RenamedFrom.
+func (r *Repo) GraphRenamedFrom() string { return r.graph.RenamedFrom() }
+
 // Rules returns the branch rules (kinds and hide patterns) in a repository's settings.
 func Rules(rs settings.RepoSettings) branchkind.Rules {
 	overrides := map[branchkind.Kind][]string{}
