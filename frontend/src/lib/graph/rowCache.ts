@@ -102,6 +102,9 @@ export interface GraphProgress {
   /** A reloaded graph replaced the displayed one; cached rows are stale. */
   reset: boolean
   refsReady: boolean
+  /** News beside a load under a path focus (labels, the whole history's count, a rename):
+   * read those again, and leave the rest as it was. */
+  late?: boolean
   error: string
 }
 

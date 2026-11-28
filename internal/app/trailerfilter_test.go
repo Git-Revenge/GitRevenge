@@ -27,6 +27,47 @@ func graphRows(t *testing.T, a *App, path string, n int) {
 	t.Fatalf("the graph never had %d rows: %d, loading %v", n, last.Total, last.Loading)
 }
 
+// #1062: under a path focus a filter narrows the path's history further, as under a branch
+// focus, and counts what it keeps there: it never says more than the history's total.
+func TestTrailerFilterUnderAPathFocusCountsWhatItKeepsThere(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "src/a.txt", "One", "Changelog: fixed")
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "docs/b.txt", "Two", "Changelog: fixed")
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "docs/c.txt", "Three", "Changelog: fixed")
+	commitAs(fx, "Sam Ortiz", "sam@tidewater.example", "src/d.txt", "Four")
+	path := openForMap(t, a, fx)
+	trailersRead(t, a, path)
+	graphRows(t, a, path, 4)
+	if err := a.SetGraphPath(path, "src/"); err != nil {
+		t.Fatal(err)
+	}
+	graphRows(t, a, path, 2)
+	fixed := []trailerindex.Pick{{Key: "changelog", Value: "text:fixed"}}
+
+	// Highlight: both of src/'s commits stay, and one is fixed.
+	state, err := a.SetTrailerFilter(path, fixed, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.Kept != 1 || state.Total != 2 {
+		t.Errorf("highlighting: %d of %d, want 1 of 2", state.Kept, state.Total)
+	}
+	// Only these: that one is the graph.
+	if _, err := a.SetTrailerFilter(path, fixed, true); err != nil {
+		t.Fatal(err)
+	}
+	graphRows(t, a, path, 1)
+	if state, _ = a.TrailerFilter(path); state.Kept != 1 || state.Total != 2 {
+		t.Errorf("only these: %d of %d, want 1 of 2", state.Kept, state.Total)
+	}
+	page, _ := a.GraphRows(path, 0, 10)
+	if len(page.Rows) != 1 || page.Rows[0].Subject != "One" {
+		t.Errorf("rows = %+v, want One", page.Rows)
+	}
+}
+
 // A filter shows only the commits its picks keep, or with Highlight keeps everything and
 // says which rows match. Picks of one key are either-or, and of two keys both.
 func TestTrailerFilterNarrowsTheGraph(t *testing.T) {

@@ -6,7 +6,7 @@
   import { onBackend } from './events'
   import FilterStrip from './filters/FilterStrip.svelte'
   import { hasPick, loadOnly, saveOnly, togglePick } from './filters/filters'
-  import { historyKey, historyOptions, type HistoryOptions } from './filters/history'
+  import { historyKey, historyOptions, inFocus, type HistoryOptions } from './filters/history'
   import { theme as colorTheme } from './theme.svelte'
   import { repoReads } from './repoReads'
   import { provideCommands } from './commands.svelte'
@@ -632,9 +632,10 @@
     diffShown={diff}
     onOpenFile={(t) => (diff = t)}
     onHistorySearch={(o) => {
-      // The graph shows what the search finds: a file open from Find steps aside for it.
+      // The graph shows what the search finds: a file open from Find steps aside for it. One
+      // that names no files starts in the folder the timeline is focused on (#1062).
       diff = null
-      void setHistory(o)
+      void setHistory(inFocus(o, focusPath))
     }}
   />
   <div class="main">
@@ -668,7 +669,7 @@
       <ShallowBand {path} since={shallowSince} />
     {/snippet}
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} onFocusPath={(p: string) => (focusPath = p)} tail={shallowSince ? shallowTail : undefined} historySince={shallowSince} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filterOn} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFindInFiles={(text) => findAsk.show(path, text)} onHistorySearch={(text) => setHistory(historyOptions(text))} history={historyOn} onFilterDrop={dropLastFilter} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onSelection={(s) => (several = s)} onSelectionMenu={(x, y) => openMenu(selectionMenu(several?.count ?? 0, several?.info ?? null, ctx, squashState), x, y)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} onFocusPath={(p: string) => (focusPath = p)} tail={shallowSince ? shallowTail : undefined} historySince={shallowSince} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filterOn} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFindInFiles={(text) => findAsk.show(path, text)} onHistorySearch={(text) => setHistory(inFocus(historyOptions(text), focusPath))} onFileHistory={(file: string) => (diff = { mode: 'history', file })} history={historyOn} onFilterDrop={dropLastFilter} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onSelection={(s) => (several = s)} onSelectionMenu={(x, y) => openMenu(selectionMenu(several?.count ?? 0, several?.info ?? null, ctx, squashState), x, y)} onContext={(row, refs, x, y) =>
           void whileBusy(loadRefExtras(path, refs)).then((e) => openMenu(commitMenuItems(row, refs, ctx, e), x, y))}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)

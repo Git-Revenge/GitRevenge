@@ -13,6 +13,15 @@ export function historyOptions(text: string, o: Partial<HistoryOptions> = {}): H
   return { text, matchCase: false, regex: false, lines: false, paths: [], since: 0, ...o }
 }
 
+/** A new search's Only in, while the timeline is focused on a folder or file (#1062): that
+ * path, unless the search names files of its own. Only in reads git's patterns, so a path with
+ * a pattern's characters in it is given as it's spelled. */
+export function inFocus(o: HistoryOptions, focusPath: string): HistoryOptions {
+  if (!focusPath || o.paths?.length) return o
+  const literal = /[*?[\\]/.test(focusPath) || /^[!:]/.test(focusPath)
+  return { ...o, paths: [literal ? `:(literal)${focusPath}` : focusPath] }
+}
+
 /** Names a search's options, so what's worked out for one isn't used for another. */
 export function historyKey(o: HistoryOptions): string {
   return JSON.stringify([o.text, o.matchCase, o.regex, o.lines, o.paths ?? [], o.since])

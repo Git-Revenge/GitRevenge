@@ -258,3 +258,47 @@ func (r *Repo) LastTouched(ctx context.Context, tip, path string) (id string, la
 	later, err = strconv.Atoi(strings.TrimSpace(n))
 	return id, later, err
 }
+
+// RenamedFrom says what a file was called before the oldest commit in the history opts names
+// that touched it, when that commit renamed it there (#1062). opts.Paths holds the file. A
+// timeline focused on a file follows no renames, as git log -- <path> doesn't: git can follow
+// one for a single file's own history only, never across a graph. So the history before the
+// rename isn't in the timeline, and the window says so. old is "" when that commit added or
+// changed the file without a rename, or nothing in the history touched it.
+func (r *Repo) RenamedFrom(ctx context.Context, opts LogOptions) (old string, err error) {
+	if len(opts.Paths) != 1 {
+		return "", errors.New("RenamedFrom takes one file")
+	}
+	if err := CheckRevs(append(slices.Clone(opts.Revs), opts.Extra...)...); err != nil {
+		return "", err
+	}
+	// Oldest last, as the timeline lays it out.
+	out, err := r.ReadString(ctx, append([]string{"rev-list", "--date-order"}, r.logRevs(ctx, opts)...)...)
+	if isEmptyRepoLogError(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	out = strings.TrimSpace(out)
+	oldest := out[strings.LastIndexByte(out, '\n')+1:]
+	if oldest == "" {
+		return "", nil
+	}
+	// A first commit, or a shallow clone's edge, has no parent here to have been renamed from.
+	parent, err := r.ReadString(ctx, "rev-parse", "--verify", "-q", oldest+"^")
+	if err != nil {
+		return "", nil
+	}
+	// Every file, not only this one: a rename is found from the file that went away.
+	raw, err := r.readCmd(ctx, Cmd{Args: []string{"diff-tree", "-r", "-z", "--name-status", "-M", "--no-commit-id", strings.TrimSpace(parent), oldest}, Env: noLazyFetch})
+	if err != nil {
+		return "", err
+	}
+	for _, c := range parseNameStatus(raw) {
+		if c.Status == "R" && c.Path == opts.Paths[0] {
+			return c.OldPath, nil
+		}
+	}
+	return "", nil
+}
