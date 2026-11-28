@@ -1,15 +1,19 @@
 <script lang="ts">
   import { kindInfo } from '../branchKinds'
   import Icon from '../ui/Icon.svelte'
-  import type { RefLabel } from './draw'
+  import { laterSaid, type RefLabel } from './draw'
 
   let {
     label,
     lane = 'var(--ink-mute)',
+    focusPath = '',
   }: {
     label: RefLabel
     /** The colour of the commit's lane, for a branch with no kind of its own. */
     lane?: string
+    /** The folder or file the timeline is focused on, for a label whose branch's tip is later
+     * than its commit (#1061). */
+    focusPath?: string
   } = $props()
 
   let ref = $derived(label.ref)
@@ -18,7 +22,7 @@
   let color = $derived(ref.kind === 'tag' ? 'var(--lane-4)' : kind ? `var(${kind.token})` : lane)
 </script>
 
-<span class="chip" class:head={ref.head} style:--chip={color}>
+<span class="chip" class:head={ref.head} class:later={!!ref.later} style:--chip={color} title={laterSaid(label, focusPath) || undefined}>
   {#if kind}<Icon name={kind.icon} size={12} />{/if}
   <span class="name">{label.text}</span>
   {#if ref.worktree}<span class="worktree" title="Checked out in the worktree at {ref.worktree}"><Icon name="worktree" size={12} /><span class="visually-hidden">, in a worktree</span></span>{/if}
@@ -61,6 +65,11 @@
     flex: none;
     margin-left: 4px;
     color: var(--ink-mute);
+  }
+
+  /* A branch whose tip is later than this commit isn't really here (#1061). */
+  .later {
+    opacity: 0.6;
   }
 
   .head {

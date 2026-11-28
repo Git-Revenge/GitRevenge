@@ -81,8 +81,11 @@ type graphLoader struct {
 	total int
 	// outOf is how many commits the history has without a path focus, counted only under one
 	// (#1060): the chip says 265 of 1,410. 0 until counted, or with no path focus.
-	outOf   int
-	current *graph.Graph
+	outOf int
+	// pathLabels holds, under a path focus, the labels of branches whose tips changed nothing
+	// there, by the commit where their history last did (#1061); nil until found.
+	pathLabels map[string][]git.Ref
+	current    *graph.Graph
 	// narrowed says current was loaded under a filter: it holds only what the filter keeps.
 	// filter is what the next load will be under, which isn't always what's shown.
 	narrowed bool
@@ -100,6 +103,10 @@ type graphLoader struct {
 	// changed is closed and replaced whenever the graph advances, waking waiters.
 	changed chan struct{}
 	cancel  context.CancelFunc
+	// cancelAfter ends what a load starts that may outlast it: the labels and the whole
+	// history's count under a path focus. The next reload or stop calls it; the load's own
+	// cancel is gone once it has ended.
+	cancelAfter context.CancelFunc
 	// wg tracks load goroutines so stop can wait for their git processes to exit.
 	wg sync.WaitGroup
 }
@@ -269,6 +276,90 @@ func (l *graphLoader) Authored(spans [][2]int64) (counts []int, ok bool) {
 // Filtered reports whether a filter is narrowing the graph, how many commits the load
 // under it has looked through so far, kept or passed over, and how many the history has
 // in all (0 until that's counted).
+// maxLabelReads is how many branches labelPath asks git about at once.
+const maxLabelReads = 8
+
+// labelAfterRows is how many rows a path focus shows before labelPath starts asking about
+// branches: more than a screen.
+const labelAfterRows = 150
+
+// labelPath finds, for each branch shown, the newest commit in its history that touched path
+// and how far its tip is past it, so a branch whose tip changed nothing there is labelled
+// where its history last did (#1061). It runs beside the load, one git rev-list for each
+// branch, and the rows never wait for it: the labels arrive with a progress update.
+func (l *graphLoader) labelPath(ctx context.Context, g *graph.Graph, idx *RefIndex, path string) {
+	defer l.wg.Done()
+	// The rows go first. On the Linux kernel with 300 branches, asking about them all while
+	// the first screen of mm/ was still being read took it from 3 s to 11 s.
+	for {
+		l.mu.Lock()
+		done := l.current == g && !l.loading
+		l.mu.Unlock()
+		if done || g.Len() >= labelAfterRows {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+	var (
+		mu     sync.Mutex
+		wg     sync.WaitGroup
+		labels = map[string][]git.Ref{}
+		slots  = make(chan struct{}, maxLabelReads)
+	)
+	for _, list := range idx.ByCommit {
+		for _, ref := range list {
+			if ref.Kind != git.LocalBranch && ref.Kind != git.RemoteBranch {
+				continue
+			}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				select {
+				case slots <- struct{}{}:
+				case <-ctx.Done():
+					return
+				}
+				defer func() { <-slots }()
+				id, later, err := l.repo.LastTouched(ctx, ref.Commit, path)
+				if err != nil || later == 0 {
+					return
+				}
+				ref.Later = later
+				// The label isn't where HEAD is, so it never says "you're here".
+				ref.Head = false
+				mu.Lock()
+				labels[id] = append(labels[id], ref)
+				mu.Unlock()
+			}()
+		}
+	}
+	wg.Wait()
+	for _, list := range labels {
+		slices.SortFunc(list, func(a, b git.Ref) int { return strings.Compare(a.Name, b.Name) })
+	}
+	l.mu.Lock()
+	if ctx.Err() != nil {
+		l.mu.Unlock()
+		return
+	}
+	l.pathLabels = labels
+	l.mu.Unlock()
+	l.report(GraphProgress{Rows: g.Len(), RefsReady: true})
+}
+
+// PathLabels is, under a path focus, the labels of branches whose tips changed nothing under
+// the path, by the commit where their history last did; nil until found, or with no path
+// focus.
+func (l *graphLoader) PathLabels() map[string][]git.Ref {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.pathLabels
+}
+
 // OutOf is how many commits the history has without the path focus, while one narrows it;
 // 0 until counted, or with no path focus.
 func (l *graphLoader) OutOf() int {
@@ -544,8 +635,13 @@ func (l *graphLoader) reload() {
 	if l.cancel != nil {
 		l.cancel()
 	}
+	if l.cancelAfter != nil {
+		l.cancelAfter()
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	l.cancel = cancel
+	after, cancelAfter := context.WithCancel(context.Background())
+	l.cancelAfter = cancelAfter
 	g := graph.New()
 	if l.current == nil {
 		l.current = g
@@ -562,6 +658,7 @@ func (l *graphLoader) reload() {
 	l.looked = 0
 	l.times = nil
 	l.outOf = 0
+	l.pathLabels = nil
 	// Counted before the lock is let go, so that stop, which takes it to say nothing more
 	// loads, never starts waiting with a load about to be added.
 	l.wg.Add(1)
@@ -635,6 +732,10 @@ func (l *graphLoader) reload() {
 			if first {
 				l.report(GraphProgress{Rows: g.Len(), RefsReady: true})
 			}
+			if focus.Path != "" && err == nil {
+				l.wg.Add(1)
+				go l.labelPath(after, g, idx, focus.Path)
+			}
 			refsCh <- refResult{idx, err}
 		}()
 		var refs *refResult
@@ -687,12 +788,12 @@ func (l *graphLoader) reload() {
 			l.wg.Add(1)
 			go func() {
 				defer l.wg.Done()
-				n, err := l.repo.CountCommits(ctx, whole)
+				n, err := l.repo.CountCommits(after, whole)
 				if err != nil {
 					return
 				}
 				l.mu.Lock()
-				if ctx.Err() == nil {
+				if after.Err() == nil {
 					l.outOf = n
 				}
 				l.mu.Unlock()
@@ -902,6 +1003,10 @@ func (l *graphLoader) stop() {
 	if l.cancel != nil {
 		l.cancel()
 		l.cancel = nil
+	}
+	if l.cancelAfter != nil {
+		l.cancelAfter()
+		l.cancelAfter = nil
 	}
 	l.mu.Unlock()
 	l.wg.Wait()

@@ -174,6 +174,10 @@ func (r *Repo) Filtered() (on bool, looked, total int) { return r.graph.Filtered
 // the graph: see graphLoader.OutOf.
 func (r *Repo) GraphOutOf() int { return r.graph.OutOf() }
 
+// PathLabels is, under a path focus, the labels of branches whose tips changed nothing under
+// it, by the commit where their history last did: see graphLoader.PathLabels.
+func (r *Repo) PathLabels() map[string][]git.Ref { return r.graph.PathLabels() }
+
 // Rules returns the branch rules (kinds and hide patterns) in a repository's settings.
 func Rules(rs settings.RepoSettings) branchkind.Rules {
 	overrides := map[branchkind.Kind][]string{}

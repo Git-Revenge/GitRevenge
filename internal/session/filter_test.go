@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/git-revenge/gitrevenge/internal/git"
 	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
 
@@ -221,5 +222,98 @@ func TestFocusOnAPath(t *testing.T) {
 	g, _ = r.Graph()
 	if _, ok := g.RowOf(m1); ok {
 		t.Error("main's commit shows under a focus on side")
+	}
+}
+
+// #1061: under a path focus, a branch whose tip touched the path is labelled as usual; one
+// whose tip didn't is labelled where its history last did, with how far its tip is past it;
+// one that never touched it has no label.
+func TestPathFocusLabelsBranchesWhereTheyLastTouchedIt(t *testing.T) {
+	m, _ := newManager(t)
+	fx := gittest.New(t)
+	c1 := fx.CommitFile("a/x.txt", "x\n", "c1: a")
+	fx.CommitFile("b/y.txt", "y\n", "c2: b")
+	fx.Branch("touch")
+	t1 := fx.CommitFile("a/t.txt", "t\n", "t1: a, on touch")
+	fx.Checkout("main")
+	fx.Branch("away")
+	fx.CommitFile("b/q.txt", "q\n", "q1: b, on away")
+	fx.Git("checkout", "-q", "--orphan", "never")
+	fx.Git("rm", "-r", "-q", "-f", ".")
+	fx.CommitFile("c/n.txt", "n\n", "n1: c, on never")
+	fx.Checkout("main")
+	r, err := m.Open(context.Background(), fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitGraph(t, r, 5)
+
+	r.SetFocus(Focus{Path: "a/"})
+	waitGraph(t, r, 2)
+	var labels map[string][]git.Ref
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && labels == nil; time.Sleep(20 * time.Millisecond) {
+		labels = r.PathLabels()
+	}
+	at := map[string]int{}
+	for id, list := range labels {
+		for _, ref := range list {
+			if ref.Kind == git.LocalBranch {
+				at[ref.Short] = ref.Later
+				if id != c1 {
+					t.Errorf("%s is labelled at %s, want c1", ref.Short, id[:7])
+				}
+			}
+		}
+	}
+	// main is 1 past c1 (c2); away is 2 past it (c2, q1).
+	if len(at) != 2 || at["main"] != 1 || at["away"] != 2 {
+		t.Errorf("labels = %v, want main 1 and away 2 at c1", at)
+	}
+	// touch's own tip is in the history, labelled as any ref is.
+	if refs := r.Refs().ByCommit[t1]; len(refs) != 1 || refs[0].Short != "touch" || refs[0].Later != 0 {
+		t.Errorf("touch's tip: %v", refs)
+	}
+
+	// Without the path focus, no labels.
+	r.SetFocus(Focus{})
+	waitGraph(t, r, 5)
+	if got := r.PathLabels(); got != nil {
+		t.Errorf("labels without a path: %v", got)
+	}
+}
+
+// #1061: a path focus's labels wait for its rows, and outlive its load. When the next focus
+// replaced a load that had finished, they waited for the old graph's rows for ever, and
+// closing the repository waited for them (a CI run timed out at ten minutes).
+func TestPathFocusLabelsEndWithTheirLoad(t *testing.T) {
+	m, _ := newManager(t)
+	fx := gittest.New(t)
+	fx.CommitFile("a/x.txt", "x\n", "c1: a")
+	fx.Branch("side")
+	fx.CommitFile("b/y.txt", "y\n", "s1: b")
+	fx.Checkout("main")
+	fx.CommitFile("b/z.txt", "z\n", "c2: b")
+	r, err := m.Open(context.Background(), fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitGraph(t, r, 3)
+	for i := range 10 {
+		if i%2 == 0 {
+			r.SetFocus(Focus{Path: "a/"})
+		} else {
+			r.SetFocus(Focus{Branch: "side", Path: "a/"})
+		}
+		waitGraph(t, r, 1)
+	}
+	closed := make(chan struct{})
+	go func() {
+		m.CloseAll()
+		close(closed)
+	}()
+	select {
+	case <-closed:
+	case <-time.After(20 * time.Second):
+		t.Fatal("closing the repository waited on a path focus's labels")
 	}
 }

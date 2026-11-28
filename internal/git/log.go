@@ -234,3 +234,27 @@ func isEmptyRepoLogError(err error) bool {
 	return strings.Contains(gerr.Stderr, "does not have any commits yet") ||
 		strings.Contains(gerr.Stderr, "bad revision 'HEAD'")
 }
+
+// LastTouched finds the newest commit in tip's history that changed something under path,
+// and how many commits tip is past it (#1061): a branch whose tip changed nothing there is
+// labelled at that commit in a timeline focused on the path. id is "" when nothing in tip's
+// history touched it, and later is 0 when tip itself did.
+func (r *Repo) LastTouched(ctx context.Context, tip, path string) (id string, later int, err error) {
+	if err := CheckRevs(tip); err != nil {
+		return "", 0, err
+	}
+	out, err := r.ReadString(ctx, "rev-list", "-1", tip, "--", ":(literal)"+path)
+	if err != nil {
+		return "", 0, err
+	}
+	id = strings.TrimSpace(out)
+	if id == "" || id == tip {
+		return id, 0, nil
+	}
+	n, err := r.ReadString(ctx, "rev-list", "--count", id+".."+tip, "--")
+	if err != nil {
+		return "", 0, err
+	}
+	later, err = strconv.Atoi(strings.TrimSpace(n))
+	return id, later, err
+}

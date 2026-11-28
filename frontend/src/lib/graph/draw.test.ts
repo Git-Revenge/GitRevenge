@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { authorSpan, clip, dayBounds, DATE_COLUMN, noteMarkSpan, middleCut, fitLabelColumn, LABEL_COLUMN, labelColumnNeed, moreLabels, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine, bisectRow, startsRun, RUN_PAUSE, dayLineLabel, dayLineSpoken, gapLabel, dayCountLabel, strongAbove, strongBelow, selectionWash, thinned } from './draw'
+import { authorSpan, clip, dayBounds, DATE_COLUMN, noteMarkSpan, middleCut, fitLabelColumn, LABEL_COLUMN, labelColumnNeed, moreLabels, elbow, graphWidth, initials, LANE_COUNT, laneActive, laneColor, laneVar, laneWindow, laneX, layoutColumns, mainRemote, METRICS, refColumnWidth, refLabels, laterSaid, SEAL_OFFSET, relativeTime, remoteOf, repeatsAuthor, setLaneColors, sortRefs, selectionBar, hereNotePlace, HERE_NOTE, sameDay, dayLabel, timeLabel, metaLine, bisectRow, startsRun, RUN_PAUSE, dayLineLabel, dayLineSpoken, gapLabel, dayCountLabel, strongAbove, strongBelow, selectionWash, thinned } from './draw'
 import type { Ref, Row } from './rowCache'
 
 describe('graph geometry', () => {
@@ -701,5 +701,29 @@ describe('the selected row\'s wash', () => {
     expect(thinned('#cb0162', 0.5)).toBe('rgba(203, 1, 98, 0.5)')
     expect(thinned('#cb016280', 0.5)).toBe('rgba(203, 1, 98, 0.251)')
     expect(thinned('oklch(0.5 0.2 20)', 0.5)).toBe('oklch(0.5 0.2 20)')
+  })
+})
+
+// #1061: a branch labelled where its history last touched the focused path.
+describe('a label whose branch is later', () => {
+  const ref = (short: string, kind: Ref['kind'], extra: Partial<Ref> = {}) => ({ name: short, short, kind, head: false, commit: '', upstream: '', ahead: 0, behind: 0, gone: false, ...extra }) as Ref
+
+  it('comes after the refs really on the commit, and says how far back its tip is', () => {
+    const labels = refLabels([ref('main', 'local', { later: 26 }), ref('v1.2', 'tag'), ref('fix/gusts', 'local')])
+    expect(labels.map((l) => l.text)).toEqual(['◆ v1.2', 'fix/gusts', 'main · 26 later'])
+  })
+
+  it('folds with its remote copy when both are later', () => {
+    const labels = refLabels([ref('main', 'local', { later: 3 }), ref('origin/main', 'remote', { later: 3 })])
+    expect(labels.map((l) => [l.text, l.places])).toEqual([['main · 3 later', ['local', 'origin']]])
+  })
+
+  it('names what it skipped over in its tooltip', () => {
+    const [l] = refLabels([ref('main', 'local', { later: 26 })])
+    expect(laterSaid(l, 'src/alerts/')).toBe("main's tip is 26 commits later; none of them touched src/alerts/")
+    const [one] = refLabels([ref('main', 'local', { later: 1 })])
+    expect(laterSaid(one, 'src/alerts/sms.js')).toBe("main's tip is 1 commit later, which didn't touch src/alerts/sms.js")
+    const [here] = refLabels([ref('main', 'local')])
+    expect(laterSaid(here, 'src/alerts/')).toBe('')
   })
 })

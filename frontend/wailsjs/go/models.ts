@@ -5334,6 +5334,7 @@ export namespace git {
 	    worktree?: string;
 	    hidden?: boolean;
 	    focused?: boolean;
+	    later?: number;
 	    branchKind?: string;
 	    stackParent?: string;
 	    stackDepth?: number;
@@ -5361,6 +5362,7 @@ export namespace git {
 	        this.worktree = source["worktree"];
 	        this.hidden = source["hidden"];
 	        this.focused = source["focused"];
+	        this.later = source["later"];
 	        this.branchKind = source["branchKind"];
 	        this.stackParent = source["stackParent"];
 	        this.stackDepth = source["stackDepth"];

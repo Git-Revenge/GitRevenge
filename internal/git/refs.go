@@ -50,6 +50,10 @@ type Ref struct {
 	Hidden bool `json:"hidden,omitempty"`
 	// Focused marks a branch the graph is focused on (set by the session).
 	Focused bool `json:"focused,omitempty"`
+	// Later, in a timeline focused on a path, marks a branch's label on the newest commit in
+	// its history that touched the path: its tip is this many commits further on, none of
+	// which did (#1061, set by the session). Commit is still the tip.
+	Later int `json:"later,omitempty"`
 	// BranchKind is the branch's kind from the repository's patterns ("trunk", "release",
 	// "environment", "docs", "bot", "feature", "bug"), or "" for an ordinary branch (set by the session).
 	BranchKind string `json:"branchKind,omitempty"`

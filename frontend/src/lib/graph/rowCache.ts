@@ -64,6 +64,9 @@ export interface Ref {
   updated?: number
   /** The remote this branch alone pushes to (branch.<name>.pushRemote), when it sets one. */
   pushRemote?: string
+  /** In a timeline focused on a path, a branch whose tip changed nothing there is labelled on
+   * the newest commit in its history that did: its tip is this many commits later (#1061). */
+  later?: number
 }
 
 /** A pinned trailer key's value on a commit (trailerindex.Chip in Go): what a pick is made of,

@@ -231,3 +231,30 @@ func TestFocusSuggestionsAndTheWholeCount(t *testing.T) {
 	n, _ := a.GraphOutOf(path)
 	t.Errorf("out of %d, want 3", n)
 }
+
+// #1061: a branch whose tip changed nothing under the path is labelled on the row where its
+// history last did, after the refs that are there.
+func TestGraphRowsLabelABranchWhereItLastTouchedThePath(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx := gittest.New(t)
+	c1 := fx.CommitFile("src/alerts/sms.js", "x\n", "sms")
+	fx.Tag("v1", "v1")
+	fx.CommitFile("README.md", "r\n", "readme")
+	path := openForMap(t, a, fx)
+	if err := a.SetGraphPath(path, "src/alerts/"); err != nil {
+		t.Fatal(err)
+	}
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		p, err := a.GraphRows(path, 0, 10)
+		if err != nil || p.Loading || len(p.Rows) != 1 {
+			continue
+		}
+		refs := p.Refs[c1]
+		if len(refs) == 2 && refs[0].Short == "v1" && refs[1].Short == "main" && refs[1].Later == 1 {
+			return
+		}
+	}
+	p, _ := a.GraphRows(path, 0, 10)
+	t.Errorf("refs at sms: %+v", p.Refs[c1])
+}
