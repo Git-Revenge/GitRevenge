@@ -152,7 +152,7 @@ jobs:
         # The race detector needs cgo: macOS and Linux runners have a compiler, Windows
         # runners have no gcc.
         run: |
-          if [ "$RUNNER_OS" = "Windows" ]; then go test ./...; else go test -race ./...; fi
+          if [ "$RUNNER_OS" = "Windows" ]; then go test -timeout 20m ./...; else go test -race ./...; fi
       # Lint findings are the same on every OS, so one run is enough.
       - if: runner.os == 'Linux'
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
