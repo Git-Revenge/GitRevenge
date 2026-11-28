@@ -729,6 +729,7 @@
               file={diff.file}
               rev={diff.commit ?? ''}
               line={diff.line ?? 0}
+              writeAs={diff.writeAs ?? ''}
               onClose={() => (diff = null)}
               onOpen={(t: DiffTarget) => (diff = t)}
               onReveal={revealCommit}

@@ -15,6 +15,9 @@
     line?: number
     /** The search that found it, for its matches to be marked. */
     find?: FindOptions
+    /** For 'blame' carried on from before a rename: the file's name today, which a version
+     * restored from it is written under (#1082). */
+    writeAs?: string
   }
 </script>
 

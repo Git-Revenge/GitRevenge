@@ -2739,6 +2739,34 @@ export namespace app {
 	        this.head = source["head"];
 	    }
 	}
+	export class RestorePlan {
+	    added: number;
+	    removed: number;
+	    uncommitted: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RestorePlan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.added = source["added"];
+	        this.removed = source["removed"];
+	        this.uncommitted = source["uncommitted"];
+	    }
+	}
+	export class Restored {
+	    id: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Restored(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	    }
+	}
 	export class RulerMarks {
 	    loaded: number;
 	    months: graph.MonthMark[];

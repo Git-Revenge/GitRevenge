@@ -1,11 +1,12 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import Icon from '../ui/Icon.svelte'
-  import { Blame, BlameBlock, BlameDownloading, BlameNeeds, BlameStep, BlameTrack, CancelDownload, DownloadFiles, FileDiff } from '../../../wailsjs/go/app/App.js'
+  import { Blame, BlameBlock, BlameDownloading, BlameNeeds, BlameStep, BlameTrack, CancelDownload, DownloadFiles, FileDiff, RestoreBlock, RestorePlan, RestoreVersion, UndoRestore } from '../../../wailsjs/go/app/App.js'
+  import RestoreDialog from './RestoreDialog.svelte'
   import BlockPanel from './BlockPanel.svelte'
   import VersionTrack from './VersionTrack.svelte'
   import { ageBucket, blameBackward, blameForward, changedLines, changeRows, fillBlame, loadWay, saveWay, stepIndex, textLines, trackSteps, type Blamed, type ReadWay, type Step } from './track'
-  import type { git } from '../../../wailsjs/go/models'
+  import type { app, git } from '../../../wailsjs/go/models'
   import { errorText } from '../errors'
   import Busy from '../ui/Busy.svelte'
   import { formatTime, laneVar } from '../graph/draw'
@@ -22,6 +23,7 @@
     file,
     rev = '',
     line = 0,
+    writeAs = '',
     onClose,
     onOpen,
     onReveal,
@@ -31,6 +33,9 @@
     rev?: string
     /** A line (1-based) to wash and bring into view, as Find in files opens one (#980). */
     line?: number
+    /** The file's name today, when this is its blame under an older name, from before a
+     * rename: a version restored is written under it (#1082). */
+    writeAs?: string
     onClose: () => void
     onOpen: (t: DiffTarget) => void
     /** Shows a commit in the graph. */
@@ -110,6 +115,71 @@
       }
     } finally {
       reading = false
+    }
+  }
+
+  // Restoring (#1082): a version, or a block's lines, written into the working tree as a
+  // change to commit or throw away. It asks first, and Undo brings back what was there.
+  /** The file written: today's name, when this is its blame from before a rename. */
+  let target = $derived(writeAs || file)
+  /** Its name in the versions shown, when that isn't today's. */
+  let sourceName = $derived(writeAs ? file : '')
+  type RestoreAsk = { commit: string; lines: { from: number; to: number } | null; at: string; text: string[]; plan: app.RestorePlan | null }
+  let asking = $state<RestoreAsk | null>(null)
+  let restoring = $state(false)
+  let restoreProblem = $state('')
+  let restored = $state<{ id: string; said: string } | null>(null)
+  /** Goes up after a restore or its Undo: the track and the blame read the file again. */
+  let reloads = $state(0)
+
+  async function askVersion() {
+    const commit = steps[at]?.id
+    if (!commit) return
+    asking = { commit, lines: null, at: '', text: [], plan: null }
+    restoreProblem = ''
+    try {
+      const plan = await RestorePlan(path, target, commit, sourceName)
+      if (asking?.commit === commit && !asking.lines) asking = { ...asking, plan }
+    } catch (err) {
+      restoreProblem = errorText(err)
+    }
+  }
+
+  function askLines(v: git.BlockVersion) {
+    if (!block) return
+    asking = { commit: v.id, lines: { from: block.from, to: block.to }, at: block.commit, text: v.lines.filter((l) => l.kind !== '-').map((l) => l.text), plan: null }
+    restoreProblem = ''
+  }
+
+  async function restoreAsked() {
+    const a = asking
+    if (!a) return
+    restoring = true
+    restoreProblem = ''
+    try {
+      const done = a.lines ? await RestoreBlock(path, target, sourceName, a.at, a.lines.from, a.lines.to, a.text) : await RestoreVersion(path, target, a.commit, sourceName)
+      const sha = a.commit.slice(0, 7)
+      const said = a.lines ? (a.lines.from === a.lines.to ? `Line ${a.lines.from} is as it was at ${sha}.` : `Lines ${a.lines.from} to ${a.lines.to} are as they were at ${sha}.`) : `${target} is as it was at ${sha}.`
+      restored = { id: done.id, said }
+      asking = null
+      block = null
+      reloads++
+    } catch (err) {
+      restoreProblem = errorText(err)
+    } finally {
+      restoring = false
+    }
+  }
+
+  async function undoRestore() {
+    const r = restored
+    if (!r) return
+    restored = null
+    try {
+      await UndoRestore(path, r.id)
+      reloads++
+    } catch (err) {
+      session.error = errorText(err)
     }
   }
 
@@ -308,11 +378,12 @@
 
   function carryOn() {
     if (!renamedFrom || !steps[0]) return
-    onOpen({ mode: 'blame', file: renamedFrom, commit: `${steps[0].id}^` })
+    onOpen({ mode: 'blame', file: renamedFrom, commit: `${steps[0].id}^`, writeAs: writeAs || file })
   }
 
   $effect(() => {
     const [f, r] = [file, rev]
+    void reloads
     steps = []
     blameOf.clear()
     blocksOf.clear()
@@ -337,6 +408,7 @@
 
   $effect(() => {
     const [f, r] = [file, rev]
+    void reloads
     lines = null
     ask = null
     failed = ''
@@ -442,7 +514,14 @@
     <button class="btn quiet" onclick={() => onOpen({ mode: 'history', file })}>History</button>
   </header>
   {#if steps.length > 1 && !ask}
-    <VersionTrack {steps} {at} onAt={goTo} {renamedFrom} onCarryOn={carryOn} {onReveal} {way} onWay={setWay} />
+    <VersionTrack {steps} {at} onAt={goTo} {renamedFrom} onCarryOn={carryOn} {onReveal} {way} onWay={setWay} onRestore={steps[at]?.id ? askVersion : undefined} />
+  {/if}
+  {#if restored}
+    <p class="restored" role="status">
+      <span>{restored.said} It’s a change in the working tree, ready to commit or throw away.</span>
+      <button class="btn sm" onclick={undoRestore}>Undo</button>
+      <button class="btn sm quiet icon" onclick={() => (restored = null)} aria-label="Dismiss"><Icon name="close" size={12} /></button>
+    </p>
   {/if}
   <div class="split">
   <div class="body code-ground" bind:this={body}>
@@ -545,10 +624,14 @@
     {/if}
   </div>
   {#if block}
-    <BlockPanel from={block.from} to={block.to} versions={block.versions} problem={block.problem} fileVersions={steps.filter((s) => s.id).length} onShow={showAt} onClose={() => (block = null)} {onReveal} />
+    <BlockPanel from={block.from} to={block.to} versions={block.versions} problem={block.problem} fileVersions={steps.filter((s) => s.id).length} onShow={showAt} onClose={() => (block = null)} {onReveal} onRestore={askLines} />
   {/if}
   </div>
 </div>
+
+{#if asking}
+  <RestoreDialog file={target} commit={asking.commit} lines={asking.lines} plan={asking.plan} busy={restoring} problem={restoreProblem} onRestore={restoreAsked} onClose={() => (asking = null)} />
+{/if}
 
 <style>
   .blame {
@@ -763,6 +846,24 @@
 
   table.changes tr.del .sign {
     color: var(--ink-mute);
+  }
+
+  /* After a restore: what it did, and Undo. */
+  .restored {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    margin: 0;
+    padding: 6px 16px;
+    border-bottom: 1px dashed var(--paper-edge);
+    background: color-mix(in srgb, var(--success) 12%, var(--paper));
+    font-size: 13px;
+    color: var(--ink);
+  }
+
+  .restored span {
+    flex: 1 1 auto;
   }
 
   .reading {

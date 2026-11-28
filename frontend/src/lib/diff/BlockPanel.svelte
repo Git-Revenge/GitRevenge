@@ -16,6 +16,7 @@
     onShow,
     onClose,
     onReveal,
+    onRestore,
   }: {
     /** The lines rewound, counting from 1, in the version shown. */
     from: number
@@ -29,6 +30,8 @@
     onShow?: (commit: string) => void
     onClose: () => void
     onReveal?: (commit: string) => void
+    /** Puts the lines back as a version had them, in the working tree (#1082). */
+    onRestore?: (v: git.BlockVersion) => void
   } = $props()
 
   let title = $derived(from === to ? `Line ${from}, through time` : `Lines ${from} to ${to}, through time`)
@@ -67,7 +70,10 @@
             <pre class="change">{#each v.lines as l, k (k)}<span class="l {l.kind === '+' ? 'add' : l.kind === '-' ? 'del' : ''}"><span class="sign" aria-hidden="true">{l.kind === ' ' ? ' ' : l.kind === '-' ? '−' : '+'}</span>{#if l.kind === '-'}<span class="visually-hidden">Taken out:&nbsp;</span>{:else if l.kind === '+'}<span class="visually-hidden">Added:&nbsp;</span>{/if}{l.text}
 </span>{/each}</pre>
           {/if}
-          {#if onShow}<button class="btn sm text" onclick={() => onShow(v.id)}>Show the whole file at {v.id.slice(0, 7)}</button>{/if}
+          <span class="acts">
+            {#if onShow}<button class="btn sm text" onclick={() => onShow(v.id)}>Show the whole file at {v.id.slice(0, 7)}</button>{/if}
+            {#if onRestore && i > 0 && v.lines.some((l) => l.kind !== '-')}<button class="btn sm text" onclick={() => onRestore(v)}>Restore these lines</button>{/if}
+          </span>
         </li>
       {/each}
     </ol>
@@ -182,6 +188,12 @@
     font-family: var(--font-mono);
     font-size: 12px;
     line-height: 1.6;
+  }
+
+  .acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 12px;
   }
 
   .l {
