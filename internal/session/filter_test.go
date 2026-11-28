@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/git-revenge/gitrevenge/internal/gittest"
 )
@@ -168,5 +169,57 @@ func TestFilterUntilEndsTheWalk(t *testing.T) {
 	waitGraph(t, r, 3)
 	if got := rowsOf(); got[2] != ids[1] {
 		t.Fatalf("rows = %v", got)
+	}
+}
+
+// #1059: a path focus narrows the graph to the commits that changed something under the path,
+// with git's own simplification, and stacks with a branch focus.
+func TestFocusOnAPath(t *testing.T) {
+	m, _ := newManager(t)
+	fx := gittest.New(t)
+	c1 := fx.CommitFile("a/x.txt", "x\n", "c1: a")
+	fx.CommitFile("b/y.txt", "y\n", "c2: b")
+	fx.Branch("side")
+	s1 := fx.CommitFile("a/x2.txt", "x2\n", "s1: a, on side")
+	fx.Checkout("main")
+	m1 := fx.CommitFile("a/x.txt", "x, on main\n", "m1: a, on main")
+	fx.CommitFile("b/w.txt", "w\n", "c3: b")
+	r, err := m.Open(context.Background(), fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitGraph(t, r, 5)
+
+	r.SetFocus(Focus{Path: "a/"})
+	waitGraph(t, r, 3)
+	g, _ := r.Graph()
+	for _, id := range []string{c1, s1, m1} {
+		if _, ok := g.RowOf(id); !ok {
+			t.Errorf("%s touched a/ and isn't shown", id[:7])
+		}
+	}
+	// Both branches' work joins c1 again: their lanes hold together.
+	row, _ := g.RowOf(c1)
+	if rows := g.Rows(row, 1); rows[0].Parents != 0 {
+		t.Errorf("c1 has %d parents, want none", rows[0].Parents)
+	}
+	// The count runs beside the load, so it can land a moment after the rows.
+	var on bool
+	var total int
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		if on, _, total = r.Filtered(); total == 3 {
+			break
+		}
+	}
+	if on || total != 3 {
+		t.Errorf("filtered = %v, total %d; a path is a focus, not a filter, and counts 3", on, total)
+	}
+
+	// With a branch focus: that branch's history, under the path.
+	r.SetFocus(Focus{Branch: "side", Path: "a/"})
+	waitGraph(t, r, 2)
+	g, _ = r.Graph()
+	if _, ok := g.RowOf(m1); ok {
+		t.Error("main's commit shows under a focus on side")
 	}
 }

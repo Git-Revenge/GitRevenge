@@ -60,6 +60,7 @@
     tail,
     historySince = 0,
     wip,
+    onFocusPath,
     toolsHost,
     squeeze,
     bisect = null,
@@ -87,6 +88,9 @@
     /** The working tree, for a view that draws it itself where the rows use `lead`: how many
      * files have changed (null until known), whether its panel is showing, and how to show it. */
     wip?: { changes: number | null; active: boolean; open: () => void }
+    /** Told the folder or file the graph is focused on (#1059), "" for none: the working tree
+     * row counts only what's changed under it. */
+    onFocusPath?: (path: string) => void
     /** Right-click on a row, with the refs pointing at it and the mouse position. */
     onContext?: (row: Row, refs: Ref[], x: number, y: number) => void
     /** A row dragged onto another row. */
@@ -403,17 +407,25 @@
   let focus = $state<{ branch: string; stack: boolean } | null>(null)
   let focusLabel = $derived(focus ? (focus.stack ? `the stack of ${focus.branch}` : focus.branch) : '')
 
+  /** The folder or file the graph is focused on (#1059), "" for none. */
+  let focusPath = $state('')
+
   /** Whether the graph is focused, so a branch outside it can be explained. */
   export function focused(): boolean {
-    return !!focus
+    return !!focus || !!focusPath
   }
 
   /** Reads the focus, reporting whether it's a new one to show from the top. */
   async function loadFocus(): Promise<boolean> {
     const was = focusLabel
+    const wasPath = focusPath
     const next = await GraphFocus(path).catch(() => null)
     focus = next?.branch ? next : null
-    return !!focus && focusLabel !== was
+    if ((next?.path ?? '') !== focusPath) {
+      focusPath = next?.path ?? ''
+      onFocusPath?.(focusPath)
+    }
+    return (!!focus && focusLabel !== was) || (!!focusPath && focusPath !== wasPath)
   }
 
   function stopFocusing() {

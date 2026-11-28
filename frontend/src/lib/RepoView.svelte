@@ -30,6 +30,7 @@
   import { ofCommits } from './diff/target'
   import Lazy from './ui/Lazy.svelte'
   import { diffTools } from './difftool.svelte'
+  import { workingTreeSaid } from './pathFocus'
   import { findAsk } from './find/findAsk.svelte'
   import GraphView from './graph/GraphView.svelte'
   import type { RefLabel } from './graph/draw'
@@ -107,6 +108,11 @@
   let view = $state<'wip' | 'commit'>('commit')
   /** Files with uncommitted changes; null until the first answer, so nothing claims "clean". */
   let changes = $state<number | null>(null)
+  /** Their paths, for a timeline focused on a folder or file (#1059), and that folder or file. */
+  let changedFiles = $state<string[] | null>(null)
+  let focusPath = $state('')
+  /** The working tree row: under a path focus, only what changed under it. */
+  let wtRow = $derived(workingTreeSaid(changedFiles, focusPath))
 
   /** Where a shallow clone's history stops, Unix seconds; 0 for a whole history (#1006). The
    * graph ends with a band saying so, and offering the rest. */
@@ -495,6 +501,7 @@
     const wt = await session.run(() => repoReads(path).workingTree())
     if (!wt) return
     changes = wt.status.files.length
+    changedFiles = wt.status.files.map((f) => f.path)
     // Open on the changes when there are any.
     if (!checkedInitial) {
       checkedInitial = true
@@ -658,7 +665,7 @@
       <ShallowBand {path} since={shallowSince} />
     {/snippet}
     <div class="graph" class:hidden={diff || rebaseBase}>
-      <GraphView bind:this={graph} {path} {toolsHost} tail={shallowSince ? shallowTail : undefined} historySince={shallowSince} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filterOn} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFindInFiles={(text) => findAsk.show(path, text)} onHistorySearch={(text) => setHistory(historyOptions(text))} history={historyOn} onFilterDrop={dropLastFilter} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onSelection={(s) => (several = s)} onSelectionMenu={(x, y) => openMenu(selectionMenu(several?.count ?? 0, several?.info ?? null, ctx, squashState), x, y)} onContext={(row, refs, x, y) =>
+      <GraphView bind:this={graph} {path} {toolsHost} onFocusPath={(p: string) => (focusPath = p)} tail={shallowSince ? shallowTail : undefined} historySince={shallowSince} wip={{ changes, active: view === 'wip', open: openWip }} squeeze={barSqueeze} bisect={bisectMarks} {onSelect} onNote={() => (noteAsk += 1)} sparse={only && filterOn} {highlight} {trailersUnread} {pins} filterPicks={filter.picks} onFilterPick={(key, value) => setFilter(togglePick(filter.picks, key, value))} onFilterAdd={addPick} onFindInFiles={(text) => findAsk.show(path, text)} onHistorySearch={(text) => setHistory(historyOptions(text))} history={historyOn} onFilterDrop={dropLastFilter} onAuthor={(row, x, y, above) => (authorCard = { sha: row.id, name: row.author, x, y, above })} onSelectedRefs={(r) => (selectedRefs = r)} onSelection={(s) => (several = s)} onSelectionMenu={(x, y) => openMenu(selectionMenu(several?.count ?? 0, several?.info ?? null, ctx, squashState), x, y)} onContext={(row, refs, x, y) =>
           void whileBusy(loadRefExtras(path, refs)).then((e) => openMenu(commitMenuItems(row, refs, ctx, e), x, y))}
         onDrop={(source, sourceRefs, target, targetRefs, x, y) => {
           const items = dropItems(source, sourceRefs, target, targetRefs, ctx)
@@ -678,14 +685,14 @@
             style:padding-left="{at.textX}px"
             onclick={openWip}
           >
-            <span class="dot" class:dirty={!!changes} style:left="{at.nodeX - 8}px">{#if changes && changes > 0}<span class="ring"></span>{:else if changes !== null}<Icon name="check" />{/if}</span>
-            <span class="wip-title">{changes ? `${changes} ${changes === 1 ? 'file' : 'files'} changed` : 'Working tree'}</span>
-            {#if changes && session.activeTab?.head}
+            <span class="dot" class:dirty={!!wtRow.changes} style:left="{at.nodeX - 8}px">{#if wtRow.changes && wtRow.changes > 0}<span class="ring"></span>{:else if wtRow.changes !== null}<Icon name="check" />{/if}</span>
+            <span class="wip-title">{wtRow.title}</span>
+            {#if wtRow.changes && session.activeTab?.head}
               <span class="where">{session.activeTab.head.startsWith('detached') ? session.activeTab.head : `on ${session.activeTab.head}`}</span>
-            {:else if changes === 0}
+            {:else if wtRow.changes === 0 && !focusPath}
               <span class="meta">clean</span>
             {/if}
-            {#if changes}<span class="review">Review</span>{/if}
+            {#if wtRow.changes}<span class="review">Review</span>{/if}
           </button>
         {/snippet}
       </GraphView>

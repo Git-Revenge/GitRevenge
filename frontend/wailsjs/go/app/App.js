@@ -142,6 +142,10 @@ export function ChoosePatchFile() {
   return window['go']['app']['App']['ChoosePatchFile']();
 }
 
+export function ClearGraphFocus(arg1) {
+  return window['go']['app']['App']['ClearGraphFocus'](arg1);
+}
+
 export function Clone(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['Clone'](arg1, arg2, arg3, arg4);
 }
@@ -940,6 +944,10 @@ export function SetGraphDensity(arg1) {
 
 export function SetGraphFocus(arg1, arg2, arg3) {
   return window['go']['app']['App']['SetGraphFocus'](arg1, arg2, arg3);
+}
+
+export function SetGraphPath(arg1, arg2) {
+  return window['go']['app']['App']['SetGraphPath'](arg1, arg2);
 }
 
 export function SetGraphView(arg1) {
