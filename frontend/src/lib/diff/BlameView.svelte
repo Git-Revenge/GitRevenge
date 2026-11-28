@@ -1,8 +1,9 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import Icon from '../ui/Icon.svelte'
   import { Blame, BlameDownloading, BlameNeeds, BlameStep, BlameTrack, CancelDownload, DownloadFiles, FileDiff } from '../../../wailsjs/go/app/App.js'
   import VersionTrack from './VersionTrack.svelte'
-  import { blameBackward, blameForward, changedLines, fillBlame, textLines, trackSteps, type Blamed, type Step } from './track'
+  import { ageBucket, blameBackward, blameForward, changedLines, changeRows, fillBlame, loadWay, saveWay, stepIndex, textLines, trackSteps, type Blamed, type ReadWay, type Step } from './track'
   import type { git } from '../../../wailsjs/go/models'
   import { errorText } from '../errors'
   import Busy from '../ui/Busy.svelte'
@@ -69,7 +70,8 @@
   let at = $state(0)
   let newest = $derived(steps.length === 0 || at === steps.length - 1)
   /** An older version, as read: its lines and the ones it changed, or why there's no text. */
-  type Older = { at: number; kind: string; lines: string[]; tokens: Token[][]; changed: Set<number>; first: number }
+  type Older = { at: number; kind: string; lines: string[]; tokens: Token[][]; changed: Set<number>; first: number; oldLines: string[]; blocks: Block[] }
+  type Block = { oldStart: number; oldEnd: number; newStart: number; newEnd: number }
   let older = $state<Older | null>(null)
   /** Set once the person moves along the track, so a step brings its change into view, and
    * opening the view still goes to the line asked for. */
@@ -96,7 +98,7 @@
         const kind = res.contents.kind
         const text = kind === 'text' ? res.contents.new.text : ''
         const changed = changedLines(res.diff?.blocks ?? [])
-        const view: Older = { at: i, kind, lines: textLines(text), tokens: highlightLines(text, null), changed, first: changed.size ? Math.min(...changed) : -1 }
+        const view: Older = { at: i, kind, lines: textLines(text), tokens: highlightLines(text, null), changed, first: changed.size ? Math.min(...changed) : -1, oldLines: kind === 'text' ? textLines(res.contents.old.text) : [], blocks: res.diff?.blocks ?? [] }
         blocksOf.set(s.id, res.diff?.blocks ?? [])
         older = view
         olderBlame = kind === 'text' ? (blameOf.get(s.id) ?? null) : null
@@ -108,6 +110,43 @@
     } finally {
       reading = false
     }
+  }
+
+  // Three ways to read a version (#1080), the choice kept for each repository.
+  let way = $state<ReadWay>(loadWay(untrack(() => path), localStorage))
+  function setWay(w: ReadWay) {
+    way = w
+    saveWay(path, w, localStorage)
+  }
+
+  /** The newest version against the one before, for What changed there. Older versions
+   * carry theirs. */
+  let newestDiff = $state<{ id: string; before: string[]; after: string[]; blocks: Block[] } | null>(null)
+  $effect(() => {
+    const s = steps.at(-1)
+    if (way !== 'changes' || !newest || !s || newestDiff?.id === s.id) return
+    const [f, r] = [file, rev]
+    void FileDiff(path, s.id ? 'commit' : 'worktree', s.id, file, '', false, 'lines')
+      .then((res) => {
+        if (f !== file || r !== rev || res.contents.kind !== 'text') return
+        newestDiff = { id: s.id, before: textLines(res.contents.old.text), after: textLines(res.contents.new.text), blocks: res.diff?.blocks ?? [] }
+      })
+      .catch(() => {})
+  })
+
+  /** What changed, at the step shown: its lines, with the ones it took out put back. */
+  let changes = $derived.by(() => {
+    if (way !== 'changes') return null
+    if (newest) return newestDiff ? changeRows(newestDiff.before, newestDiff.after, newestDiff.blocks) : null
+    return older?.kind === 'text' ? changeRows(older.oldLines, older.lines, older.blocks) : null
+  })
+
+  /** How old each line is: versions back from the one shown, as How old washes it. */
+  let indexOf = $derived(stepIndex(steps))
+  function ageOf(l: Blamed | undefined): string {
+    if (!l) return ''
+    const i = uncommitted(l.commit) ? indexOf.get('') : indexOf.get(l.commit)
+    return ageBucket(i === undefined ? undefined : at - i)
   }
 
   // Who wrote each line at an older version (#1079): read once the handle has settled, never
@@ -220,6 +259,7 @@
     blameOf.clear()
     blocksOf.clear()
     olderBlame = null
+    newestDiff = null
     clearTimeout(settleTimer)
     renamedFrom = ''
     older = null
@@ -299,6 +339,16 @@
   const scrollHere = (row: HTMLElement) => row.scrollIntoView({ block: 'center' })
 </script>
 
+{#snippet ageKey()}
+  <p class="key" aria-label="How old: the key">
+    <span>Last changed:</span>
+    <span><span class="swatch age-now"></span>in this version</span>
+    <span><span class="swatch age-recent"></span>1 to 3 versions back</span>
+    <span><span class="swatch age-while"></span>4 to 10 back</span>
+    <span><span class="swatch age-old"></span>older</span>
+  </p>
+{/snippet}
+
 {#snippet gutter(l: Blamed, start: boolean)}
   <td class="gutter" style:border-left-color={uncommitted(l.commit) ? 'transparent' : laneVar(colorOf[l.commit] ?? 0)}>
     {#if start}
@@ -333,7 +383,7 @@
     <button class="btn quiet" onclick={() => onOpen({ mode: 'history', file })}>History</button>
   </header>
   {#if steps.length > 1 && !ask}
-    <VersionTrack {steps} {at} onAt={goTo} {renamedFrom} onCarryOn={carryOn} {onReveal} />
+    <VersionTrack {steps} {at} onAt={goTo} {renamedFrom} onCarryOn={carryOn} {onReveal} {way} onWay={setWay} />
   {/if}
   <div class="body code-ground">
     {#if ask}
@@ -351,6 +401,23 @@
           {/if}
         </div>
       </div>
+    {:else if changes}
+      <!-- What changed (#1080): the version against the one before, what it took out struck
+           through where it was. + and − say which, not colour alone. -->
+      <table class="changes" class:wrap={wrap.on}>
+        <tbody>
+          {#each changes as row, k (k)}
+            {@const toks = row.at < 0 ? undefined : newest ? tokens[row.at] : older?.tokens[row.at]}
+            <tr class={row.kind}>
+              <td class="sign" aria-hidden="true">{row.kind === 'add' ? '+' : row.kind === 'del' ? '−' : ''}</td>
+              <td class="num">{row.num || ''}</td>
+              <td class="code"
+                >{#if row.kind === 'del'}<span class="visually-hidden">Taken out:&nbsp;</span>{row.text}{:else if toks}{#each toks as t, j (j)}<span class={t.cls}>{t.text}</span>{/each}{:else}{row.text}{/if}</td
+              >
+            </tr>
+          {/each}
+        </tbody>
+      </table>
     {:else if !newest}
       {#if !older}
         <Loading />
@@ -367,13 +434,13 @@
       {:else}
         <!-- An older version: its text, the lines it changed, and once the handle has settled,
              who wrote each line (#1079). -->
-        {#if !olderBlame && older.at === at}<p class="reading" role="status">Reading who wrote each line…</p>{/if}
+        {#if !olderBlame && older.at === at}<p class="reading" role="status">Reading who wrote each line…</p>{:else if way === 'age'}{@render ageKey()}{/if}
         <table class:wrap={wrap.on} class:dim={older.at !== at}>
           <tbody>
             {#each older.lines as text, i (i)}
               {@const changed = older.changed.has(i)}
               {@const b = olderBlame?.[i]}
-              <tr class:changed class:start={!!b && (i === 0 || olderBlame?.[i - 1]?.commit !== b.commit)} {@attach stepped && i === older.first ? toChange(older.at) : undefined}>
+              <tr class={way === 'age' ? 'age-' + ageOf(b) : ''} class:changed={changed && way !== 'age'} class:start={!!b && (i === 0 || olderBlame?.[i - 1]?.commit !== b.commit)} {@attach stepped && i === older.first ? toChange(older.at) : undefined}>
                 {#if b}{@render gutter(b, i === 0 || olderBlame?.[i - 1]?.commit !== b.commit)}{:else}<td class="gutter"></td>{/if}
                 <td class="num">{i + 1}</td>
                 <td class="code"
@@ -387,6 +454,7 @@
     {:else if !lines}
       <Loading />
     {:else}
+      {#if way === 'age' && steps.length > 1}{@render ageKey()}{/if}
       <table class:wrap={wrap.on}>
         <tbody>
           {#each lines as l, i (i)}
@@ -394,7 +462,8 @@
             <tr
               class:start
               class:at={i + 1 === line}
-              class:changed={stepped && newestChanged.has(i)}
+              class={way === 'age' ? 'age-' + ageOf(l) : ''}
+              class:changed={stepped && way !== 'age' && newestChanged.has(i)}
               {@attach i + 1 === line ? scrollHere : stepped && i === newestFirst ? toChange(at) : undefined}
             >
               {@render gutter(l, start)}
@@ -497,6 +566,82 @@
   /* While the next step is read, the last one stays, faded, rather than blanking. */
   table.dim {
     opacity: 0.55;
+  }
+
+  /* How old (#1080): rose for what changed here and lately, sepia for a while back, nothing
+     for older. The key says which is which in words. */
+  tr.age-now td.code,
+  tr.age-now td.num,
+  .swatch.age-now {
+    background: color-mix(in srgb, var(--accent) 38%, transparent);
+  }
+
+  tr.age-recent td.code,
+  tr.age-recent td.num,
+  .swatch.age-recent {
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+
+  tr.age-while td.code,
+  tr.age-while td.num,
+  .swatch.age-while {
+    background: color-mix(in srgb, var(--accent-c) 22%, transparent);
+  }
+
+  .swatch {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 6px;
+    vertical-align: -1px;
+    border-radius: var(--r-xs, 2px);
+  }
+
+  .swatch.age-old {
+    border: 1px solid var(--paper-edge);
+    box-sizing: border-box;
+  }
+
+  .key {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    margin: 0;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    background: var(--paper-warm);
+  }
+
+  /* What changed: + and − in their own column, what was taken out struck through. */
+  table.changes .sign {
+    width: 18px;
+    text-align: center;
+    user-select: none;
+  }
+
+  table.changes tr.add td {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+
+  table.changes tr.add .sign {
+    color: var(--link);
+  }
+
+  table.changes tr.del td {
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+  }
+
+  table.changes tr.del .code {
+    color: var(--ink-mute);
+    text-decoration: line-through;
+  }
+
+  table.changes tr.del .sign {
+    color: var(--ink-mute);
   }
 
   .reading {

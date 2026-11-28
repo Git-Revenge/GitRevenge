@@ -145,3 +145,42 @@ test.describe('who wrote each line, at any version', () => {
     expect(await calls(page, 'BlameStep')).toHaveLength(1)
   })
 })
+
+// #1080: What changed, and How old, beside Who wrote it; the choice kept for the repository.
+test.describe('three ways to read a version', () => {
+  const diffOf = (before: string, after: string, blocks: object[]) => ({ ...step(after, blocks), contents: { ...step(after, blocks).contents, old: { exists: true, text: before, size: before.length } } })
+  const ways = (page: Page) => track(page).getByRole('group', { name: 'How to read this version' })
+
+  test('What changed shows what the version took out, struck through, and what it added', async ({ page }) => {
+    const s = scenario({}, { [C]: diffOf('one\ntwo\n', 'one\nTWO\nthree\n', [{ oldStart: 1, oldEnd: 2, newStart: 1, newEnd: 3 }]), [B]: diffOf('one\n', 'one\ntwo\n', [{ oldStart: 1, oldEnd: 1, newStart: 1, newEnd: 2 }]) })
+    await open(page, 'blame', { ...s, responses: { ...s.responses, Blame: [blame(A, 'one'), blame(C, 'TWO'), blame(C, 'three')] } })
+    await expect(code(page)).toHaveCount(3)
+    await ways(page).getByRole('button', { name: 'What changed' }).click()
+    const rows = page.locator('table.changes tr')
+    await expect(rows).toHaveCount(4)
+    await expect(page.locator('table.changes td.sign')).toHaveText(['', '−', '+', '+'])
+    await expect(page.locator('table.changes tr.del td.code')).toHaveText('Taken out: two')
+    await expect(page.locator('table.changes tr.add td.code')).toHaveText(['TWO', 'three'])
+    // An older version, the same way.
+    await track(page).getByRole('button', { name: 'The version before' }).click()
+    await expect(page.locator('table.changes td.sign')).toHaveText(['', '+'])
+    await expect(page.locator('table.changes td.code')).toHaveText(['one', 'two'])
+  })
+
+  test('How old washes each line by how many versions back it changed, with a key', async ({ page }) => {
+    await open(page, 'blame', scenario({}))
+    await expect(code(page)).toHaveCount(3)
+    await ways(page).getByRole('button', { name: 'How old' }).click()
+    await expect(page.getByLabel('How old: the key')).toContainText('in this version')
+    await expect(page.locator('.body tbody tr')).toHaveClass([/age-recent/, /age-recent/, /age-now/])
+  })
+
+  test('the way is kept for the repository', async ({ page }) => {
+    await open(page, 'blame', scenario({}))
+    await ways(page).getByRole('button', { name: 'How old' }).click()
+    await expect(ways(page).getByRole('button', { name: 'How old' })).toHaveAttribute('aria-pressed', 'true')
+    await open(page, 'blame', scenario({}))
+    await expect(ways(page).getByRole('button', { name: 'How old' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(ways(page).getByRole('button', { name: 'Who wrote it' })).toHaveAttribute('aria-pressed', 'false')
+  })
+})
