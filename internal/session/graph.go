@@ -103,6 +103,10 @@ type graphLoader struct {
 	// changed is closed and replaced whenever the graph advances, waking waiters.
 	changed chan struct{}
 	cancel  context.CancelFunc
+	// cancelAfter ends what a load starts that may outlast it: the labels and the whole
+	// history's count under a path focus. The next reload or stop calls it; the load's own
+	// cancel is gone once it has ended.
+	cancelAfter context.CancelFunc
 	// wg tracks load goroutines so stop can wait for their git processes to exit.
 	wg sync.WaitGroup
 }
@@ -631,8 +635,13 @@ func (l *graphLoader) reload() {
 	if l.cancel != nil {
 		l.cancel()
 	}
+	if l.cancelAfter != nil {
+		l.cancelAfter()
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	l.cancel = cancel
+	after, cancelAfter := context.WithCancel(context.Background())
+	l.cancelAfter = cancelAfter
 	g := graph.New()
 	if l.current == nil {
 		l.current = g
@@ -725,7 +734,7 @@ func (l *graphLoader) reload() {
 			}
 			if focus.Path != "" && err == nil {
 				l.wg.Add(1)
-				go l.labelPath(ctx, g, idx, focus.Path)
+				go l.labelPath(after, g, idx, focus.Path)
 			}
 			refsCh <- refResult{idx, err}
 		}()
@@ -779,12 +788,12 @@ func (l *graphLoader) reload() {
 			l.wg.Add(1)
 			go func() {
 				defer l.wg.Done()
-				n, err := l.repo.CountCommits(ctx, whole)
+				n, err := l.repo.CountCommits(after, whole)
 				if err != nil {
 					return
 				}
 				l.mu.Lock()
-				if ctx.Err() == nil {
+				if after.Err() == nil {
 					l.outOf = n
 				}
 				l.mu.Unlock()
@@ -994,6 +1003,10 @@ func (l *graphLoader) stop() {
 	if l.cancel != nil {
 		l.cancel()
 		l.cancel = nil
+	}
+	if l.cancelAfter != nil {
+		l.cancelAfter()
+		l.cancelAfter = nil
 	}
 	l.mu.Unlock()
 	l.wg.Wait()

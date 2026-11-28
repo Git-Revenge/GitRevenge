@@ -281,3 +281,39 @@ func TestPathFocusLabelsBranchesWhereTheyLastTouchedIt(t *testing.T) {
 		t.Errorf("labels without a path: %v", got)
 	}
 }
+
+// #1061: a path focus's labels wait for its rows, and outlive its load. When the next focus
+// replaced a load that had finished, they waited for the old graph's rows for ever, and
+// closing the repository waited for them (a CI run timed out at ten minutes).
+func TestPathFocusLabelsEndWithTheirLoad(t *testing.T) {
+	m, _ := newManager(t)
+	fx := gittest.New(t)
+	fx.CommitFile("a/x.txt", "x\n", "c1: a")
+	fx.Branch("side")
+	fx.CommitFile("b/y.txt", "y\n", "s1: b")
+	fx.Checkout("main")
+	fx.CommitFile("b/z.txt", "z\n", "c2: b")
+	r, err := m.Open(context.Background(), fx.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitGraph(t, r, 3)
+	for i := range 10 {
+		if i%2 == 0 {
+			r.SetFocus(Focus{Path: "a/"})
+		} else {
+			r.SetFocus(Focus{Branch: "side", Path: "a/"})
+		}
+		waitGraph(t, r, 1)
+	}
+	closed := make(chan struct{})
+	go func() {
+		m.CloseAll()
+		close(closed)
+	}()
+	select {
+	case <-closed:
+	case <-time.After(20 * time.Second):
+		t.Fatal("closing the repository waited on a path focus's labels")
+	}
+}
