@@ -436,3 +436,12 @@ test.describe("a remote's header", () => {
     await expect(page.locator('.row.ref', { hasText: 'one' }).locator('.chip')).toHaveText(['upstream'])
   })
 })
+
+// #975: branches named for a fix are Bug branches, marked as Feature's are, and so is their folder.
+test('a fix folder of Bug branches is marked as one', async ({ page }) => {
+  const refs = [branch('main', { branchKind: 'trunk', head: true }), branch('fix/crash', { branchKind: 'bug' }), branch('fix/offline-map', { branchKind: 'bug' }), branch('feature/one', { branchKind: 'feature' })]
+  await open(page, 'sidebar', { responses: { Refs: refs, ShowingHidden: false } })
+  await expect(page.locator('.row.folder', { hasText: 'fix' }).getByTitle('Bug')).toBeVisible()
+  // Each kind has its own mark: the lone Feature branch keeps the sprout.
+  await expect(page.locator('.row.ref', { hasText: 'feature/one' }).getByTitle('Feature')).toBeVisible()
+})

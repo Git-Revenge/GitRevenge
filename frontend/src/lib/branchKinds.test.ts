@@ -16,6 +16,15 @@ describe('kindFilterRows', () => {
     ])
   })
 
+  // #975: Bug, after Feature, in a colour and icon of its own.
+  it('lists Bug after Feature, with its own icon and colour', () => {
+    const rows = kindFilterRows([{ branchKind: 'bug' }, { branchKind: 'feature' }], [])
+    expect(rows.map((r) => r.kind)).toEqual(['feature', 'bug'])
+    expect(kindInfo('bug')).toEqual({ label: 'Bug', icon: 'bug', token: '--accent-c' })
+    const tokens = rows.map((r) => r.token)
+    expect(new Set(tokens).size).toBe(tokens.length)
+  })
+
   it('ignores a kind it does not know', () => {
     expect(kindFilterRows([{ branchKind: 'nightly' }], ['nightly'])).toEqual([])
   })

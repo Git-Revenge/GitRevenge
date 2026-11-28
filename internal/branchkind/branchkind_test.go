@@ -48,6 +48,16 @@ func TestDefaults(t *testing.T) {
 		"feat/deep/name":                Feature,
 		"feature":                       None,
 		"my-feature":                    None,
+		"fix/crash":                     Bug,
+		"fixes/42":                      Bug,
+		"bug/offline-map":               Bug,
+		"bugs/x":                        Bug,
+		"bugfix/deep/name":              Bug,
+		"bugfixes/y":                    Bug,
+		"fix":                           None,
+		"prefix/x":                      None,
+		// A hotfix is cut for a release: it stays Release.
+		"hotfix/gauge": Release,
 	}
 	for name, want := range cases {
 		if got := r.Kind(name); got != want {

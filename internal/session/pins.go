@@ -14,7 +14,7 @@ import (
 const maxPins = 2
 
 // releaseDocsTips stops a Docs branch muting a lane it shares with real work: a Docs tip that
-// an ordinary or Feature branch also points at takes that branch's kind instead. Ordinary
+// an ordinary, Feature or Bug branch also points at takes that branch's kind instead. Ordinary
 // branches aren't among the refs the patterns name, so this reads them all, but only when
 // there's a Docs tip to check.
 func releaseDocsTips(ctx context.Context, g *git.Repo, rules branchkind.Rules, remotes []string, visible func(string) bool, tips map[string]branchkind.Kind) {
@@ -31,7 +31,7 @@ func releaseDocsTips(ctx context.Context, g *git.Repo, rules branchkind.Rules, r
 	}
 	for line := range strings.Lines(out) {
 		ref, commit, ok := strings.Cut(strings.TrimSpace(line), " ")
-		if !ok || tips[commit] != branchkind.Docs && tips[commit] != branchkind.Feature {
+		if !ok || tips[commit] != branchkind.Docs && tips[commit] != branchkind.Feature && tips[commit] != branchkind.Bug {
 			continue
 		}
 		name, isLocal := strings.CutPrefix(ref, "refs/heads/")
@@ -49,9 +49,9 @@ func releaseDocsTips(ctx context.Context, g *git.Repo, rules branchkind.Rules, r
 			if tips[commit] == branchkind.Docs {
 				delete(tips, commit)
 			}
-		case branchkind.Feature:
+		case branchkind.Feature, branchkind.Bug:
 			if tips[commit] == branchkind.Docs {
-				tips[commit] = branchkind.Feature
+				tips[commit] = rules.Kind(name)
 			}
 		}
 	}
