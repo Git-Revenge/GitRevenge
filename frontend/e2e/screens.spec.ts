@@ -2240,9 +2240,9 @@ test.describe('before the first load has answered', () => {
         expect(await theBar(page).evaluate((e) => e.scrollWidth - e.clientWidth)).toBe(0)
         expect(await page.locator('.graph-tools .status').evaluate((e) => e.scrollWidth - e.clientWidth)).toBe(0)
       }
-      const at = async (page: Page, barWidth: number) => {
+      const at = async (page: Page, barWidth: number, focus?: object) => {
         await page.setViewportSize({ width: 1900, height: 700 })
-        await open(page, 'repoView', scenario)
+        await open(page, 'repoView', focus ? { ...scenario, responses: { ...scenario.responses, GraphFocus: focus, GraphOutOf: 1410 } } : scenario)
         await expect(page.getByRole('button', { name: 'Kinds' })).toBeVisible()
         // The sidebar and the right panel take a fixed share, so size the window for the bar.
         const spare = 1900 - (await theBar(page).evaluate((e) => e.clientWidth))
@@ -2255,6 +2255,25 @@ test.describe('before the first load has answered', () => {
         await expect(page.getByText('411 commits')).toBeVisible()
         await expect(page.getByRole('combobox', { name: 'Search commits' })).toHaveAttribute('placeholder', 'Search message, author or SHA')
         for (const name of ['Undo', 'Redo', 'Fetch', 'Pull', 'Push']) expect(await worded(page, name)).toBe(true)
+        await oneLine(page)
+      })
+
+      // #1072: the focus chip counts. Its name was cut, and the count with it, where the bar
+      // had room for everything but the chip.
+      test('with a focus, the chip’s room is counted: the count steps aside, and the name shows whole', async ({ page }) => {
+        await at(page, 1160, { branch: '', stack: false, path: 'src/alerts/' })
+        await expect(page.locator('.focus-name')).toHaveText('Focused on src/alerts/')
+        await expect(page.getByRole('combobox', { name: 'Search commits' })).toHaveAttribute('placeholder', 'Search 411 commits')
+        expect(await page.locator('.focus-name').evaluate((e) => e.scrollWidth - e.clientWidth)).toBe(0)
+        await oneLine(page)
+      })
+
+      test('with a focus and less room, the chip keeps its icon and the search becomes one', async ({ page }) => {
+        await at(page, 900, { branch: 'feature/offline-cache', stack: false, path: 'src/alerts/' })
+        await expect(page.locator('.focus')).toBeVisible()
+        await expect(page.locator('.focus-name')).toHaveCount(0)
+        await expect(page.getByRole('button', { name: 'Search commits' })).toBeVisible()
+        expect(await worded(page, 'Undo')).toBe(true)
         await oneLine(page)
       })
 
