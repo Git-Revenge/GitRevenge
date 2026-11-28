@@ -1,6 +1,8 @@
 <script lang="ts">
   import Icon from '../ui/Icon.svelte'
-  import { Blame, BlameDownloading, BlameNeeds, CancelDownload, DownloadFiles } from '../../../wailsjs/go/app/App.js'
+  import { Blame, BlameDownloading, BlameNeeds, BlameTrack, CancelDownload, DownloadFiles, FileDiff } from '../../../wailsjs/go/app/App.js'
+  import VersionTrack from './VersionTrack.svelte'
+  import { changedLines, textLines, trackSteps, type Step } from './track'
   import type { git } from '../../../wailsjs/go/models'
   import { errorText } from '../errors'
   import Busy from '../ui/Busy.svelte'
@@ -59,6 +61,103 @@
     if (lang && f === file) tokens = highlightLines(text, lang)
   }
 
+  // The track through the file's versions (#1078). The newest step is the blame above; any
+  // other shows that version's text, and what it changed, from FileDiff.
+  let steps = $state<Step[]>([])
+  let renamedFrom = $state('')
+  let at = $state(0)
+  let newest = $derived(steps.length === 0 || at === steps.length - 1)
+  /** An older version, as read: its lines and the ones it changed, or why there's no text. */
+  type Older = { at: number; kind: string; lines: string[]; tokens: Token[][]; changed: Set<number>; first: number }
+  let older = $state<Older | null>(null)
+  /** Set once the person moves along the track, so a step brings its change into view, and
+   * opening the view still goes to the line asked for. */
+  let stepped = $state(false)
+  let want = -1
+  let reading = false
+
+  /** Reads the step wanted, and once it's in, the one wanted since: while dragging, only the
+   * latest is read. */
+  async function readSteps() {
+    if (reading) return
+    reading = true
+    try {
+      while (want >= 0 && want < steps.length - 1 && older?.at !== want) {
+        const i = want
+        const s = steps[i]
+        const [f, r] = [file, rev]
+        const res = await FileDiff(path, 'commit', s.id, file, '', false, 'lines').catch((err) => {
+          session.error = errorText(err)
+          return null
+        })
+        if (f !== file || r !== rev || !res) return
+        if (i !== want) continue
+        const kind = res.contents.kind
+        const text = kind === 'text' ? res.contents.new.text : ''
+        const changed = changedLines(res.diff?.blocks ?? [])
+        const view: Older = { at: i, kind, lines: textLines(text), tokens: highlightLines(text, null), changed, first: changed.size ? Math.min(...changed) : -1 }
+        older = view
+        const lang = await languageFor(file)
+        // older is a proxy of view now, never the same object: the step says it's still this one.
+        if (lang && older?.at === i && f === file && r === rev) older = { ...view, tokens: highlightLines(text, lang) }
+      }
+    } finally {
+      reading = false
+    }
+  }
+
+  function goTo(i: number) {
+    if (!steps.length) return
+    at = Math.max(0, Math.min(steps.length - 1, i))
+    stepped = true
+    want = at
+    if (!newest) void readSteps()
+  }
+
+  /** The lines the newest step changed: the newest commit's, or those not committed yet. */
+  let newestChanged = $derived.by(() => {
+    const s = steps.at(-1)
+    // Made afresh each time and never changed after: nothing watches it change.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+    const out = new Set<number>()
+    if (!s || !lines) return out
+    lines.forEach((l, i) => {
+      if (s.id ? l.commit === s.id : uncommitted(l.commit)) out.add(i)
+    })
+    return out
+  })
+  let newestFirst = $derived(newestChanged.size ? Math.min(...newestChanged) : -1)
+
+  /** Brings a step's change into view, once for each step. */
+  const toChange = (step: number) => (row: HTMLElement) => {
+    void step
+    row.scrollIntoView({ block: 'center' })
+  }
+
+  function carryOn() {
+    if (!renamedFrom || !steps[0]) return
+    onOpen({ mode: 'blame', file: renamedFrom, commit: `${steps[0].id}^` })
+  }
+
+  $effect(() => {
+    const [f, r] = [file, rev]
+    steps = []
+    renamedFrom = ''
+    older = null
+    stepped = false
+    want = -1
+    void BlameTrack(path, f, r)
+      .then((t) => {
+        if (f !== file || r !== rev) return
+        steps = trackSteps(t)
+        renamedFrom = t.renamedFrom
+        at = steps.length - 1
+      })
+      .catch(() => {
+        // The track is extra: blame shows without it.
+      })
+  })
+
   $effect(() => {
     const [f, r] = [file, rev]
     lines = null
@@ -105,7 +204,15 @@
   /** How many of the file's versions are missing, in words. */
   let missingText = $derived(!ask ? '' : ask.missing.length >= ask.versions ? `any of its ${ask.versions.toLocaleString()} versions` : `${ask.missing.length.toLocaleString()} of its ${ask.versions.toLocaleString()} versions`)
 
-  provideCommands(() => [wrapCommand()])
+  provideCommands(() => [
+    wrapCommand(),
+    ...(steps.length > 1
+      ? [
+          { id: 'blame.older', group: 'Blame', title: 'The version before', keywords: 'blame history older earlier previous track', shortcut: '[', run: () => goTo(at - 1) },
+          { id: 'blame.newer', group: 'Blame', title: 'The version after', keywords: 'blame history newer later next track', shortcut: ']', run: () => goTo(at + 1) },
+        ]
+      : []),
+  ])
 
   const uncommitted = (c: string) => /^0+$/.test(c)
 
@@ -125,6 +232,9 @@
     >
     <button class="btn quiet" onclick={() => onOpen({ mode: 'history', file })}>History</button>
   </header>
+  {#if steps.length > 1 && !ask}
+    <VersionTrack {steps} {at} onAt={goTo} {renamedFrom} onCarryOn={carryOn} {onReveal} />
+  {/if}
   <div class="body code-ground">
     {#if ask}
       <div class="ask" role="group" aria-label="Blame {file}?">
@@ -141,6 +251,37 @@
           {/if}
         </div>
       </div>
+    {:else if !newest}
+      {#if !older}
+        <Loading />
+      {:else if older.kind !== 'text'}
+        <p class="no-text" role="status">
+          {older.kind === 'binary' || older.kind === 'image'
+            ? 'Not text at this version: the file was binary.'
+            : older.kind === 'large'
+              ? 'Too big to show at this version.'
+              : older.kind === 'missing'
+                ? 'This version hasn’t been downloaded to this clone.'
+                : 'The file isn’t at this version.'}
+        </p>
+      {:else}
+        <!-- An older version: its text, and the lines it changed. Who wrote each line shows at
+             the newest version. -->
+        <table class:wrap={wrap.on} class:dim={older.at !== at}>
+          <tbody>
+            {#each older.lines as text, i (i)}
+              {@const changed = older.changed.has(i)}
+              <tr class:changed {@attach stepped && i === older.first ? toChange(older.at) : undefined}>
+                <td class="gutter"></td>
+                <td class="num">{i + 1}</td>
+                <td class="code"
+                  >{#if older.tokens[i]}{#each older.tokens[i] as t, k (k)}<span class={t.cls}>{t.text}</span>{/each}{:else}{text}{/if}</td
+                >
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {/if}
     {:else if !lines}
       <Loading />
     {:else}
@@ -148,7 +289,12 @@
         <tbody>
           {#each lines as l, i (i)}
             {@const start = i === 0 || lines[i - 1].commit !== l.commit}
-            <tr class:start class:at={i + 1 === line} {@attach i + 1 === line ? scrollHere : undefined}>
+            <tr
+              class:start
+              class:at={i + 1 === line}
+              class:changed={stepped && newestChanged.has(i)}
+              {@attach i + 1 === line ? scrollHere : stepped && i === newestFirst ? toChange(at) : undefined}
+            >
               <td class="gutter" style:border-left-color={uncommitted(l.commit) ? 'transparent' : laneVar(colorOf[l.commit] ?? 0)}>
                 {#if start}
                   {#if uncommitted(l.commit)}
@@ -255,6 +401,25 @@
 
   tr.at td {
     background: var(--highlight);
+  }
+
+  /* What the step shown changed (#1078). */
+  tr.changed td.code,
+  tr.changed td.num {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+
+  /* While the next step is read, the last one stays, faded, rather than blanking. */
+  table.dim {
+    opacity: 0.55;
+  }
+
+  .no-text {
+    margin: 32px auto;
+    max-width: 560px;
+    font-size: 14px;
+    color: var(--ink-mute);
+    text-align: center;
   }
 
   td {

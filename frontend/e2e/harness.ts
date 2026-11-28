@@ -252,6 +252,9 @@ const mounts = {
   async blame() {
     host.style.cssText = 'display:block;height:100vh'
     const { default: BlameView } = await import('../src/lib/diff/BlameView.svelte')
+    // [ and ] step along the track (#1078), as the app's own key handler runs them.
+    const { commands } = await import('../src/lib/commands.svelte')
+    window.addEventListener('keydown', (e) => commands.dispatch(e))
     mount(BlameView, { target: host, props: { path: '/r', file: 'a.txt', onClose: record('close'), onOpen: record('open'), onReveal: record('reveal') } })
   },
   async math() {

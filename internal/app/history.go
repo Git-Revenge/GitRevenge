@@ -34,6 +34,47 @@ func (a *App) FileHistory(path, file string) (FileHistoryResult, error) {
 	return FileHistoryResult{Commits: commits, Stop: stop}, nil
 }
 
+// BlameTrack is the blame view's track through a file's versions (#1078).
+type BlameTrack struct {
+	// Versions are the commits that changed the file, oldest first.
+	Versions []git.FileVersion `json:"versions"`
+	// RenamedFrom is what the oldest version renamed the file from, or "": the track stops
+	// there, and the view offers to carry on under the old name.
+	RenamedFrom string `json:"renamedFrom"`
+	// WorkTree says the file has changes not committed yet, a last step after the versions.
+	// It's only ever set for the work tree's blame (rev "").
+	WorkTree bool `json:"workTree"`
+}
+
+// BlameTrack lists the versions of file in rev's history ("" for HEAD, and then the work
+// tree), for the blame view's track. Each version's text and what it changed come from
+// FileDiff, DiffCommit, or DiffWorkTree for the last step. Asking for another file's track
+// stops this one, which then answers with nothing.
+func (a *App) BlameTrack(path, file, rev string) (BlameTrack, error) {
+	empty := BlameTrack{Versions: []git.FileVersion{}}
+	r, err := a.openRepo(path)
+	if err != nil {
+		return empty, err
+	}
+	ctx, done := a.latest.start("blame-track", r.Path)
+	defer done()
+	versions, err := r.Git.Versions(ctx, file, rev)
+	if errors.Is(err, context.Canceled) {
+		return empty, nil
+	}
+	if err != nil {
+		return empty, err
+	}
+	track := BlameTrack{Versions: versions}
+	if len(versions) > 0 {
+		track.RenamedFrom, _ = r.Git.RenamedAt(ctx, versions[0].ID, file)
+	}
+	if rev == "" {
+		track.WorkTree, _ = r.Git.Uncommitted(ctx, file)
+	}
+	return track, nil
+}
+
 // Blame attributes each line of file at rev ("" for the work tree) to a commit. Asking for
 // another blame stops this one, which then answers with nothing. In a partial clone it
 // downloads nothing: BlameNeeds says what it would need, and the view asks before

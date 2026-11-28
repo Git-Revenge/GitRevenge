@@ -559,6 +559,40 @@ export namespace app {
 	        this.missing = source["missing"];
 	    }
 	}
+	export class BlameTrack {
+	    versions: git.FileVersion[];
+	    renamedFrom: string;
+	    workTree: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new BlameTrack(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.versions = this.convertValues(source["versions"], git.FileVersion);
+	        this.renamedFrom = source["renamedFrom"];
+	        this.workTree = source["workTree"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class BranchLoss {
 	    branch: string;
 	    upstream: string;
@@ -4538,6 +4572,30 @@ export namespace git {
 	        this.binary = source["binary"];
 	        this.caseClash = source["caseClash"];
 	        this.caseTwin = source["caseTwin"];
+	    }
+	}
+	export class FileVersion {
+	    id: string;
+	    author: string;
+	    time: number;
+	    subject: string;
+	    added: number;
+	    removed: number;
+	    binary?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new FileVersion(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.author = source["author"];
+	        this.time = source["time"];
+	        this.subject = source["subject"];
+	        this.added = source["added"];
+	        this.removed = source["removed"];
+	        this.binary = source["binary"];
 	    }
 	}
 	export class FolderCount {

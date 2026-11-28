@@ -43,6 +43,8 @@ export function BlameDownloading(arg1:string,arg2:string,arg3:string):Promise<Ar
 
 export function BlameNeeds(arg1:string,arg2:string,arg3:string):Promise<app.BlameNeeds>;
 
+export function BlameTrack(arg1:string,arg2:string,arg3:string):Promise<app.BlameTrack>;
+
 export function BranchAction(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
 export function BranchCaseTwin(arg1:string,arg2:string,arg3:string):Promise<string>;
