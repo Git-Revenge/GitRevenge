@@ -75,7 +75,7 @@ Further back than two months it says the month, and further back than a year, th
 ![A history search under way: seven commits found, every one since July 2026 searched, and Stop](../img/history-search-running-light.webp#gh-light-mode-only)
 ![A history search under way: seven commits found, every one since July 2026 searched, and Stop](../img/history-search-running-dark.webp#gh-dark-mode-only)
 
-Tidewater's 1,500 commits take under half a second. A big history takes longer: on the Linux kernel, 1.5 million commits, the whole history takes about six minutes, where `git log -S` in a terminal takes about twenty, because the app searches several stretches of history at once. After five seconds, if the search has more than a minute to go, the line says how long the whole history will take and offers to narrow it. **The last year** searches back a year (on the kernel, under a minute), and **Only in a folder…** opens the options at **Only in**.
+Tidewater's 1,500 commits take under half a second. A big history takes longer: on the Linux kernel, 1.5 million commits, the whole history takes about six minutes, where `git log -S` in a terminal takes about twenty, because the app searches several stretches of history at once. After five seconds, if the search has more than a minute to go, the line says how long the whole history will take and offers to narrow it. **The last year** searches back a year (on the kernel, under a minute), and **Only in a folder…** opens the options at **Only in**. Under **Only these**, the graph shows what's been found a little behind the search: each time it catches up, it reads back only as far as the search has got, so on the kernel it's ten or twenty seconds behind rather than waiting for the end.
 
 ### Its options
 

@@ -3,6 +3,7 @@ package app
 import (
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -256,4 +257,33 @@ func TestHistorySearchSaysWhyItEndedEarly(t *testing.T) {
 	if st := historyDone(t, a, tab.Path); !strings.HasPrefix(st.History.Problem, "This is a partial clone") {
 		t.Fatalf("partial clone = %+v", st.History)
 	}
+}
+
+// #995: while a search runs, a reload under Only these stops where the search has got to,
+// so the graph follows it; once it has ended, a reload walks everything again.
+func TestAReloadUnderARunningSearchStopsAtItsEdge(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	fx, path := unitsTab(t, a)
+	r, err := a.openRepo(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Newest first: other.md, notes (km/h), knots (took it out), readme, pins (km/h), wind (km/h).
+	at := func(n int) string { return strings.TrimSpace(fx.Git("rev-parse", "HEAD~"+strconv.Itoa(n))) }
+	h := newHistoryRun(git.HistoryOptions{Text: "km/h"})
+	for _, n := range []int{1, 2, 4, 5} {
+		h.found[at(n)] = struct{}{}
+	}
+	// Searched down to the readme: the two found below it were found by a chunk finished early.
+	h.running, h.after = true, at(3)
+	a.trailerFilters.set(r.Path, &repoFilter{only: true, history: h})
+	a.applyFilter(r, true)
+	graphRows(t, a, path, 2)
+
+	h.mu.Lock()
+	h.running = false
+	h.mu.Unlock()
+	a.applyFilter(r, true)
+	graphRows(t, a, path, 4)
 }
