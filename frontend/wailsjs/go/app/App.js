@@ -858,6 +858,10 @@ export function Restack(arg1, arg2) {
   return window['go']['app']['App']['Restack'](arg1, arg2);
 }
 
+export function RestoreBlock(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['app']['App']['RestoreBlock'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
 export function RestoreGitConfig(arg1, arg2) {
   return window['go']['app']['App']['RestoreGitConfig'](arg1, arg2);
 }
@@ -866,12 +870,20 @@ export function RestoreIgnoreRule(arg1, arg2) {
   return window['go']['app']['App']['RestoreIgnoreRule'](arg1, arg2);
 }
 
+export function RestorePlan(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['RestorePlan'](arg1, arg2, arg3, arg4);
+}
+
 export function RestoreSession() {
   return window['go']['app']['App']['RestoreSession']();
 }
 
 export function RestoreStack(arg1, arg2, arg3) {
   return window['go']['app']['App']['RestoreStack'](arg1, arg2, arg3);
+}
+
+export function RestoreVersion(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['RestoreVersion'](arg1, arg2, arg3, arg4);
 }
 
 export function RulerMarks(arg1) {
@@ -1260,6 +1272,10 @@ export function UndoDiff(arg1, arg2) {
 
 export function UndoIgnore(arg1, arg2) {
   return window['go']['app']['App']['UndoIgnore'](arg1, arg2);
+}
+
+export function UndoRestore(arg1, arg2) {
+  return window['go']['app']['App']['UndoRestore'](arg1, arg2);
 }
 
 export function UndoState(arg1) {

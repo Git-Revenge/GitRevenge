@@ -46,6 +46,9 @@ type App struct {
 	patches patchSets
 	// applied holds each repository's last diff applied, for its Undo (#1024).
 	applied appliedDiffs
+	// restored holds each repository's last version restored from the blame view, for its
+	// Undo (#1082).
+	restored restores
 	// versionCap, when set, stands in for maxVersionCommits in tests (#1041).
 	versionCap int
 	// promptHook answers credential prompts in tests instead of the UI.

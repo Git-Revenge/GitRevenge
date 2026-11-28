@@ -16,6 +16,7 @@
     onReveal,
     way = 'who',
     onWay,
+    onRestore,
   }: {
     steps: Step[]
     /** The step shown. */
@@ -30,6 +31,8 @@
     /** How the version is read (#1080), and how to read it another way. */
     way?: ReadWay
     onWay?: (way: ReadWay) => void
+    /** Restores the version shown into the working tree (#1082): offered for a commit. */
+    onRestore?: () => void
   } = $props()
 
   let inks = $derived(authorInks(steps))
@@ -59,6 +62,7 @@
           <button class="sha" onclick={() => onReveal?.(step.id)} title="Show in graph">{step.id.slice(0, 7)}</button>
           · {step.author} · {formatTime(step.time)} · <span class="mono">{churnText(step, at === 0)}</span>
         </span>
+        {#if onRestore && !step.binary}<button class="btn sm quiet restore" onclick={onRestore} title="Write this version into the working tree, as a change to commit or throw away"><Icon name="history" size={13} />Restore this version</button>{/if}
       {/if}
       {#if onWay}
         <div class="ways" role="group" aria-label="How to read this version">

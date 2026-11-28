@@ -437,13 +437,19 @@ export function ResolveConflict(arg1:string,arg2:string,arg3:string):Promise<voi
 
 export function Restack(arg1:string,arg2:string):Promise<void>;
 
+export function RestoreBlock(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number,arg6:number,arg7:Array<string>):Promise<app.Restored>;
+
 export function RestoreGitConfig(arg1:string,arg2:string):Promise<app.ConfigDoc>;
 
 export function RestoreIgnoreRule(arg1:string,arg2:git.IgnoreLine):Promise<void>;
 
+export function RestorePlan(arg1:string,arg2:string,arg3:string,arg4:string):Promise<app.RestorePlan>;
+
 export function RestoreSession():Promise<app.SessionState>;
 
 export function RestoreStack(arg1:string,arg2:Array<string>,arg3:Record<string, string>):Promise<void>;
+
+export function RestoreVersion(arg1:string,arg2:string,arg3:string,arg4:string):Promise<app.Restored>;
 
 export function RulerMarks(arg1:string):Promise<app.RulerMarks>;
 
@@ -638,6 +644,8 @@ export function UndoBisect(arg1:string):Promise<void>;
 export function UndoDiff(arg1:string,arg2:string):Promise<void>;
 
 export function UndoIgnore(arg1:string,arg2:app.IgnoreAdded):Promise<void>;
+
+export function UndoRestore(arg1:string,arg2:string):Promise<void>;
 
 export function UndoState(arg1:string):Promise<app.UndoInfo>;
 

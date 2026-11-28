@@ -30,6 +30,8 @@ export interface Scenario {
   current?: string
   /** Dispatches shortcuts to commands, as the app does. */
   commandKeys?: boolean
+  /** For the blame mount: the file's name today, when the blame is of an older name (#1082). */
+  blameWriteAs?: string
   /** The file whose diff is open in the working tree panel. */
   diffFile?: string
   /** What the diff view compares; a commit's file unless said. */

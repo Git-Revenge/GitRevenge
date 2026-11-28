@@ -89,7 +89,7 @@ test('a rename stops the track, and offers the old name', async ({ page }) => {
   const note = track(page).getByRole('note')
   await expect(note).toContainText('Before this it was lib/alerts.txt.')
   await note.getByRole('button', { name: 'Carry on under the old name' }).click()
-  expect(await events(page, 'open')).toEqual([[{ mode: 'blame', file: 'lib/alerts.txt', commit: `${A}^` }]])
+  expect(await events(page, 'open')).toEqual([[{ mode: 'blame', file: 'lib/alerts.txt', commit: `${A}^`, writeAs: 'a.txt' }]])
 })
 
 test('changes not committed yet are the last step', async ({ page }) => {
@@ -231,5 +231,58 @@ test.describe('rewind a block of lines', () => {
     await open(page, 'blame', { ...s, responses: { ...s.responses, BlameTrack: { versions, renamedFrom: '', workTree: true } } })
     await expect(code(page)).toHaveCount(3)
     await expect(page.getByRole('button', { name: /^Rewind line/ })).toHaveCount(0)
+  })
+})
+
+// #1082: restoring a version, or a block's lines, into the working tree. It asks first, and
+// Undo brings back what was there. History is never edited.
+test.describe('restore', () => {
+  const plan = { added: 1, removed: 2, uncommitted: 3 }
+  const ask = (page: Page) => page.getByRole('dialog')
+
+  test('a version: it asks first, says what changes and what isn’t committed, and Undo takes it back', async ({ page }) => {
+    const s = scenario({})
+    await open(page, 'blame', { ...s, responses: { ...s.responses, RestorePlan: plan, RestoreVersion: { id: 'restore-1' } } })
+    await expect(code(page)).toHaveCount(3)
+    await track(page).getByRole('button', { name: 'The version before' }).click()
+    await track(page).getByRole('button', { name: 'Restore this version' }).click()
+    await expect(ask(page)).toContainText(`Restore a.txt as it was at ${B.slice(0, 7)}?`)
+    await expect(ask(page)).toContainText('1 line added and 2 taken out, against the file as it is. No commit changes.')
+    await expect(ask(page).getByRole('note')).toContainText('the file has 3 changed lines you haven’t committed. Restoring replaces them; Undo brings them back.')
+    expect(await calls(page, 'RestorePlan')).toEqual([['/r', 'a.txt', B, '']])
+    await ask(page).getByRole('button', { name: 'Restore' }).click()
+    expect(await calls(page, 'RestoreVersion')).toEqual([['/r', 'a.txt', B, '']])
+    const note = page.getByRole('status').filter({ hasText: 'is as it was' })
+    await expect(note).toContainText(`a.txt is as it was at ${B.slice(0, 7)}. It’s a change in the working tree, ready to commit or throw away.`)
+    await note.getByRole('button', { name: 'Undo' }).click()
+    expect(await calls(page, 'UndoRestore')).toEqual([['/r', 'restore-1']])
+    await expect(note).toHaveCount(0)
+  })
+
+  test('a block’s lines, as an older version had them', async ({ page }) => {
+    const bv = (id: string, subject: string, lines: [string, string][]) => ({ id, author: 'Ana Cruz', time: T, subject, from: 2, to: 2, lines: lines.map(([kind, text]) => ({ kind, text })) })
+    const s = scenario({})
+    await open(page, 'blame', { ...s, responses: { ...s.responses, BlameBlock: [bv(C, 'Say it louder', [['-', 'two'], ['+', 'TWO']]), bv(B, 'Say two', [['+', 'two']])], RestoreBlock: { id: 'restore-2' } } })
+    await expect(code(page)).toHaveCount(3)
+    await page.getByRole('button', { name: 'Rewind line 2' }).click()
+    const panel = page.getByRole('complementary', { name: 'Line 2, through time' })
+    // The newest version of the lines is what's there already: nothing to put back.
+    await expect(panel.getByRole('button', { name: 'Restore these lines' })).toHaveCount(1)
+    await panel.getByRole('button', { name: 'Restore these lines' }).click()
+    await expect(ask(page)).toContainText(`Put line 2 back as it was at ${B.slice(0, 7)}?`)
+    await ask(page).getByRole('button', { name: 'Put them back' }).click()
+    expect(await calls(page, 'RestoreBlock')).toEqual([['/r', 'a.txt', '', C, 2, 2, ['two']]])
+    await expect(page.getByRole('status').filter({ hasText: 'as it was' })).toContainText(`Line 2 is as it was at ${B.slice(0, 7)}.`)
+  })
+
+  test('a version from before a rename is written under today’s name', async ({ page }) => {
+    const s = scenario({})
+    await open(page, 'blame', { ...s, blameWriteAs: 'lib/texts.txt', responses: { ...s.responses, RestorePlan: { added: 0, removed: 0, uncommitted: 0 }, RestoreVersion: { id: 'restore-3' } } })
+    await expect(code(page)).toHaveCount(3)
+    await track(page).getByRole('button', { name: 'Restore this version' }).click()
+    await expect(ask(page)).toContainText(`Restore lib/texts.txt as it was at ${C.slice(0, 7)}?`)
+    await expect(ask(page)).toContainText('the file is already as it was then')
+    await ask(page).getByRole('button', { name: 'Restore' }).click()
+    expect(await calls(page, 'RestoreVersion')).toEqual([['/r', 'lib/texts.txt', C, 'a.txt']])
   })
 })
